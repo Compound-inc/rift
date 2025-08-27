@@ -5,7 +5,6 @@ import { api } from "@/convex/_generated/api";
 import ChatInterface from "@/components/chat-interface";
 import ErrorMessage from "@/components/error-message";
 import { UIMessage } from "ai";
-import { Id } from "@/convex/_generated/dataModel";
 
 interface ChatPageProps {
   id: string;

@@ -153,9 +153,19 @@ export default function ApiKeysTab() {
       <div>
         <h2 className="text-lg font-semibold mb-2">API Keys</h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Add your own API keys to use premium models and avoid rate limits.
+          <strong>Free AI access is enabled by default!</strong> Your app uses OpenRouter API keys from environment variables for free AI access. 
+          Add your own API keys below to use premium models, avoid rate limits, or use different providers.
           Your keys are stored locally in your browser.
         </p>
+        <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-3 mb-4">
+          <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
+            <CheckCircle className="h-4 w-4" />
+            <span className="text-sm font-medium">Default Free Access Active</span>
+          </div>
+          <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+            Using OpenRouter API key from environment variables
+          </p>
+        </div>
       </div>
 
       <div className="space-y-6">

@@ -3,7 +3,6 @@
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import ChatList from "./chat-list";
-import { ConvexChat } from "@/lib/utils";
 
 // Use a default guest user ID for all users since we removed authentication
 const GUEST_USER_ID = "guest-user";

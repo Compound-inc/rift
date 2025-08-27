@@ -116,6 +116,15 @@ export const MODELS: ModelConfig[] = [
     pricing: { input: 0.075, output: 0.3 },
     isPremium: true,
   },
+  {
+    id: "openrouter:openai/gpt-oss-20b:free",
+    name: "GPT-OSS 20B (Free)",
+    provider: "openrouter",
+    description: "Open-source GPT model with 20B parameters - completely free",
+    contextWindow: 8192,
+    pricing: { input: 0, output: 0 },
+    isPremium: false,
+  },
 ];
 
 // Custom providers with model aliases
@@ -150,12 +159,38 @@ export const mistral = customProvider({
   fallbackProvider: originalMistral,
 });
 
-// Provider registry - Only Mistral uses environment variable
-// OpenAI: BYOK (not in registry - only custom provider)
-// OpenRouter: BYOK (not in registry - only custom provider)
+// OpenRouter provider with environment variable support
+export const openrouter = customProvider({
+  languageModels: {
+    "anthropic/claude-3.5-sonnet": createOpenRouter({
+      apiKey: process.env.OPENROUTER_API_KEY || "",
+    })("anthropic/claude-3.5-sonnet"),
+    "openai/gpt-4o": createOpenRouter({
+      apiKey: process.env.OPENROUTER_API_KEY || "",
+    })("openai/gpt-4o"),
+    "meta-llama/llama-3.1-405b-instruct": createOpenRouter({
+      apiKey: process.env.OPENROUTER_API_KEY || "",
+    })("meta-llama/llama-3.1-405b-instruct"),
+    "google/gemini-pro-1.5": createOpenRouter({
+      apiKey: process.env.OPENROUTER_API_KEY || "",
+    })("google/gemini-pro-1.5"),
+    "google/gemini-flash-1.5": createOpenRouter({
+      apiKey: process.env.OPENROUTER_API_KEY || "",
+    })("google/gemini-flash-1.5"),
+    "openai/gpt-oss-20b:free": createOpenRouter({
+      apiKey: process.env.OPENROUTER_API_KEY || "",
+    })("openai/gpt-oss-20b:free"),
+  },
+fallbackProvider: createOpenRouter({
+    apiKey: process.env.OPENROUTER_API_KEY || "",
+  }) as any,
+});
+
+// Provider registry - Now includes OpenRouter with environment variable support
 export const registry = createProviderRegistry(
   {
     mistral,
+    openrouter,
   },
   { separator: ":" },
 );
@@ -173,8 +208,8 @@ export function getAllProviders(): string[] {
   return Array.from(new Set(MODELS.map((model) => model.provider)));
 }
 
-// Default model configuration
-export const DEFAULT_MODEL = "openai:gpt-4o-mini";
+// Default model configuration - Changed to use OpenRouter for free access
+export const DEFAULT_MODEL = "openrouter:openai/gpt-oss-20b:free";
 
 // Create custom OpenAI provider with user's API key
 export function createCustomOpenAIProvider(apiKey: string) {
@@ -216,14 +251,14 @@ export function getLanguageModel(
   modelId: string,
   customApiKeys?: { openai?: string; openrouter?: string },
 ) {
-  // If user provided OpenAI API key and is using OpenAI model, use custom provider
+  // Priority 1: If user provided OpenAI API key and is using OpenAI model, use custom provider
   if (customApiKeys?.openai && modelId.startsWith("openai:")) {
     const customProvider = createCustomOpenAIProvider(customApiKeys.openai);
     const modelName = modelId.replace("openai:", "");
     return customProvider.languageModel(modelName as any);
   }
 
-  // If user provided OpenRouter API key and is using OpenRouter model, use custom provider
+  // Priority 2: If user provided OpenRouter API key and is using OpenRouter model, use custom provider
   if (customApiKeys?.openrouter && modelId.startsWith("openrouter:")) {
     const openrouterProvider = createCustomOpenRouterProvider(
       customApiKeys.openrouter,
@@ -232,6 +267,12 @@ export function getLanguageModel(
     return openrouterProvider.chat(modelName as any);
   }
 
-  // Otherwise use the default registry
+  // Priority 3: Use environment variable for OpenRouter if available and no custom key provided
+  if (modelId.startsWith("openrouter:") && process.env.OPENROUTER_API_KEY) {
+    const modelName = modelId.replace("openrouter:", "");
+    return openrouter.languageModel(modelName as any);
+  }
+
+  // Priority 4: Otherwise use the default registry (Mistral with env vars)
   return registry.languageModel(modelId as any);
 }

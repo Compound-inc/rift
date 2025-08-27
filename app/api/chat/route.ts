@@ -2,6 +2,7 @@ import { ChatSDKError } from "../../../lib/errors";
 import { attempt } from "../../../lib/try-catch";
 import { generateUUID, getTrailingMessageId } from "../../../lib/utils";
 import { getLanguageModel, DEFAULT_MODEL } from "../../../lib/ai/ai-providers";
+import type { UIMessage } from "ai";
 import {
   APICallError,
   appendClientMessage,
@@ -23,7 +24,7 @@ export const maxDuration = 30;
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 // Simple title generation function
-function generateSimpleTitle(message: any): string {
+function generateSimpleTitle(message: UIMessage): string {
   if (message.parts && message.parts.length > 0) {
     const firstPart = message.parts[0];
     if (firstPart.type === "text" && firstPart.text) {

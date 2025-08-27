@@ -1,6 +1,6 @@
 "use client";
 
-import { Key } from "lucide-react";
+import { Key, Globe } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { hasValidApiKey } from "@/lib/api-keys";
 import { useEffect, useState } from "react";
@@ -14,30 +14,49 @@ export default function ApiKeyIndicator({
   modelId,
   className,
 }: ApiKeyIndicatorProps) {
-  const [usingCustomKey, setUsingCustomKey] = useState(false);
+  const [keyStatus, setKeyStatus] = useState<'none' | 'custom' | 'env'>('none');
 
   useEffect(() => {
-    // Check if user has a custom API key for the current model's provider
+    // Check API key status for the current model's provider
     if (modelId.startsWith("openai:")) {
-      setUsingCustomKey(hasValidApiKey("openai"));
+      setKeyStatus(hasValidApiKey("openai") ? 'custom' : 'none');
     } else if (modelId.startsWith("openrouter:")) {
-      setUsingCustomKey(hasValidApiKey("openrouter"));
+      if (hasValidApiKey("openrouter")) {
+        setKeyStatus('custom');
+      } else {
+        // For OpenRouter, we can use environment variables
+        setKeyStatus('env');
+      }
+    } else if (modelId.startsWith("mistral:")) {
+      // Mistral uses environment variables by default
+      setKeyStatus('env');
     } else {
-      setUsingCustomKey(false);
+      setKeyStatus('none');
     }
   }, [modelId]);
 
-  if (!usingCustomKey) {
+  if (keyStatus === 'none') {
     return null;
   }
+
+  const isCustom = keyStatus === 'custom';
 
   return (
     <Badge
       variant="secondary"
       className={`border-green-200 bg-green-100 text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400 ${className}`}
     >
-      <Key className="mr-1 h-3 w-3" />
-      Using your API key
+      {isCustom ? (
+        <>
+          <Key className="mr-1 h-3 w-3" />
+          Using your API key
+        </>
+      ) : (
+        <>
+          <Globe className="mr-1 h-3 w-3" />
+          Free access
+        </>
+      )}
     </Badge>
   );
 }

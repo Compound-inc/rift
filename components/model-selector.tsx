@@ -87,7 +87,7 @@ export function ModelSelector({
                   <p className="text-xs text-red-500">API Key Required</p>
                 )}
                 {provider === "openrouter" && !hasValidApiKey("openrouter") && (
-                  <p className="text-xs text-red-500">API Key Required</p>
+                  <p className="text-xs text-green-600">Free Access Available</p>
                 )}
               </DropdownMenuLabel>
               <DropdownMenuGroup>
@@ -135,7 +135,7 @@ export function ModelSelector({
             href="/settings?tab=api-keys"
           >
             <Key className="h-3 w-3" />
-            Enter your API keys to unlock premium models
+            Manage API keys for premium access
           </Link>
         </DropdownMenuLabel>
       </DropdownMenuContent>

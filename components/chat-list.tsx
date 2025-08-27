@@ -5,7 +5,6 @@ import { DeleteChatDialog } from "./delete-chat-dialog";
 import { useOptimistic, startTransition } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { groupChatsByDate, ConvexChat } from "@/lib/utils";
 import PinChatButton from "./pin-chat-button";
 

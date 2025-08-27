@@ -8,7 +8,6 @@ import { MessageLoading } from "@/components/ui/message-loading";
 import { useScrollToBottom } from "@/hooks/use-scroll-to-bottom";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 
 import { Message, useChat } from "@ai-sdk/react";
 import { usePathname, useRouter } from "next/navigation";
