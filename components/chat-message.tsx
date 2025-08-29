@@ -81,7 +81,7 @@ export default function ChatMessage({
               <div key={key}>
                 {mode === "view" ? (
                   <ChatBubble
-                    className="max-w-[80%] justify-self-end break-words"
+                    className="max-w-[90%] justify-self-end break-words"
                     variant="sent"
                   >
                     <div className="group flex flex-col items-end gap-1">

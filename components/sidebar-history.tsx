@@ -74,45 +74,67 @@ function Content() {
     );
   }
 
-  const formatDate = (timestamp: number) => {
+  const getTimeCategory = (timestamp: number) => {
     const date = new Date(timestamp);
     const now = new Date();
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
     
-    if (diffInHours < 1) return "Just now";
-    if (diffInHours < 24) return `${Math.floor(diffInHours)}h ago`;
-    if (diffInHours < 168) return `${Math.floor(diffInHours / 24)}d ago`;
-    return date.toLocaleDateString();
+    if (diffInHours < 24) return "Hoy";
+    if (diffInHours < 168) return "Última semana";
+    if (diffInHours < 720) return "Último mes";
+    return "Antes";
   };
+
+  // Group threads by time category
+  const groupedThreads = results.reduce((groups, thread) => {
+    const category = getTimeCategory(thread.updatedAt);
+    if (!groups[category]) {
+      groups[category] = [];
+    }
+    groups[category].push(thread);
+    return groups;
+  }, {} as Record<string, ThreadItem[]>);
+
+  // Define the order of categories
+  const categoryOrder = ["Hoy", "Última semana", "Último mes", "Antes"];
 
   return (
     <ScrollArea ref={scrollRef} className="h-full">
       <div className="space-y-1 p-2">
-        {results.map((thread: ThreadItem) => {
-          const isActive = pathname === `/chat/${thread.threadId}`;
+        {categoryOrder.map((category) => {
+          const threads = groupedThreads[category];
+          if (!threads || threads.length === 0) return null;
           
           return (
-            <Link
-              key={thread.threadId}
-              href={`/chat/${thread.threadId}`}
-              className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground ${
-                isActive ? "bg-accent text-accent-foreground" : "text-muted-foreground"
-              }`}
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  {thread.pinned && (
-                    <Pin className="h-3 w-3 text-yellow-500 flex-shrink-0" />
-                  )}
-                  <span className="truncate font-medium">
-                    {thread.title}
-                  </span>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {formatDate(thread.updatedAt)}
-                </div>
+            <div key={category}>
+              <div className="px-3 py-2 text-xs font-medium text-blue-600 dark:text-blue-400 tracking-wide">
+                {category}
               </div>
-            </Link>
+              {threads.map((thread: ThreadItem) => {
+                const isActive = pathname === `/chat/${thread.threadId}`;
+                
+                return (
+                  <Link
+                    key={thread.threadId}
+                    href={`/chat/${thread.threadId}`}
+                    className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground ${
+                      isActive ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        {thread.pinned && (
+                          <Pin className="h-3 w-3 text-yellow-500 flex-shrink-0" />
+                        )}
+                        <span className="truncate font-medium">
+                          {thread.title}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
           );
         })}
         
