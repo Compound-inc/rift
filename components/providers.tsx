@@ -5,7 +5,6 @@ import { convex } from "@/lib/convex";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Suspense } from "react";
 import { Toaster } from "@/components/ui/sonner";
-import AuthCleanup from "@/components/auth-cleanup";
 
 interface ProvidersProps {
   children: React.ReactNode;
@@ -20,7 +19,6 @@ export function Providers({ children }: ProvidersProps) {
         enableSystem
         disableTransitionOnChange
       >
-        <AuthCleanup />
         <Toaster />
         <Suspense fallback={<div />}>{children}</Suspense>
       </ThemeProvider>
