@@ -6,231 +6,115 @@ import ChatWelcome from "@/components/chat-welcome";
 import { ChatMessageArea } from "@/components/ui/chat-message-area";
 import { MessageLoading } from "@/components/ui/message-loading";
 import { useScrollToBottom } from "@/hooks/use-scroll-to-bottom";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
-
-import { Message, useChat } from "@ai-sdk/react";
+import { useChat, type UIMessage } from "@ai-sdk/react";
 import { usePathname, useRouter } from "next/navigation";
 import { ChatInputContainer } from "@/components/chat-input-container";
 import { generateUUID } from "@/lib/utils";
 import { useModel } from "@/contexts/model-context";
 import { getStoredApiKeys } from "@/lib/api-keys";
 import { toast } from "sonner";
+import { useState } from "react";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
 
 export default function ChatInterface({
   id,
   initialMessages,
 }: {
   id: string;
-  initialMessages?: Message[];
+  initialMessages?: UIMessage[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const { selectedModel } = useModel();
-  
-  // Convex mutation for storing paused messages
-  const storePausedMessagesMutation = useMutation(api.chatActions.storePausedMessages);
+  const [input, setInput] = useState("");
+  const createThread = useMutation(api.threads.createThread);
 
   const {
     messages,
-    input,
-    handleInputChange,
-    setInput,
-    handleSubmit,
     stop,
     status,
     setMessages,
-    reload,
   } = useChat({
     id,
-    initialMessages,
-    sendExtraMessageFields: true,
     generateId: generateUUID,
 
-    // only send the last message to the server:
-    experimental_prepareRequestBody({ messages, id }) {
-      // Get stored API keys to send with request
-      const apiKeys = getStoredApiKeys();
+    onFinish({ message }: { message: UIMessage }) {
+      console.log("AI response finished:", message);
 
-      return {
-        message: messages[messages.length - 1],
-        id,
-        model: selectedModel,
-        apiKeys,
-      };
-    },
-
-    onFinish(message) {
-      console.log("message", message);
+      // TODO: Save message to Convex database
+      // TODO: Update thread with new message
+      // TODO: Handle navigation logic
 
       if (pathname === "/") {
         router.push(`/chat/${id}`);
-        // TODO: remove this when you find a better way to sync with the server when you create a new chat
         router.refresh();
       }
-
-      // add the modelId to the last message
-      const usedModel = selectedModel.split(":")[1];
-
-      setMessages((prevMessages) => {
-        return [
-          ...prevMessages.slice(0, -1),
-          {
-            ...message,
-            annotations: [
-              {
-                modelId: usedModel,
-              },
-            ],
-          },
-        ];
-      });
     },
 
-    onError(error) {
-      let errorMessage =
-        "An unexpected error occurred. Please try again later.";
-      let action = null;
+    onError(error: Error) {
+      console.error("Chat error:", error);
+      
+      // TODO: Implement proper error handling
+      // TODO: Show user-friendly error messages
+      // TODO: Handle different error types (API key, credits, etc.)
 
-      try {
-        // error.message might contain the JSON response from the server
-        const errorResponse = JSON.parse(error.message);
-
-        if (errorResponse.error) {
-          errorMessage = errorResponse.error;
-        }
-
-        if (errorResponse.status === 401 || errorResponse.status === 400) {
-          errorMessage = "You need to provide your API key to continue.";
-          action = {
-            label: "Go to settings",
-            onClick: () => {
-              router.push("/settings?tab=api-keys");
-            },
-          };
-        }
-
-        if (errorResponse.status === 402) {
-          errorMessage = "You don't have enough credits to continue.";
-          action = {
-            label: "Go to settings",
-            onClick: () => {
-              router.push("/settings?tab=api-keys");
-            },
-          };
-        }
-      } catch {
-        // If parsing fails, use the error message directly
-        errorMessage = error.message || errorMessage;
-
-        if (error.message.split("-")[1] === "402") {
-          errorMessage = "You don't have enough credits to continue.";
-          action = {
-            label: "Go to settings",
-            onClick: () => {
-              router.push("/settings?tab=api-keys");
-            },
-          };
-        }
-
-        toast.error(errorMessage);
-      }
-
-      if (pathname === "/") {
-        router.push(`/chat/${id}`);
-
-        router.refresh();
-      }
-
-      toast.error(errorMessage, { action });
+      toast.error("An error occurred. Please try again.");
     },
   });
 
   const [containerRef, showScrollButton, scrollToBottom] =
     useScrollToBottom<HTMLDivElement>();
 
+  // TODO: Implement proper stream stopping with Convex integration
   const handleStopStream = async () => {
     stop();
 
-    const lastMessage = messages[messages.length - 1];
-
-    const usedModel = selectedModel.split(":")[1];
-
-    // update the messages in the client:
-    setMessages((prevMessages) => {
-      if (lastMessage.role === "user") {
-        return [
-          ...messages,
-          {
-            id: lastMessage.id + "-stop",
-            role: "assistant",
-            content: "",
-            parts: [
-              {
-                type: "text",
-                text: "",
-              },
-            ],
-            annotations: [
-              {
-                hasStopped: true,
-                modelId: usedModel,
-              },
-            ],
-          },
-        ];
-      }
-
-      return [
-        ...prevMessages.slice(0, prevMessages.length - 1),
-        {
-          id: lastMessage.id + "-stop",
-          role: "assistant",
-          content: "",
-          parts: [
-            {
-              type: "text",
-              text: lastMessage.content,
-            },
-          ],
-          annotations: [
-            {
-              hasStopped: true,
-              modelId: usedModel,
-            },
-          ],
-        },
-      ];
-    });
-
-    // update the messages in Convex:
-    try {
-      if (lastMessage.role === "assistant") {
-        await storePausedMessagesMutation({
-          chatUuid: id,
-          responseMessage: {
-            id: lastMessage.id,
-            role: "assistant",
-            parts: [
-              {
-                type: "text",
-                text: lastMessage.content,
-              },
-            ],
-          },
-          modelId: usedModel,
-        });
-      }
-    } catch (error) {
-      console.error("Error saving chat on stop:", error);
-      toast.error("Error saving chat on stop");
-    }
+    // TODO: Save partial response to Convex
+    // TODO: Update thread status
+    // TODO: Handle navigation
 
     if (pathname === "/") {
       router.push(`/chat/${id}`);
-
       router.refresh();
     }
+  };
+
+  // Implement proper input handling for AI SDK v2
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+  };
+
+  const handleSubmit = async () => {
+    if (!input.trim()) return;
+
+    try {
+      // Create thread and message using the createThread mutation
+      const result = await createThread({
+        threadId: id,
+        content: input.trim(),
+        model: selectedModel,
+        messageId: generateUUID(),
+      });
+
+      console.log("Thread and message created:", result);
+      
+      // Clear the input after successful creation
+      setInput("");
+      
+      // TODO: Navigate to the new thread or update the current view
+      // For now, we'll just show a success message
+      toast.success("Message sent successfully!");
+      
+    } catch (error) {
+      console.error("Failed to create thread:", error);
+      toast.error("Failed to send message. Please try again.");
+    }
+  };
+
+  const reload = () => {
+    // TODO: Implement reload functionality
+    console.log("Reload functionality not yet implemented");
   };
 
   return (
@@ -244,7 +128,7 @@ export default function ChatInterface({
       >
         {messages.length > 0 || input.length > 0 ? (
           <div className="flex flex-col px-4 pb-8">
-            {messages.map((message) => (
+            {messages.map((message: UIMessage) => (
               <div className="flex-1" key={message.id}>
                 <ChatMessage
                   message={message}

@@ -8,7 +8,8 @@
  * @module
  */
 
-import type * as test from "../test.js";
+import type * as helpers_getUser from "../helpers/getUser.js";
+import type * as threads from "../threads.js";
 
 import type {
   ApiFromModules,
@@ -25,7 +26,8 @@ import type {
  * ```
  */
 declare const fullApi: ApiFromModules<{
-  test: typeof test;
+  "helpers/getUser": typeof helpers_getUser;
+  threads: typeof threads;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
 

@@ -1,6 +1,5 @@
 "use client";
 
-import { Message } from "ai";
 import { ChatBubble, ChatBubbleMessage } from "./ui/chat-bubble";
 import { MarkdownContent } from "./ui/markdown-content";
 import { Edit, RefreshCcw } from "lucide-react";
@@ -8,45 +7,55 @@ import CustomButton from "./custom-button";
 import CopyButton from "./ui/copy-button";
 import { useState } from "react";
 import EditMessage from "./edit-message";
-import { UseChatHelpers } from "@ai-sdk/react";
+import { UseChatHelpers, type UIMessage } from "@ai-sdk/react";
 import { toast } from "sonner";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
 
 export default function ChatMessage({
   message,
   setMessages,
   reload,
 }: {
-  message: Message;
-  setMessages: UseChatHelpers["setMessages"];
-  reload: UseChatHelpers["reload"];
+  message: UIMessage;
+  setMessages: UseChatHelpers<UIMessage>["setMessages"];
+  // TODO: reload property doesn't exist in AI SDK 5.0 - implement differently
+  reload: any;
 }) {
   const isUser = message.role === "user";
   const [mode, setMode] = useState<"view" | "edit">("view");
-  const deleteTrailingMessages = useMutation(api.messages.deleteTrailingMessages);
+  
+  // TODO: Implement deleteTrailingMessages when we add the messages API
+  // const deleteTrailingMessages = useMutation(api.messages.deleteTrailingMessages);
 
   const handleSetMode = (mode: "view" | "edit") => {
     setMode(mode);
   };
 
+  // TODO: Implement proper retry functionality with Convex
   const handleRetry = async (draftContent?: string) => {
-    // todo: add retry message for assistant
+    console.log("Retry functionality not yet implemented");
+
+    // TODO: Implement retry message for assistant
+    // TODO: Delete trailing messages in Convex
+    // TODO: Update messages state properly
 
     try {
-      await deleteTrailingMessages({ messageId: message.id as any });
+      // TODO: Replace with actual Convex mutation when messages API is ready
+      // await deleteTrailingMessages({ messageId: message.id });
+      console.log("Would delete trailing messages for:", message.id);
     } catch (error) {
       toast.error("Failed to delete trailing messages");
     }
 
+    // TODO: Fix this when we implement proper message handling
     // @ts-expect-error todo: support UIMessage in setMessages
-    setMessages((messages) => {
-      const index = messages.findIndex((m) => m.id === message.id);
+    setMessages((messages: UIMessage[]) => {
+      const index = messages.findIndex((m: UIMessage) => m.id === message.id);
 
       if (index !== -1) {
         const updatedMessage = {
           ...message,
-          content: "",
+          // TODO: Fix content property access for UIMessage
+          // content: "",
           parts: [{ type: "text", text: draftContent || "" }],
         };
 
@@ -56,12 +65,13 @@ export default function ChatMessage({
       return messages;
     });
 
-    reload();
+    // TODO: Implement reload functionality for AI SDK 5.0
+    // reload();
   };
 
   return (
     <>
-      {message.parts?.map((part, index) => {
+      {message.parts?.map((part: any, index: number) => {
         const { type } = part;
         const key = `message-${message.id}-part-${index}`;
 
@@ -126,7 +136,9 @@ export default function ChatMessage({
                     <MarkdownContent content={part.text} id={message.id} />
                   </ChatBubbleMessage>
 
-                  {message.annotations?.map((annotation, index) => {
+                  {/* TODO: Implement proper annotation handling when we add annotations support */}
+                  {/* TODO: Annotations property doesn't exist in UIMessage - implement differently */}
+                  {/* {message.annotations?.map((annotation: any, index: number) => {
                     if (
                       typeof annotation === "object" &&
                       annotation !== null &&
@@ -141,18 +153,22 @@ export default function ChatMessage({
                         </div>
                       );
                     }
-                  })}
+                  })} */}
 
                   <div className="pointer-events-none flex items-center opacity-0 group-hover:pointer-events-auto group-hover:opacity-100">
                     <CopyButton value={part.text} />
-                    {/* todo: add retry message for assistant */}
+                    
+                    {/* TODO: Add retry message for assistant */}
                     {/* <CustomButton
                       description="Retry message"
                       className="bg-transparent"
                     >
                       <RefreshCcw />
                     </CustomButton> */}
-                    {message.annotations?.map((annotation, index) => {
+                    
+                    {/* TODO: Implement proper model ID display when we add annotations support */}
+                    {/* TODO: Annotations property doesn't exist in UIMessage - implement differently */}
+                    {/* {message.annotations?.map((annotation: any, index: number) => {
                       if (
                         typeof annotation === "object" &&
                         annotation !== null &&
@@ -167,7 +183,7 @@ export default function ChatMessage({
                           </p>
                         );
                       }
-                    })}
+                    })} */}
                   </div>
                 </div>
               </ChatBubble>
