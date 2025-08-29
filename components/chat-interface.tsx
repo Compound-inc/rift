@@ -194,15 +194,7 @@ export default function ChatInterface({
           <ChatWelcome onQuestionClick={setInput} />
         )}
 
-        <ChatInputContainer
-          input={input}
-          status={status}
-          showScrollButton={showScrollButton}
-          onInputChange={handleInputChange}
-          onSubmit={handleSubmit}
-          onStop={handleStopStream}
-          onScrollToBottom={scrollToBottom}
-        />
+        {/* Input is now handled by the parent component */}
       </div>
     </ChatMessageArea>
   );

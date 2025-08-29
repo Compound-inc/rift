@@ -134,89 +134,21 @@ export const getThreadInfo = query({
 });
 
 /**
- * Get all messages for a thread.
+ * Get paginated user threads ordered by most recent activity.
  * This query is secure and only returns data for the authenticated user.
  */
-export const getAllThreadMessages = query({
+export const getUserThreadsPaginated = query({
   args: {
-    threadId: v.string(),
+    paginationOpts: paginationOptsValidator,
   },
-  returns: v.array(
-    v.object({
-      _id: v.id("messages"),
-      _creationTime: v.number(),
-      messageId: v.string(),
-      threadId: v.string(),
-      userId: v.string(),
-      reasoning: v.optional(v.string()),
-      content: v.string(),
-      status: v.union(
-        v.literal("waiting"),
-        v.literal("thinking"),
-        v.literal("streaming"),
-        v.literal("done"),
-        v.literal("error"),
-        v.literal("error.rejected"),
-        v.literal("deleted"),
-        v.literal("cancelled"),
-      ),
-      updated_at: v.optional(v.number()),
-      branches: v.optional(v.array(v.id("threads"))),
-      role: v.union(
-        v.literal("user"),
-        v.literal("assistant"),
-        v.literal("system"),
-      ),
-      created_at: v.number(),
-      serverError: v.optional(
-        v.object({
-          type: v.string(),
-          message: v.string(),
-        }),
-      ),
-      model: v.string(),
-      attachmentsIds: v.array(v.id("attachments")),
-      modelParams: v.optional(
-        v.object({
-          temperature: v.optional(v.number()),
-          topP: v.optional(v.number()),
-          topK: v.optional(v.number()),
-          reasoningEffort: v.optional(
-            v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
-          ),
-          includeSearch: v.optional(v.boolean()),
-        }),
-      ),
-      providerMetadata: v.optional(v.record(v.string(), v.any())),
-      backfill: v.optional(v.boolean()),
-    }),
-  ),
   handler: async (ctx, args) => {
-    // Get the authenticated user ID using the helper
     const userId = await getAuthUserId(ctx);
 
-    // Verify the thread exists and belongs to the authenticated user
-    const thread = await ctx.db
+    return await ctx.db
       .query("threads")
-      .withIndex("by_user_and_threadId", (q) =>
-        q.eq("userId", userId).eq("threadId", args.threadId)
-      )
-      .unique();
-
-    if (!thread) {
-      throw new Error("Thread not found or access denied");
-    }
-
-    // Get all messages for this thread, ordered by creation time (oldest first)
-    const messages = await ctx.db
-      .query("messages")
-      .withIndex("by_treadId", (q) =>
-        q.eq("threadId", args.threadId)
-      )
-      .order("asc") // Oldest messages first for chronological display
-      .collect();
-
-    return messages;
+      .withIndex("by_user_and_updatedAt", (q) => q.eq("userId", userId))
+      .order("desc") // Most recently updated first
+      .paginate(args.paginationOpts);
   },
 });
 
