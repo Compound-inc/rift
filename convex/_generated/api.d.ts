@@ -8,10 +8,7 @@
  * @module
  */
 
-import type * as chatActions from "../chatActions.js";
-import type * as chats from "../chats.js";
-import type * as messages from "../messages.js";
-import type * as rateLimiting from "../rateLimiting.js";
+import type * as test from "../test.js";
 
 import type {
   ApiFromModules,
@@ -28,10 +25,7 @@ import type {
  * ```
  */
 declare const fullApi: ApiFromModules<{
-  chatActions: typeof chatActions;
-  chats: typeof chats;
-  messages: typeof messages;
-  rateLimiting: typeof rateLimiting;
+  test: typeof test;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
 

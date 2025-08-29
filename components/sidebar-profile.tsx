@@ -1,10 +1,13 @@
+import { api } from "@/convex/_generated/api";
 import { Avatar, AvatarImage } from "./ui/avatar";
 import { Skeleton } from "./ui/skeleton";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
+import { useMutation, useQuery } from "convex/react";
+import { Authenticated } from "convex/react";
 
 export default function SidebarProfile() {
   const { user } = useAuth();
-  
+
   return (
     <button className="border-t">
       <div className="hover:bg-sidebar-border-light mb-2 flex cursor-pointer items-center gap-3 rounded-lg px-3 py-3">
