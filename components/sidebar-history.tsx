@@ -1,11 +1,11 @@
 "use client";
 
-import { usePaginatedQuery } from "convex/react";
+import { usePaginatedQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useEffect, useRef, useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageSquare, Pin } from "lucide-react";
+import { MessageSquare, Pin, Pencil, Trash } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Authenticated, Unauthenticated } from "convex/react";
@@ -25,6 +25,11 @@ function Content() {
   const router = useRouter();
   const { prefetchThread } = useChatCache();
   const [loadingThreadId, setLoadingThreadId] = useState<string | null>(null);
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState<string>("");
+  
+  const renameThread = useMutation(api.threads.renameThread);
+  const deleteThread = useMutation(api.threads.deleteThread);
   
   // Load threads with pagination (most recent first)
   const { results, status, loadMore } = usePaginatedQuery(
@@ -61,14 +66,60 @@ function Content() {
 
   const handleClick = useCallback(async (e: React.MouseEvent, threadId: string) => {
     e.preventDefault();
+    // If currently editing this row, do not navigate
+    if (editingThreadId === threadId) return;
     try {
       setLoadingThreadId(threadId);
       await prefetchThread(threadId, { numMessages: 20 });
       router.push(`/chat/${threadId}`);
+    } catch {
+      // Thread may not exist anymore; route to root to avoid errors
+      router.push("/");
     } finally {
       setLoadingThreadId(null);
     }
-  }, [prefetchThread, router]);
+  }, [prefetchThread, router, editingThreadId]);
+
+  const beginEdit = useCallback((e: React.MouseEvent, thread: ThreadItem) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditingThreadId(thread.threadId);
+    setEditingTitle(thread.title);
+  }, []);
+
+  const commitEdit = useCallback(async () => {
+    if (!editingThreadId) return;
+    const trimmed = editingTitle.trim();
+    if (trimmed.length === 0) {
+      // No empty title; just cancel
+      setEditingThreadId(null);
+      return;
+    }
+    await renameThread({ threadId: editingThreadId, title: trimmed });
+    setEditingThreadId(null);
+  }, [editingThreadId, editingTitle, renameThread]);
+
+  const cancelEdit = useCallback(() => {
+    setEditingThreadId(null);
+  }, []);
+
+  const handleDelete = useCallback(async (e: React.MouseEvent, thread: ThreadItem) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const isActive = pathname === `/chat/${thread.threadId}`;
+    if (isActive) {
+      // Navigate away first to prevent active chat page from querying a deleted thread
+      router.push("/");
+      // Defer deletion to the next tick to let the route transition unmount the page
+      setTimeout(() => {
+        void deleteThread({ threadId: thread.threadId });
+      }, 0);
+      return;
+    }
+
+    await deleteThread({ threadId: thread.threadId });
+  }, [deleteThread, pathname, router]);
 
   // Show loading state until we have results or know there are no results
   if (status === "LoadingFirstPage" || results === undefined) {
@@ -128,6 +179,7 @@ function Content() {
               {threads.map((thread: ThreadItem) => {
                 const isActive = pathname === `/chat/${thread.threadId}`;
                 const isLoading = loadingThreadId === thread.threadId;
+                const isEditing = editingThreadId === thread.threadId;
                 
                 return (
                   <Link
@@ -135,7 +187,7 @@ function Content() {
                     href={`/chat/${thread.threadId}`}
                     prefetch={false}
                     onClick={(e) => void handleClick(e, thread.threadId)}
-                    className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground ${
+                    className={`group/thread relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground ${
                       isActive ? "bg-accent text-accent-foreground" : "text-muted-foreground"
                     } ${isLoading ? "opacity-70" : ""}`}
                     aria-busy={isLoading}
@@ -145,10 +197,51 @@ function Content() {
                         {thread.pinned && (
                           <Pin className="h-3 w-3 text-yellow-500 flex-shrink-0" />
                         )}
-                        <span className="truncate font-medium">
-                          {thread.title}
-                        </span>
+                        {isEditing ? (
+                          <input
+                            className="w-full bg-transparent outline-none border-b border-transparent focus:border-border text-foreground font-medium"
+                            value={editingTitle}
+                            onChange={(e) => setEditingTitle(e.target.value)}
+                            autoFocus
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                void commitEdit();
+                              } else if (e.key === "Escape") {
+                                e.preventDefault();
+                                cancelEdit();
+                              }
+                            }}
+                            onBlur={() => void commitEdit()}
+                          />
+                        ) : (
+                          <span className="truncate font-medium">
+                            {thread.title}
+                          </span>
+                        )}
                       </div>
+                    </div>
+
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover/thread:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        aria-label="Edit"
+                        onClick={(e) => beginEdit(e, thread)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        aria-label="Delete"
+                        onClick={(e) => void handleDelete(e, thread)}
+                      >
+                        <Trash className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </Link>
                 );

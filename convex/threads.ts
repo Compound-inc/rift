@@ -245,14 +245,75 @@ export const getThreadMessagesPaginated = query({
       )
       .unique();
 
-    if (!thread) {
-      throw new Error("Thread not found or access denied");
-    }
-
     return await ctx.db
       .query("messages")
       .withIndex("by_treadId", (q) => q.eq("threadId", args.threadId))
       .order("desc") // Newest first; client can reverse for display
       .paginate(args.paginationOpts);
+  },
+});
+
+export const renameThread = mutation({
+  args: {
+    threadId: v.string(),
+    title: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+
+    const thread = await ctx.db
+      .query("threads")
+      .withIndex("by_user_and_threadId", (q) =>
+        q.eq("userId", userId).eq("threadId", args.threadId)
+      )
+      .unique();
+
+    if (!thread) {
+      throw new Error("Thread not found or access denied");
+    }
+
+    await ctx.db.patch(thread._id, {
+      title: args.title,
+      userSetTitle: true,
+      updatedAt: Date.now(),
+    });
+
+    return null;
+  },
+});
+
+export const deleteThread = mutation({
+  args: {
+    threadId: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+
+    const thread = await ctx.db
+      .query("threads")
+      .withIndex("by_user_and_threadId", (q) =>
+        q.eq("userId", userId).eq("threadId", args.threadId)
+      )
+      .unique();
+
+    if (!thread) {
+      throw new Error("Thread not found or access denied");
+    }
+
+    // Delete messages belonging to this thread
+    const messages = ctx.db
+      .query("messages")
+      .withIndex("by_treadId", (q) => q.eq("threadId", args.threadId));
+
+    for await (const m of messages) {
+      await ctx.db.delete(m._id);
+    }
+
+    // Delete the thread
+    await ctx.db.delete(thread._id);
+
+    return null;
   },
 });
