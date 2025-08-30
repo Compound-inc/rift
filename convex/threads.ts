@@ -276,7 +276,6 @@ export const renameThread = mutation({
     await ctx.db.patch(thread._id, {
       title: args.title,
       userSetTitle: true,
-      updatedAt: Date.now(),
     });
 
     return null;

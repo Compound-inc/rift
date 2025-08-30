@@ -4,7 +4,7 @@ import { useQuery, usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import ChatInterface from "@/components/chat-interface";
 import ErrorMessage from "@/components/error-message";
-import { UIMessage } from "ai";
+import { UIMessage } from "@ai-sdk/react";
 import { useEffect, useMemo, useState } from "react";
 import { Authenticated, Unauthenticated } from "convex/react";
 import { ChatInputContainer } from "@/components/chat-input-container";
@@ -134,16 +134,39 @@ function Content({ id }: ChatPageProps) {
   // When results arrive, sync cache
   useEffect(() => {
     if (!results) return;
-    const msgs = (results as Array<ConvexMessage>)
+
+    const backendMessages: UIMessage[] = (results as Array<ConvexMessage>)
       .slice()
       .reverse()
       .map((m) => ({
         id: m.messageId,
         role: m.role,
         parts: [{ type: "text" as const, text: m.content }],
-      }));
-    setMessages(id, msgs);
-  }, [results, id, setMessages]);
+      }) as UIMessage);
+
+    // Merge backend messages with any existing optimistic ones by id, preserving order (oldest -> newest)
+    const existing = getMessages(id) ?? [];
+
+    // Build a map of backend messages for quick lookup
+    const backendById = new Map(backendMessages.map((m) => [m.id, m] as const));
+
+    // Start with backend messages (authoritative when present)
+    const merged: UIMessage[] = [...backendMessages];
+
+    // Append any existing messages that aren't yet in backend (optimistic ones)
+    for (const msg of existing) {
+      if (!backendById.has(msg.id)) {
+        merged.push(msg);
+      }
+    }
+
+    // Only update cache if something actually changes to avoid unnecessary re-renders
+    const prevJson = JSON.stringify(existing);
+    const nextJson = JSON.stringify(merged);
+    if (prevJson !== nextJson) {
+      setMessages(id, merged);
+    }
+  }, [results, id, setMessages, getMessages]);
 
   const initialMessages = useMemo(() => {
     if (cachedMessages && cachedMessages.length > 0) return cachedMessages;
