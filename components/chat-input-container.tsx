@@ -28,7 +28,8 @@ export function ChatInputContainer({
   onScrollToBottom,
 }: ChatInputContainerProps) {
   return (
-    <div className="sticky bottom-0 z-50 mt-auto w-full">
+    <div className="fixed bottom-0 z-50 mt-auto w-2xl">
+      
       <div className="absolute inset-0 rounded-2xl rounded-t-[20px] rounded-b-none border-8 border-b-0 bg-white/30 backdrop-blur-md dark:bg-black/30" />
       <ChatInput
         variant="default"

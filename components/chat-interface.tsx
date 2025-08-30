@@ -160,14 +160,13 @@ export default function ChatInterface({
   return (
     <ChatMessageArea
       scrollButtonAlignment="center"
-      className="h-full"
     >
       <div
         ref={containerRef}
         className="relative mx-auto flex h-full w-full max-w-3xl flex-col px-2 pt-14"
       >
         {renderedMessages.length > 0 || input.length > 0 ? (
-          <div className="flex flex-col px-4 pb-30">
+          <div className="flex flex-col px-4">
             {renderedMessages.map((message: UIMessage) => (
               <div className="flex-1" key={message.id}>
                 <ChatMessage

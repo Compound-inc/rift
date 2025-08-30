@@ -163,7 +163,7 @@ function Content({ id }: ChatPageProps) {
     // If we have cached messages, render them immediately; otherwise, render an empty shell
     if (cachedMessages && cachedMessages.length > 0) {
       return (
-        <div className="pb-32">
+        <div className="flex-1 min-h-0 flex">
           <ChatInterface id={id} initialMessages={cachedMessages} />
         </div>
       );
@@ -182,7 +182,7 @@ function Content({ id }: ChatPageProps) {
   }
 
   return (
-    <div className="pb-32">
+    <div className="flex-1 min-h-0 flex">
       <ChatInterface
         id={id}
         initialMessages={initialMessages}
@@ -195,7 +195,7 @@ export default function ChatPage({ id }: ChatPageProps) {
   return (
     <div className="flex min-h-screen h-full flex-col">
       <Authenticated>
-        <div className="flex-1">
+        <div className="flex-1 min-h-0 flex">
           <Content id={id} />
         </div>
       </Authenticated>

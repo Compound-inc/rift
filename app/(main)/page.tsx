@@ -94,7 +94,7 @@ export default function Home() {
         </Unauthenticated>
       </div>
 
-      <div className="mx-auto w-full max-w-3xl px-4 pt-4 mt-auto">
+      <div className="mx-auto w-full max-w-3xl px-4 mt-auto">
         <ChatInputContainer
           input={input}
           status={status}
