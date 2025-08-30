@@ -1,18 +1,10 @@
 "use client";
 
-import ChatMessage from "@/components/chat-message";
-import ChatWelcome from "@/components/chat-welcome";
-
-import { ChatMessageArea } from "@/components/ui/chat-message-area";
-import { MessageLoading } from "@/components/ui/message-loading";
-import { useScrollToBottom } from "@/hooks/use-scroll-to-bottom";
 import { useChat, type UIMessage } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { usePathname, useRouter } from "next/navigation";
-import { ChatInputContainer } from "@/components/chat-input-container";
 import { generateUUID } from "@/lib/utils";
 import { useModel } from "@/contexts/model-context";
-import { getStoredApiKeys } from "@/lib/api-keys";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { useMutation } from "convex/react";
@@ -73,8 +65,6 @@ export default function ChatInterface({
     }
   }, [initialMessages, setMessages, messages.length]);
 
-  const [containerRef, showScrollButton, scrollToBottom] =
-    useScrollToBottom<HTMLDivElement>();
 
   // Use initialMessages as a first-render fallback to avoid welcome flicker
   const renderedMessages: UIMessage[] =
@@ -133,47 +123,8 @@ export default function ChatInterface({
   };
 
   return (
-    <ChatMessageArea
-      scrollButtonAlignment="center"
-    >
-      <div
-        ref={containerRef}
-        className="relative mx-auto flex h-full w-full max-w-3xl flex-col px-2 pt-14"
-      >
-        {renderedMessages.length > 0 || input.length > 0 ? (
-          <div className="flex flex-col px-4">
-            {renderedMessages.map((message: UIMessage) => (
-              <div className="flex-1" key={message.id}>
-                <ChatMessage
-                  message={message}
-                  reload={reload}
-                  setMessages={setMessages}
-                />
-              </div>
-            ))}
-            {status === "submitted" && (
-              <div className="block">
-                <MessageLoading />
-              </div>
-            )}
-          </div>
-        ) : (
-          <ChatWelcome onQuestionClick={setInput} />
-        )}
-
-        <div className="fixed bottom-0 z-50 mt-auto w-2xl">
-          <div className="absolute inset-0 rounded-2xl rounded-t-[20px] rounded-b-none border-8 border-b-0 bg-white/30 backdrop-blur-md dark:bg-black/30" />
-          <ChatInputContainer
-            input={input}
-            status={status}
-            showScrollButton={showScrollButton}
-            onInputChange={handleInputChange}
-            onSubmit={handleSubmit}
-            onStop={handleStopStream}
-            onScrollToBottom={scrollToBottom}
-          />
-        </div>
-      </div>
-    </ChatMessageArea>
+    <div>
+      <h1>Chat Interface</h1>
+    </div>
   );
 }

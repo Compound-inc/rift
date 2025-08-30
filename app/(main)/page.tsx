@@ -1,7 +1,6 @@
 "use client";
 
 import ChatInterface from "@/components/chat-interface";
-import { ChatInputContainer } from "@/components/chat-input-container";
 import { generateUUID } from "@/lib/utils";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -92,18 +91,6 @@ export default function Home() {
         <Unauthenticated>
           {null}
         </Unauthenticated>
-      </div>
-
-      <div className="mx-auto w-full max-w-3xl px-4 mt-auto">
-        <ChatInputContainer
-          input={input}
-          status={status}
-          showScrollButton={false}
-          onInputChange={handleInputChange}
-          onSubmit={handleSubmit}
-          onStop={() => {}}
-          onScrollToBottom={() => {}}
-        />
       </div>
     </div>
   );
