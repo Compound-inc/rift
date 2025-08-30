@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "@/styles/globals.css";
 import { ConvexClientProvider } from "@/components/ConvexClientProvider";
-import { ChatCacheProvider } from "@/contexts/chat-cache";
 import { ThemeProvider } from "next-themes";
 
 const geistSans = Geist({

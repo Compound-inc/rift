@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
 type ChatShellProps = {
@@ -10,7 +10,21 @@ type ChatShellProps = {
 };
 
 export default function ChatShell({ children, className, sidebar }: ChatShellProps) {
-  const [isOpen, setIsOpen] = useState<boolean>(false);
+  // Always start with true (sidebar open by default)
+  const [isOpen, setIsOpen] = useState<boolean>(true);
+
+  // Keyboard shortcut: Cmd/Ctrl + B to toggle sidebar
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'b') {
+        event.preventDefault();
+        setIsOpen(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const toggle = useCallback(() => setIsOpen((v) => !v), []);
 
@@ -41,6 +55,7 @@ export default function ChatShell({ children, className, sidebar }: ChatShellPro
             type="button"
             onClick={toggle}
             aria-pressed={isOpen}
+            title={`${isOpen ? 'Hide' : 'Show'} sidebar (⌘+B)`}
             className={cn(
               "absolute top-4 left-4 z-10 inline-flex h-9 items-center rounded-md border bg-background/80 backdrop-blur-sm px-3 text-sm transition-colors shadow-sm",
               "hover:bg-background hover:shadow-md"

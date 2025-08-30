@@ -7,7 +7,6 @@ import { generateUUID } from "../lib/utils";
 import { useModel } from "@/contexts/model-context";
 import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import ChatShell from "@/components/ai/ChatShell";
 import { Message, MessageContent } from "@/components/ai/message";
 import {
   PromptInput,
@@ -242,201 +241,176 @@ export default function ChatInterface({
 
   const models = MODELS;
 
-  const sidebar = useMemo(() => (
-    <div className="h-full w-full bg-">
-      <div className="p-4">
-        <h2 className="mb-2 text-sm font-semibold">Sidebar</h2>
-        <p className="text-muted-foreground text-sm">Toggle me to expand/collapse. Content pushes chat and input.</p>
+  return (
+    <div className="flex h-screen w-full min-h-0 flex-col relative">
+      {/* Single scrollable area that includes messages and actions - now takes full height */}
+      <div className="flex-1 min-h-0">
+        <Authenticated>
+          <Conversation>
+            <ConversationContent className="mx-auto w-full max-w-3xl p-4 pb-30">
+              {renderedMessages.map((message) => (
+                <div key={message.id} className="group">
+                  <Message from={message.role} key={message.id}>
+                    <MessageContent from={message.role}>
+                      {message.parts.map((part: any, i: number) => {
+                        switch ((part as any).type) {
+                          case 'text':
+                            return (
+                              <Response key={`${message.id}-${i}`}>
+                                {(part as any).text}
+                              </Response>
+                            );
+                          case 'reasoning':
+                            return (
+                              <Reasoning
+                                key={`${message.id}-${i}`}
+                                className="w-full"
+                                isStreaming={status === 'streaming'}
+                              >
+                                <ReasoningTrigger />
+                                <ReasoningContent>{(part as any).text}</ReasoningContent>
+                              </Reasoning>
+                            );
+                          default:
+                            return null;
+                        }
+                      })}
+                    </MessageContent>
+                  </Message>
+                  {/* Actions appear outside the message */}
+                  {message.role === 'assistant' && (
+                    <div className="px-0">
+                      <Actions className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity justify-start">
+                        <Action
+                          onClick={() => regenerate?.()}
+                          label="Retry"
+                          tooltip="Regenerate response"
+                        >
+                          <RefreshCwIcon className="size-4" />
+                        </Action>
+                        <Action
+                          onClick={() => {
+                            // Get the text content from all parts
+                            const textContent = message.parts
+                              .filter((part: any) => part.type === 'text')
+                              .map((part: any) => part.text)
+                              .join('\n');
+                            navigator.clipboard.writeText(textContent);
+                            toast.success("Copied to clipboard");
+                          }}
+                          label="Copy"
+                          tooltip="Copy to clipboard"
+                        >
+                          <CopyIcon className="size-4" />
+                        </Action>
+                        <Action
+                          onClick={() => {
+                            // TODO: Implement branch functionality
+                            toast.info("Branch feature coming soon");
+                          }}
+                          label="Branch"
+                          tooltip="Create a new branch"
+                        >
+                          <GitBranchIcon className="size-4" />
+                        </Action>
+                      </Actions>
+                    </div>
+                  )}
+                  {/* Actions for user messages */}
+                  {message.role === 'user' && (
+                    <div className="px-0">
+                      <Actions className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
+                        <Action
+                          onClick={() => {
+                            // TODO: Implement retry for user message
+                            toast.info("Retry user message feature coming soon");
+                          }}
+                          label="Retry"
+                          tooltip="Retry message"
+                        >
+                          <RefreshCwIcon className="size-4" />
+                        </Action>
+                        <Action
+                          onClick={() => {
+                            // TODO: Implement edit functionality
+                            toast.info("Edit message feature coming soon");
+                          }}
+                          label="Edit"
+                          tooltip="Edit message"
+                        >
+                          <EditIcon className="size-4" />
+                        </Action>
+                        <Action
+                          onClick={() => {
+                            // Get the text content from all parts
+                            const textContent = message.parts
+                              .filter((part: any) => part.type === 'text')
+                              .map((part: any) => part.text)
+                              .join('\n');
+                            navigator.clipboard.writeText(textContent);
+                            toast.success("Copied to clipboard");
+                          }}
+                          label="Copy"
+                          tooltip="Copy to clipboard"
+                        >
+                          <CopyIcon className="size-4" />
+                        </Action>
+                        <Action
+                          onClick={() => {
+                            // TODO: Implement branch functionality
+                            toast.info("Branch feature coming soon");
+                          }}
+                          label="Branch"
+                          tooltip="Create a new branch"
+                        >
+                          <GitBranchIcon className="size-4" />
+                        </Action>
+                      </Actions>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {(status === 'submitted' || status === 'streaming') && !hasAssistantMessage && <Loader />}
+            </ConversationContent>
+            <ConversationScrollButton />
+          </Conversation>
+        </Authenticated>
+      </div>
+
+      {/* Prompt input overlayed at bottom of the main area (not part of scroll flow) */}
+      <div className="absolute bottom-0 left-0 right-0">
+        <div className="mx-auto w-full max-w-3xl px-2">
+          <PromptInput onSubmit={handleSubmit}>
+            <PromptInputTextarea
+              onChange={handleInputChange}
+              value={input}
+              disabled={disableInput || !isAuthenticated}
+              placeholder={!isAuthenticated ? "Sign in to start chatting..." : "Type your message..."}
+            />
+            <PromptInputToolbar>
+              <PromptInputTools>
+                <PromptInputButton onClick={handleAttachClick} aria-label="Add attachments" disabled={disableInput || !isAuthenticated}>
+                  <PaperclipIcon size={16} />
+                </PromptInputButton>
+                <PromptInputModelSelect value={selectedModel} onValueChange={setSelectedModel}>
+                  <PromptInputModelSelectTrigger>
+                    <PromptInputModelSelectValue />
+                  </PromptInputModelSelectTrigger>
+                  <PromptInputModelSelectContent>
+                    {models.map((model) => (
+                      <PromptInputModelSelectItem key={model.id} value={model.id}>
+                        {model.name}
+                      </PromptInputModelSelectItem>
+                    ))}
+                  </PromptInputModelSelectContent>
+                </PromptInputModelSelect>
+              </PromptInputTools>
+              <PromptInputSubmit disabled={disableInput || !isAuthenticated} />
+            </PromptInputToolbar>
+          </PromptInput>
+          <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFilesSelected} />
+        </div>
       </div>
     </div>
-  ), []);
-
-  return (
-    <ChatShell sidebar={sidebar}>
-      <div className="flex h-full min-h-0 flex-col relative">
-        {/* Single scrollable area that includes messages and actions - now takes full height */}
-        <div className="flex-1 min-h-0">
-          <Authenticated>
-            <Conversation>
-              <ConversationContent className="mx-auto w-full max-w-3xl p-4 pb-30">
-                {renderedMessages.map((message) => (
-                  <div key={message.id} className="group">
-                    <Message from={message.role} key={message.id}>
-                      <MessageContent from={message.role}>
-                        {message.parts.map((part: any, i: number) => {
-                          switch ((part as any).type) {
-                            case 'text':
-                              return (
-                                <Response key={`${message.id}-${i}`}>
-                                  {(part as any).text}
-                                </Response>
-                              );
-                            case 'reasoning':
-                              return (
-                                <Reasoning
-                                  key={`${message.id}-${i}`}
-                                  className="w-full"
-                                  isStreaming={status === 'streaming'}
-                                >
-                                  <ReasoningTrigger />
-                                  <ReasoningContent>{(part as any).text}</ReasoningContent>
-                                </Reasoning>
-                              );
-                            default:
-                              return null;
-                          }
-                        })}
-                      </MessageContent>
-                    </Message>
-                    {/* Actions appear outside the message */}
-                    {message.role === 'assistant' && (
-                      <div className="px-0">
-                        <Actions className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity justify-start">
-                          <Action
-                            onClick={() => regenerate?.()}
-                            label="Retry"
-                            tooltip="Regenerate response"
-                          >
-                            <RefreshCwIcon className="size-4" />
-                          </Action>
-                          <Action
-                            onClick={() => {
-                              // Get the text content from all parts
-                              const textContent = message.parts
-                                .filter((part: any) => part.type === 'text')
-                                .map((part: any) => part.text)
-                                .join('\n');
-                              navigator.clipboard.writeText(textContent);
-                              toast.success("Copied to clipboard");
-                            }}
-                            label="Copy"
-                            tooltip="Copy to clipboard"
-                          >
-                            <CopyIcon className="size-4" />
-                          </Action>
-                          <Action
-                            onClick={() => {
-                              // TODO: Implement branch functionality
-                              toast.info("Branch feature coming soon");
-                            }}
-                            label="Branch"
-                            tooltip="Create a new branch"
-                          >
-                            <GitBranchIcon className="size-4" />
-                          </Action>
-                        </Actions>
-                      </div>
-                    )}
-                    {/* Actions for user messages */}
-                    {message.role === 'user' && (
-                      <div className="px-0">
-                        <Actions className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
-                          <Action
-                            onClick={() => {
-                              // TODO: Implement retry for user message
-                              toast.info("Retry user message feature coming soon");
-                            }}
-                            label="Retry"
-                            tooltip="Retry message"
-                          >
-                            <RefreshCwIcon className="size-4" />
-                          </Action>
-                          <Action
-                            onClick={() => {
-                              // TODO: Implement edit functionality
-                              toast.info("Edit message feature coming soon");
-                            }}
-                            label="Edit"
-                            tooltip="Edit message"
-                          >
-                            <EditIcon className="size-4" />
-                          </Action>
-                          <Action
-                            onClick={() => {
-                              // Get the text content from all parts
-                              const textContent = message.parts
-                                .filter((part: any) => part.type === 'text')
-                                .map((part: any) => part.text)
-                                .join('\n');
-                              navigator.clipboard.writeText(textContent);
-                              toast.success("Copied to clipboard");
-                            }}
-                            label="Copy"
-                            tooltip="Copy to clipboard"
-                          >
-                            <CopyIcon className="size-4" />
-                          </Action>
-                          <Action
-                            onClick={() => {
-                              // TODO: Implement branch functionality
-                              toast.info("Branch feature coming soon");
-                            }}
-                            label="Branch"
-                            tooltip="Create a new branch"
-                          >
-                            <GitBranchIcon className="size-4" />
-                          </Action>
-                        </Actions>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {(status === 'submitted' || status === 'streaming') && !hasAssistantMessage && <Loader />}
-              </ConversationContent>
-              <ConversationScrollButton />
-            </Conversation>
-          </Authenticated>
-        </div>
-
-        {/* Prompt input overlayed at bottom of the main area (not part of scroll flow) */}
-        <div className="absolute bottom-0 left-0 right-0">
-          <div className="mx-auto w-full max-w-3xl px-2">
-            <PromptInput onSubmit={handleSubmit}>
-              <PromptInputTextarea
-                onChange={handleInputChange}
-                value={input}
-                disabled={disableInput || !isAuthenticated}
-                placeholder={!isAuthenticated ? "Sign in to start chatting..." : "Type your message..."}
-              />
-              <PromptInputToolbar>
-                <PromptInputTools>
-                  <PromptInputButton onClick={handleAttachClick} aria-label="Add attachments" disabled={disableInput || !isAuthenticated}>
-                    <PaperclipIcon size={16} />
-                  </PromptInputButton>
-                  <PromptInputButton onClick={handleWebSearch} aria-label="Search the web" disabled={false}>
-                    <GlobeIcon size={16} />
-                    <span>Search</span>
-                  </PromptInputButton>
-                  <PromptInputModelSelect
-                    onValueChange={(value) => setSelectedModel(value)}
-                    value={selectedModel}
-                    disabled={disableInput || !isAuthenticated}
-                  >
-                    <PromptInputModelSelectTrigger>
-                      <PromptInputModelSelectValue />
-                    </PromptInputModelSelectTrigger>
-                    <PromptInputModelSelectContent>
-                      {models.map((m) => (
-                        <PromptInputModelSelectItem key={m.id} value={m.id}>
-                          {m.name}
-                        </PromptInputModelSelectItem>
-                      ))}
-                    </PromptInputModelSelectContent>
-                  </PromptInputModelSelect>
-                </PromptInputTools>
-                <PromptInputSubmit disabled={!input || disableInput || !isAuthenticated} status={status} />
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={handleFilesSelected}
-                />
-              </PromptInputToolbar>
-            </PromptInput>
-          </div>
-        </div>
-      </div>
-    </ChatShell>
   );
 }
