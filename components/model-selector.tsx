@@ -13,9 +13,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDownIcon, Key } from "lucide-react";
-import { TablerBrandOpenai } from "./ui/icons/openai-icon";
-import { LogosMistralAiIcon } from "./ui/icons/mistral-icon";
-import { AnthropicIcon } from "./ui/icons/anthropic-icon";
 import { GoogleIcon } from "./ui/icons/google-icon";
 import { useModel } from "@/contexts/model-context";
 import {
@@ -25,22 +22,14 @@ import {
 } from "@/lib/ai/ai-providers";
 import { ModelInfo } from "./model-info";
 import ApiKeyIndicator from "./api-key-indicator";
-import OpenRouterIcon from "./ui/icons/openrouter-icon";
-import { MaterialSymbolsDiamondOutline } from "./ui/icons/diamond-icon";
-import { hasValidApiKey } from "@/lib/api-keys";
 import Link from "next/link";
-import CustomButton from "./custom-button";
 
-// Provider icon mapping
+// Provider icon mapping (Google only)
 const providerIcons: Record<
   string,
   React.ComponentType<React.SVGProps<SVGSVGElement>>
 > = {
-  openai: TablerBrandOpenai,
-  anthropic: AnthropicIcon,
-  mistral: LogosMistralAiIcon,
   google: GoogleIcon,
-  openrouter: OpenRouterIcon,
 };
 
 export function ModelSelector({
@@ -49,7 +38,8 @@ export function ModelSelector({
 }: React.ComponentProps<"button">) {
   const { selectedModel, setSelectedModel } = useModel();
   const currentModel = getModelById(selectedModel);
-  const providers = getAllProviders();
+  // Only Google provider
+  const providers = getAllProviders().filter((p) => p === "google");
 
   return (
     <DropdownMenu>
@@ -83,12 +73,6 @@ export function ModelSelector({
               <DropdownMenuLabel className="text-muted-foreground flex items-center gap-2 text-xs font-semibold tracking-wider uppercase">
                 <ProviderIcon className="h-4 w-4" />
                 {provider}
-                {provider === "openai" && !hasValidApiKey("openai") && (
-                  <p className="text-xs text-red-500">API Key Required</p>
-                )}
-                {provider === "openrouter" && !hasValidApiKey("openrouter") && (
-                  <p className="text-xs text-green-600">Free Access Available</p>
-                )}
               </DropdownMenuLabel>
               <DropdownMenuGroup>
                 {models.map((model) => (
@@ -105,14 +89,6 @@ export function ModelSelector({
                             {model.name}
                           </span>
                           <div className="flex items-center gap-1">
-                            {model.isPremium && (
-                              <CustomButton
-                                description="Premium model"
-                                className="h-min w-min bg-transparent px-0! py-0!"
-                              >
-                                <MaterialSymbolsDiamondOutline className="text-yellow-500" />
-                              </CustomButton>
-                            )}
                             <ModelInfo modelInfo={model.description} />
                           </div>
                         </div>
@@ -121,9 +97,6 @@ export function ModelSelector({
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuGroup>
-              {provider !== providers[providers.length - 1] && (
-                <DropdownMenuSeparator />
-              )}
             </div>
           );
         })}
@@ -135,7 +108,7 @@ export function ModelSelector({
             href="/settings?tab=api-keys"
           >
             <Key className="h-3 w-3" />
-            Manage API keys for premium access
+            Manage API keys
           </Link>
         </DropdownMenuLabel>
       </DropdownMenuContent>

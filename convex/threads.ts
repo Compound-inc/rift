@@ -316,3 +316,141 @@ export const deleteThread = mutation({
     return null;
   },
 });
+
+// New: Begin assistant streaming lifecycle
+export const startAssistantMessage = mutation({
+  args: {
+    threadId: v.string(),
+    messageId: v.string(),
+    model: v.string(),
+  },
+  returns: v.object({ messageDocId: v.id("messages") }),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+
+    // Ensure thread belongs to user
+    const thread = await ctx.db
+      .query("threads")
+      .withIndex("by_user_and_threadId", (q) =>
+        q.eq("userId", userId).eq("threadId", args.threadId)
+      )
+      .unique();
+
+    if (!thread) {
+      throw new Error("Thread not found or access denied");
+    }
+
+    const now = Date.now();
+
+    const messageDocId = await ctx.db.insert("messages", {
+      messageId: args.messageId,
+      threadId: args.threadId,
+      userId: userId,
+      reasoning: undefined,
+      content: "",
+      status: "streaming" as const,
+      updated_at: now,
+      branches: undefined,
+      role: "assistant" as const,
+      created_at: now,
+      serverError: undefined,
+      model: args.model,
+      attachmentsIds: [],
+      modelParams: undefined,
+      providerMetadata: undefined,
+      backfill: false,
+    });
+
+    // Update thread generation status
+    await ctx.db.patch(thread._id, {
+      generationStatus: "generation" as const,
+      updatedAt: now,
+      lastMessageAt: now,
+    });
+
+    return { messageDocId };
+  },
+});
+
+export const appendAssistantMessageDelta = mutation({
+  args: {
+    messageId: v.string(),
+    delta: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+
+    const message = await ctx.db
+      .query("messages")
+      .withIndex("by_messageId_and_userId", (q) =>
+        q.eq("messageId", args.messageId).eq("userId", userId)
+      )
+      .unique();
+
+    if (!message) {
+      throw new Error("Message not found or access denied");
+    }
+
+    const now = Date.now();
+
+    await ctx.db.patch(message._id, {
+      content: (message.content || "") + args.delta,
+      updated_at: now,
+      status: "streaming" as const,
+    });
+
+    return null;
+  },
+});
+
+export const finalizeAssistantMessage = mutation({
+  args: {
+    messageId: v.string(),
+    ok: v.boolean(),
+    error: v.optional(
+      v.object({
+        type: v.string(),
+        message: v.string(),
+      })
+    ),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+
+    const message = await ctx.db
+      .query("messages")
+      .withIndex("by_messageId_and_userId", (q) =>
+        q.eq("messageId", args.messageId).eq("userId", userId)
+      )
+      .unique();
+
+    if (!message) {
+      throw new Error("Message not found or access denied");
+    }
+
+    // Update message
+    await ctx.db.patch(message._id, {
+      status: args.ok ? ("done" as const) : ("error" as const),
+      serverError: args.ok ? undefined : args.error,
+      updated_at: Date.now(),
+    });
+
+    // Update thread state as well
+    const thread = await ctx.db
+      .query("threads")
+      .withIndex("by_threadId", (q) => q.eq("threadId", message.threadId))
+      .unique();
+
+    if (thread) {
+      await ctx.db.patch(thread._id, {
+        generationStatus: args.ok ? ("compleated" as const) : ("failed" as const),
+        updatedAt: Date.now(),
+        lastMessageAt: Date.now(),
+      });
+    }
+
+    return null;
+  },
+});

@@ -48,7 +48,7 @@ interface ChatMessageAreaProps {
 export function ChatMessageArea({ children, className }: ChatMessageAreaProps) {
   return (
     <ScrollArea className="relative flex-1">
-      <div className={cn(className, "min-h-0")}>{children}</div>
+      <div className={cn(className, "min-h-0 pb-40")}>{children}</div>
     </ScrollArea>
   );
 }

@@ -1,10 +1,6 @@
 import React from "react";
 import { Eye, FileText, Search, ExternalLink, Zap, Key, FlaskConical } from "lucide-react";
 import { GoogleIcon } from "@/components/ui/icons/google-icon";
-import { AnthropicIcon } from "@/components/ui/icons/anthropic-icon";
-import { TablerBrandOpenai } from "@/components/ui/icons/openai-icon";
-import { LogosMistralAiIcon } from "@/components/ui/icons/mistral-icon";
-import { MaterialSymbolsDiamondOutline } from "@/components/ui/icons/diamond-icon";
 
 export interface ModelFeature {
   id: string;
@@ -17,7 +13,7 @@ export interface ModelFeature {
 export interface AIModel {
   id: string;
   name: string;
-  provider: "google" | "anthropic" | "openai" | "mistral";
+  provider: "google";
   description: string;
   features: string[];
   enabled: boolean;
@@ -77,11 +73,6 @@ export const tagIcons: Record<string, React.ReactNode> = {
       <Key className="h-3 w-3 text-blue-500" />
     </span>
   ),
-  premium: (
-    <span title="Premium">
-      <MaterialSymbolsDiamondOutline className="h-3 w-3 text-yellow-500" />
-    </span>
-  ),
 };
 
 export const initialModels: AIModel[] = [
@@ -90,7 +81,7 @@ export const initialModels: AIModel[] = [
     name: "Gemini 2.0 Flash",
     provider: "google",
     description:
-      "Google's flagship model, known for speed and accuracy (and also web search!). Not quite as smart as Claude 3.5 Sonnet, but WAY faster and cheaper. Also has an insanely large context window (it can handle a lot of data).",
+      "Google's fast multi‑modal model with large context.",
     features: ["vision", "pdfs", "search"],
     enabled: false,
     showMore: false,
@@ -102,12 +93,22 @@ export const initialModels: AIModel[] = [
     ],
   },
   {
-    id: "gemini-2.0-flash-lite",
-    name: "Gemini 2.0 Flash Lite",
+    id: "gemini-2.5-flash",
+    name: "Gemini 2.5 Flash",
     provider: "google",
     description:
-      "Similar to 2.0 Flash, but even faster. Optimized for quick responses while maintaining high quality output.",
-    features: ["fast", "vision", "pdfs", "reasoning"],
+      "Google's latest fast model with strong capabilities and web search.",
+    features: ["vision", "pdfs", "search"],
+    enabled: true,
+    showMore: false,
+  },
+  {
+    id: "gemini-2.5-pro",
+    name: "Gemini 2.5 Pro",
+    provider: "google",
+    description:
+      "Higher‑quality Gemini with advanced reasoning and tools.",
+    features: ["reasoning", "pdfs", "search"],
     enabled: false,
     showMore: false,
     modelTags: [
@@ -117,27 +118,8 @@ export const initialModels: AIModel[] = [
       },
     ],
   },
-  {
-    id: "gemini-2.5-flash",
-    name: "Gemini 2.5 Flash",
-    provider: "google",
-    description:
-      "Google's latest fast model, known for speed and accuracy. It also includes web search capabilities for real-time information.",
-    features: ["vision", "pdfs", "search"],
-    enabled: true,
-    showMore: false,
-    modelTags: [
-      {
-        icon: "premium",
-        description: "Premium Model",
-      },
-    ],
-  },
 ];
 
 export const providerIcons = {
   google: <GoogleIcon className="h-6 w-6" />,
-  anthropic: <AnthropicIcon className="h-6 w-6" />,
-  openai: <TablerBrandOpenai className="h-6 w-6" />,
-  mistral: <LogosMistralAiIcon className="h-6 w-6" />,
 }; 
