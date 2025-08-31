@@ -3,6 +3,10 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "@/styles/globals.css";
 import { ConvexClientProvider } from "@/components/ConvexClientProvider";
 import { ThemeProvider } from "next-themes";
+import { Providers } from "./providers";
+import ChatShell from "@/components/ai/ChatShell";
+import ThreadSidebar from "@/components/thread-sidebar";
+import { cookies } from "next/headers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -21,11 +25,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const initialModel = cookieStore.get("selectedModel")?.value;
+
   return (
     <html
       lang="en"
@@ -37,7 +44,11 @@ export default function RootLayout({
       >
         <ConvexClientProvider>
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-            {children}
+            <Providers initialModel={initialModel}>
+              <ChatShell sidebar={<ThreadSidebar />}>
+                {children}
+              </ChatShell>
+            </Providers>
           </ThemeProvider>
         </ConvexClientProvider>
       </body>

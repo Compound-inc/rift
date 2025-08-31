@@ -2,6 +2,5 @@ node_modules
 .next/
 
 .env.local
-
+Reference-ai-chat/
 # clerk configuration (can include secrets)
-/.clerk/
