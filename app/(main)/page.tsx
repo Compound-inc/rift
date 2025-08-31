@@ -1,3 +1,4 @@
+"use client";
 import ChatInterface from "@/components/chat-interface";
 import { HomeMessageHandler } from "@/components/home-message-handler";
 
