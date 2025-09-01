@@ -36,7 +36,7 @@ export default function ChatShell({ children, className, sidebar }: ChatShellPro
   );
 
   return (
-    <div className="h-screen w-full overflow-hidden">
+    <div className="h-[100dvh] w-full overflow-hidden">
       <div className="flex h-full w-full">
         <aside
           className={cn(

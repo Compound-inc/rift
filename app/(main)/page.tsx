@@ -6,10 +6,7 @@ export default function Home() {
   return (
     <HomeMessageHandler>
       {(handleInitialMessage) => (
-        <ChatInterface
-          id="welcome"
-          onInitialMessage={handleInitialMessage}
-        />
+        <ChatInterface id="welcome" onInitialMessage={handleInitialMessage} />
       )}
     </HomeMessageHandler>
   );

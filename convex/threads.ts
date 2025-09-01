@@ -7,7 +7,7 @@ import { paginationOptsValidator } from "convex/server";
  * Create a new thread with an initial message.
  * This mutation is secure and only allows authenticated users to create threads.
  */
-export const createThread = mutation({
+export const nalizeassistantmessage = mutation({
   args: {
     threadId: v.string(), // Client-generated thread ID
     model: v.string(),

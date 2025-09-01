@@ -5,6 +5,7 @@ import { DefaultChatTransport } from "ai";
 import { usePathname, useRouter } from "next/navigation";
 import { generateUUID } from "../lib/utils";
 import { useModel } from "@/contexts/model-context";
+import { useInitialMessage } from "@/contexts/initial-message-context";
 import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Message, MessageContent } from "@/components/ai/message";
@@ -33,9 +34,19 @@ import { Loader } from "@/components/ai/loader";
 import { MODELS } from "@/lib/ai/ai-providers";
 import { usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { GlobeIcon, PaperclipIcon, RefreshCwIcon, CopyIcon, GitBranchIcon, EditIcon } from "lucide-react";
-import { Authenticated, Unauthenticated, AuthLoading, useConvexAuth } from "convex/react";
-import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai/conversation";
+import {
+  PaperclipIcon,
+  RefreshCwIcon,
+  CopyIcon,
+  GitBranchIcon,
+  EditIcon,
+} from "lucide-react";
+import { Authenticated, useConvexAuth } from "convex/react";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from "@/components/ai/conversation";
 
 export default function ChatInterface({
   id,
@@ -51,48 +62,28 @@ export default function ChatInterface({
   const router = useRouter();
   const pathname = usePathname();
   const { selectedModel, setSelectedModel } = useModel();
+  const { consumeInitialMessage } = useInitialMessage();
   const [input, setInput] = useState("");
-  const [optimisticMessages, setOptimisticMessages] = useState<UIMessage[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
+  const autoStartTriggeredRef = useRef(false);
+  const sendMessageRef = useRef<((message: UIMessage) => Promise<void>) | null>(
+    null,
+  );
+  const { isAuthenticated } = useConvexAuth();
 
   const isThread = id !== "welcome";
-  
+
   // Only run the Convex query when authenticated
   const { results: threadDocs = [] } = usePaginatedQuery(
     api.threads.getThreadMessagesPaginated,
     isThread && isAuthenticated ? { threadId: id } : "skip",
-    { initialNumItems: 10 }
+    { initialNumItems: 10 },
   );
 
-  const initialFromConvex: UIMessage[] = useMemo(() => {
-    if (!isThread || !threadDocs || threadDocs.length === 0) return [];
-    const chrono = [...threadDocs].reverse();
-    return chrono.map((m: any) => ({
-      id: m.messageId,
-      role: m.role,
-      parts: [
-        ...(m.reasoning ? [{ type: "reasoning", text: m.reasoning } as any] : []),
-        ...(m.content ? [{ type: "text", text: m.content } as any] : []),
-      ],
-    }));
-  }, [isThread, threadDocs]);
-
-  // Flags to manage one-time autostart
-  const autostartRef = useRef(false);
-  const autostartTriggeredRef = useRef(false);
-
-  const {
-    messages,
-    stop,
-    status,
-    setMessages,
-    sendMessage,
-    regenerate,
-  } = useChat({
+  const { messages, status, setMessages, sendMessage, regenerate } = useChat({
     id,
     generateId: generateUUID,
-    onFinish({ message }: { message: UIMessage }) {
+    onFinish() {
       if (pathname === "/") {
         router.push(`/chat/${id}`);
         router.refresh();
@@ -110,134 +101,169 @@ export default function ChatInterface({
     }),
   });
 
+  // Store sendMessage in ref to prevent useEffect from re-running
+  sendMessageRef.current = sendMessage;
+
   useEffect(() => {
-    if ((initialMessages && initialMessages.length > 0) && messages.length === 0) {
+    if (
+      initialMessages &&
+      initialMessages.length > 0 &&
+      messages.length === 0
+    ) {
       setMessages(initialMessages);
     }
   }, [initialMessages, setMessages, messages.length]);
 
   useEffect(() => {
-    if (messages.length === 0 && initialFromConvex.length > 0 && isAuthenticated) {
-      setMessages(initialFromConvex);
+    if (messages.length === 0 && threadDocs.length > 0 && isAuthenticated) {
+      // Convert Convex messages to UIMessage format
+      const convexMessages = [...threadDocs].reverse().map((m: any) => ({
+        id: m.messageId,
+        role: m.role,
+        parts: [
+          ...(m.reasoning
+            ? [{ type: "reasoning", text: m.reasoning } as any]
+            : []),
+          ...(m.content ? [{ type: "text", text: m.content } as any] : []),
+        ],
+      }));
+      setMessages(convexMessages);
     }
-  }, [messages.length, initialFromConvex, setMessages, isAuthenticated]);
+  }, [messages.length, threadDocs, setMessages, isAuthenticated]);
 
-  // Auto-start assistant generation after redirect when only the first user message is present
+  // Auto-start with initial message from context
   useEffect(() => {
-    if (!isThread || !isAuthenticated) return;
-    if (autostartTriggeredRef.current) return;
-    if (messages.length === 0) return;
-    const hasAssistant = messages.some((m) => m.role === "assistant");
-    const hasUser = messages.some((m) => m.role === "user");
-    if (hasUser && !hasAssistant) {
-      autostartTriggeredRef.current = true;
-      autostartRef.current = true;
-      try {
-        regenerate?.();
-      } finally {
-        setTimeout(() => {
-          autostartRef.current = false;
-        }, 0);
+    if (!autoStartTriggeredRef.current && isThread && isAuthenticated) {
+      const initialMessage = consumeInitialMessage(id);
+
+      if (initialMessage) {
+        // Mark as triggered to prevent duplicate calls
+        autoStartTriggeredRef.current = true;
+
+        // Start AI streaming - this will handle both user message persistence and AI response
+        sendMessageRef.current?.(initialMessage);
       }
     }
-  }, [isThread, messages, regenerate, isAuthenticated]);
+  }, [id, isThread, isAuthenticated, consumeInitialMessage]);
 
-  const renderedMessages: UIMessage[] = useMemo(
-    () => {
-      // Show optimistic messages first, then regular messages
-      if (optimisticMessages.length > 0) {
-        return optimisticMessages;
-      }
-      // Only show Convex messages when authenticated
-      if (isAuthenticated && messages.length > 0) {
+  // Removed auto-start effect - no longer needed with Convex optimistic updates
+  // The AI SDK sendMessage will handle streaming responses automatically
+
+  const renderedMessages: UIMessage[] = useMemo(() => {
+    // Convert Convex messages to UIMessage format for display
+    if (isThread && isAuthenticated && threadDocs.length > 0) {
+      // Convert Convex messages to UIMessage format (oldest-first for display)
+      const convexMessages = [...threadDocs].reverse().map((m: any) => ({
+        id: m.messageId,
+        role: m.role,
+        parts: [
+          ...(m.reasoning
+            ? [{ type: "reasoning", text: m.reasoning } as any]
+            : []),
+          ...(m.content ? [{ type: "text", text: m.content } as any] : []),
+        ],
+      }));
+
+      // If we have AI SDK messages (for streaming), merge them with Convex messages
+      if (messages.length > 0) {
+        // Find the last user message from AI SDK to see if we need to add it
+        const lastUserMessage = messages.find((m) => m.role === "user");
+        if (
+          lastUserMessage &&
+          !convexMessages.some((m) => m.id === lastUserMessage.id)
+        ) {
+          return [...convexMessages, lastUserMessage];
+        }
         return messages;
       }
-      if (isAuthenticated && initialMessages && initialMessages.length > 0) {
-        return initialMessages;
-      }
-      if (isAuthenticated && initialFromConvex.length > 0) {
-        return initialFromConvex;
-      }
-      // Fallback to initial messages for unauthenticated users
-      return initialMessages ?? [];
-    },
-    [optimisticMessages, messages, initialMessages, initialFromConvex, isAuthenticated]
+
+      return convexMessages;
+    }
+
+    // Fallback to AI SDK messages or initial messages
+    if (messages.length > 0) {
+      return messages;
+    }
+    if (initialMessages && initialMessages.length > 0) {
+      return initialMessages;
+    }
+
+    return [];
+  }, [isThread, isAuthenticated, threadDocs, messages, initialMessages]);
+
+  const hasAssistantMessage = useMemo(
+    () => renderedMessages.some((m) => m.role === "assistant"),
+    [renderedMessages],
   );
 
-  const hasAssistantMessage = useMemo(() => renderedMessages.some((m) => m.role === 'assistant'), [renderedMessages]);
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      if (disableInput) return;
+      setInput(e.target.value);
+    },
+    [disableInput],
+  );
 
-  const handleStopStream = useCallback(() => {
-    stop();
-    if (pathname === "/" && isAuthenticated) {
-      router.push(`/chat/${id}`);
-      router.refresh();
-    }
-  }, [stop, pathname, router, id, isAuthenticated]);
+  const handleSubmit = useCallback(
+    async (e?: React.FormEvent) => {
+      e?.preventDefault();
+      if (disableInput || !input.trim()) return;
 
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    if (disableInput) return;
-    setInput(e.target.value);
-  }, [disableInput]);
+      const messageContent = input.trim();
+      const messageId = generateUUID();
 
-  const handleSubmit = useCallback(async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (disableInput || !input.trim()) return;
+      setInput("");
 
-    const messageContent = input.trim();
-    const messageId = generateUUID();
+      try {
+        if (id === "welcome" && onInitialMessage) {
+          // Handle initial message on welcome page
+          const optimisticMessage: UIMessage = {
+            id: messageId,
+            role: "user",
+            parts: [{ type: "text", text: messageContent }],
+          };
 
-    setInput("");
+          // Show optimistic message immediately
+          setMessages([optimisticMessage]);
 
-    try {
-      if (id === "welcome" && onInitialMessage) {
-        // Handle initial message on welcome page
-        const optimisticMessage: UIMessage = {
-          id: messageId,
-          role: "user",
-          parts: [{ type: "text", text: messageContent }],
-        };
-
-        // Show optimistic message immediately
-        setOptimisticMessages([optimisticMessage]);
-
-        // Call the onInitialMessage callback to create thread
-        await onInitialMessage(optimisticMessage);
-      } else if (id !== "welcome") {
-        // Use normal sendMessage for existing threads
-        await sendMessage({
-          id: messageId,
-          role: "user",
-          parts: [{ type: "text", text: messageContent }],
-        });
+          // Call the onInitialMessage callback to create thread and navigate
+          await onInitialMessage(optimisticMessage);
+        } else if (id !== "welcome") {
+          // Use AI SDK sendMessage for streaming response
+          // The API route will handle user message persistence
+          await sendMessage({
+            id: messageId,
+            role: "user",
+            parts: [{ type: "text", text: messageContent }],
+          });
+        }
+      } catch (error) {
+        console.error("Failed to send message:", error);
+        toast.error("Failed to send message. Please try again.");
+        setInput(messageContent);
+        // Clear optimistic messages on error
+        setMessages([]);
       }
-    } catch (error) {
-      console.error("Failed to send message:", error);
-      toast.error("Failed to send message. Please try again.");
-      setInput(messageContent);
-      // Clear optimistic messages on error
-      setOptimisticMessages([]);
-    }
-  }, [disableInput, input, sendMessage, id, onInitialMessage, setOptimisticMessages, isAuthenticated]);
+    },
+    [disableInput, input, id, onInitialMessage, setMessages, sendMessage],
+  );
 
   const handleAttachClick = useCallback(() => {
     if (disableInput) return;
     fileInputRef.current?.click();
   }, [disableInput]);
 
-  const handleFilesSelected = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    if (files.length === 0) return;
-    const names = files.map((f) => `[${f.name}]`).join(" ");
-    setInput((prev) => (prev ? `${prev} ${names}` : names));
-    // reset to allow selecting the same file again
-    e.currentTarget.value = "";
-  }, []);
-
-  const handleWebSearch = useCallback(() => {
-    const q = input.trim();
-    const url = q ? `https://www.google.com/search?q=${encodeURIComponent(q)}` : "https://www.google.com";
-    window.open(url, "_blank", "noopener,noreferrer");
-  }, [input]);
+  const handleFilesSelected = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files ?? []);
+      if (files.length === 0) return;
+      const names = files.map((f) => `[${f.name}]`).join(" ");
+      setInput((prev) => (prev ? `${prev} ${names}` : names));
+      // reset to allow selecting the same file again
+      e.currentTarget.value = "";
+    },
+    [],
+  );
 
   const models = MODELS;
 
@@ -254,21 +280,23 @@ export default function ChatInterface({
                     <MessageContent from={message.role}>
                       {message.parts.map((part: any, i: number) => {
                         switch ((part as any).type) {
-                          case 'text':
+                          case "text":
                             return (
                               <Response key={`${message.id}-${i}`}>
                                 {(part as any).text}
                               </Response>
                             );
-                          case 'reasoning':
+                          case "reasoning":
                             return (
                               <Reasoning
                                 key={`${message.id}-${i}`}
                                 className="w-full"
-                                isStreaming={status === 'streaming'}
+                                isStreaming={status === "streaming"}
                               >
                                 <ReasoningTrigger />
-                                <ReasoningContent>{(part as any).text}</ReasoningContent>
+                                <ReasoningContent>
+                                  {(part as any).text}
+                                </ReasoningContent>
                               </Reasoning>
                             );
                           default:
@@ -278,7 +306,7 @@ export default function ChatInterface({
                     </MessageContent>
                   </Message>
                   {/* Actions appear outside the message */}
-                  {message.role === 'assistant' && (
+                  {message.role === "assistant" && (
                     <div className="px-0">
                       <Actions className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity justify-start">
                         <Action
@@ -292,9 +320,9 @@ export default function ChatInterface({
                           onClick={() => {
                             // Get the text content from all parts
                             const textContent = message.parts
-                              .filter((part: any) => part.type === 'text')
+                              .filter((part: any) => part.type === "text")
                               .map((part: any) => part.text)
-                              .join('\n');
+                              .join("\n");
                             navigator.clipboard.writeText(textContent);
                             toast.success("Copied to clipboard");
                           }}
@@ -317,13 +345,15 @@ export default function ChatInterface({
                     </div>
                   )}
                   {/* Actions for user messages */}
-                  {message.role === 'user' && (
+                  {message.role === "user" && (
                     <div className="px-0">
                       <Actions className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
                         <Action
                           onClick={() => {
                             // TODO: Implement retry for user message
-                            toast.info("Retry user message feature coming soon");
+                            toast.info(
+                              "Retry user message feature coming soon",
+                            );
                           }}
                           label="Retry"
                           tooltip="Retry message"
@@ -344,9 +374,9 @@ export default function ChatInterface({
                           onClick={() => {
                             // Get the text content from all parts
                             const textContent = message.parts
-                              .filter((part: any) => part.type === 'text')
+                              .filter((part: any) => part.type === "text")
                               .map((part: any) => part.text)
-                              .join('\n');
+                              .join("\n");
                             navigator.clipboard.writeText(textContent);
                             toast.success("Copied to clipboard");
                           }}
@@ -370,7 +400,8 @@ export default function ChatInterface({
                   )}
                 </div>
               ))}
-              {(status === 'submitted' || status === 'streaming') && !hasAssistantMessage && <Loader />}
+              {(status === "submitted" || status === "streaming") &&
+                !hasAssistantMessage && <Loader />}
             </ConversationContent>
             <ConversationScrollButton />
           </Conversation>
@@ -385,20 +416,34 @@ export default function ChatInterface({
               onChange={handleInputChange}
               value={input}
               disabled={disableInput || !isAuthenticated}
-              placeholder={!isAuthenticated ? "Sign in to start chatting..." : "Type your message..."}
+              placeholder={
+                !isAuthenticated
+                  ? "Sign in to start chatting..."
+                  : "Type your message..."
+              }
             />
             <PromptInputToolbar>
               <PromptInputTools>
-                <PromptInputButton onClick={handleAttachClick} aria-label="Add attachments" disabled={disableInput || !isAuthenticated}>
+                <PromptInputButton
+                  onClick={handleAttachClick}
+                  aria-label="Add attachments"
+                  disabled={disableInput || !isAuthenticated}
+                >
                   <PaperclipIcon size={16} />
                 </PromptInputButton>
-                <PromptInputModelSelect value={selectedModel} onValueChange={setSelectedModel}>
+                <PromptInputModelSelect
+                  value={selectedModel}
+                  onValueChange={setSelectedModel}
+                >
                   <PromptInputModelSelectTrigger>
                     <PromptInputModelSelectValue />
                   </PromptInputModelSelectTrigger>
                   <PromptInputModelSelectContent>
                     {models.map((model) => (
-                      <PromptInputModelSelectItem key={model.id} value={model.id}>
+                      <PromptInputModelSelectItem
+                        key={model.id}
+                        value={model.id}
+                      >
                         {model.name}
                       </PromptInputModelSelectItem>
                     ))}
@@ -408,7 +453,13 @@ export default function ChatInterface({
               <PromptInputSubmit disabled={disableInput || !isAuthenticated} />
             </PromptInputToolbar>
           </PromptInput>
-          <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFilesSelected} />
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={handleFilesSelected}
+          />
         </div>
       </div>
     </div>

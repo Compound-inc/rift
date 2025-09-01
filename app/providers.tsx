@@ -1,7 +1,7 @@
 "use client";
 
 import { ModelProvider } from "@/contexts/model-context";
-import { ChatCacheProvider } from "@/contexts/chat-cache";
+import { InitialMessageProvider } from "@/contexts/initial-message-context";
 import { ReactNode } from "react";
 
 interface ProvidersProps {
@@ -12,9 +12,7 @@ interface ProvidersProps {
 export function Providers({ children, initialModel }: ProvidersProps) {
   return (
     <ModelProvider initialModel={initialModel}>
-      <ChatCacheProvider>
-        {children}
-      </ChatCacheProvider>
+      <InitialMessageProvider>{children}</InitialMessageProvider>
     </ModelProvider>
   );
-} 
+}
