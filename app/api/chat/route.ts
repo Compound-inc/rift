@@ -5,7 +5,10 @@ import {
   createUIMessageStream,
   createUIMessageStreamResponse,
 } from "ai";
-import { getLanguageModel } from "@/lib/ai/ai-providers";
+import {
+  getLanguageModel,
+  modelSupportsReasoning,
+} from "@/lib/ai/ai-providers";
 import { createToolsForModel, ToolType } from "@/lib/ai/model-tools";
 import { api } from "@/convex/_generated/api";
 import { fetchMutation } from "convex/nextjs";
@@ -184,6 +187,9 @@ export async function POST(req: Request) {
           ? createToolsForModel(modelId, enabledTools)
           : undefined;
 
+      // Check if this is a reasoning model to enable reasoning summaries
+      const useReasoning = modelSupportsReasoning(modelId);
+
       // Start streaming from the model
       const result = streamText({
         // Accept union model from registry
@@ -192,6 +198,14 @@ export async function POST(req: Request) {
         // @ts-expect-error AI SDK
         tools,
         abortSignal: abortSignal,
+        // Add reasoning support for OpenAI reasoning models
+        ...(useReasoning && {
+          providerOptions: {
+            openai: {
+              reasoningSummary: "auto", // Enable reasoning summaries
+            },
+          },
+        }),
         onChunk: async ({ chunk }) => {
           // Skip processing if aborted
           if (abortSignal?.aborted || isAborted) {

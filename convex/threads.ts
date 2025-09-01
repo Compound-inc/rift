@@ -406,7 +406,40 @@ export const appendAssistantMessageDelta = mutation({
     return null;
   },
 });
+/**
+ * Regenerate a message delta for an existing thread.
+ */
+export const regenerateAssistantMessageDelta = mutation({
+  args: {
+    messageId: v.string(),
+    delta: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
 
+    const message = await ctx.db
+      .query("messages")
+      .withIndex("by_messageId_and_userId", (q) =>
+        q.eq("messageId", args.messageId).eq("userId", userId),
+      )
+      .unique();
+
+    if (!message) {
+      throw new Error("Message not found or access denied");
+    }
+
+    const now = Date.now();
+
+    await ctx.db.patch(message._id, {
+      content: (message.content || "") + args.delta,
+      updated_at: now,
+      status: "streaming" as const,
+    });
+
+    return null;
+  },
+});
 // Agent update thread title
 export const autoUpdateThreadTitle = mutation({
   args: {

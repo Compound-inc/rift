@@ -117,9 +117,20 @@ export default function ChatInterface({
     { initialNumItems: 10 },
   );
 
+  // Force useChat to re-initialize when model changes
+  const [chatKey, setChatKey] = useState(0);
+  const prevModelRef = useRef(selectedModel);
+
+  useEffect(() => {
+    if (prevModelRef.current !== selectedModel) {
+      prevModelRef.current = selectedModel;
+      setChatKey((prev) => prev + 1);
+    }
+  }, [selectedModel]);
+
   const { messages, status, setMessages, sendMessage, regenerate, stop } =
     useChat({
-      id,
+      id: `${id}-${chatKey}`,
       generateId: generateUUID,
       onFinish() {
         if (pathname === "/") {
@@ -351,111 +362,157 @@ export default function ChatInterface({
                 <div key={message.id} className="group">
                   <Message from={message.role} key={message.id}>
                     <MessageContent from={message.role}>
-                      {message.parts.map((part, i: number) => {
-                        if (part.type === "text" && "text" in part) {
-                          return (
-                            <Response key={`${message.id}-${i}`}>
-                              {part.text}
-                            </Response>
-                          );
-                        }
-                        if (part.type === "reasoning" && "text" in part) {
-                          return (
-                            <Reasoning
-                              key={`${message.id}-${i}`}
-                              className="w-full"
-                              isStreaming={status === "streaming"}
-                            >
-                              <ReasoningTrigger />
-                              <ReasoningContent>
-                                {(part as { text: string }).text}
-                              </ReasoningContent>
-                            </Reasoning>
-                          );
-                        }
-                        if (part.type === "tool-call") {
-                          const toolCall = part as {
-                            toolName?: string;
-                            args?: unknown;
-                          };
-                          const toolName = toolCall.toolName || "tool";
+                      {(() => {
+                        // Group reasoning parts together
+                        const reasoningParts = message.parts.filter(
+                          (part) => part.type === "reasoning" && "text" in part,
+                        );
+                        const nonReasoningParts = message.parts.filter(
+                          (part) => part.type !== "reasoning",
+                        );
 
-                          return (
-                            <Tool
-                              key={`${message.id}-${i}`}
-                              className="my-2 border-blue-200 bg-blue-50/50"
-                            >
-                              <ToolHeader
-                                type={`tool-${toolName}` as `tool-${string}`}
-                                state="input-available"
-                              />
-                              <ToolContent>
-                                <ToolInput input={toolCall.args || {}} />
-                              </ToolContent>
-                            </Tool>
-                          );
-                        }
-                        if (part.type === "tool-result") {
-                          const toolResult = part as {
-                            toolName?: string;
-                            result?: unknown;
-                            isError?: boolean;
-                          };
-                          const toolName = toolResult.toolName || "tool";
+                        return (
+                          <>
+                            {/* Single reasoning section for all reasoning parts */}
+                            {reasoningParts.length > 0 && (
+                              <Reasoning
+                                key={`${message.id}-reasoning`}
+                                className="w-full mb-4"
+                                isStreaming={status === "streaming"}
+                                defaultOpen={false}
+                              >
+                                <ReasoningTrigger />
+                                <ReasoningContent>
+                                  <div className="bg-gradient-to-r from-blue-50/80 to-purple-50/80 dark:from-blue-950/30 dark:to-purple-950/30 rounded-lg p-5 border border-blue-200/50 dark:border-blue-800/50 shadow-sm">
+                                    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-blue-200/30 dark:border-blue-800/30">
+                                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                                      <div className="text-xs text-blue-700 dark:text-blue-300 font-semibold uppercase tracking-wide">
+                                        AI Reasoning Process
+                                      </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                      {reasoningParts.map((part, i) => (
+                                        <div
+                                          key={i}
+                                          className="relative pl-4 border-l-2 border-blue-300/40 dark:border-blue-700/40"
+                                        >
+                                          <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
+                                            {(part as { text: string }).text}
+                                          </div>
+                                          {i < reasoningParts.length - 1 && (
+                                            <div className="mt-3 mb-1 w-full h-px bg-gradient-to-r from-transparent via-blue-200/50 to-transparent dark:via-blue-800/50"></div>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </ReasoningContent>
+                              </Reasoning>
+                            )}
 
-                          return (
-                            <Tool
-                              key={`${message.id}-${i}`}
-                              className="my-2 border-green-200 bg-green-50/50"
-                            >
-                              <ToolHeader
-                                type={`tool-${toolName}` as `tool-${string}`}
-                                state={
-                                  toolResult.isError
-                                    ? "output-error"
-                                    : "output-available"
-                                }
-                              />
-                              <ToolContent>
-                                <ToolOutput
-                                  output={
-                                    toolName === "google_search" ||
-                                    toolName === "url_context" ? (
-                                      <div className="p-3 text-sm">
-                                        <div className="text-green-700 font-medium mb-2">
-                                          ✓ Successfully retrieved information
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">
-                                          Content has been analyzed and
-                                          integrated into the response above.
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <div className="p-3">
-                                        <pre className="whitespace-pre-wrap text-xs">
-                                          {typeof toolResult.result === "string"
-                                            ? toolResult.result
-                                            : JSON.stringify(
-                                                toolResult.result,
-                                                null,
-                                                2,
-                                              )}
-                                        </pre>
-                                      </div>
-                                    )
-                                  }
-                                  errorText={
-                                    toolResult.isError
-                                      ? "Tool execution failed"
-                                      : ""
-                                  }
-                                />
-                              </ToolContent>
-                            </Tool>
-                          );
-                        }
-                        return null;
-                      })}
+                            {/* Render non-reasoning parts */}
+                            {nonReasoningParts.map((part, i: number) => {
+                              if (part.type === "text" && "text" in part) {
+                                return (
+                                  <Response key={`${message.id}-${i}`}>
+                                    {part.text}
+                                  </Response>
+                                );
+                              }
+                              if (part.type === "tool-call") {
+                                const toolCall = part as {
+                                  toolName?: string;
+                                  args?: unknown;
+                                };
+                                const toolName = toolCall.toolName || "tool";
+
+                                return (
+                                  <Tool
+                                    key={`${message.id}-${i}`}
+                                    className="my-2 border-blue-200 bg-blue-50/50"
+                                  >
+                                    <ToolHeader
+                                      type={
+                                        `tool-${toolName}` as `tool-${string}`
+                                      }
+                                      state="input-available"
+                                    />
+                                    <ToolContent>
+                                      <ToolInput input={toolCall.args || {}} />
+                                    </ToolContent>
+                                  </Tool>
+                                );
+                              }
+                              if (part.type === "tool-result") {
+                                const toolResult = part as {
+                                  toolName?: string;
+                                  result?: unknown;
+                                  isError?: boolean;
+                                };
+                                const toolName = toolResult.toolName || "tool";
+
+                                return (
+                                  <Tool
+                                    key={`${message.id}-${i}`}
+                                    className="my-2 border-green-200 bg-green-50/50"
+                                  >
+                                    <ToolHeader
+                                      type={
+                                        `tool-${toolName}` as `tool-${string}`
+                                      }
+                                      state={
+                                        toolResult.isError
+                                          ? "output-error"
+                                          : "output-available"
+                                      }
+                                    />
+                                    <ToolContent>
+                                      <ToolOutput
+                                        output={
+                                          toolName === "google_search" ||
+                                          toolName === "url_context" ? (
+                                            <div className="p-3 text-sm">
+                                              <div className="text-green-700 font-medium mb-2">
+                                                ✓ Successfully retrieved
+                                                information
+                                              </div>
+                                              <div className="text-xs text-muted-foreground">
+                                                Content has been analyzed and
+                                                integrated into the response
+                                                above.
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div className="p-3">
+                                              <pre className="whitespace-pre-wrap text-xs">
+                                                {typeof toolResult.result ===
+                                                "string"
+                                                  ? toolResult.result
+                                                  : JSON.stringify(
+                                                      toolResult.result,
+                                                      null,
+                                                      2,
+                                                    )}
+                                              </pre>
+                                            </div>
+                                          )
+                                        }
+                                        errorText={
+                                          toolResult.isError
+                                            ? "Tool execution failed"
+                                            : undefined
+                                        }
+                                      />
+                                    </ToolContent>
+                                  </Tool>
+                                );
+                              }
+
+                              return null;
+                            })}
+                          </>
+                        );
+                      })()}
                     </MessageContent>
                   </Message>
                   {/* Actions appear outside the message */}
@@ -475,8 +532,8 @@ export default function ChatInterface({
                               .filter((part) => part.type === "text")
                               .map((part) => (part as { text: string }).text)
                               .join("\n");
-                              await copyToClipboard(textContent);
-                              toast.success("Copied to clipboard");
+                            await copyToClipboard(textContent);
+                            toast.success("Copied to clipboard");
                           }}
                           label="Copy"
                           tooltip="Copy to clipboard"
@@ -528,7 +585,7 @@ export default function ChatInterface({
                               .filter((part) => part.type === "text")
                               .map((part) => (part as { text: string }).text)
                               .join("\n");
-                              await copyToClipboard(textContent);
+                            await copyToClipboard(textContent);
                           }}
                           label="Copy"
                           tooltip="Copy to clipboard"

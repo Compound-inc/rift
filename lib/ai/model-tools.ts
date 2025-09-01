@@ -1,5 +1,6 @@
 // Model-specific tool configurations
 import { google } from "@ai-sdk/google";
+import { anthropic } from "@ai-sdk/anthropic";
 
 // Tool configuration types
 export interface ToolConfig {
@@ -7,7 +8,13 @@ export interface ToolConfig {
   name: string;
   description: string;
   icon: string; // Lucide icon name
-  category: "search" | "context" | "computation" | "media" | "analysis";
+  category:
+    | "none"
+    | "search"
+    | "context"
+    | "computation"
+    | "media"
+    | "analysis";
   requiresAuth: boolean;
   supportedProviders: string[];
   parameters?: Record<string, unknown>;
@@ -22,10 +29,24 @@ export interface ModelToolConfig {
 }
 
 // Available tool types
-export type ToolType = "google_search" | "url_context";
+export type ToolType =
+  | "none"
+  | "google_search"
+  | "url_context"
+  | "web_search"
+  | "anthropic_web_search";
 
 // Tool configurations with metadata
 export const TOOL_CONFIGS: Record<ToolType, ToolConfig> = {
+  none: {
+    id: "none",
+    name: "None",
+    description: "No tool",
+    icon: "None",
+    category: "none",
+    requiresAuth: false,
+    supportedProviders: [],
+  },
   google_search: {
     id: "google_search",
     name: "Web Search",
@@ -45,10 +66,48 @@ export const TOOL_CONFIGS: Record<ToolType, ToolConfig> = {
     requiresAuth: false,
     supportedProviders: ["google"],
   },
+  web_search: {
+    id: "web_search",
+    name: "Web Search",
+    description: "Search the web for real-time information and current events",
+    icon: "Search",
+    category: "search",
+    requiresAuth: false,
+    supportedProviders: ["openai", "google"],
+  },
+  anthropic_web_search: {
+    id: "anthropic_web_search",
+    name: "Web Search",
+    description: "Search the web for real-time information and current events",
+    icon: "Search",
+    category: "search",
+    requiresAuth: false,
+    supportedProviders: ["anthropic"],
+  },
 };
 
 // Model-specific tool configurations
 export const MODEL_TOOLS: Record<string, ModelToolConfig> = {
+  // OpenAI Models
+  "openai:gpt-4o": {
+    modelId: "openai:gpt-4o",
+    supportedTools: [],
+    defaultTools: [],
+    toolImplementations: {},
+  },
+
+  "openai:gpt-4": {
+    modelId: "openai:gpt-4",
+    supportedTools: [],
+    defaultTools: [],
+    toolImplementations: {},
+  },
+  "openai:gpt-3.5-turbo": {
+    modelId: "openai:gpt-3.5-turbo",
+    supportedTools: [],
+    defaultTools: [],
+    toolImplementations: {},
+  },
   // Google Gemini Models
   "google:gemini-2.5-flash": {
     modelId: "google:gemini-2.5-flash",
@@ -70,8 +129,8 @@ export const MODEL_TOOLS: Record<string, ModelToolConfig> = {
   },
   "google:gemini-2.0-flash": {
     modelId: "google:gemini-2.0-flash",
-    supportedTools: ["google_search", "url_context"],
-    defaultTools: ["url_context"],
+    supportedTools: ["none"],
+    defaultTools: ["none"],
     toolImplementations: {
       google_search: () => google.tools.googleSearch({}),
       url_context: () => google.tools.urlContext({}),
@@ -79,12 +138,78 @@ export const MODEL_TOOLS: Record<string, ModelToolConfig> = {
   },
   "google:gemini-2.0-flash-lite": {
     modelId: "google:gemini-2.0-flash-lite",
-    supportedTools: ["google_search", "url_context"],
-    defaultTools: ["url_context"],
+    supportedTools: ["none"],
+    defaultTools: ["none"],
     toolImplementations: {
       google_search: () => google.tools.googleSearch({}),
       url_context: () => google.tools.urlContext({}),
     },
+  },
+  // Anthropic Models
+  "anthropic:claude-opus-4-20250514": {
+    modelId: "anthropic:claude-opus-4-20250514",
+    supportedTools: ["anthropic_web_search"],
+    defaultTools: [],
+    toolImplementations: {
+      anthropic_web_search: () =>
+        anthropic.tools.webSearch_20250305({ maxUses: 5 }),
+    },
+  },
+  "anthropic:claude-sonnet-4-20250514": {
+    modelId: "anthropic:claude-sonnet-4-20250514",
+    supportedTools: ["anthropic_web_search"],
+    defaultTools: [],
+    toolImplementations: {
+      anthropic_web_search: () =>
+        anthropic.tools.webSearch_20250305({ maxUses: 5 }),
+    },
+  },
+  "anthropic:claude-3-7-sonnet-20250219": {
+    modelId: "anthropic:claude-3-7-sonnet-20250219",
+    supportedTools: ["anthropic_web_search"],
+    defaultTools: [],
+    toolImplementations: {
+      anthropic_web_search: () =>
+        anthropic.tools.webSearch_20250305({ maxUses: 5 }),
+    },
+  },
+
+  // OpenAI new models
+  "openai:gpt-5": {
+    modelId: "openai:gpt-5",
+    supportedTools: [],
+    defaultTools: [],
+    toolImplementations: {},
+  },
+  "openai:o3": {
+    modelId: "openai:o3",
+    supportedTools: [],
+    defaultTools: [],
+    toolImplementations: {},
+  },
+  "openai:gpt-4o-nano": {
+    modelId: "openai:gpt-4o-nano",
+    supportedTools: [],
+    defaultTools: [],
+    toolImplementations: {},
+  },
+  "openai:gpt-4.1": {
+    modelId: "openai:gpt-4.1",
+    supportedTools: [],
+    defaultTools: [],
+    toolImplementations: {},
+  },
+  "openai:gpt-4.1-mini": {
+    modelId: "openai:gpt-4.1-mini",
+    supportedTools: [],
+    defaultTools: [],
+    toolImplementations: {},
+  },
+  "openai:gpt-4.1-nano": {
+    modelId: "openai:gpt-4.1-nano",
+    supportedTools: [],
+    defaultTools: [],
+    toolImplementations: {},
   },
 };
 
