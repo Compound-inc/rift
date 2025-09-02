@@ -49,7 +49,6 @@ import { Loader } from "@/components/ai/loader";
 import { MODELS } from "@/lib/ai/ai-providers";
 import { usePaginatedQuery, usePreloadedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { PaperclipIcon, SearchIcon } from "lucide-react";
 import { Authenticated, useConvexAuth, Preloaded } from "convex/react";
 import {
   Conversation,
@@ -672,7 +671,7 @@ export default function ChatInterface({
                   aria-label="Add attachments"
                   disabled={disableInput || (!isAuthenticated && !preloadedMessages)}
                 >
-                  <PaperclipIcon size={16} />
+                  <Image src="/attachements.svg" alt="Add attachments" width={16} height={16} />
                 </PromptInputButton>
                 <TooltipProvider>
                   <Tooltip>
@@ -688,7 +687,7 @@ export default function ChatInterface({
                             : ""
                         }
                       >
-                        <SearchIcon size={16} />
+                        <Image src="/search.svg" alt="Toggle web search" width={16} height={16} />
                       </PromptInputButton>
                     </TooltipTrigger>
                     <TooltipContent side="top" align="center">

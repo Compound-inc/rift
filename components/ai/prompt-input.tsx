@@ -11,7 +11,7 @@ import {
 import { Textarea } from "@/components/ai/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { ChatStatus } from "ai";
-import { Loader2Icon, SendIcon, SquareIcon, XIcon } from "lucide-react";
+import Image from "next/image";
 import type {
   ComponentProps,
   HTMLAttributes,
@@ -134,19 +134,19 @@ export const PromptInputSubmit = ({
   onClick,
   ...props
 }: PromptInputSubmitProps) => {
-  let Icon = <SendIcon className="size-4" />;
+  let Icon = <Image src="/sent.svg" alt="Send" width={16} height={16} className="size-4" />;
   let isStreaming = false;
   let buttonTitle = "Send message";
 
   if (status === "submitted") {
-    Icon = <Loader2Icon className="size-4 animate-spin" />;
+    Icon = <Image src="/loading.svg" alt="Loading" width={16} height={16} className="size-4 animate-spin" />;
     buttonTitle = "Sending...";
   } else if (status === "streaming") {
-    Icon = <SquareIcon className="size-4" />;
+    Icon = <Image src="/stop.svg" alt="Stop" width={16} height={16} className="size-4" />;
     isStreaming = true;
     buttonTitle = "Stop generation";
   } else if (status === "error") {
-    Icon = <XIcon className="size-4" />;
+    Icon = <Image src="/Delete.svg" alt="Error" width={16} height={16} className="size-4" />;
     buttonTitle = "Error occurred";
   }
 
