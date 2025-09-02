@@ -49,10 +49,7 @@ import { Loader } from "@/components/ai/loader";
 import { MODELS } from "@/lib/ai/ai-providers";
 import { usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import {
-  PaperclipIcon,
-  SearchIcon,
-} from "lucide-react";
+import { PaperclipIcon, SearchIcon } from "lucide-react";
 import { Authenticated, useConvexAuth } from "convex/react";
 import {
   Conversation,
@@ -521,7 +518,12 @@ export default function ChatInterface({
                           label="Retry"
                           tooltip="Regenerate response"
                         >
-                          <Image src={'/redo.svg'} alt="Redo" width={16} height={16} />
+                          <Image
+                            src={"/redo.svg"}
+                            alt="Redo"
+                            width={16}
+                            height={16}
+                          />
                         </Action>
                         <Action
                           onClick={async () => {
@@ -535,7 +537,12 @@ export default function ChatInterface({
                           label="Copy"
                           tooltip="Copy to clipboard"
                         >
-                          <Image src={'/copy.svg'} alt="Copy" width={16} height={16} />
+                          <Image
+                            src={"/copy.svg"}
+                            alt="Copy"
+                            width={16}
+                            height={16}
+                          />
                         </Action>
                         <Action
                           onClick={() => {
@@ -545,7 +552,12 @@ export default function ChatInterface({
                           label="Branch"
                           tooltip="Create a new branch"
                         >
-                          <Image src={'/branch.svg'} alt="Branch" width={16} height={16} />
+                          <Image
+                            src={"/branch.svg"}
+                            alt="Branch"
+                            width={16}
+                            height={16}
+                          />
                         </Action>
                       </Actions>
                     </div>
@@ -564,7 +576,12 @@ export default function ChatInterface({
                           label="Retry"
                           tooltip="Retry message"
                         >
-                          <Image src={'/redo.svg'} alt="Redo" width={16} height={16} />
+                          <Image
+                            src={"/redo.svg"}
+                            alt="Redo"
+                            width={16}
+                            height={16}
+                          />
                         </Action>
                         <Action
                           onClick={() => {
@@ -574,7 +591,12 @@ export default function ChatInterface({
                           label="Edit"
                           tooltip="Edit message"
                         >
-                          <Image src={'/edit.svg'} alt="Edit" width={16} height={16} />
+                          <Image
+                            src={"/edit.svg"}
+                            alt="Edit"
+                            width={16}
+                            height={16}
+                          />
                         </Action>
                         <Action
                           onClick={async () => {
@@ -587,7 +609,12 @@ export default function ChatInterface({
                           label="Copy"
                           tooltip="Copy to clipboard"
                         >
-                          <Image src={'/copy.svg'} alt="Copy" width={16} height={16} />
+                          <Image
+                            src={"/copy.svg"}
+                            alt="Copy"
+                            width={16}
+                            height={16}
+                          />
                         </Action>
                         <Action
                           onClick={() => {
@@ -597,7 +624,12 @@ export default function ChatInterface({
                           label="Branch"
                           tooltip="Create a new branch"
                         >
-                          <Image src={'/branch.svg'} alt="Branch" width={16} height={16} />
+                          <Image
+                            src={"/branch.svg"}
+                            alt="Branch"
+                            width={16}
+                            height={16}
+                          />
                         </Action>
                       </Actions>
                     </div>
