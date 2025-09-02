@@ -63,6 +63,37 @@ export const createThread = mutation({
 });
 
 /**
+ * Safe version of getUserThreadsPaginated that returns empty results when unauthenticated.
+ * This prevents the component from crashing when auth hasn't loaded yet.
+ */
+export const getUserThreadsPaginatedSafe = query({
+  args: {
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    // Use the safe auth helper that returns null instead of throwing
+    const identity = await ctx.auth.getUserIdentity();
+
+    // If not authenticated, return empty results
+    if (!identity) {
+      return {
+        page: [],
+        isDone: true,
+        continueCursor: "",
+      };
+    }
+
+    const userId = identity.subject;
+
+    return await ctx.db
+      .query("threads")
+      .withIndex("by_user_and_updatedAt", (q) => q.eq("userId", userId))
+      .order("desc") // Most recently updated first
+      .paginate(args.paginationOpts);
+  },
+});
+
+/**
  * Get thread information (without messages).
  * This query is secure and only returns data for the authenticated user.
  */

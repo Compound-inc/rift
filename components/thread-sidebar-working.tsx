@@ -2,6 +2,7 @@
 
 import { usePreloadedQuery, usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Doc } from "@/convex/_generated/dataModel";
 import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ai/ui/button";
 import { PinIcon, CheckIcon } from "lucide-react";
@@ -10,14 +11,107 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import { Preloaded } from "convex/react";
+import { useAuth } from "@workos-inc/authkit-nextjs/components";
 
 interface ThreadSidebarWorkingProps {
-  preloadedThreads?: Preloaded<typeof api.threads.getUserThreadsPaginated>;
+  preloadedThreads?: Preloaded<typeof api.threads.getUserThreadsPaginatedSafe>;
 }
 
-export function ThreadSidebarWorking({
+// Component that uses preloaded data with seamless pagination fallback
+function ThreadSidebarWithPreloadedData({
   preloadedThreads,
-}: ThreadSidebarWorkingProps) {
+}: {
+  preloadedThreads: Preloaded<typeof api.threads.getUserThreadsPaginatedSafe>;
+}) {
+  const [hasLoadedMore, setHasLoadedMore] = useState(false);
+  const preloadedResults = usePreloadedQuery(preloadedThreads);
+
+  // Always initialize the paginated query for seamless fallback
+  const paginatedResults = usePaginatedQuery(
+    api.threads.getUserThreadsPaginatedSafe,
+    { paginationOpts: { numItems: 20, cursor: null } },
+    { initialNumItems: 20 },
+  );
+
+  // Always prefer preloaded data when available and not exhausted
+  let threads: Doc<"threads">[];
+  let status: "LoadingFirstPage" | "CanLoadMore" | "Exhausted" | "LoadingMore";
+
+  if (!hasLoadedMore && preloadedResults) {
+    // Use preloaded data initially - show instantly
+    threads = preloadedResults.page || [];
+    status = preloadedResults.isDone ? "Exhausted" : "CanLoadMore";
+  } else {
+    // Fall back to paginated data after first loadMore
+    threads = paginatedResults.results || [];
+    status = paginatedResults.status;
+  }
+
+  // If preloaded data exists but is empty and paginated has data, merge them
+  if (
+    !hasLoadedMore &&
+    preloadedResults &&
+    threads.length === 0 &&
+    paginatedResults.results &&
+    paginatedResults.results.length > 0
+  ) {
+    threads = paginatedResults.results;
+    status = paginatedResults.status;
+  }
+
+  const loadMore = (numItems: number) => {
+    if (!hasLoadedMore) {
+      setHasLoadedMore(true);
+    }
+    paginatedResults.loadMore(numItems);
+  };
+
+  return (
+    <ThreadSidebarUI
+      threads={threads}
+      status={status}
+      loadMore={loadMore}
+      hasPreloadedData={!hasLoadedMore}
+    />
+  );
+}
+
+// Component that uses paginated query
+function ThreadSidebarWithPaginatedQuery() {
+  const fallbackResults = usePaginatedQuery(
+    api.threads.getUserThreadsPaginatedSafe,
+    { paginationOpts: { numItems: 20, cursor: null } },
+    { initialNumItems: 20 },
+  );
+
+  const threads = fallbackResults.results || [];
+  const status = fallbackResults.status;
+  const loadMore = (numItems: number) => {
+    fallbackResults.loadMore(numItems);
+  };
+
+  return (
+    <ThreadSidebarUI
+      threads={threads}
+      status={status}
+      loadMore={loadMore}
+      hasPreloadedData={false}
+    />
+  );
+}
+
+// Shared UI component
+function ThreadSidebarUI({
+  threads,
+  status,
+  loadMore,
+  hasPreloadedData,
+}: {
+  threads: Doc<"threads">[];
+  status: "LoadingFirstPage" | "CanLoadMore" | "Exhausted" | "LoadingMore";
+  loadMore: (numItems: number) => void;
+  hasPreloadedData: boolean;
+}) {
   const [searchQuery, setSearchQuery] = useState("");
   const router = useRouter();
   const pathname = usePathname();
@@ -26,35 +120,9 @@ export function ThreadSidebarWorking({
   const [editingTitle, setEditingTitle] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Use preloaded data if available
-  const preloadedResults = preloadedThreads
-    ? usePreloadedQuery(preloadedThreads)
-    : null;
-
-  // Always have fallback for pagination
-  const fallbackResults = usePaginatedQuery(
-    api.threads.getUserThreadsPaginated,
-    { paginationOpts: { numItems: 20, cursor: null } },
-    { initialNumItems: 20 }
-  );
-
-  // Determine which data to use
-  const threads = preloadedResults?.page || fallbackResults.results || [];
-  const status = preloadedResults
-    ? preloadedResults.isDone
-      ? "Exhausted"
-      : "CanLoadMore"
-    : fallbackResults.status;
-  const loadMore = (numItems: number) => {
-    // Always use fallback loadMore for pagination
-    fallbackResults.loadMore(numItems);
-  };
-
-  console.log(
-    "🔄 ThreadSidebarWorking render - threads:",
-    threads.length,
-    "preloaded:",
-    !!preloadedThreads,
+  // Get authentication state
+  const { user, loading: authLoading } = useAuth();
+  const isAuthenticated = !!user && !authLoading;
   );
 
   // Filter threads based on search query
@@ -180,8 +248,8 @@ export function ThreadSidebarWorking({
     }
   };
 
-  // Show loading state only if we have no threads and no preloaded data
-  if (threads.length === 0 && !preloadedThreads && status === "LoadingFirstPage") {
+  // Show loading state if we have no threads and are still loading
+  if (threads.length === 0 && status === "LoadingFirstPage") {
     return (
       <div className="p-4 text-center text-muted-foreground">
         <p className="text-sm">Loading chats...</p>
@@ -370,4 +438,41 @@ export function ThreadSidebarWorking({
       )}
     </>
   );
+}
+
+// Main component that conditionally renders based on preloaded data availability
+export function ThreadSidebarWorking({
+  preloadedThreads,
+}: ThreadSidebarWorkingProps) {
+  const { user, loading: authLoading } = useAuth();
+  const isAuthenticated = !!user && !authLoading;
+
+  // If we have preloaded threads, render them immediately (they're already authenticated server-side)
+  if (preloadedThreads) {
+    return (
+      <ThreadSidebarWithPreloadedData preloadedThreads={preloadedThreads} />
+    );
+  }
+
+  // Only check auth state when we don't have preloaded data
+  // Show loading state when auth is loading
+  if (authLoading) {
+    return (
+      <div className="p-4 text-center text-muted-foreground">
+        <p className="text-sm">Loading...</p>
+      </div>
+    );
+  }
+
+  // If not authenticated, show empty state
+  if (!isAuthenticated) {
+    return (
+      <div className="p-4 text-center text-muted-foreground">
+        <p className="text-sm">Please sign in to view your chats</p>
+      </div>
+    );
+  }
+
+  // Otherwise, use the paginated query component
+  return <ThreadSidebarWithPaginatedQuery />;
 }

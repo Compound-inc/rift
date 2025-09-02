@@ -67,7 +67,7 @@ const scrollbarStyles = `
 `;
 
 interface ThreadSidebarClientProps {
-  preloadedThreads?: Preloaded<typeof api.threads.getUserThreadsPaginated>;
+  preloadedThreads?: Preloaded<typeof api.threads.getUserThreadsPaginatedSafe>;
 }
 
 export function ThreadSidebarClient({
