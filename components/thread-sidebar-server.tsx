@@ -4,10 +4,8 @@ import { getAccessToken } from "@/lib/auth";
 import { ThreadSidebarClient } from "./thread-sidebar-client-component";
 
 // Server component for preloading thread data
-
 export async function ThreadSidebarServer() {
   try {
-    // Get the user's access token
     const accessToken = await getAccessToken();
 
     // If no access token, render without preloaded data
@@ -23,9 +21,7 @@ export async function ThreadSidebarServer() {
     );
 
     return <ThreadSidebarClient preloadedThreads={preloadedThreads} />;
-  } catch (error) {
-    console.error("Failed to preload threads:", error);
-    // Fallback to client-side loading on error
+  } catch {
     return <ThreadSidebarClient />;
   }
 }

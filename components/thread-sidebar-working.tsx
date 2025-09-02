@@ -9,7 +9,7 @@ import { PinIcon, CheckIcon } from "lucide-react";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Preloaded } from "convex/react";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
 
@@ -26,38 +26,35 @@ function ThreadSidebarWithPreloadedData({
   const [hasLoadedMore, setHasLoadedMore] = useState(false);
   const preloadedResults = usePreloadedQuery(preloadedThreads);
 
-  // Always initialize the paginated query for seamless fallback
+  // Always initialize paginated query but use useMemo to prevent flicker
   const paginatedResults = usePaginatedQuery(
     api.threads.getUserThreadsPaginatedSafe,
     { paginationOpts: { numItems: 20, cursor: null } },
     { initialNumItems: 20 },
   );
 
-  // Always prefer preloaded data when available and not exhausted
-  let threads: Doc<"threads">[];
-  let status: "LoadingFirstPage" | "CanLoadMore" | "Exhausted" | "LoadingMore";
-
-  if (!hasLoadedMore && preloadedResults) {
-    // Use preloaded data initially - show instantly
-    threads = preloadedResults.page || [];
-    status = preloadedResults.isDone ? "Exhausted" : "CanLoadMore";
-  } else {
-    // Fall back to paginated data after first loadMore
-    threads = paginatedResults.results || [];
-    status = paginatedResults.status;
-  }
-
-  // If preloaded data exists but is empty and paginated has data, merge them
-  if (
-    !hasLoadedMore &&
-    preloadedResults &&
-    threads.length === 0 &&
-    paginatedResults.results &&
-    paginatedResults.results.length > 0
-  ) {
-    threads = paginatedResults.results;
-    status = paginatedResults.status;
-  }
+  // Stabilize data with useMemo to prevent flicker from background query updates
+  const stableData = useMemo(() => {
+    if (!hasLoadedMore) {
+      // Always use preloaded data until user explicitly loads more
+      const threads = preloadedResults?.page || [];
+      const status = preloadedResults?.isDone
+        ? ("Exhausted" as const)
+        : ("CanLoadMore" as const);
+      return { threads, status };
+    } else {
+      // Use paginated data after first loadMore
+      const threads = paginatedResults.results || [];
+      const status = paginatedResults.status;
+      return { threads, status };
+    }
+  }, [
+    hasLoadedMore,
+    preloadedResults?.page,
+    preloadedResults?.isDone,
+    paginatedResults.results,
+    paginatedResults.status,
+  ]);
 
   const loadMore = (numItems: number) => {
     if (!hasLoadedMore) {
@@ -68,10 +65,9 @@ function ThreadSidebarWithPreloadedData({
 
   return (
     <ThreadSidebarUI
-      threads={threads}
-      status={status}
+      threads={stableData.threads}
+      status={stableData.status}
       loadMore={loadMore}
-      hasPreloadedData={!hasLoadedMore}
     />
   );
 }
@@ -91,12 +87,7 @@ function ThreadSidebarWithPaginatedQuery() {
   };
 
   return (
-    <ThreadSidebarUI
-      threads={threads}
-      status={status}
-      loadMore={loadMore}
-      hasPreloadedData={false}
-    />
+    <ThreadSidebarUI threads={threads} status={status} loadMore={loadMore} />
   );
 }
 
@@ -105,12 +96,10 @@ function ThreadSidebarUI({
   threads,
   status,
   loadMore,
-  hasPreloadedData,
 }: {
   threads: Doc<"threads">[];
   status: "LoadingFirstPage" | "CanLoadMore" | "Exhausted" | "LoadingMore";
   loadMore: (numItems: number) => void;
-  hasPreloadedData: boolean;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const router = useRouter();
@@ -119,11 +108,6 @@ function ThreadSidebarUI({
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // Get authentication state
-  const { user, loading: authLoading } = useAuth();
-  const isAuthenticated = !!user && !authLoading;
-  );
 
   // Filter threads based on search query
   const filteredThreads = threads.filter((thread) =>
@@ -445,7 +429,10 @@ export function ThreadSidebarWorking({
   preloadedThreads,
 }: ThreadSidebarWorkingProps) {
   const { user, loading: authLoading } = useAuth();
-  const isAuthenticated = !!user && !authLoading;
+  const isAuthenticated = useMemo(
+    () => !!user && !authLoading,
+    [user, authLoading],
+  );
 
   // If we have preloaded threads, render them immediately (they're already authenticated server-side)
   if (preloadedThreads) {
