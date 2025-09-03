@@ -11,6 +11,12 @@ import {
   BrainIcon,
   WrenchIcon,
 } from "lucide-react";
+import {
+  AutoIcon,
+  SorpresaIcon,
+  ProblemasDificilesIcon,
+  EscrituraIcon,
+} from "@/components/ui/icons/svg-icons";
 import { cn } from "@/lib/utils";
 import {
   MODELS,
@@ -23,6 +29,7 @@ import { TablerBrandOpenai } from "@/components/ui/icons/openai-icon";
 import { GoogleIcon } from "@/components/ui/icons/google-icon";
 import { XAiIcon } from "@/components/ui/icons/xai-icon";
 import { OpenRouterIcon } from "@/components/ui/icons/openrouter-icon";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ai/ui/tabs";
 
 // Provider icon mapping
 const providerIcons = {
@@ -50,6 +57,46 @@ const providerNames = {
   openrouter: "OpenRouter",
 } as const;
 
+// Recommended options configuration
+const RECOMMENDED_OPTIONS = [
+  {
+    id: "rec:automatico",
+    name: "Automático",
+    description: "Selección inteligente del mejor modelo para tu consulta",
+    icon: AutoIcon,
+    color: "text-blue-500 dark:text-blue-300",
+    bgColor: "hover:bg-blue-50 dark:hover:bg-blue-950/20",
+    borderColor: "hover:border-blue-200 dark:hover:border-blue-800",
+  },
+  {
+    id: "rec:problemas-dificiles",
+    name: "Problemas Difíciles",
+    description: "Modelos especializados en razonamiento complejo",
+    icon: ProblemasDificilesIcon,
+    color: "text-purple-500 dark:text-purple-300",
+    bgColor: "hover:bg-purple-50 dark:hover:bg-purple-950/20",
+    borderColor: "hover:border-purple-200 dark:hover:border-purple-800",
+  },
+  {
+    id: "rec:escritura",
+    name: "Escritura",
+    description: "Optimizado para creación de contenido y redacción",
+    icon: EscrituraIcon,
+    color: "text-emerald-500 dark:text-emerald-300",
+    bgColor: "hover:bg-emerald-50 dark:hover:bg-emerald-950/20",
+    borderColor: "hover:border-emerald-200 dark:hover:border-emerald-800",
+  },
+  {
+    id: "rec:sorpresa",
+    name: "Sorpresa",
+    description: "Deja que el azar elija tu próxima experiencia",
+    icon: SorpresaIcon,
+    color: "text-amber-500 dark:text-amber-300",
+    bgColor: "hover:bg-amber-50 dark:hover:bg-amber-950/20",
+    borderColor: "hover:border-amber-200 dark:hover:border-amber-800",
+  },
+] as const;
+
 interface ModelSelectorProps {
   value: string;
   onValueChange: (value: string) => void;
@@ -61,8 +108,17 @@ function ModelSelector({
   onValueChange,
   className,
 }: ModelSelectorProps) {
+  const [activeTab, setActiveTab] = React.useState<"recomendado" | "avanzado">(
+    "recomendado",
+  );
   const selectedModel = MODELS.find((model) => model.id === value);
   const providers = getAllProviders();
+
+  // Check if current value is a recommended option
+  const selectedRecommended = RECOMMENDED_OPTIONS.find(
+    (option) => option.id === value,
+  );
+  const isRecommendedSelected = !!selectedRecommended;
 
   // Create balanced columns by distributing providers based on model count
   const createBalancedColumns = () => {
@@ -96,27 +152,45 @@ function ModelSelector({
 
   const { leftColumn, rightColumn } = createBalancedColumns();
 
-  const renderColumn = (columnProviders: typeof leftColumn) => (
-    <div className="space-y-6">
-      {columnProviders.map(({ provider, models }) => {
-        const ProviderIcon =
-          providerIcons[provider as keyof typeof providerIcons];
+  const renderRecommendedItems = () => (
+    <>
+      {RECOMMENDED_OPTIONS.map((option) => {
+        const IconComponent = option.icon;
 
         return (
-          <SelectPrimitive.Group key={provider}>
-            <SelectPrimitive.Label className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-popover-text border-b border-border/50">
-              {ProviderIcon && <ProviderIcon className="size-4" />}
-              {providerNames[provider as keyof typeof providerNames] ||
-                provider}
-            </SelectPrimitive.Label>
+          <SelectPrimitive.Item
+            key={option.id}
+            value={option.id}
+            className={cn(
+              "relative flex flex-col items-center gap-4 p-4 mx-3 mb-3 rounded-xl border border-border/30 bg-transparent transition-all duration-200 group cursor-pointer hover:border-border/60 hover:bg-popover-secondary/50 min-h-[120px] outline-none focus:bg-popover-secondary/40 data-[highlighted]:bg-popover-secondary/40 data-[state=checked]:bg-popover-secondary/20 data-[state=checked]:text-popover-text data-[state=checked]:border-border/80",
+            )}
+          >
+            <SelectPrimitive.ItemText>
+              <div className="flex flex-col items-center gap-4">
+                <IconComponent
+                  className={cn("size-6 transition-colors", option.color)}
+                />
 
-            {models.map((model) => (
-              <ModelItem key={model.id} model={model} />
-            ))}
-          </SelectPrimitive.Group>
+                <div className="text-center space-y-1 flex-1 flex flex-col justify-center">
+                  <h4 className="font-medium text-sm text-popover-text">
+                    {option.name}
+                  </h4>
+                  <p className="text-xs text-muted-foreground leading-snug line-clamp-2">
+                    {option.description}
+                  </p>
+                </div>
+              </div>
+            </SelectPrimitive.ItemText>
+
+            <span className="absolute right-3 top-3 flex size-4 items-center justify-center">
+              <SelectPrimitive.ItemIndicator>
+                <CheckIcon className="size-4" />
+              </SelectPrimitive.ItemIndicator>
+            </span>
+          </SelectPrimitive.Item>
         );
       })}
-    </div>
+    </>
   );
 
   return (
@@ -128,7 +202,14 @@ function ModelSelector({
         )}
       >
         <div className="flex items-center gap-2">
-          {selectedModel && (
+          {isRecommendedSelected && selectedRecommended ? (
+            <>
+              <selectedRecommended.icon
+                className={cn("size-4", selectedRecommended.color)}
+              />
+              <span className="font-medium">{selectedRecommended.name}</span>
+            </>
+          ) : selectedModel ? (
             <>
               {(() => {
                 const IconComponent =
@@ -144,6 +225,8 @@ function ModelSelector({
                 <SparklesIcon className="size-3 text-yellow-500" />
               )}
             </>
+          ) : (
+            <span className="font-medium">Seleccionar modelo</span>
           )}
         </div>
         <SelectPrimitive.Icon asChild>
@@ -159,11 +242,97 @@ function ModelSelector({
           position="popper"
           sideOffset={4}
         >
-          <SelectPrimitive.Viewport className="p-6 max-h-[600px] overflow-y-auto">
-            <div className="grid grid-cols-2 gap-8">
-              {renderColumn(leftColumn)}
-              {renderColumn(rightColumn)}
-            </div>
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) =>
+              setActiveTab(value as "recomendado" | "avanzado")
+            }
+          >
+            <TabsList className="w-fit mx-auto bg-popover-secondary p-1 mt-4">
+              <TabsTrigger
+                value="recomendado"
+                className="text-secondary data-[state=active]:bg-popover-main data-[state=active]:text-white px-4 py-2"
+              >
+                Recomendado
+              </TabsTrigger>
+              <TabsTrigger
+                value="avanzado"
+                className="text-secondary data-[state=active]:bg-popover-main data-[state=active]:text-white px-4 py-2"
+              >
+                Avanzado
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <SelectPrimitive.Viewport className="max-h-[600px] overflow-y-auto">
+            {activeTab === "recomendado" && (
+              <div className="px-6 pb-6 pt-2 space-y-6">
+                <div className="text-center mb-6">
+                  <h3 className="text-lg font-semibold text-popover-text mb-2">
+                    Selección Recomendada
+                  </h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Opciones optimizadas para diferentes tipos de tareas
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-0.5">
+                  {renderRecommendedItems()}
+                </div>
+              </div>
+            )}
+
+            {activeTab === "avanzado" && (
+              <div className="p-6">
+                <div className="grid grid-cols-2 gap-8">
+                  <div className="space-y-6">
+                    {leftColumn.map(({ provider, models }) => {
+                      const ProviderIcon =
+                        providerIcons[provider as keyof typeof providerIcons];
+
+                      return (
+                        <SelectPrimitive.Group key={provider}>
+                          <SelectPrimitive.Label className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-popover-text border-b border-border/50">
+                            {ProviderIcon && (
+                              <ProviderIcon className="size-4" />
+                            )}
+                            {providerNames[
+                              provider as keyof typeof providerNames
+                            ] || provider}
+                          </SelectPrimitive.Label>
+
+                          {models.map((model) => (
+                            <ModelItem key={model.id} model={model} />
+                          ))}
+                        </SelectPrimitive.Group>
+                      );
+                    })}
+                  </div>
+                  <div className="space-y-6">
+                    {rightColumn.map(({ provider, models }) => {
+                      const ProviderIcon =
+                        providerIcons[provider as keyof typeof providerIcons];
+
+                      return (
+                        <SelectPrimitive.Group key={provider}>
+                          <SelectPrimitive.Label className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-popover-text border-b border-border/50">
+                            {ProviderIcon && (
+                              <ProviderIcon className="size-4" />
+                            )}
+                            {providerNames[
+                              provider as keyof typeof providerNames
+                            ] || provider}
+                          </SelectPrimitive.Label>
+
+                          {models.map((model) => (
+                            <ModelItem key={model.id} model={model} />
+                          ))}
+                        </SelectPrimitive.Group>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </SelectPrimitive.Viewport>
         </SelectPrimitive.Content>
       </SelectPrimitive.Portal>

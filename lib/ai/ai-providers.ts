@@ -764,7 +764,8 @@ export const registry = createProviderRegistry({}, { separator: ":" });
 
 // Helpers for UI
 export function getModelById(modelId: string): ModelConfig | undefined {
-  return MODELS.find((model) => model.id === modelId);
+  const resolvedModelId = resolveRecommendedModel(modelId);
+  return MODELS.find((model) => model.id === resolvedModelId);
 }
 
 export function getModelsByProvider(provider: string): ModelConfig[] {
@@ -775,6 +776,39 @@ export function getAllProviders(): string[] {
   return Array.from(new Set(MODELS.map((model) => model.provider)));
 }
 
+// Recommended options mapping
+export const RECOMMENDED_OPTIONS_MAP = {
+  "rec:automatico": "openrouter:openai/gpt-oss-120b:nitro", // GPT-OSS-120B
+  "rec:problemas-dificiles": "openai:gpt-5", // GPT-5
+  "rec:escritura": "anthropic:claude-sonnet-4-20250514", // Claude 4 Sonnet
+  "rec:sorpresa": "openrouter:mistralai/magistral-small-latest", // Magistral Small
+} as const;
+
+// Helper function to resolve recommended options to actual model IDs
+export function resolveRecommendedModel(selectedModel: string): string {
+  // If it's already a regular model ID, return as-is
+  if (!selectedModel.startsWith("rec:")) {
+    return selectedModel;
+  }
+
+  // Handle surprise option - now uses fixed model instead of random
+  if (selectedModel === "rec:sorpresa") {
+    return "openrouter:mistralai/magistral-small-latest";
+  }
+
+  // Map other recommended options to specific models
+  const mappedModel =
+    RECOMMENDED_OPTIONS_MAP[
+      selectedModel as keyof typeof RECOMMENDED_OPTIONS_MAP
+    ];
+  return mappedModel || DEFAULT_MODEL;
+}
+
+// Helper function to check if a model ID is a recommended option
+export function isRecommendedOption(modelId: string): boolean {
+  return modelId.startsWith("rec:");
+}
+
 // Default model configuration
 export const DEFAULT_MODEL = "openai:gpt-4o";
 
@@ -782,17 +816,20 @@ export const DEFAULT_MODEL = "openai:gpt-4o";
 export function getModelCapabilities(
   modelId: string,
 ): ModelCapabilities | undefined {
-  const model = getModelById(modelId);
+  const resolvedModelId = resolveRecommendedModel(modelId);
+  const model = getModelById(resolvedModelId);
   return model?.capabilities;
 }
 
 export function getModelSupportedTools(modelId: string): ToolType[] {
-  const model = getModelById(modelId);
+  const resolvedModelId = resolveRecommendedModel(modelId);
+  const model = getModelById(resolvedModelId);
   return model?.supportedTools || [];
 }
 
 export function getModelDefaultTools(modelId: string): ToolType[] {
-  const model = getModelById(modelId);
+  const resolvedModelId = resolveRecommendedModel(modelId);
+  const model = getModelById(resolvedModelId);
   return model?.defaultTools || [];
 }
 
@@ -800,7 +837,8 @@ export function isModelCapable(
   modelId: string,
   capability: keyof ModelCapabilities,
 ): boolean {
-  const capabilities = getModelCapabilities(modelId);
+  const resolvedModelId = resolveRecommendedModel(modelId);
+  const capabilities = getModelCapabilities(resolvedModelId);
   return Boolean(capabilities?.[capability]) || false;
 }
 
@@ -827,19 +865,22 @@ function isReasoningModel(modelName: string): boolean {
 
 // Check if a model supports reasoning based on its capabilities
 export function modelSupportsReasoning(modelId: string): boolean {
-  const capabilities = getModelCapabilities(modelId);
+  const resolvedModelId = resolveRecommendedModel(modelId);
+  const capabilities = getModelCapabilities(resolvedModelId);
   return Boolean(capabilities?.supportsReasoning);
 }
 
 // Resolve language model
 export function getLanguageModel(modelId: string) {
-  if (modelId.startsWith("google:")) {
-    const modelName = modelId.replace("google:", "");
+  // Resolve recommended options to actual model IDs
+  const resolvedModelId = resolveRecommendedModel(modelId);
+  if (resolvedModelId.startsWith("google:")) {
+    const modelName = resolvedModelId.replace("google:", "");
     return google(modelName as any);
   }
 
-  if (modelId.startsWith("openai:")) {
-    const modelName = modelId.replace("openai:", "");
+  if (resolvedModelId.startsWith("openai:")) {
+    const modelName = resolvedModelId.replace("openai:", "");
     // Use responses API for reasoning models
     if (isReasoningModel(modelName)) {
       return openai.responses(modelName as any);
@@ -847,18 +888,18 @@ export function getLanguageModel(modelId: string) {
     return openai(modelName as any);
   }
 
-  if (modelId.startsWith("anthropic:")) {
-    const modelName = modelId.replace("anthropic:", "");
+  if (resolvedModelId.startsWith("anthropic:")) {
+    const modelName = resolvedModelId.replace("anthropic:", "");
     return anthropic(modelName as any);
   }
 
-  if (modelId.startsWith("xai:")) {
-    const modelName = modelId.replace("xai:", "");
+  if (resolvedModelId.startsWith("xai:")) {
+    const modelName = resolvedModelId.replace("xai:", "");
     return xai(modelName as any);
   }
 
-  if (modelId.startsWith("openrouter:")) {
-    const modelName = modelId.replace("openrouter:", "");
+  if (resolvedModelId.startsWith("openrouter:")) {
+    const modelName = resolvedModelId.replace("openrouter:", "");
     const openrouter = createOpenRouter({
       apiKey: process.env.OPENROUTER_API_KEY!,
     });

@@ -1,6 +1,7 @@
 // Model-specific tool configurations
 import { google } from "@ai-sdk/google";
 import { anthropic } from "@ai-sdk/anthropic";
+import { resolveRecommendedModel } from "./ai-providers";
 
 // Tool configuration types
 export interface ToolConfig {
@@ -215,16 +216,19 @@ export const MODEL_TOOLS: Record<string, ModelToolConfig> = {
 
 // Helper functions
 export function getModelTools(modelId: string): ModelToolConfig | undefined {
-  return MODEL_TOOLS[modelId];
+  const resolvedModelId = resolveRecommendedModel(modelId);
+  return MODEL_TOOLS[resolvedModelId];
 }
 
 export function getSupportedTools(modelId: string): ToolType[] {
-  const modelConfig = MODEL_TOOLS[modelId];
+  const resolvedModelId = resolveRecommendedModel(modelId);
+  const modelConfig = MODEL_TOOLS[resolvedModelId];
   return (modelConfig?.supportedTools as ToolType[]) || [];
 }
 
 export function getDefaultTools(modelId: string): ToolType[] {
-  const modelConfig = MODEL_TOOLS[modelId];
+  const resolvedModelId = resolveRecommendedModel(modelId);
+  const modelConfig = MODEL_TOOLS[resolvedModelId];
   return (modelConfig?.defaultTools as ToolType[]) || [];
 }
 
@@ -232,7 +236,8 @@ export function createToolsForModel(
   modelId: string,
   enabledTools: ToolType[] = [],
 ) {
-  const modelConfig = MODEL_TOOLS[modelId];
+  const resolvedModelId = resolveRecommendedModel(modelId);
+  const modelConfig = MODEL_TOOLS[resolvedModelId];
   if (!modelConfig) return {};
 
   const toolsToEnable =
