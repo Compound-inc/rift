@@ -16,8 +16,8 @@ import { fetchMutation } from "convex/nextjs";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { Id } from "@/convex/_generated/dataModel";
 
-// Allow streaming responses up to 30 seconds
-export const maxDuration = 30;
+// Allow streaming responses up to 280 seconds
+export const maxDuration = 280;
 
 export async function POST(req: Request) {
   // Get abort signal from request for proper cancellation
