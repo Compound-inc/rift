@@ -29,16 +29,22 @@ export function UserProfileSection() {
               <Image
                 src="/avatar.png"
                 alt="Loading"
-                width={32}
-                height={32}
+                width={38}
+                height={38}
                 className="w-full h-full object-cover"
               />
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium">Loading...</p>
-            <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full opacity-0">
-              pro
+            <span 
+              className="text-xs px-2 py-0.5 rounded-full font-medium opacity-0"
+              style={{ 
+                backgroundColor: 'rgb(204,244,218,1)', 
+                color: 'rgb(16,161,66,1)' 
+              }}
+            >
+              Plus
             </span>
           </div>
         </div>
@@ -50,8 +56,8 @@ export function UserProfileSection() {
               <Image
                 src="/avatar.png"
                 alt="Loading"
-                width={32}
-                height={32}
+                width={38}
+                height={38}
                 className="w-full h-full object-cover opacity-50"
               />
             </AvatarFallback>
@@ -67,14 +73,14 @@ export function UserProfileSection() {
           <Avatar className="h-8 w-8">
             <AvatarImage
               src={user?.profilePictureUrl || "/avatar.png"}
-              alt={user?.firstName || user?.email || "User"}
+              alt={user?.firstName || "User"}
             />
             <AvatarFallback>
               <Image
                 src="/avatar.png"
                 alt="Default avatar"
-                width={32}
-                height={32}
+                width={38}
+                height={38}
                 className="w-full h-full object-cover"
               />
             </AvatarFallback>
@@ -83,10 +89,16 @@ export function UserProfileSection() {
             <p className="text-sm font-medium truncate">
               {user?.firstName && user?.lastName
                 ? `${user.firstName} ${user.lastName}`
-                : user?.firstName || user?.email || "User"}
+                : user?.firstName || "User"}
             </p>
-            <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
-              pro
+            <span 
+              className="text-xs px-2 py-0.5 rounded-full font-medium"
+              style={{ 
+                backgroundColor: 'rgb(204,244,218,1)', 
+                color: 'rgb(16,161,66,1)' 
+              }}
+            >
+              Plus
             </span>
           </div>
         </div>

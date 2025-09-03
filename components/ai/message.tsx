@@ -37,7 +37,7 @@ export const MessageContent = ({
     className={cn(
       'group flex flex-col gap-2 overflow-hidden px-4 text-foreground text-sm',
       from === 'user' 
-        ? 'bg-primary text-primary-foreground rounded-lg py-3' 
+        ? 'bg-hover text-secondary rounded-lg py-3' 
         : 'bg-transparent text-foreground py-0',
       'is-user:dark',
       className
