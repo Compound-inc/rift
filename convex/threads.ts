@@ -1,7 +1,14 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { getAuthUserId } from "./helpers/getUser";
+import { getAuthUserId, getAuthUserIdentity } from "./helpers/getUser";
 import { paginationOptsValidator } from "convex/server";
+import {
+  extractEntitlementsFromJWT,
+  extractOrganizationIdFromJWT,
+  checkQuotaLimit,
+  incrementQuotaUsage,
+  getOrganizationBillingCycle,
+} from "./helpers/quota";
 
 /**
  * Create a new thread with an initial message.
@@ -101,14 +108,17 @@ export const getUserThreadsPaginatedSafe = query({
       // Pinned threads first
       if (a.pinned && !b.pinned) return -1;
       if (!a.pinned && b.pinned) return 1;
-      
+
       // Then by most recently updated
       return b.updatedAt - a.updatedAt;
     });
 
     // Apply pagination manually
     const startIndex = 0;
-    const endIndex = Math.min(startIndex + args.paginationOpts.numItems, sortedThreads.length);
+    const endIndex = Math.min(
+      startIndex + args.paginationOpts.numItems,
+      sortedThreads.length,
+    );
     const page = sortedThreads.slice(startIndex, endIndex);
     const isDone = endIndex >= sortedThreads.length;
 
@@ -197,8 +207,49 @@ export const sendMessage = mutation({
     messageDocId: v.id("messages"),
   }),
   handler: async (ctx, args) => {
-    // Get the authenticated user ID using the helper
-    const userId = await getAuthUserId(ctx);
+    // Get the authenticated user identity (full JWT token)
+    const identity = await getAuthUserIdentity(ctx);
+    if (!identity) {
+      throw new Error("Unauthenticated call - user must be logged in");
+    }
+
+    console.log(
+      "sendMessage - Full identity:",
+      JSON.stringify(identity, null, 2),
+    );
+
+    // Get the authenticated user ID
+    const userId = identity.subject;
+    console.log("sendMessage - Using userId (subject):", userId);
+
+    // Extract entitlements from JWT token
+    const entitlements = extractEntitlementsFromJWT(identity);
+    if (!entitlements) {
+      throw new Error("No valid entitlements found in user token");
+    }
+
+    // Extract organization ID from JWT token
+    const orgId = extractOrganizationIdFromJWT(identity);
+    if (!orgId) {
+      throw new Error("No organization ID found in user token");
+    }
+
+    // Get organization's billing cycle information
+    const billingCycle = await getOrganizationBillingCycle(ctx, orgId);
+
+    // Check quota limits
+    const quotaCheck = await checkQuotaLimit(
+      ctx,
+      userId,
+      entitlements.messageLimit,
+      billingCycle?.billingCycleStart,
+    );
+
+    if (!quotaCheck.allowed) {
+      throw new Error(
+        `Message quota exceeded. Usage: ${quotaCheck.currentUsage}/${quotaCheck.limit} messages`,
+      );
+    }
 
     // Get current timestamp
     const now = Date.now();
@@ -229,6 +280,9 @@ export const sendMessage = mutation({
     //     messageDocId: existing._id,
     //   };
     // }
+
+    // Increment user's quota usage
+    await incrementQuotaUsage(ctx, userId, billingCycle?.billingCycleStart);
 
     // Create the message
     const messageDocId = await ctx.db.insert("messages", {

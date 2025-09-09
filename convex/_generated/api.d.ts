@@ -9,6 +9,7 @@
  */
 
 import type * as helpers_getUser from "../helpers/getUser.js";
+import type * as helpers_quota from "../helpers/quota.js";
 import type * as http from "../http.js";
 import type * as organizations from "../organizations.js";
 import type * as stripe from "../stripe.js";
@@ -32,6 +33,7 @@ import type {
  */
 declare const fullApi: ApiFromModules<{
   "helpers/getUser": typeof helpers_getUser;
+  "helpers/quota": typeof helpers_quota;
   http: typeof http;
   organizations: typeof organizations;
   stripe: typeof stripe;

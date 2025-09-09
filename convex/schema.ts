@@ -5,7 +5,6 @@ export const providerMetadataValidor = v.optional(
   v.record(v.string(), v.any()),
 );
 
-
 export const MessagesStatusValidor = v.union(
   v.literal("waiting"),
   v.literal("thinking"),
@@ -21,10 +20,14 @@ export default defineSchema({
   users: defineTable({
     email: v.string(),
     workos_id: v.string(),
+    quotaUsage: v.optional(v.number()),
+    lastQuotaResetAt: v.optional(v.number()),
   }),
   organizations: defineTable({
     workos_id: v.string(),
     name: v.string(),
+    billingCycleStart: v.optional(v.number()),
+    billingCycleEnd: v.optional(v.number()),
   }),
   threads: defineTable({
     threadId: v.string(), // User client Defined
