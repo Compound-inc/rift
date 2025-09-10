@@ -68,8 +68,8 @@ export async function checkQuotaLimit(
     // Get user's current quota usage
     const user = await ctx.db
       .query("users")
-      .filter((q) => q.eq(q.field("workos_id"), userId))
-      .first();
+      .withIndex("by_workos_id", (q) => q.eq("workos_id", userId))
+      .unique();
 
     if (!user) {
       throw new Error(`User not found with workos_id: ${userId}`);
@@ -108,8 +108,8 @@ export async function incrementQuotaUsage(
   try {
     const user = await ctx.db
       .query("users")
-      .filter((q) => q.eq(q.field("workos_id"), userId))
-      .first();
+      .withIndex("by_workos_id", (q) => q.eq("workos_id", userId))
+      .unique();
 
     if (!user) {
       throw new Error("User not found");
@@ -154,8 +154,8 @@ export async function getOrganizationBillingCycle(
   try {
     const organization = await ctx.db
       .query("organizations")
-      .filter((q) => q.eq(q.field("workos_id"), orgWorkosId))
-      .first();
+      .withIndex("by_workos_id", (q) => q.eq("workos_id", orgWorkosId))
+      .unique();
 
     if (!organization) {
       return null;

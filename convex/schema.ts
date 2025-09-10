@@ -22,13 +22,13 @@ export default defineSchema({
     workos_id: v.string(),
     quotaUsage: v.optional(v.number()),
     lastQuotaResetAt: v.optional(v.number()),
-  }),
+  }).index("by_workos_id", ["workos_id"]),
   organizations: defineTable({
     workos_id: v.string(),
     name: v.string(),
     billingCycleStart: v.optional(v.number()),
     billingCycleEnd: v.optional(v.number()),
-  }),
+  }).index("by_workos_id", ["workos_id"]),
   threads: defineTable({
     threadId: v.string(), // User client Defined
     title: v.string(),

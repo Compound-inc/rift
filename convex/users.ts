@@ -37,8 +37,8 @@ export const getByWorkOSId = internalQuery({
   handler: async (ctx, args) => {
     const user = await ctx.db
       .query("users")
-      .filter((q) => q.eq(q.field("workos_id"), args.workos_id))
-      .first();
+      .withIndex("by_workos_id", (q) => q.eq("workos_id", args.workos_id))
+      .unique();
     return user;
   },
 });
@@ -50,8 +50,8 @@ export const getCurrentUser = query({
 
     const user = await ctx.db
       .query("users")
-      .filter((q) => q.eq(q.field("workos_id"), userId))
-      .first();
+      .withIndex("by_workos_id", (q) => q.eq("workos_id", userId))
+      .unique();
 
     return user;
   },
@@ -64,8 +64,8 @@ export const resetQuota = internalMutation({
   handler: async (ctx, args) => {
     const user = await ctx.db
       .query("users")
-      .filter((q) => q.eq(q.field("workos_id"), args.userWorkosId))
-      .first();
+      .withIndex("by_workos_id", (q) => q.eq("workos_id", args.userWorkosId))
+      .unique();
 
     if (!user) {
       throw new Error("User not found");
@@ -87,8 +87,8 @@ export const getUserQuotaInfo = query({
 
     const user = await ctx.db
       .query("users")
-      .filter((q) => q.eq(q.field("workos_id"), userId))
-      .first();
+      .withIndex("by_workos_id", (q) => q.eq("workos_id", userId))
+      .unique();
 
     if (!user) {
       return null;

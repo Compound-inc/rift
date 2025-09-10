@@ -213,14 +213,8 @@ export const sendMessage = mutation({
       throw new Error("Unauthenticated call - user must be logged in");
     }
 
-    console.log(
-      "sendMessage - Full identity:",
-      JSON.stringify(identity, null, 2),
-    );
-
     // Get the authenticated user ID
     const userId = identity.subject;
-    console.log("sendMessage - Using userId (subject):", userId);
 
     // Extract entitlements from JWT token
     const entitlements = extractEntitlementsFromJWT(identity);
