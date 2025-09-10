@@ -29,7 +29,9 @@ export default defineSchema({
     stripeCustomerId: v.optional(v.string()),
     billingCycleStart: v.optional(v.number()),
     billingCycleEnd: v.optional(v.number()),
-  }).index("by_workos_id", ["workos_id"]),
+  })
+    .index("by_workos_id", ["workos_id"])
+    .index("by_stripe_customer_id", ["stripeCustomerId"]),
   threads: defineTable({
     threadId: v.string(), // User client Defined
     title: v.string(),

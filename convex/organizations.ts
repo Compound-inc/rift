@@ -103,3 +103,58 @@ export const setStripeCustomerIdByWorkOSId = internalMutation({
     });
   },
 });
+
+export const getOrganizationByStripeCustomerId = internalQuery({
+  args: { stripeCustomerId: v.string() },
+  handler: async (ctx, args) => {
+    const organization = await ctx.db
+      .query("organizations")
+      .withIndex("by_stripe_customer_id", (q) => q.eq("stripeCustomerId", args.stripeCustomerId))
+      .first();
+    return organization;
+  },
+});
+
+export const updateBillingCycleFromStripe = internalMutation({
+  args: {
+    stripeCustomerId: v.string(),
+    billingCycleStart: v.number(),
+    billingCycleEnd: v.number(),
+  },
+  returns: v.id("organizations"),
+  handler: async (ctx, args) => {
+    console.log('Looking for organization with Stripe customer ID:', args.stripeCustomerId);
+    
+    const organization = await ctx.db
+      .query("organizations")
+      .withIndex("by_stripe_customer_id", (q) => q.eq("stripeCustomerId", args.stripeCustomerId))
+      .first();
+
+    console.log('Found organization:', organization);
+
+    if (!organization) {
+      console.log('No organization found, checking all organizations with Stripe customer IDs...');
+      const allOrgs = await ctx.db.query("organizations").collect();
+      const orgsWithStripe = allOrgs.filter(org => org.stripeCustomerId);
+      console.log('Organizations with Stripe customer IDs:', orgsWithStripe.map(org => ({ 
+        id: org._id, 
+        stripeCustomerId: org.stripeCustomerId,
+        name: org.name 
+      })));
+      throw new Error(`Organization not found for Stripe customer ID: ${args.stripeCustomerId}`);
+    }
+
+    console.log('Updating organization:', organization._id, 'with billing cycle:', {
+      start: args.billingCycleStart,
+      end: args.billingCycleEnd
+    });
+
+    await ctx.db.patch(organization._id, {
+      billingCycleStart: args.billingCycleStart,
+      billingCycleEnd: args.billingCycleEnd,
+    });
+
+    console.log('Successfully updated organization billing cycle');
+    return organization._id;
+  },
+});

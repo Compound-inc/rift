@@ -187,4 +187,52 @@ http.route({
   }),
 });
 
+// Stripe webhook endpoint
+http.route({
+  path: "/stripe-webhook",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const bodyText = await request.text();
+    const sigHeader = request.headers.get("stripe-signature");
+
+    if (!sigHeader) {
+      return new Response(JSON.stringify({ error: "Missing stripe-signature header" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    try {
+      // Verify the webhook signature
+      const event = await ctx.runAction(internal.stripe.verifyStripeWebhook, {
+        payload: bodyText,
+        signature: sigHeader,
+      });
+
+      // Handle the webhook event
+      const result = await ctx.runAction(internal.stripe.handleStripeWebhook, {
+        event,
+      });
+
+      return new Response(JSON.stringify({ 
+        status: "success", 
+        eventType: result.eventType 
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Stripe webhook error:", error);
+      
+      return new Response(JSON.stringify({ 
+        error: "Webhook processing failed",
+        message: error instanceof Error ? error.message : "Unknown error"
+      }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }),
+});
+
 export default http;
