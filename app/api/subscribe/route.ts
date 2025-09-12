@@ -51,7 +51,7 @@ export const POST = async (req: NextRequest) => {
 
     const user = await workos.userManagement.getUser(userId);
 
-    // Create Stripe customer with userId in metadata - CRITICAL for the guide's approach
+    // Create Stripe customer
     const customer = await stripe.customers.create({
       email: user.email,
       metadata: {
@@ -97,7 +97,7 @@ export const POST = async (req: NextRequest) => {
       }
     }
 
-    // ALWAYS create checkout with a stripeCustomerId - following the guide
+    // ALWAYS create checkout with a stripeCustomerId
     const session = await stripe.checkout.sessions.create({
       customer: customer.id, // Customer is guaranteed to exist at this point
       billing_address_collection: "auto",

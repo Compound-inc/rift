@@ -76,11 +76,37 @@ export const processStripeEvent = internalAction({
         );
       }
 
-      // Use the new sync function to update all subscription data
+      // Extract billing period from webhook event data
+      let billingPeriod: { start: number; end: number } | undefined;
+
+      if (event.type.startsWith("invoice.")) {
+        const invoice = event.data.object as any;
+        // Get billing period from invoice line items
+        if (invoice.lines?.data?.[0]?.period) {
+          billingPeriod = {
+            start: invoice.lines.data[0].period.start,
+            end: invoice.lines.data[0].period.end,
+          };
+        }
+      } else if (event.type.startsWith("customer.subscription.")) {
+        const subscription = event.data.object as any;
+        if (
+          subscription.current_period_start &&
+          subscription.current_period_end
+        ) {
+          billingPeriod = {
+            start: subscription.current_period_start,
+            end: subscription.current_period_end,
+          };
+        }
+      }
+
+      // Use the sync function with webhook billing period data
       const syncResult: any = await ctx.runAction(
-        internal.organizations.syncStripeDataToConvex,
+        internal.organizations.syncStripeDataWithPeriod,
         {
           stripeCustomerId: customerId,
+          billingPeriod,
         },
       );
 

@@ -163,8 +163,16 @@ export const syncStripeSubscriptionData = internalMutation({
   },
 });
 
-export const syncStripeDataToConvex = internalAction({
-  args: { stripeCustomerId: v.string() },
+export const syncStripeDataWithPeriod = internalAction({
+  args: {
+    stripeCustomerId: v.string(),
+    billingPeriod: v.optional(
+      v.object({
+        start: v.number(),
+        end: v.number(),
+      }),
+    ),
+  },
   handler: async (
     ctx,
     args,
@@ -205,8 +213,8 @@ export const syncStripeDataToConvex = internalAction({
           subscriptionId: subscription.id,
           status: subscription.status,
           priceId: subscription.items.data[0]?.price?.id || null,
-          billingCycleStart: (subscription as any).current_period_start,
-          billingCycleEnd: (subscription as any).current_period_end,
+          billingCycleStart: args.billingPeriod?.start,
+          billingCycleEnd: args.billingPeriod?.end,
           cancelAtPeriodEnd: subscription.cancel_at_period_end,
           paymentMethodBrand:
             subscription.default_payment_method &&

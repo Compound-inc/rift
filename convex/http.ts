@@ -190,7 +190,7 @@ http.route({
   }),
 });
 
-// Stripe webhook endpoint - handles webhooks directly in Convex
+// Stripe webhook endpoint
 http.route({
   path: "/stripe-webhook",
   method: "POST",
@@ -244,7 +244,7 @@ http.route({
   }),
 });
 
-// Stripe success endpoint - handles post-payment sync directly in Convex
+// Stripe success endpoint
 http.route({
   path: "/stripe-success",
   method: "POST",
@@ -281,11 +281,12 @@ http.route({
         );
       }
 
-      // Sync the latest Stripe data
+      // Sync the latest Stripe data (no billing period from success endpoint)
       const syncResult = await ctx.runAction(
-        internal.organizations.syncStripeDataToConvex,
+        internal.organizations.syncStripeDataWithPeriod,
         {
           stripeCustomerId: organization.stripeCustomerId,
+          billingPeriod: undefined,
         },
       );
 
