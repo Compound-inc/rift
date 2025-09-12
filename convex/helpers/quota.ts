@@ -15,7 +15,7 @@ export function extractOrganizationIdFromJWT(
 }
 
 /**
- * Extract entitlements from JWT token claims
+ * Extract entitlements from JWT token claims (DEPRECATED - kept for compatibility)
  */
 export function extractEntitlementsFromJWT(
   identity: { entitlements?: string[] } & Record<string, unknown>,
@@ -56,15 +56,57 @@ export function extractEntitlementsFromJWT(
 }
 
 /**
+ * Get organization's quota limit by type
+ */
+export async function getOrganizationQuotaLimit(
+  ctx: QueryCtx | MutationCtx,
+  orgWorkosId: string,
+  quotaType: "standard" | "premium",
+): Promise<number | null> {
+  try {
+    const organization = await ctx.db
+      .query("organizations")
+      .withIndex("by_workos_id", (q) => q.eq("workos_id", orgWorkosId))
+      .unique();
+
+    if (!organization) {
+      return null;
+    }
+
+    if (quotaType === "standard") {
+      return organization.standardQuotaLimit || null;
+    } else {
+      return organization.premiumQuotaLimit || null;
+    }
+  } catch (error) {
+    console.error(`Error getting organization ${quotaType} quota:`, error);
+    return null;
+  }
+}
+
+/**
  * Check if user is within quota limits
  */
 export async function checkQuotaLimit(
   ctx: QueryCtx | MutationCtx,
   userId: string,
-  messageLimit: number,
+  orgWorkosId: string,
+  quotaType: "standard" | "premium",
   billingCycleStart?: number,
 ): Promise<{ allowed: boolean; currentUsage: number; limit: number }> {
   try {
+    // Get organization's quota limit by type
+    const messageLimit = await getOrganizationQuotaLimit(
+      ctx,
+      orgWorkosId,
+      quotaType,
+    );
+    if (!messageLimit) {
+      throw new Error(
+        `No ${quotaType} quota found for organization: ${orgWorkosId}`,
+      );
+    }
+
     // Get user's current quota usage
     const user = await ctx.db
       .query("users")
@@ -75,7 +117,10 @@ export async function checkQuotaLimit(
       throw new Error(`User not found with workos_id: ${userId}`);
     }
 
-    const currentUsage = user.quotaUsage || 0;
+    const currentUsage =
+      quotaType === "standard"
+        ? user.standardQuotaUsage || 0
+        : user.premiumQuotaUsage || 0;
     const lastResetAt = user.lastQuotaResetAt || 0;
 
     // If we have billing cycle info, check if quota should be reset
@@ -103,6 +148,7 @@ export async function checkQuotaLimit(
 export async function incrementQuotaUsage(
   ctx: MutationCtx,
   userId: string,
+  quotaType: "standard" | "premium",
   billingCycleStart?: number,
 ): Promise<number> {
   try {
@@ -115,27 +161,54 @@ export async function incrementQuotaUsage(
       throw new Error("User not found");
     }
 
-    const currentUsage = user.quotaUsage || 0;
+    const currentUsage =
+      quotaType === "standard"
+        ? user.standardQuotaUsage || 0
+        : user.premiumQuotaUsage || 0;
     const lastResetAt = user.lastQuotaResetAt || 0;
     const now = Date.now();
 
-    // If billing cycle started after last reset, reset usage
+    // If billing cycle started after last reset, reset both quota types
     let newUsage: number;
     let newResetAt: number;
 
     if (billingCycleStart && lastResetAt < billingCycleStart) {
       newUsage = 1; // Start fresh with this message
       newResetAt = now;
+
+      // Reset both quota types when billing cycle resets
+      const resetData: {
+        lastQuotaResetAt: number;
+        standardQuotaUsage: number;
+        premiumQuotaUsage: number;
+      } = {
+        lastQuotaResetAt: newResetAt,
+        standardQuotaUsage: quotaType === "standard" ? 1 : 0,
+        premiumQuotaUsage: quotaType === "premium" ? 1 : 0,
+      };
+
+      await ctx.db.patch(user._id, resetData);
     } else {
       newUsage = currentUsage + 1;
       newResetAt = lastResetAt || now;
-    }
 
-    // Update user's quota usage
-    await ctx.db.patch(user._id, {
-      quotaUsage: newUsage,
-      lastQuotaResetAt: newResetAt,
-    });
+      // Regular increment - only update the specific quota type
+      const updateData: {
+        lastQuotaResetAt: number;
+        standardQuotaUsage?: number;
+        premiumQuotaUsage?: number;
+      } = {
+        lastQuotaResetAt: newResetAt,
+      };
+
+      if (quotaType === "standard") {
+        updateData.standardQuotaUsage = newUsage;
+      } else {
+        updateData.premiumQuotaUsage = newUsage;
+      }
+
+      await ctx.db.patch(user._id, updateData);
+    }
 
     return newUsage;
   } catch (error) {

@@ -17,6 +17,7 @@ import { withAuth } from "@workos-inc/authkit-nextjs";
 import { Id } from "@/convex/_generated/dataModel";
 import { PostHog } from "posthog-node";
 import { withTracing } from "@posthog/ai";
+import { isModelPremium } from "@/lib/ai/ai-providers";
 
 // Allow streaming responses up to 280 seconds
 export const maxDuration = 280;
@@ -35,6 +36,13 @@ export async function POST(req: Request) {
     threadId: string;
     enabledTools?: ToolType[];
   } = await req.json();
+
+  // Determine quota type based on model premium status
+  const quotaType: "standard" | "premium" = isModelPremium(modelId)
+    ? "premium"
+    : "standard";
+
+  console.log(`Using ${quotaType} quota for model: ${modelId}`);
 
   // Return early if request is already aborted
   if (abortSignal?.aborted) {
@@ -426,6 +434,7 @@ export async function POST(req: Request) {
                 content: lastUserText,
                 model: modelId,
                 messageId: lastUserId,
+                quotaType,
               },
               { token: accessToken },
             );

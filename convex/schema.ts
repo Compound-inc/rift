@@ -20,7 +20,8 @@ export default defineSchema({
   users: defineTable({
     email: v.string(),
     workos_id: v.string(),
-    quotaUsage: v.optional(v.number()),
+    standardQuotaUsage: v.optional(v.number()),
+    premiumQuotaUsage: v.optional(v.number()),
     lastQuotaResetAt: v.optional(v.number()),
   }).index("by_workos_id", ["workos_id"]),
   organizations: defineTable({
@@ -29,6 +30,8 @@ export default defineSchema({
     stripeCustomerId: v.optional(v.string()),
     billingCycleStart: v.optional(v.number()),
     billingCycleEnd: v.optional(v.number()),
+    standardQuotaLimit: v.optional(v.number()),
+    premiumQuotaLimit: v.optional(v.number()),
   })
     .index("by_workos_id", ["workos_id"])
     .index("by_stripe_customer_id", ["stripeCustomerId"]),

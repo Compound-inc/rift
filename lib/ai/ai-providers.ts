@@ -871,6 +871,14 @@ export function modelSupportsReasoning(modelId: string): boolean {
 }
 
 // Resolve language model using Vercel AI Gateway
+/**
+ * Check if a model is premium based on its configuration
+ */
+export function isModelPremium(modelId: string): boolean {
+  const model = getModelById(modelId);
+  return model?.isPremium ?? false;
+}
+
 export function getLanguageModel(modelId: string) {
   const resolvedModelId = resolveRecommendedModel(modelId);
 

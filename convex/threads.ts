@@ -3,7 +3,6 @@ import { v } from "convex/values";
 import { getAuthUserId, getAuthUserIdentity } from "./helpers/getUser";
 import { paginationOptsValidator } from "convex/server";
 import {
-  extractEntitlementsFromJWT,
   extractOrganizationIdFromJWT,
   checkQuotaLimit,
   incrementQuotaUsage,
@@ -190,6 +189,7 @@ export const sendMessage = mutation({
     content: v.string(), // Message content
     model: v.string(),
     messageId: v.string(), // Client-generated message ID
+    quotaType: v.union(v.literal("standard"), v.literal("premium")),
     modelParams: v.optional(
       v.object({
         temperature: v.optional(v.number()),
@@ -216,12 +216,6 @@ export const sendMessage = mutation({
     // Get the authenticated user ID
     const userId = identity.subject;
 
-    // Extract entitlements from JWT token
-    const entitlements = extractEntitlementsFromJWT(identity);
-    if (!entitlements) {
-      throw new Error("No valid entitlements found in user token");
-    }
-
     // Extract organization ID from JWT token
     const orgId = extractOrganizationIdFromJWT(identity);
     if (!orgId) {
@@ -231,11 +225,12 @@ export const sendMessage = mutation({
     // Get organization's billing cycle information
     const billingCycle = await getOrganizationBillingCycle(ctx, orgId);
 
-    // Check quota limits
+    // Check quota limits using organization's quota by type
     const quotaCheck = await checkQuotaLimit(
       ctx,
       userId,
-      entitlements.messageLimit,
+      orgId,
+      args.quotaType,
       billingCycle?.billingCycleStart,
     );
 
@@ -276,7 +271,12 @@ export const sendMessage = mutation({
     // }
 
     // Increment user's quota usage
-    await incrementQuotaUsage(ctx, userId, billingCycle?.billingCycleStart);
+    await incrementQuotaUsage(
+      ctx,
+      userId,
+      args.quotaType,
+      billingCycle?.billingCycleStart,
+    );
 
     // Create the message
     const messageDocId = await ctx.db.insert("messages", {

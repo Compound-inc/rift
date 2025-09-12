@@ -16,7 +16,8 @@ export const updateUser = internalMutation({
     patch: v.object({
       email: v.optional(v.string()),
       workos_id: v.optional(v.string()),
-      quotaUsage: v.optional(v.number()),
+      standardQuotaUsage: v.optional(v.number()),
+      premiumQuotaUsage: v.optional(v.number()),
       lastQuotaResetAt: v.optional(v.number()),
     }),
   },
@@ -60,6 +61,9 @@ export const getCurrentUser = query({
 export const resetQuota = internalMutation({
   args: {
     userWorkosId: v.string(),
+    quotaType: v.optional(
+      v.union(v.literal("standard"), v.literal("premium"), v.literal("both")),
+    ),
   },
   handler: async (ctx, args) => {
     const user = await ctx.db
@@ -71,10 +75,23 @@ export const resetQuota = internalMutation({
       throw new Error("User not found");
     }
 
-    await ctx.db.patch(user._id, {
-      quotaUsage: 0,
+    const quotaType = args.quotaType || "both";
+    const updateData: {
+      lastQuotaResetAt: number;
+      standardQuotaUsage?: number;
+      premiumQuotaUsage?: number;
+    } = {
       lastQuotaResetAt: Date.now(),
-    });
+    };
+
+    if (quotaType === "standard" || quotaType === "both") {
+      updateData.standardQuotaUsage = 0;
+    }
+    if (quotaType === "premium" || quotaType === "both") {
+      updateData.premiumQuotaUsage = 0;
+    }
+
+    await ctx.db.patch(user._id, updateData);
 
     return { success: true, resetAt: Date.now() };
   },
@@ -95,7 +112,8 @@ export const getUserQuotaInfo = query({
     }
 
     return {
-      quotaUsage: user.quotaUsage || 0,
+      standardQuotaUsage: user.standardQuotaUsage || 0,
+      premiumQuotaUsage: user.premiumQuotaUsage || 0,
       lastQuotaResetAt: user.lastQuotaResetAt,
     };
   },

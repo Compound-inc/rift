@@ -2,6 +2,9 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 
+// NOTE: The sendMessage mutation now requires a 'quotaType' parameter.
+// If you use these hooks directly, you must provide quotaType: "standard" | "premium"
+
 // Hook for comprehensive thread operations
 export function useConvexThreads() {
   const createThread = useMutation(api.threads.createThread);
@@ -17,49 +20,62 @@ export function useConvexThreads() {
 
 // Hook for message operations
 export function useMessageOperations() {
-  const sendMessage = useMutation(api.threads.sendMessage).withOptimisticUpdate((localStore, args) => {
-    // Try to get existing messages from the local store
-    const existingMessages = localStore.getQuery(api.threads.getThreadMessagesPaginated, { 
-      threadId: args.threadId,
-      paginationOpts: { numItems: 20, cursor: null }
-    });
-    
-    // Only proceed if we have existing messages to update
-    if (existingMessages !== undefined && existingMessages.page) {
-      const newMessage = {
-        _id: `temp_${args.messageId}` as Id<"messages">, // Use the actual messageId for consistency
-        _creationTime: Date.now(),
-        messageId: args.messageId, // This should match exactly
-        threadId: args.threadId,
-        userId: "", // Will be filled by the server
-        content: args.content,
-        status: "done" as const,
-        role: "user" as const,
-        created_at: Date.now(),
-        model: args.model,
-        attachmentsIds: [],
-        modelParams: args.modelParams,
-        backfill: false,
-        reasoning: undefined,
-        updated_at: undefined,
-        branches: undefined,
-        serverError: undefined,
-        providerMetadata: undefined,
-      };
-      
-      // Add the new message to the beginning since messages are ordered desc (newest first)
-      localStore.setQuery(api.threads.getThreadMessagesPaginated, 
-        { threadId: args.threadId, paginationOpts: { numItems: 20, cursor: null } },
+  const sendMessage = useMutation(api.threads.sendMessage).withOptimisticUpdate(
+    (localStore, args) => {
+      // Try to get existing messages from the local store
+      const existingMessages = localStore.getQuery(
+        api.threads.getThreadMessagesPaginated,
         {
-          ...existingMessages,
-          page: [newMessage, ...existingMessages.page],
-        }
+          threadId: args.threadId,
+          paginationOpts: { numItems: 20, cursor: null },
+        },
       );
-    }
-  });
+
+      // Only proceed if we have existing messages to update
+      if (existingMessages !== undefined && existingMessages.page) {
+        const newMessage = {
+          _id: `temp_${args.messageId}` as Id<"messages">, // Use the actual messageId for consistency
+          _creationTime: Date.now(),
+          messageId: args.messageId, // This should match exactly
+          threadId: args.threadId,
+          userId: "", // Will be filled by the server
+          content: args.content,
+          status: "done" as const,
+          role: "user" as const,
+          created_at: Date.now(),
+          model: args.model,
+          attachmentsIds: [],
+          modelParams: args.modelParams,
+          backfill: false,
+          reasoning: undefined,
+          updated_at: undefined,
+          branches: undefined,
+          serverError: undefined,
+          providerMetadata: undefined,
+        };
+
+        // Add the new message to the beginning since messages are ordered desc (newest first)
+        localStore.setQuery(
+          api.threads.getThreadMessagesPaginated,
+          {
+            threadId: args.threadId,
+            paginationOpts: { numItems: 20, cursor: null },
+          },
+          {
+            ...existingMessages,
+            page: [newMessage, ...existingMessages.page],
+          },
+        );
+      }
+    },
+  );
   const startAssistantMessage = useMutation(api.threads.startAssistantMessage);
-  const appendAssistantMessageDelta = useMutation(api.threads.appendAssistantMessageDelta);
-  const finalizeAssistantMessage = useMutation(api.threads.finalizeAssistantMessage);
+  const appendAssistantMessageDelta = useMutation(
+    api.threads.appendAssistantMessageDelta,
+  );
+  const finalizeAssistantMessage = useMutation(
+    api.threads.finalizeAssistantMessage,
+  );
 
   return {
     sendMessage,
@@ -79,7 +95,7 @@ export function useConvexChat() {
     createThread: threads.createThread,
     renameThread: threads.renameThread,
     deleteThread: threads.deleteThread,
-    
+
     // Message operations
     sendMessage: messageOps.sendMessage,
     startAssistantMessage: messageOps.startAssistantMessage,
@@ -102,46 +118,55 @@ export function useDeleteThread() {
 }
 
 export function useSendMessage() {
-  return useMutation(api.threads.sendMessage).withOptimisticUpdate((localStore, args) => {
-    // Try to get existing messages from the local store
-    const existingMessages = localStore.getQuery(api.threads.getThreadMessagesPaginated, { 
-      threadId: args.threadId,
-      paginationOpts: { numItems: 20, cursor: null }
-    });
-    
-    // Only proceed if we have existing messages to update
-    if (existingMessages !== undefined && existingMessages.page) {
-      const newMessage = {
-        _id: `temp_${args.messageId}` as Id<"messages">, // Use the actual messageId for consistency
-        _creationTime: Date.now(),
-        messageId: args.messageId, // This should match exactly
-        threadId: args.threadId,
-        userId: "", // Will be filled by the server
-        content: args.content,
-        status: "done" as const,
-        role: "user" as const,
-        created_at: Date.now(),
-        model: args.model,
-        attachmentsIds: [],
-        modelParams: args.modelParams,
-        backfill: false,
-        reasoning: undefined,
-        updated_at: undefined,
-        branches: undefined,
-        serverError: undefined,
-        providerMetadata: undefined,
-      };
-      
-      // Add the new message to the beginning since messages are ordered desc (newest first)
-      localStore.setQuery(api.threads.getThreadMessagesPaginated, 
-        { threadId: args.threadId, paginationOpts: { numItems: 20, cursor: null } },
+  return useMutation(api.threads.sendMessage).withOptimisticUpdate(
+    (localStore, args) => {
+      // Try to get existing messages from the local store
+      const existingMessages = localStore.getQuery(
+        api.threads.getThreadMessagesPaginated,
         {
-          ...existingMessages,
-          page: [newMessage, ...existingMessages.page],
-        }
+          threadId: args.threadId,
+          paginationOpts: { numItems: 20, cursor: null },
+        },
       );
-    }
-  });
+
+      // Only proceed if we have existing messages to update
+      if (existingMessages !== undefined && existingMessages.page) {
+        const newMessage = {
+          _id: `temp_${args.messageId}` as Id<"messages">, // Use the actual messageId for consistency
+          _creationTime: Date.now(),
+          messageId: args.messageId, // This should match exactly
+          threadId: args.threadId,
+          userId: "", // Will be filled by the server
+          content: args.content,
+          status: "done" as const,
+          role: "user" as const,
+          created_at: Date.now(),
+          model: args.model,
+          attachmentsIds: [],
+          modelParams: args.modelParams,
+          backfill: false,
+          reasoning: undefined,
+          updated_at: undefined,
+          branches: undefined,
+          serverError: undefined,
+          providerMetadata: undefined,
+        };
+
+        // Add the new message to the beginning since messages are ordered desc (newest first)
+        localStore.setQuery(
+          api.threads.getThreadMessagesPaginated,
+          {
+            threadId: args.threadId,
+            paginationOpts: { numItems: 20, cursor: null },
+          },
+          {
+            ...existingMessages,
+            page: [newMessage, ...existingMessages.page],
+          },
+        );
+      }
+    },
+  );
 }
 
 export function useStartAssistantMessage() {

@@ -825,7 +825,10 @@ export default function ChatInterface({
                       </PromptInputButton>
                     </TooltipTrigger>
                     <TooltipContent side="top" align="center">
-                      <p>{isSearchEnabled ? "Desactivar" : "Activar"} búsqueda web</p>
+                      <p>
+                        {isSearchEnabled ? "Desactivar" : "Activar"} búsqueda
+                        web
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         Buscar en la web información actual
                       </p>
