@@ -596,33 +596,23 @@ export default function ChatInterface({
                             <Reasoning
                               key={`${message.id}-reasoning`}
                               className="w-full mb-4"
-                              isStreaming={status === "streaming"}
+                              isStreaming={
+                                status === "streaming" &&
+                                message.id === messages[messages.length - 1]?.id
+                              }
                               defaultOpen={false}
                             >
                               <ReasoningTrigger />
                               <ReasoningContent>
-                                <div className="bg-gradient-to-r from-blue-50/80 to-purple-50/80 dark:from-blue-950/30 dark:to-purple-950/30 rounded-2xl p-5 border border-blue-200/50 dark:border-blue-800/50 shadow-sm">
-                                  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-blue-200/30 dark:border-blue-800/30">
-                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                                    <div className="text-xs text-blue-700 dark:text-blue-300 font-semibold uppercase tracking-wide">
-                                      Proceso de Razonamiento IA
+                                <div className="space-y-2">
+                                  {reasoningParts.map((part, i) => (
+                                    <div
+                                      key={i}
+                                      className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap"
+                                    >
+                                      {(part as { text: string }).text}
                                     </div>
-                                  </div>
-                                  <div className="space-y-3">
-                                    {reasoningParts.map((part, i) => (
-                                      <div
-                                        key={i}
-                                        className="relative pl-4 border-l-2 border-blue-300/40 dark:border-blue-700/40"
-                                      >
-                                        <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
-                                          {(part as { text: string }).text}
-                                        </div>
-                                        {i < reasoningParts.length - 1 && (
-                                          <div className="mt-3 mb-1 w-full h-px bg-gradient-to-r from-transparent via-blue-200/50 to-transparent dark:via-blue-800/50"></div>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
+                                  ))}
                                 </div>
                               </ReasoningContent>
                             </Reasoning>

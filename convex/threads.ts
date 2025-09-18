@@ -564,6 +564,7 @@ export const appendAssistantMessageDelta = mutation({
   args: {
     messageId: v.string(),
     delta: v.string(),
+    reasoningDelta: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -582,11 +583,24 @@ export const appendAssistantMessageDelta = mutation({
 
     const now = Date.now();
 
-    await ctx.db.patch(message._id, {
+    // Prepare update object with content and optional reasoning
+    const updateData: {
+      content: string;
+      updated_at: number;
+      status: "streaming";
+      reasoning?: string;
+    } = {
       content: (message.content || "") + args.delta,
       updated_at: now,
       status: "streaming" as const,
-    });
+    };
+
+    // Add reasoning if provided
+    if (args.reasoningDelta) {
+      updateData.reasoning = (message.reasoning || "") + args.reasoningDelta;
+    }
+
+    await ctx.db.patch(message._id, updateData);
 
     return null;
   },
@@ -667,6 +681,7 @@ export const finalizeAssistantMessage = mutation({
     messageId: v.string(),
     ok: v.boolean(),
     finalContent: v.optional(v.string()), // Add final content parameter
+    finalReasoning: v.optional(v.string()), // Add final reasoning parameter
     error: v.optional(
       v.object({
         type: v.string(),
@@ -695,6 +710,7 @@ export const finalizeAssistantMessage = mutation({
       serverError?: { type: string; message: string };
       updated_at: number;
       content?: string;
+      reasoning?: string;
     } = {
       status: args.ok ? ("done" as const) : ("error" as const),
       serverError: args.ok ? undefined : args.error,
@@ -704,6 +720,11 @@ export const finalizeAssistantMessage = mutation({
     // If final content is provided (manual stop case), save it directly
     if (args.finalContent !== undefined && args.finalContent.length > 0) {
       updateData.content = args.finalContent;
+    }
+
+    // If final reasoning is provided, save it directly
+    if (args.finalReasoning !== undefined && args.finalReasoning.length > 0) {
+      updateData.reasoning = args.finalReasoning;
     }
 
     // Update message

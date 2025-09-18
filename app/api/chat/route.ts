@@ -103,6 +103,7 @@ export async function POST(req: Request) {
       let assistantMessageStarted = false;
       let finalizationPromise: Promise<void> | null = null;
       let totalContent = ""; // Track complete content for finalization
+      let totalReasoning = ""; // Track complete reasoning for finalization
       let isAborted = false; // Track if request was manually aborted
 
       // Fetch auth lazily in parallel
@@ -179,9 +180,11 @@ export async function POST(req: Request) {
 
       // Batch persistence every ~800ms without affecting client stream
       let pendingDelta = "";
+      let pendingReasoning = "";
       let lastFlushAt = Date.now();
       const FLUSH_EVERY_MS = 1500;
       let gotAnyDelta = false;
+      let gotAnyReasoning = false;
       let startAssistantPromise: Promise<
         { messageDocId: Id<"messages"> } | undefined
       > | null = null;
@@ -194,7 +197,11 @@ export async function POST(req: Request) {
 
       const flush = async () => {
         // Double-check abort status before any database operations
-        if (abortSignal?.aborted || pendingDelta.length === 0) return;
+        if (
+          abortSignal?.aborted ||
+          (pendingDelta.length === 0 && pendingReasoning.length === 0)
+        )
+          return;
 
         // Ensure assistant message doc exists before appending deltas
         if (startAssistantPromise) {
@@ -213,8 +220,10 @@ export async function POST(req: Request) {
         if (abortSignal?.aborted) return;
 
         await ensureAuth();
-        const toSend = pendingDelta;
+        const toSendContent = pendingDelta;
+        const toSendReasoning = pendingReasoning;
         pendingDelta = "";
+        pendingReasoning = "";
         lastFlushAt = Date.now();
 
         // Only write to database if not aborted
@@ -223,7 +232,9 @@ export async function POST(req: Request) {
             api.threads.appendAssistantMessageDelta,
             {
               messageId: assistantMessageId,
-              delta: toSend,
+              delta: toSendContent,
+              reasoningDelta:
+                toSendReasoning.length > 0 ? toSendReasoning : undefined,
             },
             { token: accessToken },
           ).catch(() => {});
@@ -260,6 +271,7 @@ export async function POST(req: Request) {
 
               // Send any pending content + accumulated content directly in finalization
               const contentToSave = totalContent + pendingDelta;
+              const reasoningToSave = totalReasoning + pendingReasoning;
 
               await fetchMutation(
                 api.threads.finalizeAssistantMessage,
@@ -267,6 +279,8 @@ export async function POST(req: Request) {
                   messageId: assistantMessageId,
                   ok: true, // Mark as OK since user manually stopped
                   finalContent: contentToSave, // Send all content including pending
+                  finalReasoning:
+                    reasoningToSave.length > 0 ? reasoningToSave : undefined,
                   error: undefined,
                 },
                 { token: accessToken },
@@ -342,6 +356,24 @@ export async function POST(req: Request) {
             ) {
               await flush();
             }
+          } else if (
+            chunk.type === "reasoning-delta" &&
+            "text" in chunk &&
+            typeof (chunk as { text: string }).text === "string" &&
+            (chunk as { text: string }).text.length > 0
+          ) {
+            gotAnyReasoning = true;
+            const reasoningText = (chunk as { text: string }).text;
+            pendingReasoning += reasoningText;
+            totalReasoning += reasoningText; // Accumulate total reasoning
+            const now = Date.now();
+            if (
+              now - lastFlushAt >= FLUSH_EVERY_MS &&
+              !abortSignal?.aborted &&
+              !isAborted
+            ) {
+              await flush();
+            }
           }
         },
         onFinish: async ({ text }) => {
@@ -360,7 +392,8 @@ export async function POST(req: Request) {
 
           finalizationPromise = (async (): Promise<void> => {
             await ensureAuth();
-            const ok = gotAnyDelta || (text?.length ?? 0) > 0;
+            const ok =
+              gotAnyDelta || gotAnyReasoning || (text?.length ?? 0) > 0;
 
             // Wait for assistant message to be created first
             if (startAssistantPromise) {
@@ -377,11 +410,18 @@ export async function POST(req: Request) {
 
             // Only finalize if not aborted
             if (!abortSignal?.aborted) {
+              // Include any remaining reasoning content in finalization
+              const finalReasoningContent = totalReasoning + pendingReasoning;
+
               await fetchMutation(
                 api.threads.finalizeAssistantMessage,
                 {
                   messageId: assistantMessageId,
                   ok,
+                  finalReasoning:
+                    finalReasoningContent.length > 0
+                      ? finalReasoningContent
+                      : undefined,
                   error: ok
                     ? undefined
                     : {
