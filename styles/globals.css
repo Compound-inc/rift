@@ -49,6 +49,7 @@
   --color-hover: var(--hover);
   --color-secundary: var(--secundary);
   --color-popover-main: var(--popover-main);
+  --color-popover-main-s: var(--popover-main-s);
   --color-popover-secondary: var(--popover-secondary);
   --color-popover-text: var(--popover-text);
 }
@@ -78,6 +79,7 @@
   --danger: oklch(0.6417 0.2062 15.77);
 
   --popover-main: oklch(0.2046 0 0 / 85%);
+  --popover-main-s: oklch(0.2046 0 0);
   --popover-secondary: oklch(0.2686 0 0);
   --popover-text: oklch(0.937 0 0);
 

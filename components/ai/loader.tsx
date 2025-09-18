@@ -1,5 +1,5 @@
-import { cn } from '@/lib/utils';
-import type { HTMLAttributes } from 'react';
+import { cn } from "@/lib/utils";
+import type { HTMLAttributes } from "react";
 
 type LoaderIconProps = {
   size?: number;
@@ -9,11 +9,11 @@ const LoaderIcon = ({ size = 16 }: LoaderIconProps) => (
   <svg
     height={size}
     strokeLinejoin="round"
-    style={{ color: 'currentcolor' }}
+    style={{ color: "currentcolor" }}
     viewBox="0 0 16 16"
     width={size}
   >
-    <title>Loader</title>
+    <title></title>
     <g clipPath="url(#clip0_2393_1490)">
       <path d="M8 0V4" stroke="currentColor" strokeWidth="1.5" />
       <path
@@ -86,8 +86,8 @@ export type LoaderProps = HTMLAttributes<HTMLDivElement> & {
 export const Loader = ({ className, size = 16, ...props }: LoaderProps) => (
   <div
     className={cn(
-      'inline-flex animate-spin items-center justify-center',
-      className
+      "inline-flex animate-spin items-center justify-center",
+      className,
     )}
     {...props}
   >

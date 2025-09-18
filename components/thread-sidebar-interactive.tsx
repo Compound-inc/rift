@@ -4,13 +4,19 @@ import { usePreloadedQuery, usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ai/ui/button";
-import { CheckIcon } from "lucide-react";
+import { CheckIcon, AlertTriangleIcon } from "lucide-react";
 import { EditIcon, DeleteIcon, PinIcon } from "@/components/ui/icons/svg-icons";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import { Preloaded } from "convex/react";
+import { Loader } from "@/components/ai/loader";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ai/ui/tooltip";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -23,8 +29,9 @@ import {
 interface Thread {
   threadId: string;
   title: string;
-  pinned?: boolean;
+  pinned: boolean;
   _creationTime: number;
+  generationStatus: "pending" | "generation" | "compleated" | "failed";
 }
 
 interface ThreadSidebarInteractiveProps {
@@ -340,12 +347,49 @@ export function ThreadSidebarInteractive({
                     </Button>
                   </div>
                 ) : (
-                  <h3 className="text-sm font-medium truncate h-5 leading-5">
-                    {thread.title}
-                  </h3>
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <h3 className="text-sm font-medium truncate h-5 leading-5 flex-1">
+                      {thread.title}
+                    </h3>
+                    {(thread.generationStatus === "pending" ||
+                      thread.generationStatus === "generation") && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex-shrink-0">
+                            <Loader
+                              size={14}
+                              className="text-muted-foreground hover:text-muted-foreground transition-colors"
+                            />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" sideOffset={8}>
+                          <p>
+                            {thread.generationStatus === "pending"
+                              ? "Preparando respuesta..."
+                              : "Generando respuesta..."}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    {thread.generationStatus === "failed" && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex-shrink-0">
+                            <AlertTriangleIcon
+                              size={14}
+                              className="text-destructive/70 hover:text-destructive transition-colors"
+                            />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" sideOffset={8}>
+                          <p>Error al generar la respuesta</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
                 )}
                 {thread.pinned && (
-                  <PinIcon className="h-3 w-3 text-popover-text flex-shrink-0" />
+                  <PinIcon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                 )}
               </div>
             </div>
