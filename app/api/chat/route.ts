@@ -8,59 +8,111 @@ import {
 } from "ai";
 import {
   getLanguageModel,
-  modelSupportsReasoning,
+  getProviderOptions,
+  isPremium,
 } from "@/lib/ai/ai-providers";
-import { createToolsForModel, ToolType } from "@/lib/ai/model-tools";
+import { createToolsForModel } from "@/lib/ai/model-tools";
+import { ToolType } from "@/lib/ai/config/base";
 import { api } from "@/convex/_generated/api";
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { Id } from "@/convex/_generated/dataModel";
 import { PostHog } from "posthog-node";
 import { withTracing } from "@posthog/ai";
-import { isModelPremium } from "@/lib/ai/ai-providers";
 
 // Allow streaming responses up to 280 seconds
 export const maxDuration = 280;
 
-export async function POST(req: Request) {
-  // Get abort signal from request for proper cancellation
-  const abortSignal = req.signal;
-  const {
-    messages,
-    modelId,
-    threadId,
-    enabledTools = [],
-  }: {
-    messages: UIMessage[];
-    modelId: string;
-    threadId: string;
-    enabledTools?: ToolType[];
-  } = await req.json();
+// Enhanced error boundary wrapper
+async function withErrorBoundary<T>(
+  operation: () => Promise<T>,
+  errorMessage: string,
+  statusCode: number = 500,
+): Promise<T | Response> {
+  try {
+    return await operation();
+  } catch (error) {
+    console.error(`${errorMessage}:`, error);
+    return new Response(
+      JSON.stringify({
+        error: errorMessage,
+        message: error instanceof Error ? error.message : "Unknown error",
+      }),
+      {
+        status: statusCode,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+}
 
-  // Determine quota type based on model premium status
-  const quotaType: "standard" | "premium" = isModelPremium(modelId)
+// Optimized auth context
+interface AuthContext {
+  accessToken: string;
+  user: { id: string; organizationId?: string };
+}
+
+async function getAuthContext(): Promise<AuthContext | Response> {
+  return withErrorBoundary(
+    async () => {
+      const authResult = await withAuth();
+      if (!authResult.accessToken || !authResult.user) {
+        throw new Error("Unauthorized");
+      }
+      return {
+        accessToken: authResult.accessToken,
+        user: {
+          id: authResult.user.id,
+          organizationId: authResult.organizationId,
+        },
+      };
+    },
+    "Authentication failed",
+    401,
+  );
+}
+
+export async function POST(req: Request) {
+  // Get abort signal and early abort check
+  const abortSignal = req.signal;
+  if (abortSignal?.aborted) {
+    return new Response("Request aborted", { status: 499 });
+  }
+
+  // Parse request with error boundary
+  const requestData = await withErrorBoundary(
+    async () => {
+      return (await req.json()) as {
+        messages: UIMessage[];
+        modelId: string;
+        threadId: string;
+        enabledTools?: ToolType[];
+      };
+    },
+    "Invalid request data",
+    400,
+  );
+
+  if (requestData instanceof Response) return requestData;
+
+  const { messages, modelId, threadId, enabledTools = [] } = requestData;
+
+  // Determine quota type
+  const quotaType: "standard" | "premium" = isPremium(modelId)
     ? "premium"
     : "standard";
 
   console.log(`Using ${quotaType} quota for model: ${modelId}`);
 
-  // Return early if request is already aborted
-  if (abortSignal?.aborted) {
-    return new Response("Request aborted", { status: 499 });
-  }
+  // Optimized auth and quota check
+  const authContext = await getAuthContext();
+  if (authContext instanceof Response) return authContext;
 
-  // Check quota limits BEFORE making any AI calls
-  try {
-    const authResult = await withAuth();
-    if (!authResult.accessToken || !authResult.user) {
-      return new Response("Unauthorized", { status: 401 });
-    }
-
-    // Check both quota types to provide complete information
+  const quotaCheck = await withErrorBoundary(async () => {
     const bothQuotas = await fetchQuery(
       api.users.getUserBothQuotas,
       {},
-      { token: authResult.accessToken },
+      { token: authContext.accessToken },
     );
 
     const currentQuota = bothQuotas[quotaType];
@@ -68,7 +120,7 @@ export async function POST(req: Request) {
       bothQuotas[quotaType === "premium" ? "standard" : "premium"];
 
     if (!currentQuota.allowed) {
-      return new Response(
+      throw new Response(
         JSON.stringify({
           error: "Quota exceeded",
           message: `Message quota exceeded. Usage: ${currentQuota.currentUsage}/${currentQuota.limit} messages`,
@@ -82,19 +134,11 @@ export async function POST(req: Request) {
         },
       );
     }
-  } catch (error) {
-    console.error("Quota check failed:", error);
-    return new Response(
-      JSON.stringify({
-        error: "Quota check failed",
-        message: "Unable to verify quota limits",
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
-  }
+
+    return { currentQuota, otherQuota };
+  }, "Quota check failed");
+
+  if (quotaCheck instanceof Response) return quotaCheck;
 
   const stream = createUIMessageStream({
     originalMessages: messages,
@@ -102,83 +146,67 @@ export async function POST(req: Request) {
       const assistantMessageId = crypto.randomUUID();
       let assistantMessageStarted = false;
       let finalizationPromise: Promise<void> | null = null;
-      let totalContent = ""; // Track complete content for finalization
-      let totalReasoning = ""; // Track complete reasoning for finalization
-      let isAborted = false; // Track if request was manually aborted
+      let totalContent = "";
+      let totalReasoning = "";
+      let isAborted = false;
 
-      // Fetch auth lazily in parallel
-      let accessToken: string | undefined;
-      let user: { id?: string; organizationId?: string } | undefined;
-      const authPromise = withAuth()
-        .then((authResult) => {
-          accessToken = authResult.accessToken;
-          user = authResult.user
-            ? {
-                id: authResult.user.id,
-                organizationId: authResult.organizationId,
-              }
-            : undefined;
-        })
-        .catch((err) => {
-          console.error("withAuth failed", err);
-        });
+      // Use pre-authenticated context
+      const { accessToken, user } = authContext;
 
-      // Immediately signal start to the client so spinner shows instantly
+      // Immediately signal start to the client
       writer.write({ type: "start", messageId: assistantMessageId });
 
-      // Wait for auth before setting up model
-      await authPromise;
-
-      // Set up PostHog AI tracking
       let languageModel = getLanguageModel(modelId);
 
-      // Wrap with PostHog tracking if key is available
-      if (process.env.NEXT_PUBLIC_POSTHOG_KEY) {
-        try {
-          const phClient = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
+      // PostHog tracking
+      const setupPostHogTracking = async () => {
+        if (!process.env.NEXT_PUBLIC_POSTHOG_KEY) return languageModel;
+
+        const result = await withErrorBoundary(async () => {
+          const phClient = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
             host: "https://us.i.posthog.com",
-            flushAt: 1, // Flush immediately to ensure events are sent
-            flushInterval: 0, // Don't wait for interval
+            flushAt: 1,
+            flushInterval: 0,
           });
 
-          languageModel = withTracing(languageModel, phClient, {
-            posthogDistinctId: user?.id,
+          const tracedModel = withTracing(languageModel, phClient, {
+            posthogDistinctId: user.id,
             posthogTraceId: threadId,
             posthogProperties: {
               conversationId: threadId,
               model: modelId,
-              // Additional context for debugging and analytics
               requestId: assistantMessageId,
               enabledTools:
                 enabledTools.length > 0 ? enabledTools.join(",") : undefined,
             },
-            posthogPrivacyMode: false, // Set to true to avoid logging prompts/responses
-            ...(user?.organizationId && {
+            posthogPrivacyMode: false,
+            ...(user.organizationId && {
               posthogGroups: { organization: user.organizationId },
             }),
           });
 
-          // Clean shutdown after request completes
-          const cleanupPostHog = () => {
+          // Cleanup handler
+          const cleanup = () => {
             try {
               phClient.shutdown();
             } catch (e) {
-              console.warn("Error shutting down PostHog:", e);
+              console.warn("PostHog shutdown error:", e);
             }
           };
 
-          // Register cleanup for various exit scenarios
-          process.on("beforeExit", cleanupPostHog);
-          if (abortSignal) {
-            abortSignal.addEventListener("abort", cleanupPostHog);
-          }
-        } catch (error) {
-          console.warn("Failed to initialize PostHog AI tracking:", error);
-        }
-      }
+          process.on("beforeExit", cleanup);
+          abortSignal?.addEventListener("abort", cleanup);
+
+          return tracedModel;
+        }, "PostHog setup failed");
+
+        return result instanceof Response ? languageModel : result;
+      };
+
+      languageModel = await setupPostHogTracking();
       console.debug("AI streaming with model", modelId);
 
-      // Batch persistence every ~800ms without affecting client stream
+      // Batch persistence every ~1500ms without affecting client stream
       let pendingDelta = "";
       let pendingReasoning = "";
       let lastFlushAt = Date.now();
@@ -189,46 +217,34 @@ export async function POST(req: Request) {
         { messageDocId: Id<"messages"> } | undefined
       > | null = null;
 
-      const ensureAuth = async () => {
-        if (!accessToken) {
-          await authPromise;
-        }
-      };
-
       const flush = async () => {
-        // Double-check abort status before any database operations
         if (
           abortSignal?.aborted ||
+          isAborted ||
           (pendingDelta.length === 0 && pendingReasoning.length === 0)
         )
           return;
 
-        // Ensure assistant message doc exists before appending deltas
         if (startAssistantPromise) {
           try {
             const result = await startAssistantPromise;
-            if (!result) {
-              return; // Skip persisting if message creation failed
-            }
+            if (!result) return;
           } catch {
-            // If creation failed, skip persisting deltas
             return;
           }
         }
 
-        // Final abort check before database write
-        if (abortSignal?.aborted) return;
+        if (abortSignal?.aborted || isAborted) return;
 
-        await ensureAuth();
         const toSendContent = pendingDelta;
         const toSendReasoning = pendingReasoning;
         pendingDelta = "";
         pendingReasoning = "";
         lastFlushAt = Date.now();
 
-        // Only write to database if not aborted
-        if (!abortSignal?.aborted) {
-          fetchMutation(
+        // Error handling for database operations
+        await withErrorBoundary(async () => {
+          await fetchMutation(
             api.threads.appendAssistantMessageDelta,
             {
               messageId: assistantMessageId,
@@ -237,58 +253,50 @@ export async function POST(req: Request) {
                 toSendReasoning.length > 0 ? toSendReasoning : undefined,
             },
             { token: accessToken },
-          ).catch(() => {});
-        }
+          );
+        }, "Failed to flush message delta");
       };
 
-      // Listen for abort from client
+      // Abort handling with error boundaries
       const handleAbort = async () => {
-        if (isAborted) return; // Prevent double execution
+        if (isAborted) return;
         isAborted = true;
 
-        // If we abort before starting assistant message, don't try to finalize
-        if (!assistantMessageStarted && !startAssistantPromise) {
-          return;
-        }
+        if (!assistantMessageStarted && !startAssistantPromise) return;
 
         if (!finalizationPromise) {
-          finalizationPromise = (async (): Promise<void> => {
-            try {
-              await ensureAuth();
-
-              // Wait for assistant message to be created first
-              if (startAssistantPromise) {
-                try {
-                  const result = await startAssistantPromise;
-                  if (!result) {
-                    return;
-                  }
-                } catch (e) {
-                  console.error("Failed to create assistant message:", e);
-                  return;
-                }
+          const result = withErrorBoundary(async () => {
+            if (startAssistantPromise) {
+              try {
+                const result = await startAssistantPromise;
+                if (!result) return;
+              } catch (e) {
+                console.error("Failed to create assistant message:", e);
+                return;
               }
-
-              // Send any pending content + accumulated content directly in finalization
-              const contentToSave = totalContent + pendingDelta;
-              const reasoningToSave = totalReasoning + pendingReasoning;
-
-              await fetchMutation(
-                api.threads.finalizeAssistantMessage,
-                {
-                  messageId: assistantMessageId,
-                  ok: true, // Mark as OK since user manually stopped
-                  finalContent: contentToSave, // Send all content including pending
-                  finalReasoning:
-                    reasoningToSave.length > 0 ? reasoningToSave : undefined,
-                  error: undefined,
-                },
-                { token: accessToken },
-              );
-            } catch (e) {
-              console.error("Failed to finalize on abort:", e);
             }
-          })();
+
+            const contentToSave = totalContent + pendingDelta;
+            const reasoningToSave = totalReasoning + pendingReasoning;
+
+            await fetchMutation(
+              api.threads.finalizeAssistantMessage,
+              {
+                messageId: assistantMessageId,
+                ok: true,
+                finalContent: contentToSave,
+                finalReasoning:
+                  reasoningToSave.length > 0 ? reasoningToSave : undefined,
+                error: undefined,
+              },
+              { token: accessToken },
+            );
+          }, "Failed to finalize on abort");
+
+          finalizationPromise =
+            result instanceof Response
+              ? Promise.resolve()
+              : (result as Promise<void>);
         }
 
         return finalizationPromise;
@@ -316,28 +324,19 @@ export async function POST(req: Request) {
           : undefined;
 
       // Check if this is a reasoning model to enable reasoning summaries
-      const useReasoning = modelSupportsReasoning(modelId);
+      const providerOptions = getProviderOptions(modelId);
 
       // Start streaming from the model
       const result = streamText({
-        // Accept union model from registry
         model: languageModel,
         messages: convertToModelMessages(messages),
-        // @ts-expect-error AI SDK
         tools,
         experimental_transform: smoothStream({
           delayInMs: 10,
           chunking: "word",
         }),
-        abortSignal: abortSignal,
-        // Add reasoning support for OpenAI reasoning models
-        ...(useReasoning && {
-          providerOptions: {
-            openai: {
-              reasoningSummary: "auto", // Enable reasoning summaries
-            },
-          },
-        }),
+        abortSignal,
+        providerOptions,
         onChunk: async ({ chunk }) => {
           // Skip processing if aborted
           if (abortSignal?.aborted || isAborted) {
@@ -390,27 +389,21 @@ export async function POST(req: Request) {
             return finalizationPromise;
           }
 
-          finalizationPromise = (async (): Promise<void> => {
-            await ensureAuth();
+          const result = withErrorBoundary(async () => {
             const ok =
               gotAnyDelta || gotAnyReasoning || (text?.length ?? 0) > 0;
 
-            // Wait for assistant message to be created first
             if (startAssistantPromise) {
               try {
                 const result = await startAssistantPromise;
-                if (!result) {
-                  return;
-                }
+                if (!result) return;
               } catch (e) {
                 console.error("Assistant message creation failed:", e);
                 return;
               }
             }
 
-            // Only finalize if not aborted
-            if (!abortSignal?.aborted) {
-              // Include any remaining reasoning content in finalization
+            if (!abortSignal?.aborted && !isAborted) {
               const finalReasoningContent = totalReasoning + pendingReasoning;
 
               await fetchMutation(
@@ -430,9 +423,14 @@ export async function POST(req: Request) {
                       },
                 },
                 { token: accessToken },
-              ).catch(() => {});
+              );
             }
-          })();
+          }, "Failed to finalize message");
+
+          finalizationPromise =
+            result instanceof Response
+              ? Promise.resolve()
+              : (result as Promise<void>);
 
           return finalizationPromise;
         },
@@ -460,14 +458,11 @@ export async function POST(req: Request) {
             return;
           }
 
-          finalizationPromise = (async (): Promise<void> => {
-            // Wait for assistant message to be created first
+          const result = withErrorBoundary(async () => {
             if (startAssistantPromise) {
               try {
                 const result = await startAssistantPromise;
-                if (!result) {
-                  return;
-                }
+                if (!result) return;
               } catch (e) {
                 console.error("Assistant message creation failed:", e);
                 return;
@@ -482,69 +477,67 @@ export async function POST(req: Request) {
                 error: { type: "generation", message: "stream error" },
               },
               { token: accessToken },
-            ).catch((e) => {
-              console.error("Failed to finalize error:", e);
-            });
-          })();
+            );
+          }, "Failed to finalize error");
+
+          finalizationPromise =
+            result instanceof Response
+              ? Promise.resolve()
+              : (result as Promise<void>);
 
           await finalizationPromise;
         },
       });
       writer.merge(result.toUIMessageStream({ sendStart: false }));
 
-      // Persist user message first, then start assistant message (proper order)
-      startAssistantPromise = (async () => {
-        try {
-          await ensureAuth();
+      // Enhanced message persistence with error boundaries
+      const persistenceResult = await withErrorBoundary(async () => {
+        // First, persist the user message
+        const lastUser = [...messages].reverse().find((m) => m.role === "user");
 
-          // First, persist the user message
-          const lastUser = [...messages]
-            .reverse()
-            .find((m) => m.role === "user");
+        const lastUserText =
+          lastUser?.parts
+            ?.map((p) => {
+              if (p.type === "text" && "text" in p) {
+                return p.text;
+              }
+              return "";
+            })
+            .join("") ?? "";
+        const lastUserId = lastUser?.id;
 
-          const lastUserText =
-            lastUser?.parts
-              ?.map((p) => {
-                if (p.type === "text" && "text" in p) {
-                  return p.text;
-                }
-                return "";
-              })
-              .join("") ?? "";
-          const lastUserId = lastUser?.id;
-
-          if (lastUser && lastUserId) {
-            await fetchMutation(
-              api.threads.sendMessage,
-              {
-                threadId,
-                content: lastUserText,
-                model: modelId,
-                messageId: lastUserId,
-                quotaType,
-              },
-              { token: accessToken },
-            );
-          }
-
-          // Then start assistant message (only once)
-          if (!assistantMessageStarted) {
-            assistantMessageStarted = true;
-            return await fetchMutation(
-              api.threads.startAssistantMessage,
-              {
-                threadId,
-                messageId: assistantMessageId,
-                model: modelId,
-              },
-              { token: accessToken },
-            );
-          }
-        } catch (err) {
-          console.error("startAssistantMessage failed", err);
-          throw err;
+        if (lastUser && lastUserId) {
+          await fetchMutation(
+            api.threads.sendMessage,
+            {
+              threadId,
+              content: lastUserText,
+              model: modelId,
+              messageId: lastUserId,
+              quotaType,
+            },
+            { token: accessToken },
+          );
         }
-      })();
+
+        // Then start assistant message (only once)
+        if (!assistantMessageStarted) {
+          assistantMessageStarted = true;
+          return await fetchMutation(
+            api.threads.startAssistantMessage,
+            {
+              threadId,
+              messageId: assistantMessageId,
+              model: modelId,
+            },
+            { token: accessToken },
+          );
+        }
+      }, "Failed to persist messages");
+
+      startAssistantPromise = Promise.resolve(
+        persistenceResult instanceof Response ? undefined : persistenceResult,
+      );
     },
   });
 

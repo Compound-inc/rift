@@ -9,11 +9,7 @@ import {
   WrenchIcon,
   ExternalLinkIcon,
 } from "lucide-react";
-import {
-  MODELS,
-  getAllProviders,
-  getModelsByProvider,
-} from "@/lib/ai/ai-providers";
+import { MODELS } from "@/lib/ai/ai-providers";
 import { AnthropicIcon } from "@/components/ui/icons/anthropic-icon";
 import { TablerBrandOpenai } from "@/components/ui/icons/openai-icon";
 import { GoogleIcon } from "@/components/ui/icons/google-icon";

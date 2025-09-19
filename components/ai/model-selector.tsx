@@ -24,8 +24,8 @@ import {
   MODELS,
   getModelsByProvider,
   getAllProviders,
-  type ModelConfig,
 } from "@/lib/ai/ai-providers";
+import { type BaseModelConfig } from "@/lib/ai/config/base";
 import { AnthropicIcon } from "@/components/ui/icons/anthropic-icon";
 import { TablerBrandOpenai } from "@/components/ui/icons/openai-icon";
 import { GoogleIcon } from "@/components/ui/icons/google-icon";
@@ -307,16 +307,16 @@ function ModelSelector({
                       const ProviderIcon =
                         providerIcons[provider as keyof typeof providerIcons];
 
-                      return (
-                        <SelectPrimitive.Group key={provider}>
-                          <SelectPrimitive.Label className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-popover-text border-b border-border/50">
-                            {ProviderIcon && (
-                              <ProviderIcon className="size-4" />
-                            )}
-                            {providerNames[
-                              provider as keyof typeof providerNames
-                            ] || provider}
-                          </SelectPrimitive.Label>
+                        return (
+                          <SelectPrimitive.Group key={provider}>
+                            <SelectPrimitive.Label className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-popover-text border-b border-border/50">
+                              {ProviderIcon && (
+                                <ProviderIcon className="size-4" />
+                              )}
+                              {providerNames[
+                                provider as keyof typeof providerNames
+                              ] || provider}
+                            </SelectPrimitive.Label>
 
                           {models.map((model) => (
                             <ModelItem key={model.id} model={model} />
@@ -330,16 +330,16 @@ function ModelSelector({
                       const ProviderIcon =
                         providerIcons[provider as keyof typeof providerIcons];
 
-                      return (
-                        <SelectPrimitive.Group key={provider}>
-                          <SelectPrimitive.Label className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-popover-text border-b border-border/50">
-                            {ProviderIcon && (
-                              <ProviderIcon className="size-4" />
-                            )}
-                            {providerNames[
-                              provider as keyof typeof providerNames
-                            ] || provider}
-                          </SelectPrimitive.Label>
+                        return (
+                          <SelectPrimitive.Group key={provider}>
+                            <SelectPrimitive.Label className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-popover-text border-b border-border/50">
+                              {ProviderIcon && (
+                                <ProviderIcon className="size-4" />
+                              )}
+                              {providerNames[
+                                provider as keyof typeof providerNames
+                              ] || provider}
+                            </SelectPrimitive.Label>
 
                           {models.map((model) => (
                             <ModelItem key={model.id} model={model} />
@@ -359,7 +359,7 @@ function ModelSelector({
 }
 
 interface ModelItemProps {
-  model: ModelConfig;
+  model: BaseModelConfig;
 }
 
 function ModelItem({ model }: ModelItemProps) {

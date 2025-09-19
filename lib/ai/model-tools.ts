@@ -1,255 +1,203 @@
-// Model-specific tool configurations
-import { google } from "@ai-sdk/google";
-import { anthropic } from "@ai-sdk/anthropic";
-import { resolveRecommendedModel } from "./ai-providers";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-// Tool configuration types
-export interface ToolConfig {
-  id: string;
-  name: string;
-  description: string;
-  icon: string; // Lucide icon name
-  category:
-    | "none"
-    | "search"
-    | "context"
-    | "computation"
-    | "media"
-    | "analysis";
-  requiresAuth: boolean;
-  supportedProviders: string[];
-  parameters?: Record<string, unknown>;
-}
+import {
+  OPENAI_TOOLS,
+  getOpenAIModelSupportedTools,
+  getOpenAIModelDefaultTools,
+  createOpenAIToolsForModel,
+} from "./providers/openai";
+import {
+  type ToolType,
+  type BaseToolConfig,
+  BASE_TOOL_CONFIGS,
+} from "./config/base";
+import { resolveRecommendedModel, getModelById } from "./ai-providers";
 
-export interface ModelToolConfig {
-  modelId: string;
-  supportedTools: ToolType[];
-  defaultTools: ToolType[];
-  toolImplementations: Record<string, () => unknown>;
-  providerOptions?: Record<string, unknown>;
-}
-
-// Available tool types
-export type ToolType =
-  | "none"
-  | "google_search"
-  | "url_context"
-  | "web_search"
-  | "anthropic_web_search";
-
-// Tool configurations with metadata
-export const TOOL_CONFIGS: Record<ToolType, ToolConfig> = {
+// Enhanced tool configurations with provider support
+export const TOOL_CONFIGS: Record<
+  ToolType,
+  BaseToolConfig & { supportedProviders: string[] }
+> = {
   none: {
-    id: "none",
-    name: "None",
-    description: "No tool",
-    icon: "None",
-    category: "none",
-    requiresAuth: false,
-    supportedProviders: [],
-  },
-  google_search: {
-    id: "google_search",
-    name: "Web Search",
-    description: "Search the web for real-time information and current events",
-    icon: "Search",
-    category: "search",
-    requiresAuth: false,
-    supportedProviders: ["google"],
-  },
-  url_context: {
-    id: "url_context",
-    name: "URL Context",
-    description:
-      "Automatically analyze links and URLs you share in your messages",
-    icon: "Link",
-    category: "context",
-    requiresAuth: false,
-    supportedProviders: ["google"],
+    ...BASE_TOOL_CONFIGS.none,
+    supportedProviders: ["openai"],
   },
   web_search: {
-    id: "web_search",
-    name: "Web Search",
-    description: "Search the web for real-time information and current events",
-    icon: "Search",
-    category: "search",
-    requiresAuth: false,
-    supportedProviders: ["openai", "google"],
+    ...BASE_TOOL_CONFIGS.web_search,
+    supportedProviders: ["openai"],
   },
-  anthropic_web_search: {
-    id: "anthropic_web_search",
-    name: "Web Search",
-    description: "Search the web for real-time information and current events",
-    icon: "Search",
-    category: "search",
-    requiresAuth: false,
-    supportedProviders: ["anthropic"],
+  file_search: {
+    ...BASE_TOOL_CONFIGS.file_search,
+    supportedProviders: ["openai"],
+  },
+  code_interpreter: {
+    ...BASE_TOOL_CONFIGS.code_interpreter,
+    supportedProviders: ["openai"],
+  },
+  image_generation: {
+    ...BASE_TOOL_CONFIGS.image_generation,
+    supportedProviders: ["openai"],
   },
 };
 
-// Model-specific tool configurations
-export const MODEL_TOOLS: Record<string, ModelToolConfig> = {
-  // OpenAI Models
-  "openai/gpt-4o": {
-    modelId: "openai/gpt-4o",
-    supportedTools: [],
-    defaultTools: [],
-    toolImplementations: {},
-  },
-
-  "openai/gpt-4": {
-    modelId: "openai/gpt-4",
-    supportedTools: [],
-    defaultTools: [],
-    toolImplementations: {},
-  },
-  "openai/gpt-3.5-turbo": {
-    modelId: "openai/gpt-3.5-turbo",
-    supportedTools: [],
-    defaultTools: [],
-    toolImplementations: {},
-  },
-  // Google Gemini Models
-  "google/gemini-2.5-flash": {
-    modelId: "google/gemini-2.5-flash",
-    supportedTools: ["google_search", "url_context"],
-    defaultTools: ["url_context"],
-    toolImplementations: {
-      google_search: () => google.tools.googleSearch({}),
-      url_context: () => google.tools.urlContext({}),
-    },
-  },
-  "google/gemini-2.5-pro": {
-    modelId: "google/gemini-2.5-pro",
-    supportedTools: ["google_search", "url_context"],
-    defaultTools: ["url_context"],
-    toolImplementations: {
-      google_search: () => google.tools.googleSearch({}),
-      url_context: () => google.tools.urlContext({}),
-    },
-  },
-  "google/gemini-2.0-flash": {
-    modelId: "google/gemini-2.0-flash",
-    supportedTools: ["none"],
-    defaultTools: ["none"],
-    toolImplementations: {
-      google_search: () => google.tools.googleSearch({}),
-      url_context: () => google.tools.urlContext({}),
-    },
-  },
-  "google/gemini-2.0-flash-lite": {
-    modelId: "google/gemini-2.0-flash-lite",
-    supportedTools: ["none"],
-    defaultTools: ["none"],
-    toolImplementations: {
-      google_search: () => google.tools.googleSearch({}),
-      url_context: () => google.tools.urlContext({}),
-    },
-  },
-  // Anthropic Models
-  "anthropic/claude-opus-4-20250514": {
-    modelId: "anthropic/claude-opus-4-20250514",
-    supportedTools: ["anthropic_web_search"],
-    defaultTools: [],
-    toolImplementations: {
-      anthropic_web_search: () =>
-        anthropic.tools.webSearch_20250305({ maxUses: 5 }),
-    },
-  },
-  "anthropic/claude-sonnet-4-20250514": {
-    modelId: "anthropic/claude-sonnet-4-20250514",
-    supportedTools: ["anthropic_web_search"],
-    defaultTools: [],
-    toolImplementations: {
-      anthropic_web_search: () =>
-        anthropic.tools.webSearch_20250305({ maxUses: 5 }),
-    },
-  },
-  "anthropic/claude-3-7-sonnet-20250219": {
-    modelId: "anthropic/claude-3-7-sonnet-20250219",
-    supportedTools: ["anthropic_web_search"],
-    defaultTools: [],
-    toolImplementations: {
-      anthropic_web_search: () =>
-        anthropic.tools.webSearch_20250305({ maxUses: 5 }),
-    },
-  },
-
-  // OpenAI new models
-  "openai/gpt-5": {
-    modelId: "openai/gpt-5",
-    supportedTools: [],
-    defaultTools: [],
-    toolImplementations: {},
-  },
-  "openai/o3": {
-    modelId: "openai/o3",
-    supportedTools: [],
-    defaultTools: [],
-    toolImplementations: {},
-  },
-  "openai/gpt-4o-nano": {
-    modelId: "openai/gpt-4o-nano",
-    supportedTools: [],
-    defaultTools: [],
-    toolImplementations: {},
-  },
-  "openai/gpt-4.1": {
-    modelId: "openai/gpt-4.1",
-    supportedTools: [],
-    defaultTools: [],
-    toolImplementations: {},
-  },
-  "openai/gpt-4.1-mini": {
-    modelId: "openai/gpt-4.1-mini",
-    supportedTools: [],
-    defaultTools: [],
-    toolImplementations: {},
-  },
-  "openai/gpt-4.1-nano": {
-    modelId: "openai/gpt-4.1-nano",
-    supportedTools: [],
-    defaultTools: [],
-    toolImplementations: {},
-  },
-};
-
-// Helper functions
-export function getModelTools(modelId: string): ModelToolConfig | undefined {
-  const resolvedModelId = resolveRecommendedModel(modelId);
-  return MODEL_TOOLS[resolvedModelId];
-}
-
+// Provider-agnostic tool utility functions
 export function getSupportedTools(modelId: string): ToolType[] {
   const resolvedModelId = resolveRecommendedModel(modelId);
-  const modelConfig = MODEL_TOOLS[resolvedModelId];
-  return (modelConfig?.supportedTools as ToolType[]) || [];
+  const model = getModelById(resolvedModelId);
+
+  if (model) {
+    return model.supportedTools;
+  }
+
+  // Fallback to provider-specific functions
+  if (resolvedModelId.startsWith("openai/")) {
+    return getOpenAIModelSupportedTools(resolvedModelId);
+  }
+
+  return [];
 }
 
 export function getDefaultTools(modelId: string): ToolType[] {
   const resolvedModelId = resolveRecommendedModel(modelId);
-  const modelConfig = MODEL_TOOLS[resolvedModelId];
-  return (modelConfig?.defaultTools as ToolType[]) || [];
+  const model = getModelById(resolvedModelId);
+
+  if (model) {
+    return model.defaultTools;
+  }
+
+  // Fallback to provider-specific functions
+  if (resolvedModelId.startsWith("openai/")) {
+    return getOpenAIModelDefaultTools(resolvedModelId);
+  }
+
+  return [];
 }
 
 export function createToolsForModel(
   modelId: string,
   enabledTools: ToolType[] = [],
-) {
+): Record<string, any> {
   const resolvedModelId = resolveRecommendedModel(modelId);
-  const modelConfig = MODEL_TOOLS[resolvedModelId];
-  if (!modelConfig) return {};
 
-  const toolsToEnable =
-    enabledTools.length > 0 ? enabledTools : modelConfig.defaultTools;
-  const tools: Record<string, unknown> = {};
+  // Route to provider-specific tool creation
+  if (resolvedModelId.startsWith("openai/")) {
+    return createOpenAIToolsForModel(resolvedModelId, enabledTools);
+  }
 
-  for (const toolId of toolsToEnable) {
-    const implementation = modelConfig.toolImplementations[toolId];
-    if (implementation) {
-      tools[toolId] = implementation();
+  // Fallback for unknown providers
+  console.warn(`Unknown provider for model ${modelId}, no tools available`);
+  return {};
+}
+
+// Tool availability helpers
+export function isToolSupportedByModel(
+  modelId: string,
+  toolType: ToolType,
+): boolean {
+  const supportedTools = getSupportedTools(modelId);
+  return supportedTools.includes(toolType);
+}
+
+export function getToolsByCategory(
+  category: BaseToolConfig["category"],
+): ToolType[] {
+  return Object.entries(BASE_TOOL_CONFIGS)
+    .filter(([, config]) => config.category === category)
+    .map(([toolType]) => toolType as ToolType);
+}
+
+// Provider-specific tool creation with custom configurations
+export function createToolsForModelWithConfig(
+  modelId: string,
+  toolConfigs: Partial<Record<ToolType, any>> = {},
+  enabledTools?: ToolType[],
+): Record<string, any> {
+  const resolvedModelId = resolveRecommendedModel(modelId);
+  const supportedTools = getSupportedTools(resolvedModelId);
+  const defaultTools = getDefaultTools(resolvedModelId);
+
+  // Use provided tools, fallback to default tools
+  const toolsToCreate = enabledTools || defaultTools;
+
+  // Filter to only include supported tools
+  const validTools = toolsToCreate.filter(
+    (tool) => supportedTools.includes(tool) && tool !== "none",
+  );
+
+  const tools: Record<string, any> = {};
+
+  // Route to provider-specific tool creation with configs
+  if (resolvedModelId.startsWith("openai/")) {
+    for (const toolType of validTools) {
+      const toolConfig = toolConfigs[toolType];
+
+      switch (toolType) {
+        case "web_search":
+          tools[toolType] = OPENAI_TOOLS.web_search(toolConfig);
+          break;
+        case "file_search":
+          tools[toolType] = OPENAI_TOOLS.file_search(toolConfig);
+          break;
+        case "code_interpreter":
+          tools[toolType] = OPENAI_TOOLS.code_interpreter(toolConfig);
+          break;
+        case "image_generation":
+          tools[toolType] = OPENAI_TOOLS.image_generation(toolConfig);
+          break;
+        default:
+          // Skip unsupported tools
+          break;
+      }
     }
   }
 
   return tools;
+}
+
+// Helper function to get all available tools across providers
+export function getAllAvailableTools(): ToolType[] {
+  return Object.keys(TOOL_CONFIGS) as ToolType[];
+}
+
+// Helper function to get tools by provider
+export function getToolsByProvider(provider: string): ToolType[] {
+  return Object.entries(TOOL_CONFIGS)
+    .filter(([, config]) => config.supportedProviders.includes(provider))
+    .map(([toolType]) => toolType as ToolType);
+}
+
+// Validate if a set of tools can be used with a model
+export function validateToolsForModel(
+  modelId: string,
+  toolTypes: ToolType[],
+): {
+  valid: ToolType[];
+  invalid: ToolType[];
+} {
+  const supportedTools = getSupportedTools(modelId);
+
+  const valid = toolTypes.filter((tool) => supportedTools.includes(tool));
+  const invalid = toolTypes.filter((tool) => !supportedTools.includes(tool));
+
+  return { valid, invalid };
+}
+
+// Get model information including tool support
+export function getModelToolInfo(modelId: string) {
+  const resolvedModelId = resolveRecommendedModel(modelId);
+  const model = getModelById(resolvedModelId);
+
+  if (!model) {
+    return null;
+  }
+
+  return {
+    modelId: resolvedModelId,
+    name: model.name,
+    provider: model.provider,
+    supportedTools: model.supportedTools,
+    defaultTools: model.defaultTools,
+    capabilities: model.capabilities,
+    isPremium: model.isPremium,
+  };
 }
