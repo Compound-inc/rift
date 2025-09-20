@@ -11,6 +11,9 @@ import {
   type BaseToolConfig,
   BASE_TOOL_CONFIGS,
 } from "./config/base";
+
+// Re-export ToolType for external use
+export type { ToolType };
 import { resolveRecommendedModel, getModelById } from "./ai-providers";
 
 // Enhanced tool configurations with provider support
@@ -28,14 +31,6 @@ export const TOOL_CONFIGS: Record<
   },
   file_search: {
     ...BASE_TOOL_CONFIGS.file_search,
-    supportedProviders: ["openai"],
-  },
-  code_interpreter: {
-    ...BASE_TOOL_CONFIGS.code_interpreter,
-    supportedProviders: ["openai"],
-  },
-  image_generation: {
-    ...BASE_TOOL_CONFIGS.image_generation,
     supportedProviders: ["openai"],
   },
 };
@@ -137,12 +132,6 @@ export function createToolsForModelWithConfig(
           break;
         case "file_search":
           tools[toolType] = OPENAI_TOOLS.file_search(toolConfig);
-          break;
-        case "code_interpreter":
-          tools[toolType] = OPENAI_TOOLS.code_interpreter(toolConfig);
-          break;
-        case "image_generation":
-          tools[toolType] = OPENAI_TOOLS.image_generation(toolConfig);
           break;
         default:
           // Skip unsupported tools

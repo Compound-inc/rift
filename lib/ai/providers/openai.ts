@@ -105,62 +105,6 @@ export const OPENAI_TOOLS = {
     filters: config?.filters,
     ranking: config?.ranking,
   }),
-  code_interpreter: (config?: {
-    container?: { fileIds?: string[] } | string;
-  }) => ({
-    type: "function" as const,
-    function: {
-      name: "code_interpreter",
-      description: "Execute Python code and perform calculations",
-      parameters: {
-        type: "object",
-        properties: {
-          code: {
-            type: "string",
-            description: "Python code to execute",
-          },
-        },
-        required: ["code"],
-      },
-    },
-    container: config?.container,
-  }),
-  image_generation: (config?: {
-    outputFormat?: "webp" | "png";
-    quality?: "low" | "standard" | "high";
-    size?: string;
-    background?: string;
-  }) => ({
-    type: "function" as const,
-    function: {
-      name: "image_generation",
-      description: "Generate images based on text descriptions",
-      parameters: {
-        type: "object",
-        properties: {
-          prompt: {
-            type: "string",
-            description: "Text description of the image to generate",
-          },
-          size: {
-            type: "string",
-            description: "Image size (e.g., '1024x1024')",
-            enum: ["256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"],
-          },
-          quality: {
-            type: "string",
-            description: "Image quality",
-            enum: ["low", "standard", "high"],
-          },
-        },
-        required: ["prompt"],
-      },
-    },
-    outputFormat: config?.outputFormat || "webp",
-    quality: config?.quality || "standard",
-    size: config?.size || "1024x1024",
-    background: config?.background,
-  }),
 };
 
 // Create OpenAI provider instance
@@ -205,12 +149,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       maxTokens: 16384,
       contextWindow: 200000,
     }),
-    supportedTools: [
-      "web_search",
-      "file_search",
-      "code_interpreter",
-      "image_generation",
-    ],
+    supportedTools: ["web_search", "file_search"],
     defaultTools: [],
   },
   {
@@ -225,18 +164,14 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       supportsTools: true,
       supportsSearch: true,
       supportsStreaming: true,
+      supportsReasoning: true,
       supportsImageInput: true,
       supportsObjectGeneration: true,
       maxTokens: 16384,
       contextWindow: 128000,
     }),
-    supportedTools: [
-      "web_search",
-      "file_search",
-      "code_interpreter",
-      "image_generation",
-    ],
-    defaultTools: [],
+    supportedTools: ["web_search", "file_search"],
+    defaultTools: ["web_search"],
   },
   {
     id: "openai/gpt-5-nano",
@@ -248,13 +183,14 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     isPremium: false,
     capabilities: mergeCapabilities({
       supportsTools: true,
+      supportsReasoning: true,
       supportsImageInput: true,
       supportsStreaming: true,
       supportsObjectGeneration: true,
       maxTokens: 16384,
       contextWindow: 128000,
     }),
-    supportedTools: ["web_search", "code_interpreter"],
+    supportedTools: ["web_search"],
     defaultTools: [],
   },
   {
@@ -275,7 +211,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       maxTokens: 16384,
       contextWindow: 200000,
     }),
-    supportedTools: ["web_search", "code_interpreter"],
+    supportedTools: ["web_search"],
     defaultTools: [],
   },
   {
@@ -296,7 +232,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       maxTokens: 16384,
       contextWindow: 128000,
     }),
-    supportedTools: ["web_search", "code_interpreter"],
+    supportedTools: ["web_search"],
     defaultTools: [],
   },
   {
@@ -315,7 +251,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       maxTokens: 8192,
       contextWindow: 128000,
     }),
-    supportedTools: ["web_search", "code_interpreter"],
+    supportedTools: ["web_search"],
     defaultTools: [],
   },
   {
@@ -334,7 +270,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       maxTokens: 8192,
       contextWindow: 128000,
     }),
-    supportedTools: ["web_search", "code_interpreter"],
+    supportedTools: ["web_search"],
     defaultTools: [],
   },
   {
@@ -353,7 +289,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       maxTokens: 8192,
       contextWindow: 128000,
     }),
-    supportedTools: ["web_search", "code_interpreter"],
+    supportedTools: ["web_search"],
     defaultTools: [],
   },
   {
@@ -372,7 +308,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       maxTokens: 16384,
       contextWindow: 128000,
     }),
-    supportedTools: ["web_search", "code_interpreter"],
+    supportedTools: ["web_search"],
     defaultTools: [],
   },
   {
@@ -391,7 +327,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       maxTokens: 16384,
       contextWindow: 128000,
     }),
-    supportedTools: ["web_search", "code_interpreter"],
+    supportedTools: ["web_search"],
     defaultTools: [],
   },
   {
@@ -411,7 +347,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       maxTokens: 4096,
       contextWindow: 128000,
     }),
-    supportedTools: ["web_search", "code_interpreter"],
+    supportedTools: ["web_search"],
     defaultTools: [],
   },
   {
@@ -429,7 +365,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       maxTokens: 8192,
       contextWindow: 8192,
     }),
-    supportedTools: ["web_search", "code_interpreter"],
+    supportedTools: ["web_search"],
     defaultTools: [],
   },
   {
@@ -447,18 +383,13 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       maxTokens: 4096,
       contextWindow: 16385,
     }),
-    supportedTools: ["web_search", "code_interpreter"],
+    supportedTools: ["web_search"],
     defaultTools: [],
   },
 ];
 
 // Supported tool types for OpenAI models
-export const OPENAI_SUPPORTED_TOOLS: ToolType[] = [
-  "web_search",
-  "file_search",
-  "code_interpreter",
-  "image_generation",
-];
+export const OPENAI_SUPPORTED_TOOLS: ToolType[] = ["web_search", "file_search"];
 
 // Default tools for OpenAI models (can be overridden per model)
 export const OPENAI_DEFAULT_TOOLS: ToolType[] = [];

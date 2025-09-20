@@ -76,12 +76,7 @@ export const GATEWAY_CONFIG = {
 };
 
 // Tool types that can be used across providers
-export type ToolType =
-  | "none"
-  | "web_search"
-  | "file_search"
-  | "code_interpreter"
-  | "image_generation";
+export type ToolType = "none" | "web_search" | "file_search";
 
 // Base tool configuration interface
 export interface BaseToolConfig {
@@ -124,22 +119,6 @@ export const BASE_TOOL_CONFIGS: Record<ToolType, BaseToolConfig> = {
     description: "Search through uploaded documents and files",
     icon: "FileSearch",
     category: "search",
-    requiresAuth: false,
-  },
-  code_interpreter: {
-    type: "code_interpreter",
-    name: "Code Interpreter",
-    description: "Execute Python code and perform calculations",
-    icon: "Code",
-    category: "computation",
-    requiresAuth: false,
-  },
-  image_generation: {
-    type: "image_generation",
-    name: "Image Generation",
-    description: "Generate images based on text descriptions",
-    icon: "Image",
-    category: "media",
     requiresAuth: false,
   },
 };
