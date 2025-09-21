@@ -41,7 +41,7 @@ export function useMessageEdit({
           .join("\n"),
       );
     },
-    [messages, status],
+    [messages, status, isLoading],
   );
 
   const cancelEditing = useCallback(() => {

@@ -277,6 +277,9 @@ export default function ChatInterface({
   } = useMessageEdit({
     messages,
     setMessages,
+    regenerateAfterUserMessage,
+    threadId: id,
+    status,
   });
 
   useEffect(() => {
