@@ -1,8 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { createOpenAI } from "@ai-sdk/openai";
 import {
-  ProviderConfig,
   BaseModelConfig,
   mergeCapabilities,
   DEFAULT_PROVIDER_SETTINGS,
@@ -106,25 +104,6 @@ export const OPENAI_TOOLS = {
     ranking: config?.ranking,
   }),
 };
-
-// Create OpenAI provider instance
-export function createOpenAIProvider(config?: {
-  apiKey?: string;
-  baseURL?: string;
-  organization?: string;
-  project?: string;
-  headers?: Record<string, string>;
-}) {
-  // Always create OpenAI provider directly for now
-  // Gateway integration can be added later if needed
-  return createOpenAI({
-    apiKey: config?.apiKey || process.env.OPENAI_API_KEY,
-    baseURL: config?.baseURL,
-    organization: config?.organization,
-    project: config?.project,
-    headers: config?.headers,
-  });
-}
 
 // OpenAI model configurations with tool support
 export const OPENAI_MODELS: BaseModelConfig[] = [
@@ -394,28 +373,9 @@ export const OPENAI_SUPPORTED_TOOLS: ToolType[] = ["web_search", "file_search"];
 // Default tools for OpenAI models (can be overridden per model)
 export const OPENAI_DEFAULT_TOOLS: ToolType[] = [];
 
-// OpenAI provider configuration
-export const OPENAI_PROVIDER: ProviderConfig = {
-  name: "openai",
-  defaultSettings: DEFAULT_OPENAI_SETTINGS,
-  models: OPENAI_MODELS,
-  tools: OPENAI_TOOLS,
-  createProvider: createOpenAIProvider,
-};
-
 // Helper functions
 export function getOpenAIModel(modelId: string): BaseModelConfig | undefined {
   return OPENAI_MODELS.find((model) => model.id === modelId);
-}
-
-export function createOpenAIModelInstance(modelId: string) {
-  const provider = createOpenAIProvider();
-
-  // Extract model name from ID (e.g., "openai/gpt-4" -> "gpt-4")
-  const modelName = modelId.replace("openai/", "");
-
-  // Create model instance
-  return provider(modelName);
 }
 
 export function getOpenAISupportedTools(): ToolType[] {

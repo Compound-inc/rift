@@ -1,34 +1,27 @@
-import { createProviderRegistry } from "ai";
-import { OPENAI_MODELS, createOpenAIProvider } from "./providers/openai";
+import { gateway } from "ai";
+import { OPENAI_MODELS } from "./providers/openai";
 import { type BaseModelConfig, type ModelCapabilities } from "./config/base";
 
 // All models in one array
 export const MODELS: BaseModelConfig[] = OPENAI_MODELS;
 
-// AI SDK registry
-export const registry = createProviderRegistry({
-  openai: createOpenAIProvider(),
-});
+const gatewayProvider = gateway;
 
-// Model resolution with simple mapping
+// Model resolution
 const SHORTCUTS: Record<string, string> = {
-  "recommended-chat": "openai:gpt-4o-mini",
-  "recommended-premium": "openai:gpt-5",
-  "recommended-reasoning": "openai:o3",
-  "recommended-fast": "openai:gpt-3.5-turbo",
-  "recommended-vision": "openai:gpt-4o",
+  automatico: "openai/gpt-4o-mini",
+  problemas_dificiles: "openai/o3",
+  escritura: "openai/gpt-4o",
+  sorpresa: "openai/gpt-5",
 };
 
-// Core functions - ultra compact
+// Simple model resolution
 export const resolveModel = (id: string): string => {
-  if (SHORTCUTS[id]) return SHORTCUTS[id];
-  if (id.includes(":")) return id;
-  if (id.startsWith("openai/")) return id.replace("/", ":");
-  return `openai:${id}`;
+  return SHORTCUTS[id] || id;
 };
 
 export const getModel = (id: string) =>
-  MODELS.find((m) => m.id === resolveModel(id).replace(":", "/"));
+  MODELS.find((m) => m.id === resolveModel(id));
 
 export const getCapabilities = (id: string) => getModel(id)?.capabilities;
 
@@ -43,17 +36,16 @@ export const supportsReasoning = (id: string) =>
 // Main model creation function
 export function getLanguageModel(modelId: string) {
   const resolved = resolveModel(modelId);
-  const registryId = resolved.replace("/", ":");
 
-  console.log(`Model: ${registryId}`);
+  console.log(`Model via AI Gateway: ${resolved}`);
 
   try {
-    return registry.languageModel(registryId as `openai:${string}`);
+    return gatewayProvider(resolved);
   } catch {
     console.warn(
       `Model ${modelId} not found in registry, using default gpt-4o-mini`,
     );
-    return registry.languageModel("openai:gpt-4o-mini");
+    return gatewayProvider("openai/gpt-4o-mini");
   }
 }
 
@@ -84,7 +76,7 @@ export const getAllProviders = (): string[] =>
   Array.from(new Set(MODELS.map((model) => model.provider)));
 
 // Default model constant
-export const DEFAULT_MODEL = "openai:gpt-4o-mini";
+export const DEFAULT_MODEL = "openai/gpt-4o-mini";
 
 // Backward compatibility aliases
 export const getModelById = getModel;
