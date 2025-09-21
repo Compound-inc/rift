@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { generateUUID, copyToClipboard } from "../lib/utils";
 import { useModel } from "@/contexts/model-context";
 import { useInitialMessage } from "@/contexts/initial-message-context";
+import { useMessageRegeneration } from "@/hooks/use-message-regeneration";
 import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
@@ -220,7 +221,7 @@ export default function ChatInterface({
       },
       transport: new DefaultChatTransport({
         api: "/api/chat",
-        prepareSendMessagesRequest: ({ messages }) => {
+        prepareSendMessagesRequest: ({ messages, trigger, messageId }) => {
           // Get current tools state at the time of sending
           const currentDefaultTools = getDefaultTools(selectedModel);
           const currentSearchState =
@@ -231,16 +232,32 @@ export default function ChatInterface({
             ? [...currentDefaultTools, "google_search" as ToolType]
             : currentDefaultTools;
 
+          // For regeneration, we need to handle the messageId and trigger
+          if (trigger === "regenerate-message" && messageId) {
+            // The messages array should already be filtered by AI SDK
+            // but we can add additional processing here if needed
+          }
+
           return {
             body: {
               messages,
               modelId: selectedModel,
               threadId: id,
               enabledTools: currentEnabledTools,
+              trigger,
+              messageId,
             },
           };
         },
       }),
+    });
+
+  // Initialize regeneration hook
+  const { regenerateAssistantMessage, regenerateAfterUserMessage } =
+    useMessageRegeneration({
+      messages,
+      setMessages,
+      regenerate,
     });
 
   // Store sendMessage in ref to prevent useEffect from re-running
@@ -728,7 +745,7 @@ export default function ChatInterface({
                   <div className="px-0">
                     <Actions className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity justify-start">
                       <Action
-                        onClick={() => regenerate?.()}
+                        onClick={() => regenerateAssistantMessage(message.id)}
                         label="Retry"
                         tooltip="Regenerate response"
                       >
@@ -767,10 +784,7 @@ export default function ChatInterface({
                   <div className="px-0">
                     <Actions className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
                       <Action
-                        onClick={() => {
-                          // TODO: Implement retry for user message
-                          toast.info("Retry user message feature coming soon");
-                        }}
+                        onClick={() => regenerateAfterUserMessage(message.id)}
                         label="Retry"
                         tooltip="Retry message"
                       >

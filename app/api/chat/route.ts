@@ -24,6 +24,8 @@ interface RequestBody {
   modelId: string;
   threadId: string;
   enabledTools?: ToolType[];
+  trigger?: "submit-message" | "regenerate-message";
+  messageId?: string;
 }
 
 interface AuthContext {
@@ -121,6 +123,8 @@ export async function POST(req: Request) {
       modelId,
       threadId,
       enabledTools = [],
+      trigger,
+      messageId,
     } = validateRequest(body);
 
     console.log(`Time after validation: ${Date.now() - start}ms`);
@@ -131,7 +135,7 @@ export async function POST(req: Request) {
     console.log(`Time after authentication: ${Date.now() - start}ms`);
 
     const quotaType = isPremium(modelId) ? "premium" : "standard";
-    const messageId = crypto.randomUUID();
+    const newMessageId = crypto.randomUUID();
     const model = getLanguageModel(modelId);
 
     // Tools setup
@@ -143,23 +147,40 @@ export async function POST(req: Request) {
 
     console.log(`Time after model/tools setup: ${Date.now() - start}ms`);
 
-    // Background: Persist user message (non-blocking)
-    const lastUser = messages.filter((m) => m.role === "user").pop();
-    const userText = lastUser?.parts?.[0]?.text;
-    if (lastUser && userText) {
+    // Handle regeneration: delete messages after the target message
+    if (trigger === "regenerate-message" && messageId) {
       DatabaseQueue.add(async () => {
         await fetchMutation(
-          api.threads.sendMessage,
+          api.threads.deleteMessagesAfter,
           {
             threadId,
-            content: userText,
-            model: modelId,
-            messageId: lastUser.id,
-            quotaType,
+            afterMessageId: messageId,
           },
           { token: auth.token },
         );
+        console.log("deleteMessagesAfter completed");
       });
+    }
+
+    // Background: Persist user message (non-blocking) - only for new messages
+    if (trigger !== "regenerate-message") {
+      const lastUser = messages.filter((m) => m.role === "user").pop();
+      const userText = lastUser?.parts?.[0]?.text;
+      if (lastUser && userText) {
+        DatabaseQueue.add(async () => {
+          await fetchMutation(
+            api.threads.sendMessage,
+            {
+              threadId,
+              content: userText,
+              model: modelId,
+              messageId: lastUser.id,
+              quotaType,
+            },
+            { token: auth.token },
+          );
+        });
+      }
     }
 
     // Start streaming response
@@ -180,7 +201,7 @@ export async function POST(req: Request) {
             api.threads.startAssistantMessage,
             {
               threadId,
-              messageId,
+              messageId: newMessageId,
               model: modelId,
             },
             { token: auth.token },
@@ -204,7 +225,7 @@ export async function POST(req: Request) {
               await fetchMutation(
                 api.threads.appendAssistantMessageDelta,
                 {
-                  messageId,
+                  messageId: newMessageId,
                   delta: update.content || " ",
                   reasoningDelta:
                     update.reasoning.length > 0 ? update.reasoning : undefined,
@@ -264,7 +285,7 @@ export async function POST(req: Request) {
                 await fetchMutation(
                   api.threads.finalizeAssistantMessage,
                   {
-                    messageId,
+                    messageId: newMessageId,
                     ok: success,
                     finalContent: content || undefined,
                     finalReasoning: reasoning || undefined,
@@ -293,7 +314,7 @@ export async function POST(req: Request) {
                     await fetchMutation(
                       api.threads.finalizeAssistantMessage,
                       {
-                        messageId,
+                        messageId: newMessageId,
                         ok: true,
                         finalContent: content,
                         finalReasoning: reasoning || undefined,
@@ -311,7 +332,7 @@ export async function POST(req: Request) {
                 await fetchMutation(
                   api.threads.finalizeAssistantMessage,
                   {
-                    messageId,
+                    messageId: newMessageId,
                     ok: false,
                     error: {
                       type: "generation",
