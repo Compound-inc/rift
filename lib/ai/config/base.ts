@@ -13,7 +13,6 @@ export interface ModelCapabilities {
   supportsAudioInput: boolean;
   supportsObjectGeneration: boolean;
   maxTokens?: number;
-  contextWindow?: number;
 }
 
 // Base model configuration interface
@@ -23,10 +22,7 @@ export interface BaseModelConfig {
   provider: string;
   description: string;
   contextWindow: number;
-  pricing: {
-    input: number; // per 1M tokens
-    output: number; // per 1M tokens
-  };
+
   isPremium: boolean;
   capabilities: ModelCapabilities;
   supportedTools: ToolType[];

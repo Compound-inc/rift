@@ -1,9 +1,10 @@
 import { gateway } from "ai";
 import { OPENAI_MODELS } from "./providers/openai";
+import { XAI_MODELS } from "./providers/xai";
 import { type BaseModelConfig, type ModelCapabilities } from "./config/base";
 
 // All models in one array
-export const MODELS: BaseModelConfig[] = OPENAI_MODELS;
+export const MODELS: BaseModelConfig[] = [...OPENAI_MODELS, ...XAI_MODELS];
 
 const gatewayProvider = gateway;
 

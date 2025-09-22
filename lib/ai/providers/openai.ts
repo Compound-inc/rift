@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { openai } from "@ai-sdk/openai";
 import {
   BaseModelConfig,
   mergeCapabilities,
@@ -114,7 +115,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     description:
       "Next-generation OpenAI model with advanced reasoning and capabilities",
     contextWindow: 200000,
-    pricing: { input: 10, output: 30 },
     isPremium: true,
     capabilities: mergeCapabilities({
       supportsTools: true,
@@ -126,7 +126,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       supportsPDFInput: true,
       supportsObjectGeneration: true,
       maxTokens: 16384,
-      contextWindow: 200000,
     }),
     supportedTools: ["web_search", "file_search"],
     defaultTools: [],
@@ -137,7 +136,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     provider: "openai",
     description: "Faster and more cost-effective version of GPT-5",
     contextWindow: 128000,
-    pricing: { input: 0.15, output: 0.6 },
     isPremium: false,
     capabilities: mergeCapabilities({
       supportsTools: true,
@@ -147,7 +145,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       supportsImageInput: true,
       supportsObjectGeneration: true,
       maxTokens: 16384,
-      contextWindow: 128000,
     }),
     supportedTools: ["web_search", "file_search"],
     defaultTools: ["web_search"],
@@ -158,7 +155,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     provider: "openai",
     description: "Ultra-fast and efficient version of GPT-5",
     contextWindow: 128000,
-    pricing: { input: 0.075, output: 0.3 },
     isPremium: false,
     capabilities: mergeCapabilities({
       supportsTools: true,
@@ -167,7 +163,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       supportsStreaming: true,
       supportsObjectGeneration: true,
       maxTokens: 16384,
-      contextWindow: 128000,
     }),
     supportedTools: ["web_search"],
     defaultTools: [],
@@ -179,7 +174,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     description:
       "Advanced reasoning model with enhanced problem-solving capabilities",
     contextWindow: 200000,
-    pricing: { input: 20, output: 60 },
     isPremium: true,
     capabilities: mergeCapabilities({
       supportsTools: true,
@@ -188,7 +182,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       supportsImageInput: true,
       supportsObjectGeneration: true,
       maxTokens: 16384,
-      contextWindow: 200000,
     }),
     supportedTools: ["web_search"],
     defaultTools: [],
@@ -200,7 +193,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     description:
       "Efficient reasoning model with strong analytical capabilities",
     contextWindow: 128000,
-    pricing: { input: 3, output: 12 },
     isPremium: false,
     capabilities: mergeCapabilities({
       supportsTools: true,
@@ -209,7 +201,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       supportsImageInput: true,
       supportsObjectGeneration: true,
       maxTokens: 16384,
-      contextWindow: 128000,
     }),
     supportedTools: ["web_search"],
     defaultTools: [],
@@ -220,7 +211,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     provider: "openai",
     description: "Enhanced version of GPT-4 with improved capabilities",
     contextWindow: 128000,
-    pricing: { input: 5, output: 15 },
     isPremium: true,
     capabilities: mergeCapabilities({
       supportsTools: true,
@@ -228,7 +218,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       supportsStreaming: true,
       supportsObjectGeneration: true,
       maxTokens: 8192,
-      contextWindow: 128000,
     }),
     supportedTools: ["web_search"],
     defaultTools: [],
@@ -239,7 +228,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     provider: "openai",
     description: "Cost-effective version of GPT-4.1",
     contextWindow: 128000,
-    pricing: { input: 0.6, output: 1.8 },
     isPremium: false,
     capabilities: mergeCapabilities({
       supportsTools: true,
@@ -247,7 +235,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       supportsStreaming: true,
       supportsObjectGeneration: true,
       maxTokens: 8192,
-      contextWindow: 128000,
     }),
     supportedTools: ["web_search"],
     defaultTools: [],
@@ -258,7 +245,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     provider: "openai",
     description: "Ultra-efficient version of GPT-4.1",
     contextWindow: 128000,
-    pricing: { input: 0.3, output: 0.9 },
     isPremium: false,
     capabilities: mergeCapabilities({
       supportsTools: true,
@@ -266,7 +252,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       supportsStreaming: true,
       supportsObjectGeneration: true,
       maxTokens: 8192,
-      contextWindow: 128000,
     }),
     supportedTools: ["web_search"],
     defaultTools: [],
@@ -277,7 +262,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     provider: "openai",
     description: "Multimodal flagship model with vision and advanced reasoning",
     contextWindow: 128000,
-    pricing: { input: 5, output: 15 },
     isPremium: true,
     capabilities: mergeCapabilities({
       supportsTools: true,
@@ -285,7 +269,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       supportsStreaming: true,
       supportsObjectGeneration: true,
       maxTokens: 16384,
-      contextWindow: 128000,
     }),
     supportedTools: ["web_search"],
     defaultTools: [],
@@ -296,7 +279,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     provider: "openai",
     description: "Affordable multimodal model with strong performance",
     contextWindow: 128000,
-    pricing: { input: 0.15, output: 0.6 },
     isPremium: false,
     capabilities: mergeCapabilities({
       supportsTools: true,
@@ -304,7 +286,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       supportsStreaming: true,
       supportsObjectGeneration: true,
       maxTokens: 16384,
-      contextWindow: 128000,
     }),
     supportedTools: ["web_search"],
     defaultTools: [],
@@ -316,7 +297,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     description:
       "High-performance version of GPT-4 with expanded context window",
     contextWindow: 128000,
-    pricing: { input: 10, output: 30 },
     isPremium: true,
     capabilities: mergeCapabilities({
       supportsTools: true,
@@ -324,7 +304,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       supportsStreaming: true,
       supportsObjectGeneration: true,
       maxTokens: 4096,
-      contextWindow: 128000,
     }),
     supportedTools: ["web_search"],
     defaultTools: [],
@@ -335,14 +314,12 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     provider: "openai",
     description: "Large multimodal model with broad general knowledge",
     contextWindow: 8192,
-    pricing: { input: 30, output: 60 },
     isPremium: true,
     capabilities: mergeCapabilities({
       supportsTools: true,
       supportsStreaming: true,
       supportsObjectGeneration: true,
       maxTokens: 8192,
-      contextWindow: 8192,
     }),
     supportedTools: ["web_search"],
     defaultTools: [],
@@ -353,14 +330,12 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     provider: "openai",
     description: "Fast and efficient model for most conversational tasks",
     contextWindow: 16385,
-    pricing: { input: 0.5, output: 1.5 },
     isPremium: false,
     capabilities: mergeCapabilities({
       supportsTools: true,
       supportsStreaming: true,
       supportsObjectGeneration: true,
       maxTokens: 4096,
-      contextWindow: 16385,
     }),
     supportedTools: ["web_search"],
     defaultTools: [],
@@ -388,6 +363,7 @@ export function getOpenAIDefaultTools(): ToolType[] {
 
 export function createOpenAITools(
   toolTypes: ToolType[] = OPENAI_DEFAULT_TOOLS,
+  toolConfigs?: Record<string, any>,
 ) {
   const tools: Record<string, any> = {};
 

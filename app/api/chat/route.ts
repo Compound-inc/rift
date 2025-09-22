@@ -1,4 +1,9 @@
-import { streamText, convertToModelMessages, UIMessage } from "ai";
+import {
+  streamText,
+  convertToModelMessages,
+  UIMessage,
+  smoothStream,
+} from "ai";
 import {
   getLanguageModel,
   getProviderOptions,
@@ -7,7 +12,6 @@ import {
 import { createToolsForModel } from "@/lib/ai/model-tools";
 import { ToolType } from "@/lib/ai/config/base";
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
-import { smoothStream } from "ai";
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import { withAuth } from "@workos-inc/authkit-nextjs";
@@ -264,7 +268,7 @@ export async function POST(req: Request) {
             messages: convertToModelMessages(messages as UIMessage[]), // Type assertion for AI SDK
             tools,
             experimental_transform: smoothStream({
-              delayInMs: 15,
+              delayInMs: 20,
               chunking: "word",
             }),
             abortSignal: req.signal,

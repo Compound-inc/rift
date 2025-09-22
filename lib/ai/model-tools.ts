@@ -1,11 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import {
-  OPENAI_TOOLS,
   getOpenAIModelSupportedTools,
   getOpenAIModelDefaultTools,
   createOpenAIToolsForModel,
 } from "./providers/openai";
+import {
+  getXAIModelSupportedTools,
+  getXAIModelDefaultTools,
+  createXAIToolsForModel,
+} from "./providers/xai";
 import {
   type ToolType,
   type BaseToolConfig,
@@ -47,6 +51,8 @@ export function getSupportedTools(modelId: string): ToolType[] {
   // Fallback to provider-specific functions
   if (resolvedModelId.startsWith("openai/")) {
     return getOpenAIModelSupportedTools(resolvedModelId);
+  } else if (resolvedModelId.startsWith("xai/")) {
+    return getXAIModelSupportedTools();
   }
 
   return [];
@@ -60,9 +66,10 @@ export function getDefaultTools(modelId: string): ToolType[] {
     return model.defaultTools;
   }
 
-  // Fallback to provider-specific functions
   if (resolvedModelId.startsWith("openai/")) {
     return getOpenAIModelDefaultTools(resolvedModelId);
+  } else if (resolvedModelId.startsWith("xai/")) {
+    return getXAIModelDefaultTools();
   }
 
   return [];
@@ -77,6 +84,8 @@ export function createToolsForModel(
   // Route to provider-specific tool creation
   if (resolvedModelId.startsWith("openai/")) {
     return createOpenAIToolsForModel(resolvedModelId, enabledTools);
+  } else if (resolvedModelId.startsWith("xai/")) {
+    return createXAIToolsForModel(enabledTools);
   }
 
   // Fallback for unknown providers
@@ -108,39 +117,17 @@ export function createToolsForModelWithConfig(
   enabledTools?: ToolType[],
 ): Record<string, any> {
   const resolvedModelId = resolveRecommendedModel(modelId);
-  const supportedTools = getSupportedTools(resolvedModelId);
-  const defaultTools = getDefaultTools(resolvedModelId);
-
-  // Use provided tools, fallback to default tools
-  const toolsToCreate = enabledTools || defaultTools;
-
-  // Filter to only include supported tools
-  const validTools = toolsToCreate.filter(
-    (tool) => supportedTools.includes(tool) && tool !== "none",
-  );
-
-  const tools: Record<string, any> = {};
 
   // Route to provider-specific tool creation with configs
   if (resolvedModelId.startsWith("openai/")) {
-    for (const toolType of validTools) {
-      const toolConfig = toolConfigs[toolType];
-
-      switch (toolType) {
-        case "web_search":
-          tools[toolType] = OPENAI_TOOLS.web_search(toolConfig);
-          break;
-        case "file_search":
-          tools[toolType] = OPENAI_TOOLS.file_search(toolConfig);
-          break;
-        default:
-          // Skip unsupported tools
-          break;
-      }
-    }
+    return createOpenAIToolsForModel(resolvedModelId, enabledTools);
+  } else if (resolvedModelId.startsWith("xai/")) {
+    return createXAIToolsForModel(enabledTools);
   }
 
-  return tools;
+  // Fallback for unknown providers
+  console.warn(`Unknown provider for model ${modelId}, no tools available`);
+  return {};
 }
 
 // Helper function to get all available tools across providers
