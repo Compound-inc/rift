@@ -151,30 +151,28 @@ export async function POST(req: Request) {
 
     console.log(`Time after model/tools setup: ${Date.now() - start}ms`);
 
-    // Handle regeneration: delete messages after the target message
+    // Handle regeneration: synchronously delete messages after the target message
     if (trigger === "regenerate-message" && messageId) {
-      // Validate thread ownership before regeneration
-      DatabaseQueue.add(async () => {
-        // First verify the user owns this thread
-        const threadInfo = await fetchQuery(
-          api.threads.getThreadInfo,
-          { threadId },
-          { token: auth.token },
-        );
+      // First verify the user owns this thread
+      const threadInfo = await fetchQuery(
+        api.threads.getThreadInfo,
+        { threadId },
+        { token: auth.token },
+      );
 
-        if (!threadInfo) {
-          throw new Error("Thread not found or access denied");
-        }
+      if (!threadInfo) {
+        throw new Error("Thread not found or access denied");
+      }
 
-        await fetchMutation(
-          api.threads.deleteMessagesAfter,
-          {
-            threadId,
-            afterMessageId: messageId,
-          },
-          { token: auth.token },
-        );
-      });
+      // Await deletion to ensure persistence before streaming begins
+      await fetchMutation(
+        api.threads.deleteMessagesAfter,
+        {
+          threadId,
+          afterMessageId: messageId,
+        },
+        { token: auth.token },
+      );
     }
 
     // Check quota limits BEFORE making AI request - only for new messages

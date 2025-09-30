@@ -46,9 +46,12 @@ export function useMessageRegeneration({
           return;
         }
 
-        // Regenerate the specific message by passing its ID
-        // The API route will handle deleting messages after the target message
+        // First trigger regenerate so AI SDK can still find the target message
         regenerate({ messageId });
+
+        // Then optimistically prune the target assistant message and all that follow
+        const prunedMessages = deduplicateMessages(messages.slice(0, messageIndex));
+        setMessages(prunedMessages);
 
         toast.success("Regenerating response...");
       } catch (error) {
