@@ -20,6 +20,7 @@ import { OverviewSection } from "./OverviewSection";
 import { TranscriptSidebar } from "./TranscriptSidebar";
 import { InsightsSection } from "./InsightsSection";
 import { StudentsSection } from "./StudentsSection";
+import { GeographySection } from "./GeographySection";
 
 type TranscriptMessage = {
   id: string;
@@ -81,7 +82,7 @@ export default function ClassroomDashboard() {
   const totalTime = "12:56";
   const currentSegment = "1/5";
   const segmentName = "Introduction";
-  const [activeSection, setActiveSection] = useState<"replay" | "homework" | "students" | "insight">("replay");
+  const [activeSection, setActiveSection] = useState<"replay" | "homework" | "students" | "insight" | "geography">("replay");
 
   return (
     <div className="flex h-screen w-full bg-background">
@@ -138,6 +139,13 @@ export default function ClassroomDashboard() {
             >
               Insight
             </Button>
+            <Button 
+              variant={activeSection === "geography" ? "default" : "ghost"} 
+              size="sm"
+              onClick={() => setActiveSection("geography")}
+            >
+              Geography
+            </Button>
             <button className="flex h-8 w-8 items-center justify-center rounded hover:bg-muted">
               <Settings className="h-4 w-4" />
             </button>
@@ -176,6 +184,8 @@ export default function ClassroomDashboard() {
             <InsightsSection />
           ) : activeSection === "students" ? (
             <StudentsSection />
+          ) : activeSection === "geography" ? (
+            <GeographySection />
           ) : (
             <div className="flex flex-1 items-center justify-center">
               <div className="text-center">

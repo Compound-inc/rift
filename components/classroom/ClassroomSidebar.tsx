@@ -19,6 +19,8 @@ import {
 import { AppLogo } from "@/components/ui/icons/svg-icons";
 import { UserProfileSection } from "@/components/user-profile-section";
 import { useRef, useEffect } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 // Custom scrollbar styles with auto-hide functionality
 const scrollbarStyles = `
@@ -77,18 +79,19 @@ const scrollbarStyles = `
 `;
 
 const navItems = [
-  { icon: Calendar, label: "Calendar", active: false },
-  { icon: Users, label: "Meetings", active: true },
-  { icon: ListMusic, label: "Playlist", active: false },
-  { icon: BookOpen, label: "Stories", active: false },
-  { icon: TrendingUp, label: "Deals", active: false },
-  { icon: BarChart3, label: "Insights", active: false },
+  { icon: Calendar, label: "Calendar" },
+  { icon: Users, label: "Meetings" },
+  { icon: ListMusic, label: "Playlist" },
+  { icon: BookOpen, label: "Stories" },
+  { icon: TrendingUp, label: "Deals" },
+  { icon: BarChart3, label: "Insights", href: "/classroom/insights" },
 ];
 
 export function ClassroomSidebar() {
   const [searchQuery, setSearchQuery] = useState("");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hideScrollbarTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pathname = usePathname();
 
   // Handle scrollbar auto-hide
   const handleScrollContainerMouseEnter = () => {
@@ -160,19 +163,28 @@ export function ClassroomSidebar() {
           onMouseLeave={handleScrollContainerMouseLeave}
         >
           <nav className="space-y-0.5">
-            {navItems.map((item) => (
-              <button
-                key={item.label}
-                className={cn(
-                  "group relative flex w-full items-center gap-2 p-2.5 mb-1 rounded-lg cursor-pointer transition-colors overflow-hidden",
-                  "hover:bg-hover hover:text-accent-foreground",
-                  item.active && "bg-hover text-accent-foreground"
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                <span className="text-sm font-medium">{item.label}</span>
-              </button>
-            ))}
+            {navItems.map((item) => {
+              const isActive = item.href ? pathname === item.href : false;
+              const content = (
+                <div
+                  className={cn(
+                    "group relative flex w-full items-center gap-2 p-2.5 mb-1 rounded-lg cursor-pointer transition-colors overflow-hidden",
+                    "hover:bg-hover hover:text-accent-foreground",
+                    isActive && "bg-hover text-accent-foreground"
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span className="text-sm font-medium">{item.label}</span>
+                </div>
+              );
+              return item.href ? (
+                <Link key={item.label} href={item.href} className="block">
+                  {content}
+                </Link>
+              ) : (
+                <div key={item.label}>{content}</div>
+              );
+            })}
           </nav>
         </div>
 
