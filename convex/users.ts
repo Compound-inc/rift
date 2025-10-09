@@ -1,10 +1,11 @@
-import { internalQuery, internalMutation, query } from "./_generated/server";
+import { internalQuery, internalMutation, query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId, getAuthUserIdentity } from "./helpers/getUser";
 import {
   extractOrganizationIdFromJWT,
   checkQuotaLimit,
   getOrganizationBillingCycle,
+  incrementQuotaUsage,
 } from "./helpers/quota";
 
 // Internal CRUD operations - not exposed to client
@@ -165,6 +166,48 @@ export const checkUserQuota = query({
     );
 
     return quotaCheck;
+  },
+});
+
+/**
+ * Increment the authenticated user's quota usage
+ * Used for regenerations where we don't need to persist a new user message
+ */
+export const incrementUserQuota = mutation({
+  args: {
+    quotaType: v.union(v.literal("standard"), v.literal("premium")),
+  },
+  returns: v.object({
+    newUsage: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    // Get the authenticated user identity (full JWT token)
+    const identity = await getAuthUserIdentity(ctx);
+    if (!identity) {
+      throw new Error("Unauthenticated call - user must be logged in");
+    }
+
+    // Get the authenticated user ID
+    const userId = identity.subject;
+
+    // Extract organization ID from JWT token
+    const orgId = extractOrganizationIdFromJWT(identity);
+    if (!orgId) {
+      throw new Error("No organization ID found in user token");
+    }
+
+    // Get organization's billing cycle information
+    const billingCycle = await getOrganizationBillingCycle(ctx, orgId);
+
+    // Increment quota usage
+    const newUsage = await incrementQuotaUsage(
+      ctx,
+      userId,
+      args.quotaType,
+      billingCycle?.billingCycleStart,
+    );
+
+    return { newUsage };
   },
 });
 

@@ -182,54 +182,55 @@ export async function POST(req: Request) {
       );
     }
 
-    // Check quota limits BEFORE making AI request - only for new messages
-    if (trigger !== "regenerate-message") {
-      const lastUser = messages.filter((m) => m.role === "user").pop();
-      const userText = lastUser?.parts?.[0]?.text;
-      if (lastUser && userText) {
-        // Check quota limits first (blocking)
-        const quotaCheck = await fetchQuery(
-          api.users.checkUserQuota,
-          { quotaType },
+    // Check quota limits BEFORE making AI request - for both new messages and regenerations
+    const lastUser = messages.filter((m) => m.role === "user").pop();
+    const userText = lastUser?.parts?.[0]?.text;
+    if (lastUser && userText) {
+      // Check quota limits first (blocking)
+      const quotaCheck = await fetchQuery(
+        api.users.checkUserQuota,
+        { quotaType },
+        { token: auth.token },
+      );
+
+      if (!quotaCheck.allowed) {
+        // Get both quota types for detailed error message
+        const bothQuotas = await fetchQuery(
+          api.users.getUserBothQuotas,
+          {},
           { token: auth.token },
         );
 
-        if (!quotaCheck.allowed) {
-          // Get both quota types for detailed error message
-          const bothQuotas = await fetchQuery(
-            api.users.getUserBothQuotas,
-            {},
-            { token: auth.token },
-          );
+        const errorResponse = {
+          error: "Quota exceeded",
+          message: `Message quota exceeded. Usage: ${quotaCheck.currentUsage}/${quotaCheck.limit} messages`,
+          quotaType,
+          quotaInfo: {
+            currentUsage: quotaCheck.currentUsage,
+            limit: quotaCheck.limit,
+          },
+          otherQuotaInfo: {
+            currentUsage: quotaType === "standard" 
+              ? bothQuotas.premium.currentUsage 
+              : bothQuotas.standard.currentUsage,
+            limit: quotaType === "standard" 
+              ? bothQuotas.premium.limit 
+              : bothQuotas.standard.limit,
+          },
+        };
 
-          const errorResponse = {
-            error: "Quota exceeded",
-            message: `Message quota exceeded. Usage: ${quotaCheck.currentUsage}/${quotaCheck.limit} messages`,
-            quotaType,
-            quotaInfo: {
-              currentUsage: quotaCheck.currentUsage,
-              limit: quotaCheck.limit,
-            },
-            otherQuotaInfo: {
-              currentUsage: quotaType === "standard" 
-                ? bothQuotas.premium.currentUsage 
-                : bothQuotas.standard.currentUsage,
-              limit: quotaType === "standard" 
-                ? bothQuotas.premium.limit 
-                : bothQuotas.standard.limit,
-            },
-          };
+        return new Response(JSON.stringify(errorResponse), {
+          status: 429,
+          headers: {
+            "Content-Type": "application/json",
+            "X-Response-Time": `${Date.now() - start}ms`,
+          },
+        });
+      }
 
-          return new Response(JSON.stringify(errorResponse), {
-            status: 429,
-            headers: {
-              "Content-Type": "application/json",
-              "X-Response-Time": `${Date.now() - start}ms`,
-            },
-          });
-        }
-
-        // Persist user message (non-blocking) - after quota check passes
+      // Handle quota increment based on trigger type
+      if (trigger !== "regenerate-message") {
+        // For new messages: persist user message (which also increments quota)
         DatabaseQueue.add(async () => {
           await fetchMutation(
             api.threads.sendMessage,
@@ -241,6 +242,15 @@ export async function POST(req: Request) {
               quotaType,
               secretToken: process.env.CONVEX_SECRET_TOKEN!,
             },
+            { token: auth.token },
+          );
+        });
+      } else {
+        // For regenerations: only increment quota (no message persistence)
+        DatabaseQueue.add(async () => {
+          await fetchMutation(
+            api.users.incrementUserQuota,
+            { quotaType },
             { token: auth.token },
           );
         });
