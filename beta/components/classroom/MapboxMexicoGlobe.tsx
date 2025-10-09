@@ -4,7 +4,6 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import Map from "react-map-gl/mapbox";
 import { useEffect, useMemo, useRef } from "react";
 import type { MapRef } from "react-map-gl/mapbox";
-import { Marker } from "react-map-gl/mapbox";
 
 type Hotspot = {
   id: string;
@@ -37,7 +36,7 @@ export default function MapboxMexicoGlobe({ height = 600, hotspots = [], cloud =
   };
 
   const hotspotsGeoJson = useMemo(() => {
-    const features: any[] = [];
+    const features: unknown[] = [];
     for (const h of hotspots) {
       if (!cloud) {
         features.push({
@@ -91,6 +90,16 @@ export default function MapboxMexicoGlobe({ height = 600, hotspots = [], cloud =
     return { type: "FeatureCollection", features } as const;
   }, [hotspots, cloud]);
 
+  // Keep heatmap data in sync if hotspots change
+  useEffect(() => {
+    const map = mapRef.current?.getMap?.();
+    if (!map) return;
+    const src: unknown = map.getSource && map.getSource("hotspots");
+    if (src && typeof src === 'object' && src !== null && 'setData' in src) {
+      (src as { setData: (data: unknown) => void }).setData(hotspotsGeoJson);
+    }
+  }, [hotspotsGeoJson]);
+
   if (!mapboxToken) {
     return (
       <div className="text-sm text-muted-foreground">
@@ -98,16 +107,6 @@ export default function MapboxMexicoGlobe({ height = 600, hotspots = [], cloud =
       </div>
     );
   }
-
-  // Keep heatmap data in sync if hotspots change
-  useEffect(() => {
-    const map = mapRef.current?.getMap?.();
-    if (!map) return;
-    const src: any = map.getSource && map.getSource("hotspots");
-    if (src && src.setData) {
-      src.setData(hotspotsGeoJson as any);
-    }
-  }, [hotspotsGeoJson]);
 
   return (
     <div style={{ width: "100%", height }}>
@@ -125,7 +124,7 @@ export default function MapboxMexicoGlobe({ height = 600, hotspots = [], cloud =
         mapboxAccessToken={mapboxToken}
         style={{ width: "100%", height: "100%", borderRadius: "0.5rem" }}
         onLoad={(e) => {
-          const map: any = e.target;
+          const map = e.target as any;
           if (!map.getSource("hotspots")) {
             map.addSource("hotspots", {
               type: "geojson",
@@ -145,16 +144,16 @@ export default function MapboxMexicoGlobe({ height = 600, hotspots = [], cloud =
                   ["linear"],
                   ["heatmap-density"],
                   0.0, "rgba(0,0,0,0)",
-                  0.1, "#e3f2fd",
-                  0.2, "#bbdefb",
-                  0.3, "#90caf9",
-                  0.4, "#64b5f6",
-                  0.5, "#42a5f5",
-                  0.6, "#2196f3",
-                  0.7, "#1e88e5",
-                  0.8, "#1976d2",
-                  0.9, "#1565c0",
-                  1.0, "#0d47a1"
+                  0.1, "#e1f5fe",
+                  0.2, "#b3e5fc",
+                  0.3, "#81d4fa",
+                  0.4, "#4fc3f7",
+                  0.5, "#29b6f6",
+                  0.6, "#03a9f4",
+                  0.7, "#039be5",
+                  0.8, "#0288d1",
+                  0.9, "#0277bd",
+                  1.0, "#01579b"
                 ],
                 "heatmap-radius": [
                   "interpolate",

@@ -11,9 +11,7 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend,
 } from "recharts";
-import { cn } from "@/lib/utils";
 
 // Sample data representing class session timeline
 const chartData = [
@@ -43,7 +41,7 @@ const COLORS = topicsData.map(t => t.color);
 
 interface CustomTooltipProps {
   active?: boolean;
-  payload?: any[];
+  payload?: unknown[];
   label?: string;
 }
 
@@ -63,7 +61,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 
 interface PieTooltipProps {
   active?: boolean;
-  payload?: any[];
+  payload?: unknown[];
 }
 
 const PieTooltip = ({ active, payload }: PieTooltipProps) => {
@@ -172,7 +170,7 @@ export function EngagementChart() {
               outerRadius={100}
               fill="#8884d8"
               dataKey="questions"
-              label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+              label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
             >
               {topicsData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index]} />

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ai/ui/button";
 import {
   Calendar,
   Users,
@@ -11,10 +10,7 @@ import {
   TrendingUp,
   BarChart3,
   Search,
-  ChevronDown,
   HelpCircle,
-  Settings,
-  LogOut,
 } from "lucide-react";
 import { AppLogo } from "@/components/ui/icons/svg-icons";
 import { UserProfileSection } from "@/components/user-profile-section";
@@ -84,7 +80,7 @@ const navItems = [
   { icon: ListMusic, label: "Playlist" },
   { icon: BookOpen, label: "Stories" },
   { icon: TrendingUp, label: "Deals" },
-  { icon: BarChart3, label: "Insights", href: "/classroom/insights" },
+  { icon: BarChart3, label: "Insights", href: "/settings/insights" },
 ];
 
 export function ClassroomSidebar() {

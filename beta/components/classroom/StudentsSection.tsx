@@ -576,7 +576,7 @@ function StudentDetailView({ student, onBack }: { student: Student; onBack: () =
           <div className="pt-4">
             <h3 className="text-2xl font-semibold mb-1">AI Message History</h3>
             <p className="text-sm text-muted-foreground">
-              Student's AI interactions during the active class session
+              Student&apos;s AI interactions during the active class session
             </p>
           </div>
           {messages.length > 0 ? (

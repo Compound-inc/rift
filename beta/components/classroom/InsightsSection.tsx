@@ -6,7 +6,6 @@ import {
   Minus,
   Users,
   Clock,
-  MapPin,
   AlertCircle,
   CheckCircle,
   Lightbulb,
@@ -15,15 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { DataTable } from "@/components/ai/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
-import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ai/ui/select";
+import { EngagementChart } from "./EngagementChart";
 
 type InsightMetric = {
   label: string;
@@ -44,177 +35,150 @@ type InsightItem = {
   category: string;
 };
 
-type RegionalData = {
+type AIQuestion = {
   id: string;
-  region: string;
+  prompt: string;
   studentCount: number;
-  avgEngagement: number;
-  topicsFocused: string;
+  category: string;
   avgResponseTime: string;
   satisfaction: number;
 };
 
 const metrics: InsightMetric[] = [
-  { label: "Total Coverage", value: "32", unit: "states", trend: "up", trendValue: "3", color: "green" },
-  { label: "Active Regions", value: 12, trend: "neutral" },
-  { label: "Avg. Engagement", value: "87.5", unit: "%", trend: "up", trendValue: "5%", color: "blue" },
-  { label: "Regional Participation", value: "42", unit: "min", trend: "down", trendValue: "2%", color: "yellow" },
+  { label: "Engagement Score", value: "94.3", unit: "%", trend: "up", trendValue: "12%", color: "green" },
+  { label: "Key Topics", value: 8, trend: "neutral" },
+  { label: "Questions Asked", value: 23, trend: "up", trendValue: "8%", color: "blue" },
+  { label: "Avg. Focus Time", value: "42", unit: "min", trend: "down", trendValue: "5%", color: "yellow" },
 ];
 
 const detailedMetrics = [
-  { label: "North", value: "91.2", unit: "%", trend: "up", trendValue: "8%", color: "green" },
-  { label: "South", value: "85.5", unit: "%", trend: "neutral", trendValue: "0%", color: "blue" },
-  { label: "East", value: "88.3", unit: "%", trend: "up", trendValue: "4%", color: "green" },
-  { label: "West", value: "84.7", unit: "%", trend: "down", trendValue: "3%", color: "red" },
-  { label: "Central", value: "89.2", unit: "%", trend: "up", trendValue: "6%", color: "green" },
+  { label: "P50", value: "8.2", unit: "min", trend: "up", trendValue: "15%", color: "red" },
+  { label: "P75", value: "12.5", unit: "min", trend: "neutral", trendValue: "0%", color: "blue" },
+  { label: "P90", value: "18.3", unit: "min", trend: "down", trendValue: "8%", color: "green" },
+  { label: "P95", value: "24.7", unit: "min", trend: "up", trendValue: "3%", color: "yellow" },
+  { label: "P99", value: "35.2", unit: "min", trend: "down", trendValue: "12%", color: "green" },
 ];
 
-type Grade = "all" | "1st" | "2nd" | "3rd" | "4th" | "5th" | "6th";
-
-const regionalData: (RegionalData & { grade: Grade })[] = [
+const aiQuestions: AIQuestion[] = [
   {
     id: "1",
-    region: "Mexico City",
-    studentCount: 45,
-    avgEngagement: 94.3,
-    topicsFocused: "Microeconomics, Market Analysis",
-    avgResponseTime: "2.1s",
-    satisfaction: 4.8,
-    grade: "1st"
+    prompt: "Can you explain the difference between price elasticity of demand and income elasticity?",
+    studentCount: 8,
+    category: "Concept Clarification",
+    avgResponseTime: "2.3s",
+    satisfaction: 4.8
   },
   {
     id: "2",
-    region: "Guadalajara",
-    studentCount: 32,
-    avgEngagement: 89.7,
-    topicsFocused: "Supply & Demand, Elasticity",
-    avgResponseTime: "2.4s",
-    satisfaction: 4.6,
-    grade: "2nd"
+    prompt: "How do I calculate the equilibrium price when given supply and demand equations?",
+    studentCount: 12,
+    category: "Problem Solving",
+    avgResponseTime: "3.1s",
+    satisfaction: 4.6
   },
   {
     id: "3",
-    region: "Monterrey",
-    studentCount: 38,
-    avgEngagement: 92.1,
-    topicsFocused: "Market Equilibrium, Consumer Theory",
-    avgResponseTime: "2.2s",
-    satisfaction: 4.7,
-    grade: "3rd"
+    prompt: "What are some real-world examples of perfectly inelastic demand?",
+    studentCount: 6,
+    category: "Application",
+    avgResponseTime: "2.8s",
+    satisfaction: 4.9
   },
   {
     id: "4",
-    region: "Puebla",
-    studentCount: 28,
-    avgEngagement: 86.5,
-    topicsFocused: "Elasticity, Price Theory",
-    avgResponseTime: "2.6s",
-    satisfaction: 4.5,
-    grade: "4th"
+    prompt: "Can you help me understand the concept of consumer surplus with a graph?",
+    studentCount: 9,
+    category: "Visual Learning",
+    avgResponseTime: "4.2s",
+    satisfaction: 4.7
   },
   {
     id: "5",
-    region: "Tijuana",
-    studentCount: 25,
-    avgEngagement: 88.9,
-    topicsFocused: "International Trade, Markets",
-    avgResponseTime: "2.3s",
-    satisfaction: 4.7,
-    grade: "5th"
-  },
-  {
-    id: "6",
-    region: "Cancún",
-    studentCount: 22,
-    avgEngagement: 85.2,
-    topicsFocused: "Tourism Economics, Demand",
-    avgResponseTime: "2.5s",
-    satisfaction: 4.4,
-    grade: "6th"
+    prompt: "What happens to market equilibrium when there's a shift in supply?",
+    studentCount: 11,
+    category: "Concept Clarification",
+    avgResponseTime: "2.9s",
+    satisfaction: 4.5
   },
   {
     id: "7",
-    region: "Mérida",
-    studentCount: 19,
-    avgEngagement: 87.3,
-    topicsFocused: "Regional Economics, Markets",
-    avgResponseTime: "2.4s",
-    satisfaction: 4.6,
-    grade: "1st"
+    prompt: "Can you provide a step-by-step solution to this elasticity problem?",
+    studentCount: 14,
+    category: "Problem Solving",
+    avgResponseTime: "3.4s",
+    satisfaction: 4.6
+  },
+  {
+    id: "8",
+    prompt: "What's the difference between normal and inferior goods?",
+    studentCount: 7,
+    category: "Concept Clarification",
+    avgResponseTime: "2.1s",
+    satisfaction: 4.9
   }
 ];
-
-// Basic coordinates for key Mexican cities present in our dataset
-const cityCoordinates: Record<string, { longitude: number; latitude: number }> = {
-  "Mexico City": { longitude: -99.1332, latitude: 19.4326 },
-  "Guadalajara": { longitude: -103.3496, latitude: 20.6597 },
-  "Monterrey": { longitude: -100.3161, latitude: 25.6866 },
-  "Puebla": { longitude: -98.2063, latitude: 19.0414 },
-  "Tijuana": { longitude: -117.0382, latitude: 32.5149 },
-  "Cancún": { longitude: -86.8515, latitude: 21.1619 },
-  "Mérida": { longitude: -89.5926, latitude: 20.9674 },
-};
 
 const insights: InsightItem[] = [
   {
     id: "1",
     type: "highlight",
-    title: "Strong Performance in Metropolitan Areas",
-    description: "Students from major metropolitan areas (Mexico City, Monterrey, Guadalajara) show 12% higher engagement rates compared to smaller regions.",
+    title: "Strong Understanding of Core Concepts",
+    description: "Students demonstrated excellent comprehension during the discussion on supply and demand equilibrium, with 89% providing accurate responses.",
     timestamp: "5/5/2025, 12:00:00 PM",
     metrics: [
-      { label: "metro_avg", value: "92.1%" },
-      { label: "regions", value: "3" }
+      { label: "accuracy", value: "89%" },
+      { label: "participation", value: "high" }
     ],
-    category: "Regional Performance"
+    category: "Comprehension"
   },
   {
     id: "2",
     type: "concern",
-    title: "Lower Engagement in Western States",
-    description: "Students from western states show 8% lower average engagement. Consider targeted support or regional study groups.",
+    title: "Declining Engagement in Mid-Session",
+    description: "Notable drop in interaction between minutes 15-25. Consider adding interactive elements or break points in future sessions.",
     timestamp: "5/5/2025, 12:00:00 PM",
     metrics: [
-      { label: "engagement", value: "84.7%" },
-      { label: "states", value: "5" }
+      { label: "segment", value: "15-25 min" },
+      { label: "engagement", value: "-35%" },
+      { label: "questions", value: "2" }
     ],
     category: "Engagement"
   },
   {
     id: "3",
     type: "recommendation",
-    title: "Opportunity for Regional Collaboration",
-    description: "High-performing regions could mentor students from developing areas through peer learning programs.",
+    title: "Opportunity for Deeper Dive",
+    description: "Multiple students requested more examples on elasticity calculations. Consider dedicating next session's first 10 minutes to this topic.",
     timestamp: "5/5/2025, 12:00:00 PM",
     metrics: [
-      { label: "potential_pairs", value: "8" },
-      { label: "expected_impact", value: "+15%" }
+      { label: "requests", value: "7" },
+      { label: "topic", value: "elasticity" }
     ],
-    category: "Collaboration"
+    category: "Content"
   },
   {
     id: "4",
     type: "observation",
-    title: "Coastal Regions Show Interest in Trade Topics",
-    description: "Students from coastal areas demonstrate 35% higher engagement when international trade topics are discussed.",
+    title: "Effective Use of Visual Aids",
+    description: "Graph demonstrations correlated with 40% increase in student questions and active participation during those segments.",
     timestamp: "5/5/2025, 12:00:00 PM",
     metrics: [
-      { label: "engagement", value: "+35%" },
-      { label: "coastal_regions", value: "4" }
+      { label: "engagement", value: "+40%" },
+      { label: "visual_segments", value: "3" }
     ],
-    category: "Content Preference"
+    category: "Teaching Method"
   },
   {
     id: "5",
     type: "highlight",
-    title: "Consistent AI Usage Across All Regions",
-    description: "AI tutoring tools show uniform adoption rates across all geographic regions, indicating successful platform accessibility.",
+    title: "Peer Learning Observed",
+    description: "Students initiated collaborative problem-solving without prompting during the market equilibrium exercise.",
     timestamp: "5/5/2025, 12:00:00 PM",
     metrics: [
-      { label: "adoption_rate", value: "94%" },
-      { label: "variance", value: "±3%" }
+      { label: "peer_interactions", value: "12" },
+      { label: "spontaneous", value: "yes" }
     ],
-    category: "Technology Adoption"
+    category: "Collaboration"
   },
 ];
 
@@ -237,15 +201,16 @@ const InsightIcon = ({ type }: { type: InsightItem["type"] }) => {
   }
 };
 
-// Column definitions for Regional Data DataTable
-const regionalDataColumns: ColumnDef<RegionalData>[] = [
+// Column definitions for AI Questions DataTable
+const aiQuestionsColumns: ColumnDef<AIQuestion>[] = [
   {
-    accessorKey: "region",
-    header: "Region",
+    accessorKey: "prompt",
+    header: "Question",
     cell: ({ row }) => (
-      <div className="flex items-center gap-2">
-        <MapPin className="h-3 w-3 text-muted-foreground" />
-        <span className="text-sm font-medium">{row.getValue("region")}</span>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium">
+          {row.getValue("prompt")}
+        </div>
       </div>
     ),
   },
@@ -260,31 +225,33 @@ const regionalDataColumns: ColumnDef<RegionalData>[] = [
     ),
   },
   {
-    accessorKey: "avgEngagement",
-    header: "Engagement",
+    accessorKey: "category",
+    header: "Category",
     cell: ({ row }) => {
-      const engagement = row.getValue("avgEngagement") as number;
-      const getEngagementColor = (value: number) => {
-        if (value >= 90) return "text-green-600 dark:text-green-400";
-        if (value >= 85) return "text-blue-600 dark:text-blue-400";
-        return "text-yellow-600 dark:text-yellow-400";
+      const category = row.getValue("category") as string;
+      const getCategoryStyle = (category: string) => {
+        switch (category) {
+          case "Concept Clarification":
+            return "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400";
+          case "Problem Solving":
+            return "bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-400";
+          case "Application":
+            return "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400";
+          case "Visual Learning":
+            return "bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-400";
+          case "Advanced Topics":
+            return "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-400";
+          default:
+            return "bg-gray-50 text-gray-700 dark:bg-gray-950 dark:text-gray-400";
+        }
       };
       
       return (
-        <span className={cn("text-sm font-medium", getEngagementColor(engagement))}>
-          {engagement}%
+        <span className={cn("inline-flex items-center px-2 py-0.5 rounded text-xs", getCategoryStyle(category))}>
+          {category}
         </span>
       );
     },
-  },
-  {
-    accessorKey: "topicsFocused",
-    header: "Top Topics",
-    cell: ({ row }) => (
-      <div className="text-xs text-muted-foreground max-w-[200px] truncate">
-        {row.getValue("topicsFocused")}
-      </div>
-    ),
   },
   {
     accessorKey: "avgResponseTime",
@@ -325,82 +292,16 @@ const regionalDataColumns: ColumnDef<RegionalData>[] = [
   },
 ];
 
-export function GeographySection() {
-  const [selectedGrade, setSelectedGrade] = useState<Grade>("all");
-  const MapboxMexicoGlobe = useMemo(
-    () => dynamic(() => import("./MapboxMexicoGlobe"), { ssr: false }),
-    []
-  );
-
-  const filteredRegionalData = useMemo(() => {
-    if (selectedGrade === "all") return regionalData;
-    return regionalData.filter((r) => r.grade === selectedGrade);
-  }, [selectedGrade]);
-
-  // Build hotspots from filtered data
-  const hotspots = useMemo(() => {
-    if (filteredRegionalData.length === 0) return [] as { id: string; name: string; longitude: number; latitude: number; value: number }[];
-    const maxStudents = Math.max(...filteredRegionalData.map((r) => r.studentCount));
-    return filteredRegionalData
-      .filter((r) => cityCoordinates[r.region])
-      .map((r) => {
-        const coords = cityCoordinates[r.region];
-        const value = maxStudents > 0 ? Math.round((r.studentCount / maxStudents) * 100) : 0;
-        return {
-          id: r.id,
-          name: r.region,
-          longitude: coords.longitude,
-          latitude: coords.latitude,
-          value,
-        };
-      });
-  }, [filteredRegionalData]);
-
-  const aggregatedMetrics = useMemo(() => {
-    const data = filteredRegionalData;
-    const totalStudents = data.reduce((sum, r) => sum + r.studentCount, 0);
-    const avgEngagement = data.length
-      ? (data.reduce((sum, r) => sum + r.avgEngagement, 0) / data.length).toFixed(1)
-      : "0.0";
-    return {
-      totalStudents,
-      avgEngagement,
-      activeRegions: data.length,
-    };
-  }, [filteredRegionalData]);
+export function InsightsSection() {
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
       <div className="px-8 py-6 space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-semibold mb-1">Geographic Insights</h1>
+          <h1 className="text-2xl font-semibold mb-1">Class Insights</h1>
           <p className="text-sm text-muted-foreground">
-            Regional distribution and performance analysis
+            AI-generated analysis of class performance and engagement
           </p>
-        </div>
-
-        {/* Controls */}
-        <div className="flex items-center gap-3">
-          <div className="text-sm text-muted-foreground">Grade</div>
-          <Select value={selectedGrade} onValueChange={(v) => setSelectedGrade(v as Grade)}>
-            <SelectTrigger>
-              <SelectValue placeholder="All grades" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="1st">1st</SelectItem>
-              <SelectItem value="2nd">2nd</SelectItem>
-              <SelectItem value="3rd">3rd</SelectItem>
-              <SelectItem value="4th">4th</SelectItem>
-              <SelectItem value="5th">5th</SelectItem>
-              <SelectItem value="6th">6th</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="ml-auto flex items-center gap-4 text-xs text-muted-foreground">
-            <span>Active regions: <span className="font-medium text-foreground">{aggregatedMetrics.activeRegions}</span></span>
-            <span>Total students: <span className="font-medium text-foreground">{aggregatedMetrics.totalStudents}</span></span>
-            <span>Avg engagement: <span className="font-medium text-foreground">{aggregatedMetrics.avgEngagement}%</span></span>
-          </div>
         </div>
 
         {/* Key Metrics Grid */}
@@ -437,7 +338,7 @@ export function GeographySection() {
           ))}
         </div>
 
-        {/* Regional Performance Metrics */}
+        {/* Detailed Percentile Metrics */}
         <div className="grid grid-cols-5 gap-3">
           {detailedMetrics.map((metric) => (
             <div
@@ -466,31 +367,29 @@ export function GeographySection() {
           ))}
         </div>
 
-        {/* Map Section */}
-        <div className="w-full pb-8">
-          <MapboxMexicoGlobe height={700} hotspots={hotspots} />
-        </div>
+        {/* Combined Engagement & Activity Chart */}
+        <EngagementChart />
 
-        {/* Regional Data Table */}
+        {/* AI Questions Section */}
         <div className="space-y-4">
           <div className="pt-4">
-            <h3 className="text-2xl font-semibold mb-1">Regional Performance Data</h3>
+            <h3 className="text-2xl font-semibold mb-1">Most Asked Questions to AI</h3>
             <p className="text-sm text-muted-foreground">
-              Detailed breakdown by region
+              Student interactions with AI during class
             </p>
           </div>
           <DataTable
-            columns={regionalDataColumns}
-            data={filteredRegionalData}
+            columns={aiQuestionsColumns}
+            data={aiQuestions}
           />
         </div>
 
-        {/* Insights Timeline */}
+        {/* Timeline */}
         <div className="space-y-4">
           <div className="pt-4">
-            <h3 className="text-2xl font-semibold mb-1">Geographic Insights Timeline</h3>
+            <h3 className="text-2xl font-semibold mb-1">AI-Generated Insights Timeline</h3>
             <p className="text-sm text-muted-foreground">
-              Regional trends and observations
+              What&apos;s happening in your class
             </p>
           </div>
           <div className="border rounded-lg">
@@ -543,4 +442,5 @@ export function GeographySection() {
     </div>
   );
 }
+
 

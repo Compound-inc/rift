@@ -18,6 +18,7 @@ import {
   LogOut,
   Shield,
   Building2,
+  BarChart3,
 } from "lucide-react";
 interface SettingsNavItem {
   title: string;
@@ -116,75 +117,80 @@ function SettingSection({
 
 const settingsSections: SettingsSection[] = [
   {
-    title: "Organization Settings",
+    title: "Organización",
     items: [
       {
-        title: "Overview",
+        title: "Resumen",
         href: "/settings",
         icon: Home,
       },
       {
-        title: "Members",
+        title: "Miembros",
         href: "/settings/members",
         icon: Users,
       },
       {
-        title: "Domain & SSO",
+        title: "Dominio y SSO",
         href: "/settings/domain-sso",
         icon: Building2,
       },
       {
-        title: "Plans",
+        title: "Planes",
         href: "/settings/plans",
         icon: ReceiptText,
+      },
+      {
+        title: "Análisis",
+        href: "/settings/insights",
+        icon: BarChart3,
       },
     ],
   },
   {
-    title: "Personal Settings",
+    title: "Cuenta",
     items: [
       {
-        title: "Profile",
+        title: "Perfil",
         href: "/settings/profile",
         icon: Users,
       },
       {
-        title: "Security",
+        title: "Seguridad",
         href: "/settings/security",
         icon: Shield,
       },
       {
-        title: "API Keys",
+        title: "Claves API",
         href: "/settings/api-keys",
         icon: Key,
       },
     ],
   },
   {
-    title: "App Settings",
+    title: "Configuración de la App",
     items: [
       {
-        title: "Responses",
+        title: "Respuestas",
         href: "/settings/responses",
         icon: MessageSquare,
       },
       {
-        title: "Models",
+        title: "Modelos",
         href: "/settings/models",
         icon: Bot,
       },
       {
-        title: "Tips",
+        title: "Consejos",
         href: "/settings/tips",
         icon: Lightbulb,
       },
       {
-        title: "Appearance",
+        title: "Apariencia",
         href: "/settings/appearance",
         icon: Palette,
       },
       {
-        title: "Shortcuts",
+        title: "Atajos",
         href: "/settings/shortcuts",
         icon: Target,
       },
@@ -194,12 +200,12 @@ const settingsSections: SettingsSection[] = [
 
 const footerItems: SettingsNavItem[] = [
   {
-    title: "Updates",
+    title: "Actualizaciones",
     href: "/settings/updates",
     icon: Bell,
   },
   {
-    title: "Contact us",
+    title: "Contáctanos",
     href: "/settings/contact-us",
     icon: Mail,
   },
@@ -252,7 +258,7 @@ export function SettingsSidebar() {
 
             {/* Logout Button */}
             <SettingItem
-              title="Log out"
+              title="Cerrar sesión"
               href="#"
               icon={LogOut}
               onClick={handleLogout}

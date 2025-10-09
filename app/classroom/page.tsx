@@ -1,4 +1,4 @@
-import ClassroomDashboard from "@/components/classroom/ClassroomDashboard";
+import ClassroomDashboard from "@/beta/components/classroom/ClassroomDashboard";
 
 export default function ClassroomPage() {
   return <ClassroomDashboard />;

@@ -63,6 +63,11 @@ export function DataTable<TData, TValue>({
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
+    initialState: {
+      pagination: {
+        pageSize: 30,
+      },
+    },
     state: {
       sorting,
       columnFilters,
@@ -169,7 +174,7 @@ export function DataTable<TData, TValue>({
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  No results.
+                  Sin resultados.
                 </TableCell>
               </TableRow>
             )}
@@ -179,8 +184,8 @@ export function DataTable<TData, TValue>({
       {showPagination && (
         <div className="flex items-center justify-end space-x-2 py-4">
           <div className="flex-1 text-sm text-muted-foreground">
-            {table.getFilteredRowModel().rows.length} of{" "}
-            {table.getCoreRowModel().rows.length} row(s) total.
+            {table.getFilteredRowModel().rows.length} de{" "}
+            {table.getCoreRowModel().rows.length} fila(s) en total.
           </div>
           <div className="flex items-center space-x-2">
             <Button
@@ -189,7 +194,7 @@ export function DataTable<TData, TValue>({
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
             >
-              Previous
+              Anterior
             </Button>
             <Button
               variant="outline"
@@ -197,7 +202,7 @@ export function DataTable<TData, TValue>({
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
             >
-              Next
+              Siguiente
             </Button>
           </div>
         </div>
