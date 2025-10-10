@@ -13,8 +13,8 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | AI Chat",
-    default: "AI Chat",
+    template: "%s | Rift",
+    default: "Rift",
   },
 };
 
