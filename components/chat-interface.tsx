@@ -669,6 +669,7 @@ export default function ChatInterface({
                           {/* Render non-reasoning parts */}
                           {nonReasoningParts.map((part, i: number) => {
                             if (part.type === "text" && "text" in part) {
+                              {/* Edit mode disabled for now
                               // Check if this message is being edited
                               if (
                                 message.role === "user" &&
@@ -732,6 +733,7 @@ export default function ChatInterface({
                                   </div>
                                 );
                               }
+                              */}
 
                               return (
                                 <Response key={`${message.id}-${i}`}>
@@ -885,6 +887,7 @@ export default function ChatInterface({
                       >
                         <RedoIcon className="size-4" />
                       </Action>
+                      {/* Edit button disabled for now
                       <Action
                         onClick={() => startEditing(message.id)}
                         disabled={
@@ -899,6 +902,7 @@ export default function ChatInterface({
                       >
                         <EditIcon className="size-4" />
                       </Action>
+                      */}
                       <Action
                         onClick={async () => {
                           const textContent = message.parts
@@ -995,23 +999,15 @@ export default function ChatInterface({
             <PromptInputTextarea
               onChange={handleInputChange}
               value={input}
-              disabled={
-                disableInput || (!isAuthenticated && !preloadedMessages)
-              }
-              placeholder={
-                !isAuthenticated && !preloadedMessages
-                  ? "Sign in to start chatting..."
-                  : "Type your message..."
-              }
+              disabled={disableInput}
+              placeholder="Escribe tu mensaje..."
             />
             <PromptInputToolbar>
               <PromptInputTools>
                 <PromptInputButton
                   onClick={handleAttachClick}
                   aria-label="Add attachments"
-                  disabled={
-                    disableInput || (!isAuthenticated && !preloadedMessages)
-                  }
+                  disabled={disableInput}
                 >
                   <AttachmentsIcon className="size-4" />
                 </PromptInputButton>
@@ -1021,10 +1017,7 @@ export default function ChatInterface({
                       <PromptInputButton
                         onClick={handleSearchToggle}
                         aria-label="Toggle web search"
-                        disabled={
-                          disableInput ||
-                          (!isAuthenticated && !preloadedMessages)
-                        }
+                        disabled={disableInput}
                         variant={isSearchEnabled ? "default" : "ghost"}
                         className={
                           isSearchEnabled
@@ -1052,9 +1045,7 @@ export default function ChatInterface({
                 />
               </PromptInputTools>
               <PromptInputSubmit
-                disabled={
-                  disableInput || (!isAuthenticated && !preloadedMessages)
-                }
+                disabled={disableInput}
                 status={status}
                 onStop={() => {
                   // Preserve current streaming message content before stopping

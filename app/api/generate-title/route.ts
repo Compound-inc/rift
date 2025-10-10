@@ -27,11 +27,11 @@ export async function POST(request: NextRequest) {
     // Generate a short title
     const { text } = await generateText({
       model: TITLE_GENERATION_MODEL,
-      prompt: `Genera un título corto y descriptivo (máximo 3 palabras) para esta conversación basado en el mensaje del usuario. Solo responde con el título, sin comillas, sin markdown, sin puntuación:
+      prompt: `Summarize the conversation in 5 words or fewer. Be as concise as possible without losing the context of the conversation, respond in the same language as the user message.
 
 User message: ${userMessage}`,
       temperature: 0.3,
-      maxOutputTokens: 24,
+      maxOutputTokens: 50,
       maxRetries: 3,
     });
 
@@ -41,7 +41,7 @@ User message: ${userMessage}`,
       .replace(/[^\w\s]/g, "") // Remove any non-alphanumeric characters except spaces
       .trim()
       .split(/\s+/) // Split by whitespace
-      .slice(0, 3) // Take only first 3 words
+      .slice(0, 8) // Take only first 12 words
       .join(" ")
       .slice(0, 50); // Ensure it's not too long
 
