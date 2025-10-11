@@ -5,9 +5,9 @@ const REDIRECT_PATHNAME = '/callback';
 
 const REDIRECT_ORIGIN =
   process.env.VERCEL_ENV === 'production'
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    ? 'https://rift.mx'
     : process.env.VERCEL_ENV === 'preview'
-    ? `https://${process.env.VERCEL_URL}`
+    ? 'https://dev.rift.mx'
     : 'http://localhost:3000';
 
 const REDIRECT_URI = new URL(REDIRECT_PATHNAME, REDIRECT_ORIGIN);
