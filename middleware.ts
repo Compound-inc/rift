@@ -12,6 +12,11 @@ const REDIRECT_ORIGIN =
 
 const REDIRECT_URI = new URL(REDIRECT_PATHNAME, REDIRECT_ORIGIN);
 
+// Log the redirect URI for debugging
+console.log('🔗 Redirect URI:', REDIRECT_URI.href);
+console.log('🌍 Environment:', process.env.VERCEL_ENV || 'development');
+console.log('📍 Origin:', REDIRECT_ORIGIN);
+
 export default authkitMiddleware({
   redirectUri: REDIRECT_URI.href,
   eagerAuth: true,
