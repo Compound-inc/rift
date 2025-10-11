@@ -141,7 +141,7 @@ export default function Footer() {
               </Link>
             </div>
             <div className="text-xs text-gray-500">
-              © 2024 LOOP. Todos los derechos reservados.
+              © {new Date().getFullYear()} RIFT. Todos los derechos reservados.
             </div>
           </div>
         </div>

@@ -1,6 +1,19 @@
 import { authkitMiddleware } from "@workos-inc/authkit-nextjs";
 
+// Dynamic redirect URI for Vercel preview deployments
+const REDIRECT_PATHNAME = '/callback';
+
+const REDIRECT_ORIGIN =
+  process.env.VERCEL_ENV === 'production'
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : process.env.VERCEL_ENV === 'preview'
+    ? `https://${process.env.VERCEL_URL}`
+    : 'http://localhost:3000';
+
+const REDIRECT_URI = new URL(REDIRECT_PATHNAME, REDIRECT_ORIGIN);
+
 export default authkitMiddleware({
+  redirectUri: REDIRECT_URI.href,
   eagerAuth: true,
   middlewareAuth: {
     enabled: true,
@@ -8,9 +21,6 @@ export default authkitMiddleware({
       "/",
       "/sign-in",
       "/sign-up",
-      "/payment-success",
-      "/router",
-      "/pricing",
     ],
   },
 });

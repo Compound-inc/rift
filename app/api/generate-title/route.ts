@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateText } from "ai";
-import { google } from "@ai-sdk/google";
+import { generateText, gateway } from "ai";
 import { api } from "@/convex/_generated/api";
 import { fetchMutation } from "convex/nextjs";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 
-const TITLE_GENERATION_MODEL = google("gemini-2.0-flash-lite");
+const TITLE_GENERATION_MODEL = gateway("google/gemini-2.0-flash-lite");
 
 export async function POST(request: NextRequest) {
   try {
