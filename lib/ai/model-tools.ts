@@ -21,7 +21,7 @@ export const TOOL_CONFIGS: Record<
   },
   web_search: {
     ...BASE_TOOL_CONFIGS.web_search,
-    supportedProviders: ["openai", "xai"],
+    supportedProviders: ["openai", "xai", "anthropic"],
   },
 };
 

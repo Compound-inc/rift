@@ -1,10 +1,11 @@
 import { gateway } from "ai";
 import { OPENAI_MODELS } from "./providers/openai";
 import { XAI_MODELS } from "./providers/xai";
+import { ANTHROPIC_MODELS } from "./providers/anthropic";
 import { type BaseModelConfig, type ModelCapabilities } from "./config/base";
 
 // All models in one array
-export const MODELS: BaseModelConfig[] = [...OPENAI_MODELS, ...XAI_MODELS];
+export const MODELS: BaseModelConfig[] = [...OPENAI_MODELS, ...XAI_MODELS, ...ANTHROPIC_MODELS];
 
 const gatewayProvider = gateway;
 
@@ -58,12 +59,24 @@ export const getProviderOptions = (modelId: string) => {
     structuredOutputs: true,
   };
 
+  const isAnthropicModel = modelId.startsWith("anthropic/");
+  const isOpenAIModel = modelId.startsWith("openai/");
+
   return {
-    openai: supportsReasoning(modelId)
+    openai: isOpenAIModel && supportsReasoning(modelId)
       ? {
           ...baseOptions,
           reasoningEffort: "medium" as const,
           reasoningSummary: "detailed" as const,
+        }
+      : baseOptions,
+    anthropic: isAnthropicModel && supportsReasoning(modelId)
+      ? {
+          ...baseOptions,
+          thinking: {
+            type: "enabled" as const,
+            budgetTokens: 3200,
+          },
         }
       : baseOptions,
   };
