@@ -9,6 +9,7 @@ import {
   getLanguageModel,
   getProviderOptions,
   isPremium,
+  isCapable,
 } from "@/lib/ai/ai-providers";
 import { createToolsForModel } from "@/lib/ai/model-tools";
 import { ToolType } from "@/lib/ai/config/base";
@@ -54,6 +55,27 @@ class StreamError extends Error {
     super(message);
     this.name = "StreamError";
   }
+}
+
+// Helper function to filter image attachments for models that don't support images
+function filterMessagesForModel(messages: UIMessage[], modelId: string): UIMessage[] {
+  const supportsImages = isCapable(modelId, "supportsImageInput");
+  
+  if (supportsImages) {
+    return messages;
+  }
+  
+  // Filter out file/image parts from all messages
+  return messages.map(msg => {
+    if (!msg.parts || msg.parts.length === 0) {
+      return msg;
+    }
+    
+    return {
+      ...msg,
+      parts: msg.parts.filter(part => part.type !== "file"),
+    };
+  });
 }
 
 // Input validation
@@ -356,7 +378,7 @@ export async function POST(req: Request) {
         try {
           const result = streamText({
             model,
-            messages: convertToModelMessages(messages as UIMessage[]), // Type assertion for AI SDK
+            messages: convertToModelMessages(filterMessagesForModel(messages as UIMessage[], modelId)), // Filter images for non-supporting models
             tools,
             stopWhen: stepCountIs(5), // Allow multi-step tool usage for web search
             experimental_transform: smoothStream({

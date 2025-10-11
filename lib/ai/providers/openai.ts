@@ -60,8 +60,8 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     name: "GPT-5",
     provider: "openai",
     description:
-      "Next-generation OpenAI model with advanced reasoning and capabilities",
-    contextWindow: 200000,
+      "The best model across domains",
+    contextWindow: 400000,
     isPremium: true,
     capabilities: mergeCapabilities({
       supportsTools: true,
@@ -78,8 +78,8 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     id: "openai/gpt-5-mini",
     name: "GPT-5 Mini",
     provider: "openai",
-    description: "Faster and more cost-effective version of GPT-5",
-    contextWindow: 128000,
+    description: "A faster version of GPT-5 for well-defined tasks",
+    contextWindow: 400000,
     isPremium: false,
     capabilities: mergeCapabilities({
       supportsTools: true,
@@ -95,7 +95,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     name: "GPT-5 Nano",
     provider: "openai",
     description: "Ultra-fast and efficient version of GPT-5",
-    contextWindow: 128000,
+    contextWindow: 400000,
     isPremium: false,
     capabilities: mergeCapabilities({
       supportsTools: true,
@@ -111,7 +111,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     name: "o3",
     provider: "openai",
     description:
-      "Advanced reasoning model with enhanced problem-solving capabilities",
+      "Reasoning model for complex tasks, succeeded by GPT-5",
     contextWindow: 200000,
     isPremium: true,
     capabilities: mergeCapabilities({
@@ -128,8 +128,8 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     name: "o4 Mini",
     provider: "openai",
     description:
-      "Efficient reasoning model with strong analytical capabilities",
-    contextWindow: 128000,
+      "Fast, cost-efficient reasoning model, succeeded by GPT-5 mini",
+    contextWindow: 200000,
     isPremium: false,
     capabilities: mergeCapabilities({
       supportsTools: true,
@@ -144,8 +144,8 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     id: "openai/gpt-4.1",
     name: "GPT-4.1",
     provider: "openai",
-    description: "Enhanced version of GPT-4 with improved capabilities",
-    contextWindow: 128000,
+    description: "Smartest non-reasoning model",
+    contextWindow: 1047576,
     isPremium: true,
     capabilities: mergeCapabilities({
       supportsTools: true,
@@ -159,23 +159,8 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     id: "openai/gpt-4.1-mini",
     name: "GPT-4.1 Mini",
     provider: "openai",
-    description: "Cost-effective version of GPT-4.1",
-    contextWindow: 128000,
-    isPremium: false,
-    capabilities: mergeCapabilities({
-      supportsTools: true,
-      supportsImageInput: true,
-      supportsStreaming: true,
-      supportsObjectGeneration: true,
-      maxTokens: 8192,
-    }),
-  },
-  {
-    id: "openai/gpt-4.1-nano",
-    name: "GPT-4.1 Nano",
-    provider: "openai",
-    description: "Ultra-efficient version of GPT-4.1",
-    contextWindow: 128000,
+    description: "Smaller, faster version of GPT-4.1",
+    contextWindow: 1047576,
     isPremium: false,
     capabilities: mergeCapabilities({
       supportsTools: true,
@@ -189,7 +174,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     id: "openai/gpt-4o",
     name: "GPT-4o",
     provider: "openai",
-    description: "Multimodal flagship model with vision and advanced reasoning",
+    description: "Fast, intelligent, flexible GPT model",
     contextWindow: 128000,
     isPremium: true,
     capabilities: mergeCapabilities({
@@ -204,7 +189,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     id: "openai/gpt-4o-mini",
     name: "GPT-4o Mini",
     provider: "openai",
-    description: "Affordable multimodal model with strong performance",
+    description: "Fast, small model for focused tasks",
     contextWindow: 128000,
     isPremium: false,
     capabilities: mergeCapabilities({
@@ -216,47 +201,31 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     }),
   },
   {
-    id: "openai/gpt-4-turbo",
-    name: "GPT-4 Turbo",
+    id: "openai/gpt-oss-120b",
+    name: "GPT-OSS-120B",
     provider: "openai",
-    description:
-      "High-performance version of GPT-4 with expanded context window",
-    contextWindow: 128000,
-    isPremium: true,
-    capabilities: mergeCapabilities({
-      supportsTools: true,
-      supportsImageInput: true,
-      supportsStreaming: true,
-      supportsObjectGeneration: true,
-      maxTokens: 4096,
-    }),
-  },
-  {
-    id: "openai/gpt-4",
-    name: "GPT-4",
-    provider: "openai",
-    description: "Large multimodal model with broad general knowledge",
-    contextWindow: 8192,
-    isPremium: true,
-    capabilities: mergeCapabilities({
-      supportsTools: true,
-      supportsStreaming: true,
-      supportsObjectGeneration: true,
-      maxTokens: 8192,
-    }),
-  },
-  {
-    id: "openai/gpt-3.5-turbo",
-    name: "GPT-3.5 Turbo",
-    provider: "openai",
-    description: "Fast and efficient model for most conversational tasks",
-    contextWindow: 16385,
+    description: "Most powerful open-weight model",
+    contextWindow: 131072,
     isPremium: false,
     capabilities: mergeCapabilities({
       supportsTools: true,
       supportsStreaming: true,
       supportsObjectGeneration: true,
-      maxTokens: 4096,
+      maxTokens: 131072,
+    }),
+  },
+  {
+    id: "openai/gpt-oss-20b",
+    name: "GPT-OSS-20B",
+    provider: "openai",
+    description: "Medium-sized open-weight model for low latency",
+    contextWindow: 131072,
+    isPremium: false,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsObjectGeneration: true,
+      maxTokens: 131072,
     }),
   },
 ];

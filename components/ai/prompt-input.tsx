@@ -19,6 +19,7 @@ import {
   XIcon,
   AttachmentsIcon,
 } from "@/components/ui/icons/svg-icons";
+import { AlertTriangle } from "lucide-react";
 import type {
   ComponentProps,
   HTMLAttributes,
@@ -171,7 +172,7 @@ export const PromptInputSubmit = ({
     isStreaming = true;
     buttonTitle = "Detener generación";
   } else if (status === "error") {
-    Icon = <DeleteIcon className="size-5" />;
+    Icon = <AlertTriangle className="size-5" />;
     buttonTitle = "Ocurrió un error";
   }
 

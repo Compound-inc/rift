@@ -20,7 +20,6 @@ export interface XAISettings {
   parallelToolCalls?: boolean;
   store?: boolean;
   user?: string;
-  reasoningEffort?: "minimal" | "low" | "medium" | "high";
   reasoning?: {
     enabled?: boolean;
   };
@@ -36,7 +35,6 @@ export const DEFAULT_XAI_SETTINGS: XAISettings = {
   ...DEFAULT_PROVIDER_SETTINGS,
   parallelToolCalls: true,
   store: true,
-  reasoningEffort: "medium",
   structuredOutputs: true,
   maxRetries: 3,
   reasoning: {
@@ -57,7 +55,7 @@ export const XAI_MODELS: BaseModelConfig[] = [
     capabilities: mergeCapabilities({
       supportsTools: true,
       supportsStreaming: true,
-      supportsReasoning: true,
+      supportsReasoning: false,
       supportsObjectGeneration: true,
       maxTokens: 16384,
     }),
@@ -80,36 +78,18 @@ export const XAI_MODELS: BaseModelConfig[] = [
   },
   {
     id: "xai/grok-4-fast-non-reasoning",
-    name: "Grok 4 Fast (Non-Reasoning)",
+    name: "Grok 4 Fast",
     provider: "xai",
     description:
-      "Latest multimodal model with SOTA cost-efficiency and 2M token context window. Non-reasoning variant",
+      "Latest multimodal model with SOTA cost-efficiency and 2M token context window. ",
     contextWindow: 2000000,
     isPremium: false,
     capabilities: mergeCapabilities({
       supportsTools: true,
       supportsStreaming: true,
-      supportsReasoning: true,
       supportsImageInput: true,
       supportsObjectGeneration: true,
-      maxTokens: 32768,
-    }),
-  },
-  {
-    id: "xai/grok-4-fast-reasoning",
-    name: "Grok 4 Fast (Reasoning)",
-    provider: "xai",
-    description:
-      "Latest multimodal model with SOTA cost-efficiency and 2M token context window. Reasoning variant",
-    contextWindow: 2000000,
-    isPremium: false,
-    capabilities: mergeCapabilities({
-      supportsTools: true,
-      supportsStreaming: true,
-      supportsReasoning: true,
-      supportsImageInput: true,
-      supportsObjectGeneration: true,
-      maxTokens: 100,
+      maxTokens: 16384,
     }),
   },
   {
@@ -123,7 +103,6 @@ export const XAI_MODELS: BaseModelConfig[] = [
     capabilities: mergeCapabilities({
       supportsTools: true,
       supportsStreaming: true,
-      supportsReasoning: false,
       supportsObjectGeneration: true,
       maxTokens: 8192,
     }),
@@ -160,7 +139,6 @@ export function supportsReasoning(modelId: string): boolean {
 export function getReasoningSettings(
   modelId: string,
   enabled: boolean = true,
-  effort: "minimal" | "low" | "medium" | "high" = "medium",
 ): Partial<XAISettings> {
   if (!supportsReasoning(modelId)) {
     return {};
@@ -170,7 +148,6 @@ export function getReasoningSettings(
     reasoning: {
       enabled,
     },
-    reasoningEffort: effort,
   };
 }
 
