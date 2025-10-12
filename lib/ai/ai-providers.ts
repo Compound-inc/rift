@@ -3,10 +3,11 @@ import { OPENAI_MODELS } from "./providers/openai";
 import { XAI_MODELS } from "./providers/xai";
 import { ANTHROPIC_MODELS } from "./providers/anthropic";
 import { GOOGLE_MODELS } from "./providers/google";
+import { DEEPSEEK_MODELS } from "./providers/deepseek";
 import { type BaseModelConfig, type ModelCapabilities } from "./config/base";
 
 // All models in one array
-export const MODELS: BaseModelConfig[] = [...OPENAI_MODELS, ...XAI_MODELS, ...ANTHROPIC_MODELS, ...GOOGLE_MODELS];
+export const MODELS: BaseModelConfig[] = [...OPENAI_MODELS, ...XAI_MODELS, ...ANTHROPIC_MODELS, ...GOOGLE_MODELS, ...DEEPSEEK_MODELS];
 
 const gatewayProvider = gateway;
 
