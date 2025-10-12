@@ -1,34 +1,53 @@
-import { preloadQuery } from "convex/nextjs";
+import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import { getAccessToken } from "@/lib/auth";
-import ChatInterfaceWithPreload from "./chat-interface-with-preload";
+import ChatInterface from "./chat";
 
 interface ChatMessagesServerProps {
   threadId: string;
 }
 
-// Server component for preloading thread messages data
+// Server component that fetches messages server-side
 export async function ChatMessagesServer({ threadId }: ChatMessagesServerProps) {
+  let initialMessages = null;
+  
   try {
-    const accessToken = await getAccessToken();
-
-    // If no access token, render without preloaded data
-    if (!accessToken) {
-      return <ChatInterfaceWithPreload id={threadId} />;
+    const token = await getAccessToken();
+    if (token) {
+      const result = await fetchQuery(
+        api.threads.getThreadMessagesPaginatedSafe,
+        { 
+          threadId,
+          paginationOpts: { numItems: 10, cursor: null } 
+        },
+        { token }
+      );
+      // Convert Convex messages to UIMessage format and reverse order (oldest first)
+      initialMessages = result.page.reverse().map((m: any) => ({
+        id: m.messageId,
+        role: m.role,
+        parts: [
+          ...(m.reasoning ? [{ type: "reasoning", text: m.reasoning }] : []),
+          ...(m.content ? [{ type: "text", text: m.content }] : []),
+          ...(m.attachments ? m.attachments.map((att: any) => ({
+            type: "file" as const,
+            mediaType: att.mimeType,
+            url: att.attachmentUrl,
+            attachmentId: att.attachmentId,
+            attachmentType: att.attachmentType,
+          })) : []),
+          ...(m.sources ? m.sources.map((source: any) => ({
+            type: "source-url" as const,
+            sourceId: source.sourceId,
+            url: source.url,
+            title: source.title,
+          })) : []),
+        ],
+      }));
     }
-
-    // Preload the thread messages using the user's token
-    const preloadedMessages = await preloadQuery(
-      api.threads.getThreadMessagesPaginatedSafe,
-      { 
-        threadId,
-        paginationOpts: { numItems: 10, cursor: null } 
-      },
-      { token: accessToken },
-    );
-
-    return <ChatInterfaceWithPreload id={threadId} preloadedMessages={preloadedMessages} />;
-  } catch {
-    return <ChatInterfaceWithPreload id={threadId} />;
+  } catch (error) {
+    console.error("Failed to fetch messages server-side:", error);
   }
+
+  return <ChatInterface id={threadId} initialMessages={initialMessages || undefined} />;
 }

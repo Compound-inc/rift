@@ -1,7 +1,5 @@
 import type React from "react";
 import type { UIMessage } from "@ai-sdk/react";
-import type { Preloaded } from "convex/react";
-import type { api } from "@/convex/_generated/api";
 import type { FileAttachment } from "@/lib/file-utils";
 
 export interface ChatInterfaceProps {
@@ -9,7 +7,6 @@ export interface ChatInterfaceProps {
   initialMessages?: UIMessage[];
   disableInput?: boolean;
   onInitialMessage?: (message: UIMessage) => Promise<void>;
-  preloadedMessages?: Preloaded<typeof api.threads.getThreadMessagesPaginatedSafe>;
 }
 
 export interface QuotaError {

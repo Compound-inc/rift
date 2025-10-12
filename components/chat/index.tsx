@@ -34,7 +34,6 @@ export default function ChatInterface({
   initialMessages,
   disableInput = false,
   onInitialMessage,
-  preloadedMessages,
 }: ChatInterfaceProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -219,7 +218,6 @@ export default function ChatInterface({
   const { renderedMessages, hasAssistantMessage } = useMessageData({
     id,
     initialMessages,
-    preloadedMessages,
     messages,
     setMessages,
     isAuthenticated,
