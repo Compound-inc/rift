@@ -11,7 +11,14 @@ import {
   BrainIcon,
   WrenchIcon,
   HelpCircleIcon,
+  CameraIcon,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ai/ui/tooltip";
 import {
   AutoIcon,
   SorpresaIcon,
@@ -46,6 +53,15 @@ const capabilityIcons = {
   supportsTools: WrenchIcon,
   supportsReasoning: BrainIcon,
   supportsStreaming: ZapIcon,
+  supportsImageInput: CameraIcon,
+} as const;
+
+// Capability descriptions for tooltips
+const capabilityDescriptions = {
+  supportsTools: "Supports function calling and tools",
+  supportsReasoning: "Advanced reasoning capabilities",
+  supportsStreaming: "Real-time streaming responses",
+  supportsImageInput: "Can process and analyze images",
 } as const;
 
 // Provider display names
@@ -111,6 +127,7 @@ function ModelSelector({
   const [activeTab, setActiveTab] = React.useState<"recomendado" | "avanzado">(
     "recomendado",
   );
+  const [open, setOpen] = React.useState(false);
   const router = useRouter();
   const selectedModel = MODELS.find((model) => model.id === value);
   const providers = getAllProviders();
@@ -195,7 +212,21 @@ function ModelSelector({
   );
 
   return (
-    <SelectPrimitive.Root value={value} onValueChange={onValueChange}>
+    <TooltipProvider>
+      <SelectPrimitive.Root 
+        value={value} 
+        open={open} 
+        onOpenChange={(newOpen) => {
+          // Only allow opening, not closing via external clicks
+          if (newOpen) {
+            setOpen(true);
+          }
+        }}
+        onValueChange={(newValue) => {
+          onValueChange(newValue);
+          setOpen(false); // Close when a value is selected
+        }}
+      >
       <SelectPrimitive.Trigger
         className={cn(
           "hover:bg-popover-main hover:text-popover-text data-[state=open]:bg-popover-main data-[state=open]:text-popover-text data-[placeholder]:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 dark:hover:bg-input/50 dark:data-[state=open]:bg-input/50 flex w-fit items-center justify-between gap-2 rounded-md bg-transparent px-3 py-2 text-sm whitespace-nowrap outline-none disabled:cursor-not-allowed disabled:opacity-50 h-9 transition-colors",
@@ -353,6 +384,7 @@ function ModelSelector({
         </SelectPrimitive.Content>
       </SelectPrimitive.Portal>
     </SelectPrimitive.Root>
+    </TooltipProvider>
   );
 }
 
@@ -368,14 +400,19 @@ function ModelItem({ model }: ModelItemProps) {
     <SelectPrimitive.Item
       value={model.id}
       className={cn(
-        "focus:bg-popover-secondary focus:text-accent-foreground data-[highlighted]:bg-popover-secondary/40 data-[highlighted]:text-popover-text data-[state=checked]:bg-popover-secondary data-[state=checked]:text-popover-text relative flex w-full cursor-pointer items-start gap-3 rounded-lg p-3 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 transition-colors border border-transparent hover:border-border/50 hover:bg-popover-secondary/20 mb-2",
+        "focus:bg-popover-secondary focus:text-accent-foreground data-[highlighted]:bg-popover-secondary/40 data-[highlighted]:text-popover-text data-[state=checked]:bg-popover-secondary data-[state=checked]:text-popover-text relative grid grid-cols-[auto_1fr] w-full cursor-pointer rounded-lg p-3 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 transition-colors border border-transparent hover:border-border/50 hover:bg-popover-secondary/20 mb-2 gap-3",
       )}
     >
-      <div className="flex items-center gap-2 mt-0.5">
-        {ProviderIcon && <ProviderIcon className="size-4 flex-shrink-0" />}
+      {/* Icon column */}
+      <div className="flex items-start justify-center pt-1">
+        <div className="flex items-center gap-2">
+          {ProviderIcon && <ProviderIcon className="size-4 flex-shrink-0" />}
+        </div>
       </div>
 
-      <SelectPrimitive.ItemText>
+      {/* Content column */}
+      <div className="flex flex-col min-w-0">
+        <SelectPrimitive.ItemText>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="font-medium text-sm">{model.name}</span>
@@ -387,38 +424,70 @@ function ModelItem({ model }: ModelItemProps) {
           <p className="text-xs text-muted-foreground mb-2 line-clamp-2 leading-relaxed">
             {model.description}
           </p>
-
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">
-              {Math.round(model.contextWindow / 1000)}K context
-            </span>
-
-            <div className="flex items-center gap-1">
-              {Object.entries(model.capabilities)
-                .filter(([, enabled]) => enabled)
-                .slice(0, 4) // Show max 4 capability icons in 2-column layout
-                .map(([capability]) => {
-                  const IconComponent =
-                    capabilityIcons[capability as keyof typeof capabilityIcons];
-                  if (!IconComponent) return null;
-
-                  return (
-                    <IconComponent
-                      key={capability}
-                      className="size-3 text-muted-foreground"
-                    />
-                  );
-                })}
-              {Object.values(model.capabilities).filter(Boolean).length > 4 && (
-                <span className="text-xs text-muted-foreground">
-                  +
-                  {Object.values(model.capabilities).filter(Boolean).length - 4}
-                </span>
-              )}
-            </div>
-          </div>
         </div>
       </SelectPrimitive.ItemText>
+
+        {/* Context and capabilities positioned at the bottom */}
+        <div className="flex items-center justify-between w-full mt-2">
+        <span className="text-xs text-muted-foreground">
+          {Math.round(model.contextWindow / 1000)}K context
+        </span>
+
+        <div className="flex items-center gap-1">
+          {Object.entries(model.capabilities)
+            .filter(([, enabled]) => enabled)
+            .filter(([capability]) => {
+              // Exclude specific capabilities from display
+              const excludedCapabilities = [
+                'supportsStreaming',
+                'supportsPDFInput', 
+                'supportsObjectGeneration',
+                'supportsImageOutput'
+              ];
+              return !excludedCapabilities.includes(capability);
+            })
+            .slice(0, 4) // Show max 4 capability icons in 2-column layout
+            .map(([capability]) => {
+              const IconComponent =
+                capabilityIcons[capability as keyof typeof capabilityIcons];
+              if (!IconComponent) return null;
+
+              return (
+                <IconComponent
+                  key={capability}
+                  className="size-3 text-muted-foreground"
+                />
+              );
+            })}
+          {Object.entries(model.capabilities)
+            .filter(([, enabled]) => enabled)
+            .filter(([capability]) => {
+              const excludedCapabilities = [
+                'supportsStreaming',
+                'supportsPDFInput', 
+                'supportsObjectGeneration',
+                'supportsImageOutput'
+              ];
+              return !excludedCapabilities.includes(capability);
+            }).length > 4 && (
+            <span className="text-xs text-muted-foreground">
+              +
+              {Object.entries(model.capabilities)
+                .filter(([, enabled]) => enabled)
+                .filter(([capability]) => {
+                  const excludedCapabilities = [
+                    'supportsStreaming',
+                    'supportsPDFInput', 
+                    'supportsObjectGeneration',
+                    'supportsImageOutput'
+                  ];
+                  return !excludedCapabilities.includes(capability);
+                }).length - 4}
+            </span>
+          )}
+        </div>
+        </div>
+      </div>
 
       <span className="absolute right-3 top-3 flex size-4 items-center justify-center">
         <SelectPrimitive.ItemIndicator>

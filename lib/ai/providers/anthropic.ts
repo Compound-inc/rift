@@ -46,7 +46,7 @@ export const ANTHROPIC_MODELS: BaseModelConfig[] = [
     id: "anthropic/claude-sonnet-4.5",
     name: "Claude Sonnet 4.5",
     provider: "anthropic",
-    description: "Claude Sonnet 4.5 is the newest model in the Sonnet series, offering improvements and updates over Sonnet 4",
+    description: "Claude Sonnet 4.5 es el modelo más nuevo de la serie Sonnet, que ofrece mejoras y actualizaciones sobre Sonnet 4",
     contextWindow: 200000,
     isPremium: true,
     capabilities: mergeCapabilities({
@@ -62,7 +62,7 @@ export const ANTHROPIC_MODELS: BaseModelConfig[] = [
     id: "anthropic/claude-sonnet-4",
     name: "Claude Sonnet 4",
     provider: "anthropic",
-    description: "The model balances performance and efficiency with enhanced steerability",
+    description: "El modelo equilibra rendimiento y eficiencia con mayor capacidad de dirección",
     contextWindow: 200000,
     isPremium: true,
     capabilities: mergeCapabilities({
@@ -78,7 +78,7 @@ export const ANTHROPIC_MODELS: BaseModelConfig[] = [
     id: "anthropic/claude-sonnet-3.7",
     name: "Claude Sonnet 3.7",
     provider: "anthropic",
-    description: "It delivers state-of-the-art performance for coding, content generation, data analysis, and planning tasks,",
+    description: "Ofrece un rendimiento de vanguardia para programación, generación de contenido, análisis de datos y tareas de planificación,",
     contextWindow: 200000,
     isPremium: true,
     capabilities: mergeCapabilities({
@@ -93,7 +93,7 @@ export const ANTHROPIC_MODELS: BaseModelConfig[] = [
     id: "anthropic/claude-sonnet-3.5",
     name: "Claude Sonnet 3.5",
     provider: "anthropic",
-    description: "The ideal balance between intelligence and speed",
+    description: "El equilibrio ideal entre inteligencia y velocidad",
     contextWindow: 200000,
     isPremium: true,
     capabilities: mergeCapabilities({
@@ -109,7 +109,7 @@ export const ANTHROPIC_MODELS: BaseModelConfig[] = [
     id: "anthropic/claude-3.5-haiku",
     name: "Claude Haiku 3.5",
     provider: "anthropic",
-    description: "Haiku 3.5 is the next generation of Anthropic's fastest model.",
+    description: "Haiku 3.5 es la próxima generación del modelo más rápido de Anthropic.",
     contextWindow: 200000,
     isPremium: true,
     capabilities: mergeCapabilities({
@@ -124,7 +124,7 @@ export const ANTHROPIC_MODELS: BaseModelConfig[] = [
     id: "anthropic/claude-3-haiku",
     name: "Claude Haiku 3",
     provider: "anthropic",
-    description: "Haiku 3 quickly analyzes large volumes of documents, such as quarterly filings, contracts, or legal cases,",
+    description: "Haiku 3 analiza rápidamente grandes volúmenes de documentos, como informes trimestrales, contratos o casos legales,",
     contextWindow: 200000,
     isPremium: true,
     capabilities: mergeCapabilities({

@@ -46,7 +46,7 @@ export const DEEPSEEK_MODELS: BaseModelConfig[] = [
     id: "deepseek/deepseek-v3.1",
     name: "DeepSeek V3.1",
     provider: "deepseek",
-    description: "Latest flagship model with advanced reasoning capabilities and multimodal support",
+    description: "El modelo insignia más reciente con capacidades avanzadas de razonamiento y soporte multimodal",
     contextWindow: 164000,
     isPremium: false,
     capabilities: mergeCapabilities({
@@ -60,7 +60,7 @@ export const DEEPSEEK_MODELS: BaseModelConfig[] = [
     id: "deepseek/deepseek-v3",
     name: "DeepSeek V3",
     provider: "deepseek",
-    description: "High-performance model with strong capabilities across multiple domains",
+    description: "Modelo de alto rendimiento con fuertes capacidades en múltiples dominios",
     contextWindow: 164000,
     isPremium: false,
     capabilities: mergeCapabilities({

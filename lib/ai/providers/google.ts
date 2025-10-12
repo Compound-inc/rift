@@ -87,7 +87,7 @@ export const GOOGLE_MODELS: BaseModelConfig[] = [
     id: "google/gemini-2.5-pro",
     name: "Gemini 2.5 Pro",
     provider: "google",
-    description: "Google's most advanced reasoning Gemini model, capable of solving complex problems",
+    description: "El modelo Gemini de razonamiento más avanzado de Google, capaz de resolver problemas complejos",
     contextWindow: 2000000,
     isPremium: true,
     capabilities: mergeCapabilities({
@@ -103,7 +103,7 @@ export const GOOGLE_MODELS: BaseModelConfig[] = [
     id: "google/gemini-2.5-flash",
     name: "Gemini 2.5 Flash",
     provider: "google",
-    description: "Thinking model that offers great, well-rounded capabilities",
+    description: "Modelo de pensamiento que ofrece grandes capacidades completas",
     contextWindow: 1000000,
     isPremium: false,
     capabilities: mergeCapabilities({
@@ -118,7 +118,7 @@ export const GOOGLE_MODELS: BaseModelConfig[] = [
     id: "google/gemini-2.0-flash",
     name: "Gemini 2.0 Flash",
     provider: "google",
-    description: "Next-gen features and improved capabilities",
+    description: "Características de próxima generación y capacidades mejoradas",
     contextWindow: 1000000,
     isPremium: false,
     capabilities: mergeCapabilities({
@@ -133,7 +133,7 @@ export const GOOGLE_MODELS: BaseModelConfig[] = [
     id: "google/gemini-2.0-flash-lite",
     name: "Gemini 2.0 Flash Lite",
     provider: "google",
-    description: "Lightweight model with improved capabilities",
+    description: "Modelo ligero con capacidades mejoradas",
     contextWindow: 1000000,
     isPremium: false,
     capabilities: mergeCapabilities({

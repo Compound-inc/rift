@@ -49,7 +49,7 @@ export const XAI_MODELS: BaseModelConfig[] = [
     name: "Grok 4",
     provider: "xai",
     description:
-      "Latest flagship model offering unparalleled performance in natural language, math and reasoning",
+      "El modelo insignia más reciente que ofrece un rendimiento sin igual en lenguaje natural, matemáticas y razonamiento",
     contextWindow: 256000,
     isPremium: true,
     capabilities: mergeCapabilities({
@@ -65,7 +65,7 @@ export const XAI_MODELS: BaseModelConfig[] = [
     name: "Grok Code Fast 1",
     provider: "xai",
     description:
-      "Speedy and economical reasoning model that excels at agentic coding tasks",
+      "Modelo de razonamiento rápido y económico que sobresale en tareas de programación agéntica",
     contextWindow: 256000,
     isPremium: false,
     capabilities: mergeCapabilities({
@@ -81,7 +81,7 @@ export const XAI_MODELS: BaseModelConfig[] = [
     name: "Grok 4 Fast",
     provider: "xai",
     description:
-      "Latest multimodal model with SOTA cost-efficiency and 2M token context window. ",
+      "El modelo multimodal más reciente con eficiencia de costos SOTA y ventana de contexto de 2M tokens. ",
     contextWindow: 2000000,
     isPremium: false,
     capabilities: mergeCapabilities({
@@ -97,7 +97,7 @@ export const XAI_MODELS: BaseModelConfig[] = [
     name: "Grok 3",
     provider: "xai",
     description:
-      "Advanced model with strong capabilities across multiple domains",
+      "Modelo avanzado con fuertes capacidades en múltiples dominios",
     contextWindow: 131072,
     isPremium: true,
     capabilities: mergeCapabilities({
@@ -112,7 +112,7 @@ export const XAI_MODELS: BaseModelConfig[] = [
     name: "Grok 3 Mini",
     provider: "xai",
     description:
-      "Lightweight reasoning model. Fast, smart, and great for logic-based tasks",
+      "Modelo de razonamiento ligero. Rápido, inteligente y excelente para tareas basadas en lógica",
     contextWindow: 131072,
     isPremium: false,
     capabilities: mergeCapabilities({
