@@ -63,8 +63,7 @@ export const DEFAULT_PROVIDER_SETTINGS: BaseProviderSettings = {
 // Gateway configuration for AI SDK
 export const GATEWAY_CONFIG = {
   apiKey: process.env.AI_GATEWAY_API_KEY,
-  baseURL:
-    process.env.AI_GATEWAY_BASE_URL || "https://gateway.ai.cloudflare.com/v1",
+  baseURL: `https://ai-gateway.vercel.sh/v1`,
 };
 
 // Tool types that can be used across providers

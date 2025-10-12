@@ -221,12 +221,7 @@ function ModelSelector({
       <SelectPrimitive.Root 
         value={value} 
         open={open} 
-        onOpenChange={(newOpen) => {
-          // Only allow opening, not closing via external clicks
-          if (newOpen) {
-            setOpen(true);
-          }
-        }}
+        onOpenChange={setOpen}
         onValueChange={(newValue) => {
           onValueChange(newValue);
           setOpen(false); // Close when a value is selected

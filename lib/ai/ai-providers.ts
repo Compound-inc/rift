@@ -53,12 +53,12 @@ export function getLanguageModel(modelId: string) {
   console.log(`Model via AI Gateway: ${resolved}`);
 
   try {
-    return (resolved);
+    return gateway(resolved);
   } catch {
     console.warn(
       `Model ${modelId} not found in registry, using default default model`,
     );
-    return (DEFAULT_MODEL);
+    return gateway(DEFAULT_MODEL);
   }
 }
 
