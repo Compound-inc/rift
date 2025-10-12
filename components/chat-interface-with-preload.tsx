@@ -2,7 +2,7 @@
 
 import { Preloaded } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import ChatInterface from "./chat-interface";
+import ChatInterface from "./chat";
 
 interface ChatInterfaceWithPreloadProps {
   id: string;

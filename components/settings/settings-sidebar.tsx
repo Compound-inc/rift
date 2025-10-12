@@ -134,11 +134,11 @@ const settingsSections: SettingsSection[] = [
         href: "/settings/domain-sso",
         icon: Building2,
       },
-      {
-        title: "Planes",
-        href: "/settings/plans",
-        icon: ReceiptText,
-      },
+      // {
+      //   title: "Planes",
+      //   href: "/settings/plans",
+      //   icon: ReceiptText,
+      // },
       {
         title: "Análisis",
         href: "/settings/insights",
@@ -159,41 +159,41 @@ const settingsSections: SettingsSection[] = [
         href: "/settings/security",
         icon: Shield,
       },
-      {
-        title: "Claves API",
-        href: "/settings/api-keys",
-        icon: Key,
-      },
+      // {
+      //   title: "Claves API",
+      //   href: "/settings/api-keys",
+      //   icon: Key,
+      // },
     ],
   },
   {
     title: "Configuración de la App",
     items: [
-      {
-        title: "Respuestas",
-        href: "/settings/responses",
-        icon: MessageSquare,
-      },
+      // {
+      //   title: "Respuestas",
+      //   href: "/settings/responses",
+      //   icon: MessageSquare,
+      // },
       {
         title: "Modelos",
         href: "/settings/models",
         icon: Bot,
       },
-      {
-        title: "Consejos",
-        href: "/settings/tips",
-        icon: Lightbulb,
-      },
+      // {
+      //   title: "Consejos",
+      //   href: "/settings/tips",
+      //   icon: Lightbulb,
+      // },
       {
         title: "Apariencia",
         href: "/settings/appearance",
         icon: Palette,
       },
-      {
-        title: "Atajos",
-        href: "/settings/shortcuts",
-        icon: Target,
-      },
+      // {
+      //   title: "Atajos",
+      //   href: "/settings/shortcuts",
+      //   icon: Target,
+      // },
     ],
   },
 ];
