@@ -7,39 +7,27 @@ import type { ComponentProps } from 'react';
 import { useCallback } from 'react';
 import { StickToBottom, useStickToBottomContext } from 'use-stick-to-bottom';
 
-export type ConversationProps = ComponentProps<typeof StickToBottom> & {
-  children?: React.ReactNode;
-};
+export type ConversationProps = ComponentProps<typeof StickToBottom>;
 
-export const Conversation = ({ className, children, ...props }: ConversationProps) => (
+export const Conversation = ({ className, ...props }: ConversationProps) => (
   <StickToBottom
     className={cn('relative h-full flex-1 min-h-0', className)}
-    initial="smooth"
+    initial="instant"
     resize="smooth"
     role="log"
     {...props}
-  >
-    {children}
-  </StickToBottom>
+  />
 );
 
 export type ConversationContentProps = ComponentProps<
   typeof StickToBottom.Content
-> & {
-  children?: React.ReactNode;
-};
+>;
 
 export const ConversationContent = ({
   className,
-  children,
   ...props
 }: ConversationContentProps) => (
-  <StickToBottom.Content className={cn('relative h-full flex-1 min-h-0 overflow-y-auto flex flex-col-reverse', className)} {...props}>
-    <div className="flex-1" />
-    <div className="mx-auto w-full max-w-3xl p-4 pb-30">
-      {children}
-    </div>
-  </StickToBottom.Content>
+  <StickToBottom.Content className={cn('p-4', className)} {...props} />
 );
 
 export type ConversationScrollButtonProps = ComponentProps<typeof Button>;
