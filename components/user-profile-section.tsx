@@ -1,5 +1,3 @@
-"use client";
-
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ai/ui/avatar";
 import Link from "next/link";

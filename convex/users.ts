@@ -8,9 +8,14 @@ import {
   incrementQuotaUsage,
 } from "./helpers/quota";
 
-// Internal CRUD operations - not exposed to client
+// Internal CRUD operations
 export const createUser = internalMutation({
-  args: { email: v.string(), workos_id: v.string() },
+  args: { 
+    email: v.string(), 
+    workos_id: v.string(),
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     return await ctx.db.insert("users", args);
   },
@@ -22,6 +27,8 @@ export const updateUser = internalMutation({
     patch: v.object({
       email: v.optional(v.string()),
       workos_id: v.optional(v.string()),
+      firstName: v.optional(v.string()),
+      lastName: v.optional(v.string()),
       standardQuotaUsage: v.optional(v.number()),
       premiumQuotaUsage: v.optional(v.number()),
       lastQuotaResetAt: v.optional(v.number()),

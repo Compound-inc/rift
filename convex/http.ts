@@ -102,6 +102,8 @@ http.route({
           await ctx.runMutation(internal.users.createUser, {
             email: data.email,
             workos_id: data.id,
+            firstName: data.first_name,
+            lastName: data.last_name,
           });
           break;
         }
@@ -136,7 +138,11 @@ http.route({
 
           await ctx.runMutation(internal.users.updateUser, {
             id: user._id,
-            patch: { email: data.email },
+            patch: { 
+              email: data.email,
+              firstName: data.first_name,
+              lastName: data.last_name,
+            },
           });
 
           break;
