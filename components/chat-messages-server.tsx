@@ -18,7 +18,7 @@ export async function ChatMessagesServer({ threadId }: ChatMessagesServerProps) 
         api.threads.getThreadMessagesPaginatedSafe,
         { 
           threadId,
-          paginationOpts: { numItems: 10, cursor: null } 
+          paginationOpts: { numItems: 100, cursor: null } 
         },
         { token }
       );

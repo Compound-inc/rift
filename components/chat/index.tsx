@@ -355,7 +355,7 @@ export default function ChatInterface({
     <div className="flex h-screen w-full min-h-0 flex-col relative">
       <div className="flex-1 min-h-0">
         <Conversation>
-          <ConversationContent className="mx-auto w-full max-w-3xl p-4 pb-30">
+          <ConversationContent>
             {/* Greeting message for welcome page when no messages */}
             {!isThread && renderedMessages.length === 0 && (
               <WelcomeScreen 
