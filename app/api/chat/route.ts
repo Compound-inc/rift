@@ -452,22 +452,21 @@ export async function POST(req: Request) {
               // Final flush and finalization
               await flushUpdate();
 
-              DatabaseQueue.add(async () => {
-                const success = content.length >= 5; // Minimum viable response
-                await fetchMutation(
-                  api.threads.finalizeAssistantMessage,
-                  {
-                    messageId: newMessageId,
-                    ok: success,
-                    finalContent: content || undefined,
-                    finalReasoning: reasoning || undefined,
-                    error: success
-                      ? undefined
-                      : { type: "empty", message: "No content generated" },
-                  },
-                  { token: auth.token },
-                );
-              });
+              // Await finalization to ensure status updates before response ends
+              const success = content.trim().length > 0; // Any non-empty content is considered successful
+              await fetchMutation(
+                api.threads.finalizeAssistantMessage,
+                {
+                  messageId: newMessageId,
+                  ok: success,
+                  finalContent: content || undefined,
+                  finalReasoning: reasoning || undefined,
+                  error: success
+                    ? undefined
+                    : { type: "empty", message: "No content generated" },
+                },
+                { token: auth.token },
+              );
 
               // Increment tool call quota if any tools were used when the assistant message is finalized
               if (toolCallCount > 0) {
@@ -502,21 +501,32 @@ export async function POST(req: Request) {
                 errorObj.name === "AbortError" || req.signal?.aborted;
               if (isAbort) {
                 // Handle graceful abort
-                const hasContent = content.length >= 5;
+                const hasContent = content.trim().length > 0;
                 if (hasContent) {
                   await flushUpdate();
-                  DatabaseQueue.add(async () => {
-                    await fetchMutation(
-                      api.threads.finalizeAssistantMessage,
-                      {
-                        messageId: newMessageId,
-                        ok: true,
-                        finalContent: content,
-                        finalReasoning: reasoning || undefined,
-                      },
-                      { token: auth.token },
-                    );
-                  });
+                  
+                  // Await finalization for abort case too
+                  await fetchMutation(
+                    api.threads.finalizeAssistantMessage,
+                    {
+                      messageId: newMessageId,
+                      ok: true,
+                      finalContent: content,
+                      finalReasoning: reasoning || undefined,
+                    },
+                    { token: auth.token },
+                  );
+                } else {
+                  // Even if no content, we need to finalize to update status from "streaming" to "error"
+                  await fetchMutation(
+                    api.threads.finalizeAssistantMessage,
+                    {
+                      messageId: newMessageId,
+                      ok: false,
+                      error: { type: "aborted", message: "Generation was aborted with no content" },
+                    },
+                    { token: auth.token },
+                  );
                 }
 
                 // Increment tool call quota when abort
@@ -546,20 +556,20 @@ export async function POST(req: Request) {
 
               // Handle actual errors
               console.error("Stream error:", error);
-              DatabaseQueue.add(async () => {
-                await fetchMutation(
-                  api.threads.finalizeAssistantMessage,
-                  {
-                    messageId: newMessageId,
-                    ok: false,
-                    error: {
-                      type: "generation",
-                      message: errorObj.message || "Stream failed",
-                    },
+              
+              // Await finalization for actual errors too to ensure status updates
+              await fetchMutation(
+                api.threads.finalizeAssistantMessage,
+                {
+                  messageId: newMessageId,
+                  ok: false,
+                  error: {
+                    type: "generation",
+                    message: errorObj.message || "Stream failed",
                   },
-                  { token: auth.token },
-                );
-              });
+                },
+                { token: auth.token },
+              );
 
               writer.write({
                 type: "error",
