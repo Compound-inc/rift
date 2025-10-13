@@ -20,6 +20,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { exaWebSearch } from "@/lib/ai/tools/exa-search";
 
+export const runtime = 'edge'; 
 export const maxDuration = 300;
 
 interface RequestBody {
@@ -90,7 +91,7 @@ function validateRequest(body: unknown): RequestBody {
   ) {
     throw new StreamError("Missing required fields", 400);
   }
-
+  // TODO: Add smart Summary of the conversation instead of this:
   // If there are more than 50 messages, keep only the latest 50 for context
   if (data.messages.length > 50) {
     data.messages = data.messages.slice(-50);
@@ -452,21 +453,22 @@ export async function POST(req: Request) {
               // Final flush and finalization
               await flushUpdate();
 
-              // Await finalization to ensure status updates before response ends
-              const success = content.trim().length > 0; // Any non-empty content is considered successful
-              await fetchMutation(
-                api.threads.finalizeAssistantMessage,
-                {
-                  messageId: newMessageId,
-                  ok: success,
-                  finalContent: content || undefined,
-                  finalReasoning: reasoning || undefined,
-                  error: success
-                    ? undefined
-                    : { type: "empty", message: "No content generated" },
-                },
-                { token: auth.token },
-              );
+              DatabaseQueue.add(async () => {
+                const success = content.length > 0; // Minimum viable response
+                await fetchMutation(
+                  api.threads.finalizeAssistantMessage,
+                  {
+                    messageId: newMessageId,
+                    ok: success,
+                    finalContent: content || undefined,
+                    finalReasoning: reasoning || undefined,
+                    error: success
+                      ? undefined
+                      : { type: "empty", message: "No content generated" },
+                  },
+                  { token: auth.token },
+                );
+              });
 
               // Increment tool call quota if any tools were used when the assistant message is finalized
               if (toolCallCount > 0) {
@@ -501,32 +503,21 @@ export async function POST(req: Request) {
                 errorObj.name === "AbortError" || req.signal?.aborted;
               if (isAbort) {
                 // Handle graceful abort
-                const hasContent = content.trim().length > 0;
+                const hasContent = content.length > 0;
                 if (hasContent) {
                   await flushUpdate();
-                  
-                  // Await finalization for abort case too
-                  await fetchMutation(
-                    api.threads.finalizeAssistantMessage,
-                    {
-                      messageId: newMessageId,
-                      ok: true,
-                      finalContent: content,
-                      finalReasoning: reasoning || undefined,
-                    },
-                    { token: auth.token },
-                  );
-                } else {
-                  // Even if no content, we need to finalize to update status from "streaming" to "error"
-                  await fetchMutation(
-                    api.threads.finalizeAssistantMessage,
-                    {
-                      messageId: newMessageId,
-                      ok: false,
-                      error: { type: "aborted", message: "Generation was aborted with no content" },
-                    },
-                    { token: auth.token },
-                  );
+                  DatabaseQueue.add(async () => {
+                    await fetchMutation(
+                      api.threads.finalizeAssistantMessage,
+                      {
+                        messageId: newMessageId,
+                        ok: true,
+                        finalContent: content,
+                        finalReasoning: reasoning || undefined,
+                      },
+                      { token: auth.token },
+                    );
+                  });
                 }
 
                 // Increment tool call quota when abort
@@ -556,20 +547,20 @@ export async function POST(req: Request) {
 
               // Handle actual errors
               console.error("Stream error:", error);
-              
-              // Await finalization for actual errors too to ensure status updates
-              await fetchMutation(
-                api.threads.finalizeAssistantMessage,
-                {
-                  messageId: newMessageId,
-                  ok: false,
-                  error: {
-                    type: "generation",
-                    message: errorObj.message || "Stream failed",
+              DatabaseQueue.add(async () => {
+                await fetchMutation(
+                  api.threads.finalizeAssistantMessage,
+                  {
+                    messageId: newMessageId,
+                    ok: false,
+                    error: {
+                      type: "generation",
+                      message: errorObj.message || "Stream failed",
+                    },
                   },
-                },
-                { token: auth.token },
-              );
+                  { token: auth.token },
+                );
+              });
 
               writer.write({
                 type: "error",
