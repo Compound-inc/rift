@@ -22,15 +22,30 @@ export function useMessageData({
   sendMessageRef,
 }: UseMessageDataProps) {
   const autoStartTriggeredRef = useRef(false);
+  const prevIdRef = useRef(id);
   const isThread = id !== "welcome";
   const convex = useConvex();
+  
+  // Cleanup effect when thread ID changes
+  useEffect(() => {
+    if (prevIdRef.current !== id) {
+      // Reset auto-start trigger for new thread
+      autoStartTriggeredRef.current = false;
+      
+      // Clear messages immediately when navigating to new thread
+      setMessages([]);
+      
+      // Update previous ID reference
+      prevIdRef.current = id;
+    }
+  }, [id, setMessages]);
   
   // Initialize messages from initialMessages when available
   useEffect(() => {
     if (messages.length === 0 && initialMessages && initialMessages.length > 0) {
       setMessages(initialMessages);
     }
-  }, [messages.length, initialMessages, setMessages]);
+  }, [messages.length, initialMessages, setMessages, id]);
 
   // Auto-start with initial message from context
   useEffect(() => {

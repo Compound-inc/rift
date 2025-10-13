@@ -91,8 +91,9 @@ function validateRequest(body: unknown): RequestBody {
     throw new StreamError("Missing required fields", 400);
   }
 
+  // If there are more than 50 messages, keep only the latest 50 for context
   if (data.messages.length > 50) {
-    throw new StreamError("Too many messages", 400);
+    data.messages = data.messages.slice(-50);
   }
 
   return data as unknown as RequestBody;

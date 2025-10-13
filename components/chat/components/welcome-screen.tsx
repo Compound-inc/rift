@@ -20,7 +20,7 @@ interface WelcomeScreenProps {
 
 export const WelcomeScreen = React.memo(function WelcomeScreen({ user, onSuggestionClick }: WelcomeScreenProps) {
   return (
-    <div className="flex items-center justify-center min-h-[70vh]">
+    <div className="absolute inset-0 flex items-start justify-center pt-[15vh] sm:pt-[12vh] lg:pt-[10vh]">
       <div className="text-center max-w-2xl">
         <div className="relative">
           <motion.h1

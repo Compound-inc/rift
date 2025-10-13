@@ -41,6 +41,7 @@ export default function ChatInterface({
   const { consumeInitialMessage } = useInitialMessage();
   const { isAuthenticated } = useConvexAuth();
   const { user } = useAuth();
+  const prevIdRef = useRef(id);
 
   const { state, setters, handleSearchToggle } = useChatState();
   const {
@@ -192,6 +193,26 @@ export default function ChatInterface({
       setMessages,
       regenerate,
     });
+
+  // Cleanup effect when thread ID changes - reset all UI state
+  useEffect(() => {
+    if (prevIdRef.current !== id) {
+      // Clear all input and file state
+      setInput("");
+      setSelectedFiles([]);
+      setUploadedAttachments([]);
+      setUploadingFiles([]);
+      setIsUploading(false);
+      setIsSendingMessage(false);
+      
+      // Clear error states
+      setQuotaError(null);
+      setShowNoSubscriptionDialog(false);
+      
+      // Update previous ID reference
+      prevIdRef.current = id;
+    }
+  }, [id, setInput, setSelectedFiles, setUploadedAttachments, setUploadingFiles, setIsUploading, setIsSendingMessage, setQuotaError, setShowNoSubscriptionDialog]);
 
   // Initialize edit hook
   const {
