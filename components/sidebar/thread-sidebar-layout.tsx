@@ -1,7 +1,6 @@
 import { ThreadSidebarHeader } from "./thread-sidebar-header";
-import { ThreadListClient } from "./thread-list-client";
-import { ThreadScrollContainer } from "./thread-scroll-container";
-import { UserProfileSection } from "./user-profile-section";
+import { ThreadSidebarInteractive } from "../thread-sidebar-interactive";
+import { UserProfileSection } from "./user-profile-section-server";
 import { Preloaded } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
@@ -16,9 +15,9 @@ export function ThreadSidebarLayout({ preloadedThreads }: ThreadSidebarLayoutPro
       <ThreadSidebarHeader />
 
       {/* Thread List with Search */}
-      <ThreadScrollContainer>
-        <ThreadListClient preloadedThreads={preloadedThreads} />
-      </ThreadScrollContainer>
+      <div className="flex-1 overflow-y-auto sidebar-scroll-container scrollbar-hidden">
+        <ThreadSidebarInteractive preloadedThreads={preloadedThreads} />
+      </div>
 
       {/* User Profile Section */}
       <UserProfileSection />

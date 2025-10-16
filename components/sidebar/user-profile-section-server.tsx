@@ -1,7 +1,7 @@
+
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import { getAccessToken } from "@/lib/auth";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ai/ui/avatar";
 import Link from "next/link";
 import { Button } from "@/components/ai/ui/button";
 import Image from "next/image";
@@ -18,6 +18,7 @@ export async function UserProfileSection() {
       console.error("Error fetching user data:", error);
     }
   }
+
 
   return (
     <div

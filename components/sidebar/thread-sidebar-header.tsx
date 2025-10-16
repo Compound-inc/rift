@@ -1,5 +1,5 @@
-import { Button } from "@/components/ai/ui/button";
 import Link from "next/link";
+import { Button } from "@/components/ai/ui/button";
 import { AppLogo } from "@/components/ui/icons/svg-icons";
 
 export function ThreadSidebarHeader() {
