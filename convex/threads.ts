@@ -113,8 +113,10 @@ export const getUserThreadsPaginatedSafe = query({
       return b.updatedAt - a.updatedAt;
     });
 
-    // Apply pagination manually
-    const startIndex = 0;
+    // Apply pagination manually with proper cursor handling
+    const startIndex = args.paginationOpts.cursor 
+      ? parseInt(args.paginationOpts.cursor) 
+      : 0;
     const endIndex = Math.min(
       startIndex + args.paginationOpts.numItems,
       sortedThreads.length,

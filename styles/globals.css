@@ -376,6 +376,26 @@
   scrollbar-width: none;
 }
 
+/* Auto-hide scrollbar on hover */
+.sidebar-scroll-container.auto-hide-scrollbar::-webkit-scrollbar {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.sidebar-scroll-container.auto-hide-scrollbar:hover::-webkit-scrollbar {
+  opacity: 1;
+}
+
+.sidebar-scroll-container.auto-hide-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.3s ease;
+}
+
+.sidebar-scroll-container.auto-hide-scrollbar:hover {
+  scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
+}
+
 /* Container setup */
 .sidebar-scroll-container {
   overflow-y: overlay;

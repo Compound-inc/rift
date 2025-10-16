@@ -58,12 +58,14 @@ export function ThreadSidebarInteractive({
   const router = useRouter();
   const pathname = usePathname();
   const inputRef = useRef<HTMLInputElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // State
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [isLoadingMoreScroll, setIsLoadingMoreScroll] = useState(false);
 
   // Extract initial data from preloaded prop for instant display
   const initialThreads: Thread[] =
@@ -91,6 +93,9 @@ export function ThreadSidebarInteractive({
       : !preloadedThreads
         ? fallbackResults.status
         : "CanLoadMore";
+  
+  // Check if we're currently loading (either manual or scroll)
+  const isCurrentlyLoading = isLoadingMore || isLoadingMoreScroll;
 
   // Effects
   useEffect(() => {
@@ -142,6 +147,47 @@ export function ThreadSidebarInteractive({
       }, 0);
     }
   }, [editingThreadId]);
+
+  // Infinite scroll effect
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
+      const threshold = 200; // Increased threshold to 200px
+      
+      // Only trigger if we're near the bottom and can load more
+      if (
+        scrollTop + clientHeight >= scrollHeight - threshold &&
+        status === "CanLoadMore" &&
+        !isCurrentlyLoading &&
+        !searchQuery // Don't auto-load during search
+      ) {
+        setIsLoadingMoreScroll(true);
+        try {
+          fallbackResults.loadMore(10);
+        } finally {
+          // Use a longer delay to prevent rapid successive calls
+          setTimeout(() => setIsLoadingMoreScroll(false), 1000);
+        }
+      }
+    };
+
+    // Add debounced scroll listener with longer debounce
+    let timeoutId: NodeJS.Timeout;
+    const debouncedHandleScroll = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(handleScroll, 200); // Increased debounce time
+    };
+
+    scrollContainer.addEventListener('scroll', debouncedHandleScroll);
+    
+    return () => {
+      scrollContainer.removeEventListener('scroll', debouncedHandleScroll);
+      clearTimeout(timeoutId);
+    };
+  }, [status, isCurrentlyLoading, searchQuery, fallbackResults]);
 
   // Helper functions
   const getTimeClassification = (timestamp: number): string => {
@@ -460,14 +506,26 @@ export function ThreadSidebarInteractive({
   return (
     <>
       {renderEmptyState() || (
-        <div className="w-full overflow-hidden">
+        <div 
+          ref={scrollContainerRef}
+          className="sidebar-scroll-container auto-hide-scrollbar w-full overflow-hidden max-h-[calc(100vh-200px)] overflow-y-auto"
+        >
           {GROUP_ORDER.map((groupName) =>
             renderThreadGroup(groupName, groupedThreads[groupName]),
           )}
         </div>
       )}
 
-      {status === "CanLoadMore" && !searchQuery && (
+      {/* Loading indicator positioned outside scroll container to prevent flickering */}
+      {isLoadingMoreScroll && (
+        <div className="p-2 text-center text-muted-foreground border-t border-border">
+          <Loader size={14} className="mx-auto" />
+          <p className="text-xs mt-1">Cargando más chats...</p>
+        </div>
+      )}
+
+      {/* Fallback Load More button - only show if infinite scroll fails */}
+      {status === "CanLoadMore" && !searchQuery && !isCurrentlyLoading && (
         <div className="p-4 border-t border-border">
           <Button
             onClick={handleLoadMore}
