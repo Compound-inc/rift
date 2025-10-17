@@ -140,7 +140,9 @@ export const MessageRenderer = React.memo(function MessageRenderer({
   const hasTextParts = message.parts.some(
     (p) => p.type === "text" && (p as any).text && (p as any).text.length > 0,
   );
-  const showInlineLoader = isStreaming && message.role === "assistant" && !hasTextParts;
+  const hasReasoningParts = message.parts.some((p) => p.type === "reasoning");
+  // Hide loader if reasoning UI is shown, otherwise show loader only when no text yet
+  const showInlineLoader = isStreaming && message.role === "assistant" && !hasTextParts && !hasReasoningParts;
   const renderMessageContent = useCallback(() => {
     // Group reasoning parts together
     const reasoningParts = message.parts.filter(
@@ -403,6 +405,8 @@ export const MessageRenderer = React.memo(function MessageRenderer({
 }, (prevProps, nextProps) => {
   // While streaming, always allow re-render so tokens appear incrementally
   if (nextProps.isStreaming) return false;
+  // Also re-render exactly when streaming toggles to update reasoning trigger immediately
+  if (prevProps.isStreaming !== nextProps.isStreaming) return false;
   // For non-streaming messages, use strict comparison to avoid churn
   return (
     prevProps.message.id === nextProps.message.id &&

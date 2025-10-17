@@ -590,8 +590,10 @@ export async function POST(req: Request) {
             },
           });
 
-          // We already sent a start with newMessageId above; keep sendStart false to avoid duplicate
-          writer.merge(result.toUIMessageStream({ sendStart: false, sendSources: true }));
+          // We already sent a start with newMessageId above; stream sources and reasoning parts
+          writer.merge(
+            result.toUIMessageStream({ sendStart: false, sendSources: true, sendReasoning: true })
+          );
         } catch (error) {
           cleanup();
           throw error;
