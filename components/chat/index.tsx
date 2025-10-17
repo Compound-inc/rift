@@ -126,6 +126,10 @@ export default function ChatInterface({
     useChat({
       id: `${id}-${chatKey}`,
       generateId: generateUUID,
+      // Seed chat store so the hook has initial history context instantly
+      ...(isThread && initialMessages && initialMessages.length > 0
+        ? { messages: initialMessages }
+        : {}),
       onFinish() {
         if (pathname === "/") {
           router.push(`/chat/${id}`);
@@ -225,9 +229,24 @@ export default function ChatInterface({
           if (trigger === "regenerate-message" && messageId) {
           }
 
+          // Build request context: merge server-fetched base with current chat hook messages
+          const base = initialMessages && initialMessages.length > 0
+            ? initialMessages
+            : historicalMessages;
+
+          const usedIds = new Set<string>();
+          const requestMessages = base.map((m) => {
+            usedIds.add(m.id);
+            const fromHook = messages.find((s) => s.id === m.id);
+            return fromHook ?? m;
+          });
+          messages.forEach((m) => {
+            if (!usedIds.has(m.id)) requestMessages.push(m);
+          });
+
           return {
             body: {
-              messages,
+              messages: requestMessages,
               modelId: selectedModel,
               threadId: id,
               enabledTools: currentEnabledTools,
