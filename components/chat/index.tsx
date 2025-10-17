@@ -21,7 +21,6 @@ import {
   ConversationScrollButton,
 } from "@/components/ai/conversation";
 
-import { useModelChangeEffect } from "./hooks/use-chat-state";
 import { useChatUIStore } from "./ui-store";
 import { WelcomeScreen } from "./components/welcome-screen";
 import { MessageRenderer } from "./components/message-renderer";
@@ -66,13 +65,23 @@ export default function ChatInterface({
   const handleSearchToggle = useChatUIStore((s) => s.handleSearchToggle);
 
   // Apply model change effects
-  useModelChangeEffect(
-    selectedModel,
-    setChatKey,
-    setQuotaError,
-    setShowNoSubscriptionDialog,
-    setIsSearchEnabled
-  );
+  const prevModelRef = useRef(selectedModel);
+  useEffect(() => {
+    if (prevModelRef.current !== selectedModel) {
+      prevModelRef.current = selectedModel;
+      setChatKey((prev) => prev + 1);
+      setQuotaError(null);
+      setShowNoSubscriptionDialog(false);
+    }
+  }, [selectedModel, setChatKey, setQuotaError, setShowNoSubscriptionDialog]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedSearchState = localStorage.getItem("webSearchEnabled");
+      const searchEnabled = savedSearchState === "true";
+      setIsSearchEnabled(searchEnabled);
+    }
+  }, [selectedModel, setIsSearchEnabled]);
 
   const isThread = id !== "welcome";
 
@@ -327,7 +336,6 @@ export default function ChatInterface({
     }
   }, [id, setMessages]);
 
-  // Removed legacy file handling and input change props (handled inside ChatInputArea via UI store)
 
   const handleSubmit = useCallback(
     async (e?: React.FormEvent) => {
