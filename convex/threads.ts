@@ -676,9 +676,19 @@ export const addSourcesToMessage = mutation({
       throw new Error("Message not found or access denied");
     }
 
-    // Update message with sources
+    // Get existing sources and append new ones, avoiding duplicates
+    const existingSources = message.sources || [];
+    const existingUrls = new Set(existingSources.map(s => s.url));
+    
+    // Filter out sources that already exist (by URL)
+    const newSources = args.sources.filter(source => !existingUrls.has(source.url));
+    
+    // Combine existing and new sources
+    const allSources = [...existingSources, ...newSources];
+
+    // Update message with combined sources
     await ctx.db.patch(message._id, {
-      sources: args.sources,
+      sources: allSources,
       updated_at: Date.now(),
     });
 
