@@ -428,41 +428,40 @@ export function ThreadSidebarInteractive({
                     <h3 className="flex-1 truncate text-sm font-medium leading-5">
                       {thread.title}
                     </h3>
-                    {(thread.generationStatus === "pending" ||
-                      thread.generationStatus === "generation") && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="flex-shrink-0">
+                    {/* Always reserve space for status icons to prevent layout shift */}
+                    <div className="flex-shrink-0 w-[14px] h-[14px] flex items-center justify-center">
+                      {(thread.generationStatus === "pending" ||
+                        thread.generationStatus === "generation") && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
                             <Loader
                               size={14}
                               className="text-muted-foreground transition-colors hover:text-muted-foreground"
                             />
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" sideOffset={8}>
-                          <p>
-                            {thread.generationStatus === "pending"
-                              ? "Preparando respuesta..."
-                              : "Generando respuesta..."}
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                    {thread.generationStatus === "failed" && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="flex-shrink-0">
+                          </TooltipTrigger>
+                          <TooltipContent side="right" sideOffset={8}>
+                            <p>
+                              {thread.generationStatus === "pending"
+                                ? "Preparando respuesta..."
+                                : "Generando respuesta..."}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {thread.generationStatus === "failed" && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
                             <AlertTriangleIcon
                               size={14}
                               className="text-destructive/70 transition-colors hover:text-destructive"
                             />
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" sideOffset={8}>
-                          <p>Error al generar la respuesta</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
+                          </TooltipTrigger>
+                          <TooltipContent side="right" sideOffset={8}>
+                            <p>Error al generar la respuesta</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
                   </div>
                 )}
                 {thread.pinned && (
