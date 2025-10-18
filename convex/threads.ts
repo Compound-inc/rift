@@ -534,6 +534,20 @@ export const serverSendMessage = mutation({
 
     const billingCycle = await getOrganizationBillingCycle(ctx, args.orgId);
     const now = Date.now();
+
+    // Idempotency: if a message with this messageId already exists for this user, return it
+    const existing = await ctx.db
+      .query("messages")
+      .withIndex("by_messageId_and_userId", (q) =>
+        q.eq("messageId", args.messageId).eq("userId", args.userId),
+      )
+      .unique();
+    if (existing) {
+      return {
+        messageId: existing.messageId,
+        messageDocId: existing._id,
+      };
+    }
     const thread = await ctx.db
       .query("threads")
       .withIndex("by_user_and_threadId", (q) =>
@@ -599,6 +613,16 @@ export const serverStartAssistantMessage = mutation({
   returns: v.object({ messageDocId: v.id("messages") }),
   handler: async (ctx, args) => {
     ensureServerSecret(args.secret);
+    // Idempotency: reuse existing assistant message by messageId if present
+    const existing = await ctx.db
+      .query("messages")
+      .withIndex("by_messageId_and_userId", (q) =>
+        q.eq("messageId", args.messageId).eq("userId", args.userId),
+      )
+      .unique();
+    if (existing && existing.threadId === args.threadId) {
+      return { messageDocId: existing._id };
+    }
     const thread = await ctx.db
       .query("threads")
       .withIndex("by_user_and_threadId", (q) =>

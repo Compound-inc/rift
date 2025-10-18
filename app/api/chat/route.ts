@@ -151,11 +151,30 @@ class DatabaseQueue {
   private static async process() {
     while (this.queue.length > 0) {
       const operation = this.queue.shift();
-      if (operation) {
+      if (!operation) continue;
+
+      // Retry with exponential backoff for transient network errors
+      const maxAttempts = 4;
+      let attempt = 0;
+      while (attempt < maxAttempts) {
         try {
           await operation();
-        } catch (error) {
-          console.error("Database operation failed:", error);
+          break; // success
+        } catch (error: any) {
+          attempt++;
+          const isTimeout =
+            error?.code === "ETIMEDOUT" ||
+            error?.name === "TimeoutError" ||
+            /fetch failed/i.test(String(error)) ||
+            /network/i.test(String(error));
+
+          if (!isTimeout || attempt >= maxAttempts) {
+            console.error("Database operation failed:", error);
+            break;
+          }
+
+          const delayMs = Math.min(1000 * 2 ** (attempt - 1), 5000);
+          await new Promise((r) => setTimeout(r, delayMs));
         }
       }
     }
