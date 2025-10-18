@@ -8,6 +8,7 @@ import { useModel } from "@/contexts/model-context";
 import { useInitialMessage } from "@/contexts/initial-message-context";
 import { toast } from "sonner";
 import { useCallback, useEffect, useRef, useMemo, useState } from "react";
+import { useRegeneration, filterHiddenForRender } from "./hooks/use-regeneration";
 import { ToolType, getDefaultTools } from "@/lib/ai/model-tools";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
 import { useConvexAuth, usePaginatedQuery } from "convex/react";
@@ -120,7 +121,7 @@ export default function ChatInterface({
   }, [paginatedMessages, isThread]);
 
   // Force useChat to re-initialize when model changes
-  const { messages, status, setMessages, sendMessage, stop } =
+  const chatHelpers =
     useChat({
       id: `${id}-${chatKey}`,
       generateId: generateUUID,
@@ -224,17 +225,20 @@ export default function ChatInterface({
             : currentDefaultTools;
 
           // Build request context: merge server-fetched base with current chat hook messages
-          const base = initialMessages && initialMessages.length > 0
+          const baseBeforePrune = initialMessages && initialMessages.length > 0
             ? initialMessages
             : historicalMessages;
+
+          const base = baseBeforePrune;
+          const hookMessages = messages;
 
           const usedIds = new Set<string>();
           const requestMessages = base.map((m) => {
             usedIds.add(m.id);
-            const fromHook = messages.find((s) => s.id === m.id);
+            const fromHook = hookMessages.find((s) => s.id === m.id);
             return fromHook ?? m;
           });
-          messages.forEach((m) => {
+          hookMessages.forEach((m) => {
             if (!usedIds.has(m.id)) requestMessages.push(m);
           });
 
@@ -251,6 +255,52 @@ export default function ChatInterface({
         },
       }),
     });
+
+  const { messages, status, setMessages, sendMessage, stop } = chatHelpers as any;
+  const regenerateRef = useRef<null | ((opts?: { messageId?: string }) => Promise<void>)>(null);
+  regenerateRef.current = (chatHelpers as any).regenerate ?? null;
+
+  const {
+    regenerateAnchorRef,
+    hiddenIdsRef,
+    pruneAt,
+    handleRegenerateAssistant,
+    handleRegenerateAfterUser,
+  } = useRegeneration({
+    setMessages,
+    status,
+    stop,
+    regenerate: async ({ messageId }: { messageId: string }) => {
+      if (regenerateRef.current) {
+        await regenerateRef.current({ messageId });
+      }
+    },
+  });
+
+  // Merge historical messages with AI SDK streaming messages (overlay stream onto base by id)
+  const renderedMessages: UIMessage[] = useMemo(() => {
+    if (!isThread) {
+      if (messages.length > 0) return messages;
+      if (initialMessages && initialMessages.length > 0) return initialMessages;
+      return [];
+    }
+
+    const baseBeforePrune = initialMessages && initialMessages.length > 0 ? initialMessages : historicalMessages;
+    const anchor = regenerateAnchorRef.current;
+    const base = anchor ? pruneAt(baseBeforePrune, anchor.id, anchor.role) : baseBeforePrune;
+
+    // Keep base order, overlay streaming message if same id, append new streaming-only items at the end
+    const usedIds = new Set<string>();
+    const result: UIMessage[] = base.map((m) => {
+      const sm = messages.find((s: UIMessage) => s.id === m.id);
+      usedIds.add(m.id);
+      return sm ?? m;
+    });
+    messages.forEach((s: UIMessage) => {
+      if (!usedIds.has(s.id)) result.push(s);
+    });
+    return filterHiddenForRender(result, hiddenIdsRef);
+  }, [isThread, historicalMessages, messages, initialMessages, pruneAt]);
 
   // Cleanup effect when thread ID changes - reset all UI state
   useEffect(() => {
@@ -272,43 +322,25 @@ export default function ChatInterface({
     }
   }, [id, setInput, setSelectedFiles, setUploadedAttachments, setUploadingFiles, setIsUploading, setIsSendingMessage, setQuotaError, setShowNoSubscriptionDialog]);
 
-  // Dummy handlers for regeneration buttons
-  const handleRegenerateAssistant = useCallback((messageId: string) => {
-    console.log("Regenerate assistant message:", messageId);
-    toast.info("Message regeneration is currently disabled");
-  }, []);
+  // Bind handlers from the hook to current renderedMessages
+  const onRegenerateAssistant = useCallback(
+    (messageId: string) => {
+      handleRegenerateAssistant(messageId, renderedMessages);
+    },
+    [handleRegenerateAssistant, renderedMessages],
+  );
 
-  const handleRegenerateAfterUser = useCallback((messageId: string) => {
-    console.log("Regenerate after user message:", messageId);
-    toast.info("Message regeneration is currently disabled");
-  }, []);
+  const onRegenerateAfterUser = useCallback(
+    (messageId: string) => {
+      handleRegenerateAfterUser(messageId, renderedMessages);
+    },
+    [handleRegenerateAfterUser, renderedMessages],
+  );
 
   // Store sendMessage in ref to prevent useEffect from re-running
   const sendMessageRef = useRef<((message: UIMessage) => Promise<void>) | null>(null);
   sendMessageRef.current = sendMessage;
 
-  // Merge historical messages with AI SDK streaming messages (overlay stream onto base by id)
-  const renderedMessages: UIMessage[] = useMemo(() => {
-    if (!isThread) {
-      if (messages.length > 0) return messages;
-      if (initialMessages && initialMessages.length > 0) return initialMessages;
-      return [];
-    }
-
-    const base = initialMessages && initialMessages.length > 0 ? initialMessages : historicalMessages;
-
-    // Keep base order, overlay streaming message if same id, append new streaming-only items at the end
-    const usedIds = new Set<string>();
-    const result: UIMessage[] = base.map((m) => {
-      const sm = messages.find((s) => s.id === m.id);
-      usedIds.add(m.id);
-      return sm ?? m;
-    });
-    messages.forEach((s) => {
-      if (!usedIds.has(s.id)) result.push(s);
-    });
-    return result;
-  }, [isThread, historicalMessages, messages, initialMessages]);
 
   const hasAssistantMessage = useMemo(
     () => renderedMessages.some((m) => m.role === "assistant"),
@@ -418,7 +450,7 @@ export default function ChatInterface({
 
   const handleStop = useCallback(() => {
     // Preserve current streaming message content before stopping
-    setMessages((currentMessages) => {
+    setMessages((currentMessages: UIMessage[]) => {
       const lastMessage = currentMessages[currentMessages.length - 1];
       if (lastMessage && lastMessage.role === "assistant") {
         const updatedMessages = [...currentMessages];
@@ -494,8 +526,8 @@ export default function ChatInterface({
                   key={message.id}
                   message={message}
                   isStreaming={isStreaming}
-                  onRegenerateAssistantMessage={handleRegenerateAssistant}
-                  onRegenerateAfterUserMessage={handleRegenerateAfterUser}
+                  onRegenerateAssistantMessage={onRegenerateAssistant}
+                  onRegenerateAfterUserMessage={onRegenerateAfterUser}
                 />
               );
             })}

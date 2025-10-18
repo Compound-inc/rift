@@ -799,18 +799,36 @@ export const deleteMessagesAfter = mutation({
       return null;
     }
 
-    // Find the target message and all messages that came after it for deletion
-    const messagesToDelete = await ctx.db
-      .query("messages")
-      .withIndex("by_thread_and_userId", (q) =>
-        q.eq("threadId", args.threadId).eq("userId", userId),
-      )
-      .filter((q) => q.gte(q.field("created_at"), targetMessage.created_at))
-      .collect();
+    // Determine inclusivity: keep user message (strictly after), remove assistant/system too (inclusive)
+    const inclusive = targetMessage.role !== "user"; // true => gte, false => gt
 
-    // Delete the target message and all subsequent messages
-    for (const message of messagesToDelete) {
-      await ctx.db.delete(message._id);
+    // Range delete using index: by_thread_and_user_and_created_at
+    const rangeQuery = ctx.db
+      .query("messages")
+      .withIndex("by_thread_and_user_and_created_at", (q) =>
+        q
+          .eq("threadId", args.threadId)
+          .eq("userId", userId)
+          [inclusive ? "gte" : "gt"]("created_at", targetMessage.created_at),
+      );
+
+    for await (const m of rangeQuery) {
+      await ctx.db.delete(m._id);
+    }
+
+    // Optionally, update thread timestamps to reflect pruning
+    const thread = await ctx.db
+      .query("threads")
+      .withIndex("by_user_and_threadId", (q) =>
+        q.eq("userId", userId).eq("threadId", args.threadId),
+      )
+      .unique();
+
+    if (thread) {
+      await ctx.db.patch(thread._id, {
+        updatedAt: Date.now(),
+        lastMessageAt: Date.now(),
+      });
     }
 
     return null;

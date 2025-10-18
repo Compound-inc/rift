@@ -182,6 +182,17 @@ export async function POST(req: Request) {
       trigger,
       messageId,
     } = validateRequest(body);
+    // Validate regenerate requests
+    if (trigger === "regenerate-message" && !messageId) {
+      return new Response(JSON.stringify({ error: "Missing messageId for regenerate" }), {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Response-Time": `${Date.now() - start}ms`,
+        },
+      });
+    }
+
 
     console.log(`Time after validation: ${Date.now() - start}ms`);
 
