@@ -197,13 +197,14 @@
     display: none; /* Chrome, Safari and Opera */
   }
 
-  /* Thread Sidebar Scrollbar Styles */
-  .sidebar-scroll-container::-webkit-scrollbar {
-    width: 6px;
-    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    scroll-padding: 0;
-    position: absolute;
-    right: 0;
+  /* Thread Sidebar Auto-Hide Scrollbar Styles */
+  .sidebar-scroll-container {
+    overflow-y: auto;
+    width: 100%;
+    box-sizing: border-box;
+    /* Always show scrollbar but make it invisible by default */
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: transparent transparent; /* Firefox - invisible by default */
   }
 
   .sidebar-scroll-container::-webkit-scrollbar-track {
@@ -213,40 +214,23 @@
   .sidebar-scroll-container::-webkit-scrollbar-thumb {
     background: rgba(156, 163, 175, 0.3);
     border-radius: 3px;
-    transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Hide by default using opacity */
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
   }
 
-  .sidebar-scroll-container::-webkit-scrollbar-thumb:hover {
+  /* Show scrollbar on hover */
+  .sidebar-scroll-container:hover::-webkit-scrollbar-thumb {
+    opacity: 1;
+  }
+
+  .sidebar-scroll-container:hover::-webkit-scrollbar-thumb:hover {
     background: rgba(156, 163, 175, 0.5);
   }
 
-  /* Firefox */
-  .sidebar-scroll-container {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
-  }
-
-  /* Auto-hide scrollbar */
-  .sidebar-scroll-container.scrollbar-hidden::-webkit-scrollbar {
-    opacity: 0;
-  }
-
-  .sidebar-scroll-container.scrollbar-hidden {
-    scrollbar-width: none;
-  }
-
-  .sidebar-scroll-container {
-    overflow-y: overlay;
-    position: relative;
-    width: 100%;
-    box-sizing: border-box;
-  }
-
-  /* Fallback for browsers that don't support overlay */
-  @supports not (overflow-y: overlay) {
-    .sidebar-scroll-container {
-      overflow-y: auto;
-    }
+  /* Firefox hover styles */
+  .sidebar-scroll-container:hover {
+    scrollbar-color: rgba(156, 163, 175, 0.3) transparent; /* Firefox */
   }
 
   .shadow-container {
@@ -338,28 +322,3 @@
   animation: subtle-shine 5s ease-in-out infinite;
 }
 
-/* Sidebar scrollbar styles */
-.sidebar-scroll-container {
-  overflow-y: auto;
-  width: 100%;
-  box-sizing: border-box;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
-}
-
-.sidebar-scroll-container::-webkit-scrollbar {
-  width: 6px;
-}
-
-.sidebar-scroll-container::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.sidebar-scroll-container::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.3);
-  border-radius: 3px;
-}
-
-.sidebar-scroll-container::-webkit-scrollbar-thumb:hover {
-  background: rgba(156, 163, 175, 0.5);
-}

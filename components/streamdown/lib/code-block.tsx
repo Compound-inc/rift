@@ -75,7 +75,7 @@ export const CodeBlock = memo(({
     <CodeBlockContext.Provider value={{ code }}>
       <div className="group relative">
         {/* Language label */}
-        <div className="absolute top-2 left-3 z-10 rounded bg-muted px-2 py-1 font-mono text-muted-foreground text-xs">
+        <div className="absolute top-2 left-3 z-0 rounded bg-muted px-2 py-1 font-mono text-muted-foreground text-xs">
           {language}
         </div>
         <div

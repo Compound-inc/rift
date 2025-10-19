@@ -46,7 +46,7 @@ const GROUP_ORDER = [
   "Este Mes",
   "Anteriores",
 ] as const;
-const MAX_TITLE_LENGTH = 18;
+const MAX_TITLE_LENGTH = 35;
 const BLUR_DELAY = 150;
 
 const parsePreloadedSnapshot = (
@@ -92,6 +92,7 @@ export function ThreadSidebarInteractive({
   const [loadingSource, setLoadingSource] = useState<null | "scroll">(null);
   const [hasHydrated, setHasHydrated] = useState(false);
   const requestInFlightRef = useRef(false);
+  const [optimisticTitles, setOptimisticTitles] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setHasHydrated(true);
@@ -335,13 +336,30 @@ export function ThreadSidebarInteractive({
       return;
     }
 
+    // Optimistically update local title and exit editing
+    setOptimisticTitles(prev => ({ ...prev, [threadId]: trimmedTitle }));
+    setEditingThreadId(null);
+    setEditingTitle("");
+
     try {
       await renameThread({ threadId, title: trimmedTitle });
-      setEditingThreadId(null);
-      setEditingTitle("");
+      // Clear optimistic after success
+      setOptimisticTitles(prev => {
+        const newTitles = { ...prev };
+        delete newTitles[threadId];
+        return newTitles;
+      });
       toast.success("Hilo renombrado");
     } catch (error) {
       console.error("Failed to rename thread:", error);
+      // Revert optimistic and return to editing with original
+      setOptimisticTitles(prev => {
+        const newTitles = { ...prev };
+        delete newTitles[threadId];
+        return newTitles;
+      });
+      setEditingThreadId(threadId);
+      setEditingTitle(originalThread.title);
       toast.error("Error al renombrar el hilo");
     }
   };
@@ -383,6 +401,14 @@ export function ThreadSidebarInteractive({
     }
   };
 
+  const handleContainerClick = useCallback((event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, []);
+
   const renderThreadItem = (thread: Thread) => {
     const isEditing = editingThreadId === thread.threadId;
 
@@ -390,7 +416,7 @@ export function ThreadSidebarInteractive({
       <ContextMenu key={thread.threadId}>
         <ContextMenuTrigger>
           <div
-            onClick={() => !isEditing && router.push(`/chat/${thread.threadId}`)}
+            onClick={isEditing ? handleContainerClick : () => !isEditing && router.push(`/chat/${thread.threadId}`)}
             className={cn(
               "group relative mb-1 flex cursor-pointer items-center gap-2 overflow-hidden rounded-lg p-2.5 transition-colors",
               "hover:bg-hover hover:text-accent-foreground",
@@ -426,7 +452,7 @@ export function ThreadSidebarInteractive({
                 ) : (
                   <div className="flex min-w-0 flex-1 items-center gap-2">
                     <h3 className="flex-1 truncate text-sm font-medium leading-5">
-                      {thread.title}
+                      {optimisticTitles[thread.threadId] || thread.title}
                     </h3>
                     {/* Always reserve space for status icons to prevent layout shift */}
                     <div className="flex-shrink-0 w-[14px] h-[14px] flex items-center justify-center">
@@ -464,7 +490,7 @@ export function ThreadSidebarInteractive({
                     </div>
                   </div>
                 )}
-                {thread.pinned && (
+                {!isEditing && thread.pinned && (
                   <PinIcon className="flex-shrink-0 h-3 w-3 text-muted-foreground" />
                 )}
               </div>
@@ -488,7 +514,7 @@ export function ThreadSidebarInteractive({
             }
           >
             <PinIcon className="mr-2 h-3 w-3" />
-            {thread.pinned ? "Desfijar" : "Fijar"}
+            {thread.pinned ? "Desanclar" : "Fijar"}
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem
@@ -521,7 +547,7 @@ export function ThreadSidebarInteractive({
             {groupName}
           </span>
         </div>
-        <div className="space-y-0.5 px-5">{groupThreads.map(renderThreadItem)}</div>
+        <div className="space-y-0.5 px-3">{groupThreads.map(renderThreadItem)}</div>
       </div>
     );
   };
