@@ -130,29 +130,10 @@ export function ThreadSidebarInteractive({
     [hasPreloadedMore],
   );
 
-  // Keep args/options shape stable to avoid internal memo size warnings
-  const effectivePaginatedArgs = useMemo(
-    () => (
-      shouldUsePaginated
-        ? paginatedArgs
-        : { paginationOpts: { numItems: 0, cursor: null } }
-    ),
-    [shouldUsePaginated, paginatedArgs],
-  );
-
-  const effectivePaginatedOptions = useMemo(
-    () => (
-      shouldUsePaginated
-        ? paginatedOptions
-        : { initialNumItems: 0 }
-    ),
-    [shouldUsePaginated, paginatedOptions],
-  );
-
   const paginated = usePaginatedQuery(
     api.threads.getUserThreadsPaginatedSafe,
-    effectivePaginatedArgs,
-    effectivePaginatedOptions,
+    shouldUsePaginated ? paginatedArgs : "skip",
+    paginatedOptions,
   );
 
   const paginatedResults = (paginated?.results ?? []) as Thread[];
