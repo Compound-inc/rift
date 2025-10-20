@@ -74,15 +74,15 @@ const MessageActions = React.memo(function MessageActions({
         <Actions className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity justify-start">
           <Action
             onClick={handleRegenerateAssistant}
-            label="Retry"
-            tooltip="Regenerate response"
+            label="Regenerar"
+            tooltip="Regenerar respuesta"
           >
             <RedoIcon className="size-4" />
           </Action>
           <Action
             onClick={handleCopy}
-            label="Copy"
-            tooltip="Copy to clipboard"
+            label="Copiar"
+            tooltip="Copiar texto"
           >
             {isCopied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
           </Action>

@@ -250,7 +250,7 @@ function ChatInterfaceInternal({
             ? initialMessages
             : historicalMessages;
 
-          const anchor = regenerateAnchorRef.current;
+          const anchor = trigger === "regenerate-message" ? regenerateAnchorRef.current : null;
           const base = anchor ? pruneAt(baseBeforePrune, anchor.id, anchor.role) : baseBeforePrune;
           const hookMessages = anchor ? pruneAt(messages, anchor.id, anchor.role) : messages;
 
@@ -422,6 +422,16 @@ function ChatInterfaceInternal({
 
       const messageContent = input.trim();
       const messageId = generateUUID();
+
+      // Reset regeneration pruning state for normal submissions so new messages are included
+      try {
+        if (regenerateAnchorRef.current) {
+          regenerateAnchorRef.current = null;
+        }
+        if (hiddenIdsRef.current && typeof hiddenIdsRef.current.clear === "function") {
+          hiddenIdsRef.current.clear();
+        }
+      } catch {}
 
       // Clear any existing quota error when user tries to send a new message
       setQuotaError(null);
