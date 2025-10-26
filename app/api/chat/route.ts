@@ -7,6 +7,7 @@ import {
 } from "ai";
 import { withTracing } from "@posthog/ai";
 import { PostHog } from "posthog-node";
+import { withSupermemory, supermemoryTools } from "@supermemory/tools/ai-sdk";
 import {
   getLanguageModel,
   getProviderOptions,
@@ -226,10 +227,17 @@ export async function POST(req: Request) {
     const newMessageId = crypto.randomUUID();
     // Create traced model for PostHog LLM analytics
     const baseModel = getLanguageModel(modelId);
+    const supermemoryEnabled = Boolean(process.env.SUPERMEMORY_API_KEY);
+    const modelWithMemory = supermemoryEnabled
+      ? withSupermemory(baseModel, auth.userId, {
+          mode: "profile",
+          verbose: process.env.NODE_ENV !== "production",
+        })
+      : baseModel;
     const phClient = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY || "", {
       host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
     });
-    const model = withTracing(baseModel, phClient, {
+    const model = withTracing(modelWithMemory, phClient, {
       posthogDistinctId: auth.userId,
       posthogTraceId: newMessageId,
       posthogProperties: {
@@ -252,6 +260,11 @@ export async function POST(req: Request) {
     const tools = {
       ...providerTools,
       ...(enabledTools.includes("web_search") ? { webSearch: exaWebSearch } : {}),
+      ...(process.env.SUPERMEMORY_API_KEY
+        ? supermemoryTools(process.env.SUPERMEMORY_API_KEY, {
+            containerTags: auth.orgId ? [auth.userId, auth.orgId] : [auth.userId],
+          })
+        : {}),
     };
     const providerOptions = getProviderOptions(modelId);
 
@@ -485,10 +498,21 @@ export async function POST(req: Request) {
         console.log(`Starting streamText call: ${Date.now() - start}ms`);
 
         try {
+          const systemPrompt = process.env.SUPERMEMORY_API_KEY
+            ? `You are a helpful personal assistant. When users share information about themselves,
+              remember it using the addMemory tool. When they ask questions that seem relevant to their memories, search your memories to provide
+              personalized responses. do not over use user memories, only use them if the question seems relevant to their memories.
+                1. Remembering their learning progress and struggles
+                2. Searching for relevant information from their past sessions
+                3. Providing personalized explanations based on their learning style
+                4. Tracking topics they've mastered vs topics they need more help with`
+                
+            : undefined;
           const result = streamText({
             model,
             messages: convertToModelMessages(filterMessagesForModel(messages as UIMessage[], modelId)), // Filter unsupported file types for non-supporting models
             tools,
+            system: systemPrompt,
             stopWhen: stepCountIs(3), // Allow multi-step tool usage for web search
             experimental_transform: smoothStream({
               delayInMs: 5,
