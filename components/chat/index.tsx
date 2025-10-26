@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { useCallback, useEffect, useRef, useMemo, useState } from "react";
 import { useRegeneration, filterHiddenForRender } from "./hooks/use-regeneration";
 import { ToolType, getDefaultTools } from "@/lib/ai/model-tools";
+import { resolveModel } from "@/lib/ai/ai-providers";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
 import { useConvexAuth, usePaginatedQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -320,7 +321,7 @@ function ChatInterfaceInternal({
           return {
             body: {
               messages: requestMessages,
-              modelId: selectedModel,
+              modelId: resolveModel(selectedModel),
               threadId: id,
               enabledTools: currentEnabledTools,
               trigger,

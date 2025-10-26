@@ -22,7 +22,7 @@ globalThis.AI_SDK_DEFAULT_PROVIDER = gateway;
 
 // Model resolution
 const SHORTCUTS: Record<string, string> = {
-  automatico: "openai/gpt-oss-120b",
+  automatico: "openai/gpt-5-mini",
   problemas_dificiles: "openai/gpt-5",
   escritura: "google/gemini-2.5-flash",
   sorpresa: "mistral/mistral-medium",
