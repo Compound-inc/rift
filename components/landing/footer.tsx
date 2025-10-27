@@ -130,10 +130,10 @@ export default function Footer() {
         <div className="mt-12 pt-8 border-t border-gray-200">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="flex space-x-6">
-              <Link href="/privacy" className="text-xs text-gray-500 hover:text-gray-700 transition-colors">
+              <Link href="/privacy-policy" className="text-xs text-gray-500 hover:text-gray-700 transition-colors">
                 Política de privacidad
               </Link>
-              <Link href="/terms" className="text-xs text-gray-500 hover:text-gray-700 transition-colors">
+              <Link href="/terms-of-service" className="text-xs text-gray-500 hover:text-gray-700 transition-colors">
                 Términos de servicio
               </Link>
               <Link href="/cookies" className="text-xs text-gray-500 hover:text-gray-700 transition-colors">
