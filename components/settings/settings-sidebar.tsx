@@ -51,7 +51,7 @@ function SettingItem({
   const isActive = pathname === href;
 
   const baseClasses = `
-    w-full flex items-center px-2 py-1.5 mb-0.5 rounded-lg text-sm font-medium transition-colors border-2 border-transparent focus:outline-none focus:border-blue-500 dark:focus:border-border
+    w-full flex items-center px-2 py-1.5 mb-0.5 rounded-lg text-sm font-medium transition-colors border-2 border-transparent focus:outline-none focus-visible:border-blue-500 dark:focus-visible:border-border
     ${
       isLogout
         ? "text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"

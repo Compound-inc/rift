@@ -23,12 +23,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const trimmedMessage = userMessage.length > 200 ? userMessage.slice(0, 200) + '...' : userMessage;
+
     // Generate a short title
     const { text } = await generateText({
       model: TITLE_GENERATION_MODEL,
       prompt: `Summarize user message in 5 words or fewer in a descriptive way. Be as concise as possible without losing the context, respond in the same language as the user message and do not compress words.
 
-      User message: ${userMessage}`,
+      User message: ${trimmedMessage}`,
       temperature: 0.5,
       maxOutputTokens: 50,
       maxRetries: 3,

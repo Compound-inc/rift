@@ -11,7 +11,7 @@ interface ThemeToggleProps {
 }
 
 export function ThemeToggle({ className, size = "md" }: ThemeToggleProps) {
-  const { theme, setTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -30,7 +30,7 @@ export function ThemeToggle({ className, size = "md" }: ThemeToggleProps) {
     lg: "size-5"
   };
 
-  const isDark = mounted ? theme === "dark" : false;
+  const isDark = mounted ? resolvedTheme === "dark" : false;
 
   return (
     <button
