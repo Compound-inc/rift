@@ -144,11 +144,6 @@ const settingsSections: SettingsSection[] = [
     title: "Organización",
     items: [
       {
-        title: "Resumen",
-        href: "/settings",
-        icon: Home,
-      },
-      {
         title: "Miembros",
         href: "/settings/members",
         icon: Users,
@@ -184,8 +179,8 @@ const settingsSections: SettingsSection[] = [
         icon: Shield,
       },
       {
-        title: "Uso y límites",
-        href: "/settings/uso-y-limites",
+        title: "Uso y Limites",
+        href: "/settings/usage",
         icon: BarChart3,
       },
       {

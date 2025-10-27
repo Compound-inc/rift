@@ -48,13 +48,15 @@ export default async function ProfilePage() {
 
       <SettingsDivider />
 
-      {/* Advanced Debug Section */}
-      <SettingsSection
-        title="Avanzado"
-        description="Información de depuración para desarrolladores."
-      >
-        <AdvancedDebugWidget debugUser={debugUser} debugClaims={debugClaims} />
-      </SettingsSection>
+      {/* Debug Section*/}
+      {process.env.NODE_ENV !== "production" && (
+        <SettingsSection
+          title="Avanzado"
+          description="Información de depuración."
+        >
+          <AdvancedDebugWidget debugUser={debugUser} debugClaims={debugClaims} />
+        </SettingsSection>
+      )}
     </div>
   );
 }

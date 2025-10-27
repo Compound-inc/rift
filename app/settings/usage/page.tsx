@@ -4,7 +4,7 @@ import { SettingsSection } from "@/components/settings";
 import { QuotaClient } from "@/components/settings/quota-client";
 import { getAccessToken } from "@/lib/auth";
 
-export default async function UsoYLimitesPage() {
+export default async function UsagePage() {
   // Get the access token for server-side authentication
   const token = await getAccessToken();
   
@@ -18,7 +18,7 @@ export default async function UsoYLimitesPage() {
   return (
     <div className="pt-12 pb-12 pl-12 pr-12 flex flex-col max-w-4xl min-w-[520px] w-full min-h-full box-border bg-background dark:bg-popover-main">
       <SettingsSection
-        title="Uso y Límites"
+        title="Uso y Limites"
         description="Monitorea el uso actual de tu cuota de mensajes Standard y Premium."
       >
         <QuotaClient preloadedQuotaInfo={preloadedQuotaInfo} />
