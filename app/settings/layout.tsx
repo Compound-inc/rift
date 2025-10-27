@@ -2,6 +2,7 @@ import { SettingsSidebar } from "@/components/settings/settings-sidebar";
 import Link from 'next/link';
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { hasPermissions } from "@/lib/permissions";
+import { SettingsEscapeHandler } from "./settings-escape-handler";
 
 // Custom scrollbar styles matching the chat interface
 const scrollbarStyles = `
@@ -89,6 +90,7 @@ export default async function SettingsLayout({
               </svg>
             </Link>
           </div>
+          <SettingsEscapeHandler />
           {children}
         </main>
       </div>

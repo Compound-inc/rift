@@ -278,6 +278,12 @@ export function SettingsSidebar({
                       return true;
                     })
                   : section.items;
+
+              // Don't render the section if there are no filtered items
+              if (filteredItems.length === 0) {
+                return null;
+              }
+
               return (
                 <SettingSection
                   key={section.title}
