@@ -16,6 +16,9 @@ export const metadata: Metadata = {
     template: "%s | Rift",
     default: "Rift",
   },
+  twitter: {
+    card: "summary_large_image",
+  },
 };
 
 export default async function RootLayout({
