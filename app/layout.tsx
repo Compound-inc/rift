@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "Rift",
-    description: "Rift AI",
+    description: "Todas las IA en un solo lugar",
     url: baseUrl,
     siteName: "Rift",
     type: "website",
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Rift",
-    description: "Rift AI",
+    description: "Todas las IA en un solo lugar",
     images: ["/twitter-image.png"],
   },
 };
