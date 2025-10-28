@@ -11,7 +11,7 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
-const productionDomain = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL; // Domains without protocol
+const productionDomain = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
 const baseUrl = productionDomain ? `https://${productionDomain}` : "http://localhost:3000";
 
 export const metadata: Metadata = {
