@@ -59,7 +59,13 @@ function sameClassAndNode(
 type OlProps = WithNode<React.JSX.IntrinsicElements['ol']>;
 const MemoOl = memo<OlProps>(
   ({ children, className, ...props }: OlProps) => (
-    <ol className={cn('ml-4 list-outside list-decimal', className)} {...props}>
+    <ol
+      className={cn(
+        'my-5 ml-0 pl-[26px] list-outside list-decimal',
+        className
+      )}
+      {...props}
+    >
       {children}
     </ol>
   ),
@@ -70,7 +76,13 @@ MemoOl.displayName = 'MarkdownOl';
 type UlProps = WithNode<React.JSX.IntrinsicElements['ul']>;
 const MemoUl = memo<UlProps>(
   ({ children, className, ...props }: UlProps) => (
-    <ul className={cn('ml-4 list-outside list-disc', className)} {...props}>
+    <ul
+      className={cn(
+        'my-5 ml-0 pl-[26px] list-outside list-disc',
+        className
+      )}
+      {...props}
+    >
       {children}
     </ul>
   ),
@@ -122,7 +134,10 @@ type HeadingProps<TTag extends keyof React.JSX.IntrinsicElements> = WithNode<
 const MemoH1 = memo<HeadingProps<'h1'>>(
   ({ children, className, ...props }: HeadingProps<'h1'>) => (
     <h1
-      className={cn('mt-6 mb-2 font-semibold text-3xl', className)}
+      className={cn(
+        'mt-[2em] mb-[1em] font-bold text-[1.5em] leading-[1.33333]',
+        className
+      )}
       {...props}
     >
       {children}
@@ -135,7 +150,10 @@ MemoH1.displayName = 'MarkdownH1';
 const MemoH2 = memo<HeadingProps<'h2'>>(
   ({ children, className, ...props }: HeadingProps<'h2'>) => (
     <h2
-      className={cn('mt-6 mb-2 font-semibold text-2xl', className)}
+      className={cn(
+        'mt-[2em] mb-[1em] font-bold text-[1.5em] leading-[1.33333]',
+        className
+      )}
       {...props}
     >
       {children}
@@ -147,7 +165,13 @@ MemoH2.displayName = 'MarkdownH2';
 
 const MemoH3 = memo<HeadingProps<'h3'>>(
   ({ children, className, ...props }: HeadingProps<'h3'>) => (
-    <h3 className={cn('mt-6 mb-2 font-semibold text-xl', className)} {...props}>
+    <h3
+      className={cn(
+        'mt-[2em] mb-[1em] font-bold text-[1.5em] leading-[1.33333]',
+        className
+      )}
+      {...props}
+    >
       {children}
     </h3>
   ),
@@ -305,7 +329,10 @@ type LiProps = WithNode<React.JSX.IntrinsicElements['li']>;
 
 const MemoLi = memo<LiProps>(
   ({ node, children, className, ...props }: LiProps) => (
-    <li className={cn('py-1', className)} {...props}>
+    <li
+      className={cn('my-2 pl-[6px]', className)}
+      {...props}
+    >
       {children}
     </li>
   ),
@@ -398,6 +425,11 @@ export const components: Options['components'] = {
   ol: MemoOl,
   li: MemoLi,
   ul: MemoUl,
+  p: ({ children, className, ...props }) => (
+    <p className={cn('my-[1.25em]', className)} {...(props as any)}>
+      {children}
+    </p>
+  ),
   hr: MemoHr,
   strong: MemoStrong,
   a: MemoA,

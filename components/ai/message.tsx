@@ -36,9 +36,9 @@ export const MessageContent = React.memo(({
 }: MessageContentProps) => (
   <div
     className={cn(
-      'group flex flex-col gap-2 overflow-hidden px-4 text-foreground text-sm',
+      'group flex flex-col gap-2 overflow-hidden px-1 text-foreground text-sm',
       from === 'user' 
-        ? 'bg-hover text-secondary rounded-lg py-3' 
+        ? 'rounded-lg py-3 px-4 bg-popover-main border border-popover-secondary text-popover-text' 
         : 'bg-transparent text-foreground py-0',
       'is-user:dark',
       className
