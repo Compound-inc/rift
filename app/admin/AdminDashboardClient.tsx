@@ -18,7 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ai/ui/select";
-import { Badge } from "@/components/ai/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ai/ui/card";
 import { DataTable } from "@/components/ai/ui/data-table";
 import {
@@ -156,30 +155,7 @@ export default function AdminDashboardClient() {
     return new Date(timestamp).toLocaleDateString();
   };
 
-  const getPlanBadgeVariant = (plan?: string) => {
-    switch (plan) {
-      case "plus":
-        return "default";
-      case "pro":
-        return "secondary";
-      default:
-        return "outline";
-    }
-  };
-
-  const getStatusBadgeVariant = (status?: string) => {
-    switch (status) {
-      case "active":
-        return "default";
-      case "trialing":
-        return "secondary";
-      case "canceled":
-      case "past_due":
-        return "destructive";
-      default:
-        return "outline";
-    }
-  };
+  // Removed badge variants; using plain text instead
 
   const capitalizeFirstLetter = (str: string) => {
     return str.charAt(0).toUpperCase() + str.slice(1);
@@ -207,11 +183,7 @@ export default function AdminDashboardClient() {
       header: "Plan",
       cell: ({ row }) => {
         const plan = row.getValue("plan") as string;
-        return (
-          <Badge variant={getPlanBadgeVariant(plan)} className="px-3 py-1">
-            {plan ? capitalizeFirstLetter(plan) : "No Plan"}
-          </Badge>
-        );
+        return <span className="text-sm">{plan ? capitalizeFirstLetter(plan) : "No Plan"}</span>;
       },
     },
     {
@@ -267,11 +239,7 @@ export default function AdminDashboardClient() {
       header: "Status",
       cell: ({ row }) => {
         const status = row.getValue("subscriptionStatus") as string;
-        return (
-          <Badge variant={getStatusBadgeVariant(status)} className="px-2 py-1">
-            {status ? capitalizeFirstLetter(status) : "None"}
-          </Badge>
-        );
+        return <span className="text-sm">{status ? capitalizeFirstLetter(status) : "None"}</span>;
       },
     },
     {
@@ -279,14 +247,7 @@ export default function AdminDashboardClient() {
       header: "CPE?",
       cell: ({ row }) => {
         const cancelAtPeriodEnd = row.getValue("cancelAtPeriodEnd") as boolean;
-        return (
-          <Badge 
-            variant={cancelAtPeriodEnd ? "destructive" : "secondary"} 
-            className="px-2 py-1"
-          >
-            {cancelAtPeriodEnd ? "Yes" : "No"}
-          </Badge>
-        );
+        return <span className="text-sm">{cancelAtPeriodEnd ? "Yes" : "No"}</span>;
       },
     },
     {
@@ -298,12 +259,12 @@ export default function AdminDashboardClient() {
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
+              <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-popover-secondary/40">
                 <span className="sr-only">Open menu</span>
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="backdrop-blur-sm bg-popover-main/80 dark:bg-popover-main/80 border-border/60 shadow-lg">
               <DropdownMenuItem
                 onClick={() => {
                   setSelectedOrg(org);
@@ -335,7 +296,7 @@ export default function AdminDashboardClient() {
 
   if (loading) {
     return (
-      <Card>
+      <Card className="dark:bg-popover-main dark:text-popover-text dark:border-border/60 backdrop-blur-sm">
         <CardContent className="flex items-center justify-center py-8">
           <Loader2 className="h-8 w-8 animate-spin" />
           <span className="ml-2">Loading organizations...</span>
@@ -346,11 +307,11 @@ export default function AdminDashboardClient() {
 
   if (error) {
     return (
-      <Card>
+      <Card className="dark:bg-popover-main dark:text-popover-text dark:border-border/60 backdrop-blur-sm">
         <CardContent className="py-8">
           <div className="text-center">
             <p className="text-destructive mb-4">{error}</p>
-            <Button onClick={fetchOrganizations} variant="outline">
+            <Button onClick={fetchOrganizations} variant="outline" className="dark:border-border/60 dark:text-popover-text">
               <RefreshCw className="h-4 w-4 mr-2" />
               Retry
             </Button>
@@ -362,11 +323,11 @@ export default function AdminDashboardClient() {
 
   return (
     <>
-      <Card>
+      <Card className="dark:bg-popover-secondary dark:border-border/60 backdrop-blur-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Organizations</CardTitle>
-            <Button onClick={fetchOrganizations} variant="outline" size="sm">
+            <Button onClick={fetchOrganizations} variant="outline" size="sm" className="dark:border-border/60 dark:text-popover-text">
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
@@ -392,7 +353,7 @@ export default function AdminDashboardClient() {
           setSelectedPlan("");
         }
       }}>
-        <DialogContent>
+        <DialogContent className="dark:bg-popover-main dark:text-popover-text dark:border-border">
           <DialogHeader>
             <DialogTitle>Set Plan for {selectedOrg?.name}</DialogTitle>
             <DialogDescription>
@@ -401,7 +362,7 @@ export default function AdminDashboardClient() {
           </DialogHeader>
           <div className="py-4">
             <Select value={selectedPlan} onValueChange={setSelectedPlan}>
-              <SelectTrigger>
+              <SelectTrigger className="dark:bg-popover-secondary/20 dark:text-popover-text dark:border-border/60">
                 <SelectValue placeholder="Select a plan" />
               </SelectTrigger>
               <SelectContent>
@@ -414,6 +375,7 @@ export default function AdminDashboardClient() {
             <Button
               variant="outline"
               onClick={() => setIsSetPlanDialogOpen(false)}
+              className="dark:border-border/60 dark:text-popover-text"
             >
               Cancel
             </Button>
@@ -437,7 +399,7 @@ export default function AdminDashboardClient() {
           setCancelStatus("canceled");
         }
       }}>
-        <DialogContent>
+        <DialogContent className="dark:bg-popover-main dark:text-popover-text dark:border-border">
           <DialogHeader>
             <DialogTitle>Cancel Subscription for {selectedOrg?.name}</DialogTitle>
             <DialogDescription>
@@ -448,7 +410,7 @@ export default function AdminDashboardClient() {
             <div>
               <label className="text-sm font-medium">Cancellation Type</label>
               <Select value={cancelType} onValueChange={(value: "now" | "end_of_cycle") => setCancelType(value)}>
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className="mt-1 dark:bg-popover-secondary/20 dark:text-popover-text dark:border-border/60">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -460,7 +422,7 @@ export default function AdminDashboardClient() {
             <div>
               <label className="text-sm font-medium">Set Status To</label>
               <Select value={cancelStatus} onValueChange={setCancelStatus}>
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className="mt-1 dark:bg-popover-secondary/20 dark:text-popover-text dark:border-border/60">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -482,8 +444,8 @@ export default function AdminDashboardClient() {
               </div>
             )}
             {cancelType === "end_of_cycle" && (
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                <p className="text-sm text-yellow-800">
+              <div className="p-3 bg-yellow-50 dark:bg-popover-secondary/20 border border-yellow-200 dark:border-border rounded-md">
+                <p className="text-sm text-yellow-800 dark:text-popover-text">
                   <strong>Note:</strong> The subscription will remain active until the end of the current billing cycle ({selectedOrg?.billingCycleEnd ? new Date(selectedOrg.billingCycleEnd).toLocaleDateString() : "Unknown"}).
                 </p>
               </div>
@@ -493,6 +455,7 @@ export default function AdminDashboardClient() {
             <Button
               variant="outline"
               onClick={() => setIsCancelDialogOpen(false)}
+              className="dark:border-border/60 dark:text-popover-text"
             >
               Cancel
             </Button>

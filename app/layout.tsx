@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     template: "%s | Rift",
     default: "Rift",
   },
-  description: "Todas las IAs en un solo lugar",
+  description: "Todas las IAs en una sola plataforma",
   applicationName: "Rift",
   metadataBase: new URL(baseUrl),
   alternates: {
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "Rift",
-    description: "Todas las IAs en un solo lugar",
+    description: "Todas las IAs en una sola plataforma",
     url: baseUrl,
     siteName: "Rift",
     type: "website",
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Rift",
-    description: "Todas las IAs en un solo lugar",
+    description: "Todas las IAs en una sola plataforma",
     images: ["/twitter-image.png"],
   },
 };

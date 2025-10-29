@@ -307,18 +307,6 @@ export function FilesClient() {
           Inicia sesión para ver tus archivos.
         </div>
       </Unauthenticated>
-      <Authenticated>
-        <div className="flex justify-end">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => loadMore(20)}
-            disabled={status !== "CanLoadMore"}
-          >
-            {status === "LoadingMore" ? "Cargando..." : status === "CanLoadMore" ? "Cargar más" : "No hay más"}
-          </Button>
-        </div>
-      </Authenticated>
 
       {/* Single Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
