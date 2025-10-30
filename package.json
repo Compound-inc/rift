@@ -1,6 +1,6 @@
 {
-  "name": "ai_chat",
-  "version": "0.1.0",
+  "name": "Rift",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -82,7 +82,7 @@
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
-    "shiki": "^3.13.0",
+    "shiki": "3.13.0",
     "sonner": "^2.0.7",
     "streamdown": "^1.4.0",
     "stripe": "^18.5.0",
