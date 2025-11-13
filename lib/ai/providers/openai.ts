@@ -109,6 +109,25 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     }),
   },
   {
+    id: "openai/gpt-5.1-instant",
+    name: "GPT-5.1 Instant",
+    provider: "openai",
+    description:
+      "Versión conversacional y cálida con razonamiento adaptativo y mejor seguimiento de instrucciones",
+    contextWindow: 128000,
+    isPremium: true,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsImageOutput: true,
+      supportsPDFInput: true,
+      supportsObjectGeneration: true,
+      maxTokens: 131072,
+    }),
+  },
+  {
     id: "openai/o3",
     name: "o3",
     provider: "openai",
