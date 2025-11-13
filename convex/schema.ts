@@ -79,6 +79,14 @@ export default defineSchema({
     userId: v.string(),
 
     model: v.string(),
+    responseStyle: v.optional(
+      v.union(
+        v.literal("regular"),
+        v.literal("learning"),
+        v.literal("technical"),
+        v.literal("concise"),
+      ),
+    ),
     pinned: v.boolean(),
     branchParentThreadId: v.optional(v.id("threads")),
     branchParentPublicMessageId: v.optional(v.string()),

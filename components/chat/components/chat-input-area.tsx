@@ -22,6 +22,7 @@ import {
   PromptInputError,
 } from "@/components/ai/prompt-input";
 import { ModelSelector } from "@/components/ai/model-selector";
+import { ResponseStyleSelector } from "@/components/ai/response-style-selector";
 import type { FileAttachment } from "@/lib/file-utils";
 import React from "react";
 import { useChatStatus } from "@ai-sdk-tools/store";
@@ -61,6 +62,8 @@ export const ChatInputArea = React.memo(function ChatInputArea({
   const setUploadedAttachments = useChatUIStore((s) => s.setUploadedAttachments);
   const setUploadingFiles = useChatUIStore((s) => s.setUploadingFiles);
   const handleSearchToggle = useChatUIStore((s) => s.handleSearchToggle);
+  const responseStyle = useChatUIStore((s) => s.responseStyle);
+  const setResponseStyle = useChatUIStore((s) => s.setResponseStyle);
   const setQuotaError = useChatUIStore((s) => s.setQuotaError);
   const setShowNoSubscriptionDialog = useChatUIStore((s) => s.setShowNoSubscriptionDialog);
   const fileUploadError = useChatUIStore((s) => s.fileUploadError);
@@ -244,6 +247,11 @@ export const ChatInputArea = React.memo(function ChatInputArea({
                   })();
                 }}
                 disabled={disableInput || isUploading}
+              />
+              <ResponseStyleSelector
+                value={responseStyle}
+                onValueChange={setResponseStyle}
+                disabled={disableInput}
               />
               <PromptInputButton
                 onClick={() => {

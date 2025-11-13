@@ -41,6 +41,7 @@ import { XAiIcon } from "@/components/ui/icons/xai-icon";
 import { OpenRouterIcon } from "@/components/ui/icons/openrouter-icon";
 import { DeepSeekIcon } from "@/components/ui/icons/deepseek-icon";
 import { LogosMistralAiIcon } from "@/components/ui/icons/mistral-icon";
+import { MoonshotIcon } from "@/components/ui/icons/moonshot-icon";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ai/ui/tabs";
 
 // Provider icon mapping
@@ -52,6 +53,7 @@ const providerIcons = {
   openrouter: OpenRouterIcon,
   deepseek: DeepSeekIcon,
   mistral: LogosMistralAiIcon,
+  moonshotai: MoonshotIcon,
 } as const;
 
 // Capability icon mapping
@@ -79,6 +81,7 @@ const providerNames = {
   openrouter: "OpenRouter",
   deepseek: "DeepSeek",
   mistral: "Mistral",
+  moonshotai: "Moonshot",
 } as const;
 
 // Recommended options configuration

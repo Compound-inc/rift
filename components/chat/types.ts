@@ -1,6 +1,7 @@
 import type React from "react";
 import type { UIMessage } from "@ai-sdk-tools/store";
 import type { FileAttachment } from "@/lib/file-utils";
+import type { ResponseStyle } from "@/lib/ai/response-styles";
 
 export interface ChatInterfaceProps {
   id: string;
@@ -52,6 +53,7 @@ export interface ChatState {
   uploadingFiles: UploadingFile[];
   isSendingMessage: boolean;
   isSearchEnabled: boolean;
+  responseStyle: ResponseStyle;
   quotaError: QuotaError | null;
   showNoSubscriptionDialog: boolean;
   chatKey: number;
@@ -66,6 +68,7 @@ export interface ChatStateSetters {
   setUploadingFiles: React.Dispatch<React.SetStateAction<UploadingFile[]>>;
   setIsSendingMessage: React.Dispatch<React.SetStateAction<boolean>>;
   setIsSearchEnabled: React.Dispatch<React.SetStateAction<boolean>>;
+  setResponseStyle: React.Dispatch<React.SetStateAction<ResponseStyle>>;
   setQuotaError: React.Dispatch<React.SetStateAction<QuotaError | null>>;
   setShowNoSubscriptionDialog: React.Dispatch<React.SetStateAction<boolean>>;
   setChatKey: React.Dispatch<React.SetStateAction<number>>;

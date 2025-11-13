@@ -22,6 +22,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { exaWebSearch } from "@/lib/ai/tools/exa-search";
+import { buildSystemPromptWithStyle, type ResponseStyle } from "@/lib/ai/response-styles";
 
 export const maxDuration = 300;
 
@@ -40,6 +41,7 @@ interface RequestBody {
   modelId: string;
   threadId: string;
   enabledTools?: ToolType[];
+  responseStyle?: ResponseStyle;
   trigger?: "submit-message" | "regenerate-message";
   messageId?: string;
 }
@@ -209,6 +211,7 @@ export async function POST(req: Request) {
       modelId,
       threadId,
       enabledTools = [],
+      responseStyle = "regular",
       trigger,
       messageId,
     } = validateRequest(body);
@@ -559,7 +562,7 @@ export async function POST(req: Request) {
         console.log(`Starting streamText call: ${Date.now() - start}ms`);
 
         try {
-          const systemPrompt = process.env.SUPERMEMORY_API_KEY
+          const baseSystemPrompt = process.env.SUPERMEMORY_API_KEY
             ? `You are a helpful personal assistant. When users share information about themselves,
               remember it using the addMemory tool. When they ask questions that seem relevant to their memories, search your memories to provide
               personalized responses. do not over use user memories, only use them if the question seems relevant to their memories.
@@ -567,14 +570,20 @@ export async function POST(req: Request) {
                 2. Searching for relevant information from their past sessions
                 3. Providing personalized explanations based on their learning style
                 4. Tracking topics they've mastered vs topics they need more help with`
-                
             : undefined;
+          
+          // Apply response style to system prompt
+          const systemPrompt = buildSystemPromptWithStyle(
+            baseSystemPrompt,
+            responseStyle as ResponseStyle
+          );
+          
           const result = streamText({
             model,
             messages: convertToModelMessages(filterMessagesForModel(messages as UIMessage[], modelId)), // Filter unsupported file types for non-supporting models
             tools,
             system: systemPrompt,
-            stopWhen: stepCountIs(3), // Allow multi-step tool usage for web search
+            stopWhen: stepCountIs(50),
             experimental_transform: smoothStream({
               delayInMs: 5,
               chunking: "word",

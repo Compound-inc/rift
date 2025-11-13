@@ -30,6 +30,14 @@ export const createThread = mutation({
         includeSearch: v.optional(v.boolean()),
       }),
     ),
+    responseStyle: v.optional(
+      v.union(
+        v.literal("regular"),
+        v.literal("learning"),
+        v.literal("technical"),
+        v.literal("concise"),
+      ),
+    ),
     userSetTitle: v.optional(v.boolean()),
     branchParentThreadId: v.optional(v.id("threads")),
     branchParentPublicMessageId: v.optional(v.string()),
@@ -70,6 +78,7 @@ export const createThread = mutation({
       userSetTitle: args.userSetTitle ?? false,
       userId: userId,
       model: args.model,
+      responseStyle: args.responseStyle,
       pinned: false, // Default pinned status
       branchParentThreadId: args.branchParentThreadId,
       branchParentPublicMessageId: args.branchParentPublicMessageId,
@@ -173,6 +182,14 @@ export const getThreadInfo = query({
       userSetTitle: v.optional(v.boolean()),
       userId: v.string(),
       model: v.string(),
+      responseStyle: v.optional(
+        v.union(
+          v.literal("regular"),
+          v.literal("learning"),
+          v.literal("technical"),
+          v.literal("concise"),
+        ),
+      ),
       pinned: v.boolean(),
       branchParentThreadId: v.optional(v.id("threads")),
       branchParentPublicMessageId: v.optional(v.string()),
@@ -193,6 +210,46 @@ export const getThreadInfo = query({
       .unique();
 
     return thread;
+  },
+});
+
+/**
+ * Update the response style for a thread.
+ */
+export const updateThreadResponseStyle = mutation({
+  args: {
+    threadId: v.string(),
+    responseStyle: v.union(
+      v.literal("regular"),
+      v.literal("learning"),
+      v.literal("technical"),
+      v.literal("concise"),
+    ),
+  },
+  returns: v.union(v.object({ success: v.literal(true) }), v.null()),
+  handler: async (ctx, args) => {
+    // Get the authenticated user ID using the helper
+    const userId = await getAuthUserId(ctx);
+
+    // Get the thread, ensuring it belongs to the authenticated user
+    const thread = await ctx.db
+      .query("threads")
+      .withIndex("by_user_and_threadId", (q) =>
+        q.eq("userId", userId).eq("threadId", args.threadId),
+      )
+      .unique();
+
+    if (!thread) {
+      return null;
+    }
+
+    // Update the response style
+    await ctx.db.patch(thread._id, {
+      responseStyle: args.responseStyle,
+      updatedAt: Date.now(),
+    });
+
+    return { success: true as const };
   },
 });
 
@@ -444,6 +501,14 @@ export const serverGetThreadInfo = query({
       userSetTitle: v.optional(v.boolean()),
       userId: v.string(),
       model: v.string(),
+      responseStyle: v.optional(
+        v.union(
+          v.literal("regular"),
+          v.literal("learning"),
+          v.literal("technical"),
+          v.literal("concise"),
+        ),
+      ),
       pinned: v.boolean(),
       branchParentThreadId: v.optional(v.id("threads")),
       branchParentPublicMessageId: v.optional(v.string()),

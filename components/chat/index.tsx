@@ -12,8 +12,9 @@ import { useRegeneration, filterHiddenForRender } from "./hooks/use-regeneration
 import { ToolType, getDefaultTools } from "@/lib/ai/model-tools";
 import { resolveModel } from "@/lib/ai/ai-providers";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
-import { useConvexAuth, usePaginatedQuery, useMutation } from "convex/react";
+import { useConvexAuth, usePaginatedQuery, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { ResponseStyle } from "@/lib/ai/response-styles";
 import { Loader } from "@/components/ai/loader";
 import { AttachmentsIcon } from "@/components/ui/icons/svg-icons";
 import {
@@ -62,6 +63,8 @@ function ChatInterfaceInternal({
   const setChatKey = useChatUIStore((s) => s.setChatKey);
   const handleSearchToggle = useChatUIStore((s) => s.handleSearchToggle);
   const setFileUploadError = useChatUIStore((s) => s.setFileUploadError);
+  const responseStyle = useChatUIStore((s) => s.responseStyle);
+  const setResponseStyle = useChatUIStore((s) => s.setResponseStyle);
   const [isDragActive, setIsDragActive] = useState(false);
   const dragCounterRef = useRef(0);
 
@@ -328,12 +331,16 @@ function ChatInterfaceInternal({
             if (!usedIds.has(m.id)) requestMessages.push(m);
           });
 
+          // Get current responseStyle from store
+          const currentResponseStyle = useChatUIStore.getState().responseStyle;
+
           return {
             body: {
               messages: requestMessages,
               modelId: resolveModel(selectedModel),
               threadId: id,
               enabledTools: currentEnabledTools,
+              responseStyle: currentResponseStyle,
               trigger,
               messageId,
             },
@@ -370,6 +377,13 @@ function ChatInterfaceInternal({
   });
 
   const updateUserMessageContent = useMutation(api.threads.updateUserMessageContent);
+  const updateThreadResponseStyle = useMutation(api.threads.updateThreadResponseStyle);
+  
+  // Load thread info to get responseStyle
+  const threadInfo = useQuery(
+    api.threads.getThreadInfo,
+    isThread && isAuthenticated ? { threadId: id } : "skip"
+  );
 
   // Merge historical messages with AI SDK streaming messages (overlay stream onto base by id)
   const renderedMessages: UIMessage[] = useMemo(() => {
@@ -468,14 +482,53 @@ function ChatInterfaceInternal({
     }
   }, [id, isThread, isAuthenticated, consumeInitialMessage, sendMessageRef]);
 
+  // Load responseStyle from thread info when thread loads or changes
+  useEffect(() => {
+    if (threadInfo?.responseStyle) {
+      setResponseStyle(threadInfo.responseStyle as ResponseStyle);
+    } else if (isThread && threadInfo && !threadInfo.responseStyle) {
+      // Thread exists but has no responseStyle, default to "regular"
+      setResponseStyle("regular");
+    }
+  }, [threadInfo, isThread, setResponseStyle]);
+
+  // Update responseStyle in database when user changes it
+  const prevResponseStyleRef = useRef<ResponseStyle | null>(null);
+  useEffect(() => {
+    // Skip initial load and only update when user explicitly changes the style
+    if (prevResponseStyleRef.current === null) {
+      prevResponseStyleRef.current = responseStyle;
+      return;
+    }
+    
+    if (
+      isThread &&
+      isAuthenticated &&
+      threadInfo &&
+      prevResponseStyleRef.current !== responseStyle &&
+      threadInfo.responseStyle !== responseStyle
+    ) {
+      // Only update if thread exists and style changed from what's in DB
+      prevResponseStyleRef.current = responseStyle;
+      updateThreadResponseStyle({
+        threadId: id,
+        responseStyle,
+      }).catch((error) => {
+        console.error("Failed to update thread response style:", error);
+      });
+    }
+  }, [responseStyle, isThread, isAuthenticated, threadInfo, id, updateThreadResponseStyle]);
+
   // Cleanup effect when thread ID changes
   useEffect(() => {
     if (prevIdRef.current !== id) {
       autoStartTriggeredRef.current = false;
       setMessages([]);
+      // Reset to default when switching threads
+      setResponseStyle("regular");
       prevIdRef.current = id;
     }
-  }, [id, setMessages]);
+  }, [id, setMessages, setResponseStyle]);
 
 
   const handleSubmit = useCallback(
