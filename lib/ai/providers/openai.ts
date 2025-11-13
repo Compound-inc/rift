@@ -78,24 +78,27 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     id: "openai/gpt-5.1-instant",
     name: "GPT-5.1 Instant",
     provider: "openai",
-    description: "Versión instantánea de GPT-5.1 sin capacidades de razonamiento",
+    description:
+      "Versión conversacional y cálida con razonamiento adaptativo y mejor seguimiento de instrucciones",
     contextWindow: 400000,
-    isPremium: true,
+    isPremium: false,
     capabilities: mergeCapabilities({
       supportsTools: true,
       supportsStreaming: true,
+      supportsReasoning: true,
       supportsImageInput: true,
       supportsImageOutput: true,
       supportsPDFInput: true,
       supportsObjectGeneration: true,
-      maxTokens: 16384,
+      maxTokens: 131072,
     }),
   },
   {
     id: "openai/gpt-5.1-thinking",
     name: "GPT-5.1 Thinking",
     provider: "openai",
-    description: "Versión avanzada de GPT-5.1 con capacidades de razonamiento",
+    description:
+      "Modelo de razonamiento avanzado con tiempo de procesamiento extendido para problemas complejos",
     contextWindow: 400000,
     isPremium: true,
     capabilities: mergeCapabilities({
@@ -106,7 +109,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       supportsImageOutput: true,
       supportsPDFInput: true,
       supportsObjectGeneration: true,
-      maxTokens: 16384,
+      maxTokens: 409600,
     }),
   },
   {
