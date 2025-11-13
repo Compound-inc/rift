@@ -75,25 +75,6 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     }),
   },
   {
-    id: "openai/gpt-5.1",
-    name: "GPT-5.1",
-    provider: "openai",
-    description:
-      "Versión mejorada de GPT-5 que adapta el tiempo de razonamiento según la complejidad",
-    contextWindow: 400000,
-    isPremium: true,
-    capabilities: mergeCapabilities({
-      supportsTools: true,
-      supportsStreaming: true,
-      supportsReasoning: true,
-      supportsImageInput: true,
-      supportsImageOutput: true,
-      supportsPDFInput: true,
-      supportsObjectGeneration: true,
-      maxTokens: 16384,
-    }),
-  },
-  {
     id: "openai/gpt-5.1-instant",
     name: "GPT-5.1 Instant",
     provider: "openai",
@@ -110,6 +91,25 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       supportsPDFInput: true,
       supportsObjectGeneration: true,
       maxTokens: 131072,
+    }),
+  },
+  {
+    id: "openai/gpt-5.1-thinking",
+    name: "GPT-5.1 Thinking",
+    provider: "openai",
+    description:
+      "Modelo de razonamiento avanzado con tiempo de procesamiento extendido para problemas complejos",
+    contextWindow: 400000,
+    isPremium: true,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsImageOutput: true,
+      supportsPDFInput: true,
+      supportsObjectGeneration: true,
+      maxTokens: 409600,
     }),
   },
   {
