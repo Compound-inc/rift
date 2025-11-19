@@ -84,6 +84,23 @@ export const DEFAULT_GOOGLE_SETTINGS: GoogleSettings = {
 // Google model configurations
 export const GOOGLE_MODELS: BaseModelConfig[] = [
   {
+    id: "google/gemini-3-pro-preview",
+    name: "Gemini 3 Pro Preview",
+    provider: "google",
+    description: "El modelo más inteligente de Google que supera a GPT-5 en benchmarks",
+    contextWindow: 200000,
+    isPremium: true,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsPDFInput: true,
+      supportsObjectGeneration: true,
+      maxTokens: 16384,
+    }),
+  },
+  {
     id: "google/gemini-2.5-pro",
     name: "Gemini 2.5 Pro",
     provider: "google",
