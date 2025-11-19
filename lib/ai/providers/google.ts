@@ -85,7 +85,7 @@ export const DEFAULT_GOOGLE_SETTINGS: GoogleSettings = {
 export const GOOGLE_MODELS: BaseModelConfig[] = [
   {
     id: "google/gemini-3-pro-preview",
-    name: "Gemini 3 Pro Preview",
+    name: "Gemini 3 Pro",
     provider: "google",
     description: "El modelo más inteligente de Google que supera a GPT-5 en benchmarks",
     contextWindow: 200000,
