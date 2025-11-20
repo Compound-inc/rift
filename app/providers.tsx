@@ -6,7 +6,6 @@ import { Theme } from "@radix-ui/themes";
 import { ReactNode } from "react";
 import { Provider as AIStoreProvider } from "@ai-sdk-tools/store";
 import { Analytics } from "@vercel/analytics/next"
-import { AutumnWrapper } from "@/contexts/AutumnWrapper";
 interface ProvidersProps {
   children: ReactNode;
   initialModel?: string;
@@ -16,13 +15,11 @@ export function Providers({ children, initialModel }: ProvidersProps) {
   return (
     <Theme>
       <Analytics />
-      <AutumnWrapper>
       <ModelProvider initialModel={initialModel}>
         <AIStoreProvider initialMessages={[]}>
             <InitialMessageProvider>{children}</InitialMessageProvider>
           </AIStoreProvider>
         </ModelProvider>
-      </AutumnWrapper>
     </Theme>
   );
 }

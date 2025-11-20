@@ -17,7 +17,7 @@ import {
 import { createToolsForModel } from "@/lib/ai/model-tools";
 import { ToolType } from "@/lib/ai/config/base";
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
-import { fetchMutation, fetchQuery } from "convex/nextjs";
+import { fetchAction, fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { withAuth } from "@workos-inc/authkit-nextjs";

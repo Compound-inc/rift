@@ -9,9 +9,8 @@ import {
   PerformanceSection,
   Footer,
   CTASection,
+  PricingSection,
 } from "@/components/landing";
-import PricingTable from "@/components/autumn/pricing-table";
-import { productDetails } from "@/lib/autumn/product-details";
 
 export default function LandingPage() {
   return (
@@ -23,12 +22,10 @@ export default function LandingPage() {
       <div className="max-w-5xl mx-auto px-4 mt-20 sm:px-6 lg:px-8 space-y-32 ">
         <HeroSection />
         <WhatIsRIFTSection />
-        <section id="pricing">
-          <PricingTable productDetails={productDetails} />
-        </section>
         <ArchitectureSection />
         <PerformanceSection />
         <IntegrationsSection />
+        <PricingSection />
         <CTASection />
       </div>
       {/* Footer */}

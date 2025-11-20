@@ -9,7 +9,6 @@
  */
 
 import type * as admin_organizations from "../admin/organizations.js";
-import type * as autumn from "../autumn.js";
 import type * as bugs from "../bugs.js";
 import type * as helpers_auth from "../helpers/auth.js";
 import type * as helpers_getUser from "../helpers/getUser.js";
@@ -30,7 +29,6 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "admin/organizations": typeof admin_organizations;
-  autumn: typeof autumn;
   bugs: typeof bugs;
   "helpers/auth": typeof helpers_auth;
   "helpers/getUser": typeof helpers_getUser;
@@ -205,5 +203,4 @@ export declare const components: {
       getServerTime: FunctionReference<"mutation", "internal", {}, number>;
     };
   };
-  autumn: {};
 };
