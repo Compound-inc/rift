@@ -2,8 +2,51 @@ import { stripe } from '@/app/api/stripe';
 import { workos } from '@/app/api/workos';
 import { NextRequest, NextResponse } from 'next/server';
 
+const MAX_SEAT_QUANTITY = 150;
+
+const parseSeatQuantity = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.floor(value);
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
+};
+
+const normalizeSeatQuantity = (value: unknown) => {
+  const parsed = parseSeatQuantity(value);
+
+  if (parsed !== null) {
+    return Math.min(MAX_SEAT_QUANTITY, Math.max(1, parsed));
+  }
+
+  return 1;
+};
+
 export const POST = async (req: NextRequest) => {
-  const { userId, orgName, subscriptionLevel, organizationId: providedOrgId } = await req.json();
+  const {
+    userId,
+    orgName,
+    subscriptionLevel,
+    organizationId: providedOrgId,
+    seatQuantity: seatQuantityRaw,
+  } = await req.json();
+  const parsedSeatQuantity = parseSeatQuantity(seatQuantityRaw);
+
+  if (parsedSeatQuantity !== null && parsedSeatQuantity > MAX_SEAT_QUANTITY) {
+    return NextResponse.json(
+      { error: `Seat quantity cannot exceed ${MAX_SEAT_QUANTITY}` },
+      { status: 400 },
+    );
+  }
+
+  const seatQuantity = normalizeSeatQuantity(seatQuantityRaw);
 
   try {
     let targetOrganizationId = providedOrgId;
@@ -38,69 +81,75 @@ export const POST = async (req: NextRequest) => {
        }
     }
 
-    // Map subscription level to Product ID
-    const productIds: Record<string, string> = {
-        plus: "prod_T19GxAJKJQf0z9",
-        pro: "prod_T2fQCV6iP9Vo2b"
+    // Map subscription level to Price ID from env
+    const priceIds: Record<string, string | undefined> = {
+      plus: process.env.PLUS_PRICE_ID,
+      pro: process.env.PRO_PRICE_ID,
     };
-    const productId = productIds[subscriptionLevel];
+    const priceId = priceIds[subscriptionLevel];
 
-    let price;
-    try {
-       // Try lookup by product ID first if available
-       if (productId) {
-          const prices = await stripe.prices.list({
-            product: productId,
-            active: true,
-            limit: 1,
-          });
-          if (prices.data.length > 0) {
-             price = prices;
-          }
-       }
-       
-       // Fallback to lookup_keys if no price found by product ID
-       if (!price || price.data.length === 0) {
-          price = await stripe.prices.list({
-            lookup_keys: [subscriptionLevel],
-          });
-       }
-
-    } catch (error) {
-      console.error(
-        'Error retrieving price from Stripe. This is likely because the products and prices have not been created yet. Run the setup script `pnpm run setup` to automatically create them.',
-        error,
+    if (!priceId) {
+      return NextResponse.json(
+        { error: "Price ID not configured for this plan" },
+        { status: 500 },
       );
-      return NextResponse.json({ error: 'Error retrieving price from Stripe' }, { status: 500 });
-    }
-    
-    if (!price || !price.data || price.data.length === 0) {
-        return NextResponse.json({ error: 'Price not found' }, { status: 400 });
     }
 
     const user = await workos.userManagement.getUser(userId);
 
-    // Create Stripe customer
-    const customer = await stripe.customers.create({
-      email: user.email,
-      metadata: {
-        workOSOrganizationId: targetOrganizationId,
-      },
-    });
+    // Check if organization already has a Stripe customer ID
+    const workosOrg = await workos.organizations.getOrganization(targetOrganizationId);
+    let customerId = workosOrg.stripeCustomerId;
 
-    // Update WorkOS organization with Stripe customer ID
-    await workos.organizations.updateOrganization({
-      organization: targetOrganizationId,
-      stripeCustomerId: customer.id,
-    });
+    // Create Stripe customer only if one doesn't exist
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: user.email,
+        metadata: {
+          workOSOrganizationId: targetOrganizationId,
+        },
+      });
+      customerId = customer.id;
+
+      // Update WorkOS organization with Stripe customer ID
+      await workos.organizations.updateOrganization({
+        organization: targetOrganizationId,
+        stripeCustomerId: customerId,
+      });
+    }
+
+    // Sync Stripe customer ID to Convex organization
+    try {
+      const convexBase = process.env.CONVEX_SITE_URL;
+      const secret = process.env.CONVEX_SYNC_SECRET;
+
+      if (convexBase && secret) {
+        await fetch(`${convexBase}/sync-stripe-customer`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${secret}`,
+          },
+          body: JSON.stringify({
+            workos_id: targetOrganizationId,
+            stripeCustomerId: customerId,
+          }),
+        });
+      } else {
+        console.warn("CONVEX_SITE_URL or CONVEX_SYNC_SECRET not set, skipping Convex sync");
+      }
+    } catch (error) {
+      // Log error but don't fail the subscription flow
+      console.error("Failed to sync Stripe customer ID to Convex:", error);
+    }
 
     const session = await stripe.checkout.sessions.create({
-      customer: customer.id,
+      customer: customerId,
       billing_address_collection: 'auto',
       line_items: [
         {
-          price: price.data[0].id,
-          quantity: 1,
+          price: priceId,
+          quantity: seatQuantity,
         },
       ],
       mode: 'subscription',

@@ -12,7 +12,18 @@ function SubscribePageContent() {
   const { user, organizationId } = useAuth();
   const searchParams = useSearchParams();
   const plan = searchParams.get("plan");
+  const seatsParam = searchParams.get("seats");
   const router = useRouter();
+  const seatCount = (() => {
+    if (!seatsParam) {
+      return 1;
+    }
+    const parsed = Number.parseInt(seatsParam, 10);
+    if (Number.isNaN(parsed) || parsed < 1) {
+      return 1;
+    }
+    return parsed;
+  })();
   
   const [orgName, setOrgName] = useState("");
   const [error, setError] = useState("");
@@ -33,6 +44,7 @@ function SubscribePageContent() {
                     userId: user.id,
                     organizationId,
                     subscriptionLevel: plan.toLowerCase(),
+                    seatQuantity: seatCount,
                 }),
             });
 
@@ -53,7 +65,7 @@ function SubscribePageContent() {
 
     handleAutoSubscribe();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, organizationId, plan, router]);
+  }, [user, organizationId, plan, router, seatCount]);
 
   if (!plan) {
      return <div>Error: No plan selected.</div>;
@@ -97,6 +109,7 @@ function SubscribePageContent() {
                 userId: user.id,
                 orgName, 
                 subscriptionLevel: plan.toLowerCase(),
+                seatQuantity: seatCount,
             }),
         });
 
@@ -123,6 +136,9 @@ function SubscribePageContent() {
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
             Para suscribirte al plan {plan.charAt(0).toUpperCase() + plan.slice(1)}, primero necesitas crear una organización.
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Seleccionaste {seatCount} {seatCount === 1 ? "asiento" : "asientos"} para tu plan.
           </p>
         </div>
         

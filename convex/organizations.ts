@@ -9,6 +9,7 @@ import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { getAuthUserIdentity } from "./helpers/getUser";
 import { extractOrganizationIdFromJWT } from "./helpers/quota";
+import type Stripe from "stripe";
 
 // Plan quota configuration // Could remove and use stripe metadata to fetch plan details
 const PLAN_QUOTAS = {
@@ -53,6 +54,7 @@ export const updateOrganization = internalMutation({
       plan: v.optional(v.union(v.literal("plus"), v.literal("pro"))),
       standardQuotaLimit: v.optional(v.number()),
       premiumQuotaLimit: v.optional(v.number()),
+      seatQuantity: v.optional(v.number()),
     }),
   },
   handler: async (ctx, args) => {
@@ -108,6 +110,7 @@ export const getOrganizationInfo = internalQuery({
       plan: organization.plan,
       standardQuotaLimit: organization.standardQuotaLimit,
       premiumQuotaLimit: organization.premiumQuotaLimit,
+      seatQuantity: organization.seatQuantity,
       billingCycleStart: organization.billingCycleStart,
       billingCycleEnd: organization.billingCycleEnd,
       hasBillingCycle: !!(
@@ -166,6 +169,7 @@ export const syncStripeSubscriptionData = internalMutation({
       cancelAtPeriodEnd: v.optional(v.boolean()),
       paymentMethodBrand: v.optional(v.union(v.string(), v.null())),
       paymentMethodLast4: v.optional(v.union(v.string(), v.null())),
+      seatQuantity: v.optional(v.union(v.number(), v.null())),
     }),
   },
   handler: async (ctx, args) => {
@@ -211,6 +215,7 @@ export const syncStripeSubscriptionData = internalMutation({
       plan?: "plus" | "pro";
       standardQuotaLimit?: number;
       premiumQuotaLimit?: number;
+      seatQuantity?: number;
     } = {
       subscriptionId: args.subscriptionData.subscriptionId,
       subscriptionStatus: args.subscriptionData.status as
@@ -229,6 +234,10 @@ export const syncStripeSubscriptionData = internalMutation({
       // Update billing cycle fields (used by quota system)
       billingCycleStart: args.subscriptionData.billingCycleStart || undefined,
       billingCycleEnd: args.subscriptionData.billingCycleEnd || undefined,
+      seatQuantity:
+        typeof args.subscriptionData.seatQuantity === "number"
+          ? args.subscriptionData.seatQuantity
+          : undefined,
     };
 
     // Update plan and quotas only if plan changed
@@ -298,9 +307,12 @@ export const syncStripeDataWithPeriod = internalAction({
     cancelAtPeriodEnd?: boolean;
     paymentMethodBrand?: string;
     paymentMethodLast4?: string;
+    seatQuantity?: number;
   }> => {
     const { default: Stripe } = await import("stripe");
     const stripe = new Stripe(process.env.STRIPE_API_KEY!);
+    const secondsToMillis = (value?: number | null) =>
+      typeof value === "number" ? value * 1000 : undefined;
 
     try {
       // Fetch latest subscription data from Stripe
@@ -316,21 +328,29 @@ export const syncStripeDataWithPeriod = internalAction({
       if (subscriptions.data.length === 0) {
         subscriptionData = {
           status: "none",
-          billingCycleStart: undefined,
-          billingCycleEnd: undefined,
+          billingCycleStart: args.billingPeriod?.start,
+          billingCycleEnd: args.billingPeriod?.end,
+          seatQuantity: null,
         };
       } else {
-        const subscription = subscriptions.data[0];
+        const subscription = subscriptions.data[0] as Stripe.Subscription;
         const price = subscription.items.data[0]?.price;
         const lookupKey = price?.lookup_key || null;
+        const firstItem = subscription.items.data[0];
+        const billingCycleStart =
+          args.billingPeriod?.start ??
+          secondsToMillis(firstItem?.current_period_start ?? null);
+        const billingCycleEnd =
+          args.billingPeriod?.end ??
+          secondsToMillis(firstItem?.current_period_end ?? null);
 
         subscriptionData = {
           subscriptionId: subscription.id,
           status: subscription.status,
           priceId: price?.id || null,
           lookupKey,
-          billingCycleStart: subscription.items.data[0]?.current_period_start,
-          billingCycleEnd: subscription.items.data[0]?.current_period_end,
+          billingCycleStart,
+          billingCycleEnd,
           cancelAtPeriodEnd: subscription.cancel_at_period_end,
           paymentMethodBrand:
             subscription.default_payment_method &&
@@ -350,6 +370,7 @@ export const syncStripeDataWithPeriod = internalAction({
                   }
                 ).card?.last4 || null
               : null,
+          seatQuantity: subscription.items.data[0]?.quantity ?? null,
         };
       }
 
@@ -367,6 +388,10 @@ export const syncStripeDataWithPeriod = internalAction({
         billingCycleEnd: subscriptionData.billingCycleEnd || undefined,
         paymentMethodBrand: subscriptionData.paymentMethodBrand || undefined,
         paymentMethodLast4: subscriptionData.paymentMethodLast4 || undefined,
+        seatQuantity:
+          typeof subscriptionData.seatQuantity === "number"
+            ? subscriptionData.seatQuantity
+            : undefined,
       };
     } catch (error) {
       console.error(
@@ -398,6 +423,7 @@ export const getSubscriptionData = internalQuery({
       plan: organization.plan,
       standardQuotaLimit: organization.standardQuotaLimit,
       premiumQuotaLimit: organization.premiumQuotaLimit,
+      seatQuantity: organization.seatQuantity,
       billingCycleStart: organization.billingCycleStart,
       billingCycleEnd: organization.billingCycleEnd,
       cancelAtPeriodEnd: organization.cancelAtPeriodEnd,

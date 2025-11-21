@@ -33,6 +33,7 @@ import {
         premiumQuotaLimit: v.optional(v.number()),
         billingCycleStart: v.optional(v.number()),
         billingCycleEnd: v.optional(v.number()),
+        seatQuantity: v.optional(v.number()),
         subscriptionStatus: v.optional(
           v.union(
             v.literal("active"),
@@ -119,6 +120,7 @@ import {
         premiumQuotaLimit: v.optional(v.number()),
         billingCycleStart: v.optional(v.number()),
         billingCycleEnd: v.optional(v.number()),
+        seatQuantity: v.optional(v.number()),
         subscriptionStatus: v.optional(
           v.union(
             v.literal("active"),

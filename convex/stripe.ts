@@ -63,6 +63,9 @@ export const processStripeEvent = internalAction({
       return { success: true, eventType: event.type, skipped: true };
     }
 
+    const secondsToMillis = (value?: number | null) =>
+      typeof value === "number" ? value * 1000 : undefined;
+
     try {
       // All the events we track have a customerId
       const { customer: customerId } = event?.data?.object as {
@@ -83,10 +86,14 @@ export const processStripeEvent = internalAction({
         const invoice = event.data.object as any;
         // Get billing period from invoice line items
         if (invoice.lines?.data?.[0]?.period) {
-          billingPeriod = {
-            start: invoice.lines.data[0].period.start,
-            end: invoice.lines.data[0].period.end,
-          };
+          const startMs = secondsToMillis(invoice.lines.data[0].period.start);
+          const endMs = secondsToMillis(invoice.lines.data[0].period.end);
+          if (startMs != null && endMs != null) {
+            billingPeriod = {
+              start: startMs,
+              end: endMs,
+            };
+          }
         }
       } else if (event.type.startsWith("customer.subscription.")) {
         const subscription = event.data.object as any;
@@ -94,10 +101,14 @@ export const processStripeEvent = internalAction({
           subscription.current_period_start &&
           subscription.current_period_end
         ) {
-          billingPeriod = {
-            start: subscription.current_period_start,
-            end: subscription.current_period_end,
-          };
+          const startMs = secondsToMillis(subscription.current_period_start);
+          const endMs = secondsToMillis(subscription.current_period_end);
+          if (startMs != null && endMs != null) {
+            billingPeriod = {
+              start: startMs,
+              end: endMs,
+            };
+          }
         }
       }
 
