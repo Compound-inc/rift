@@ -7,6 +7,16 @@ import { api } from "@/convex/_generated/api";
 
 export async function inviteUser(organizationId: string, email: string, roleSlug?: string) {
   try {
+    // Verify plan
+    const plan = await fetchQuery(api.organizations.getOrganizationPlan, {
+      workos_id: organizationId,
+      secret: process.env.CONVEX_SECRET_TOKEN!,
+    });
+
+    if (plan !== "enterprise") {
+      return { success: false, error: "Solo las organizaciones con el plan Enterprise pueden invitar miembros." };
+    }
+
     // Verify seat limits
     const seatQuantity = await fetchQuery(api.organizations.getOrganizationSeats, {
       workos_id: organizationId,

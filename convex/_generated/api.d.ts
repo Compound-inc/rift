@@ -11,6 +11,7 @@
 import type * as admin_organizations from "../admin/organizations.js";
 import type * as bugs from "../bugs.js";
 import type * as helpers_auth from "../helpers/auth.js";
+import type * as helpers_authenticated from "../helpers/authenticated.js";
 import type * as helpers_getUser from "../helpers/getUser.js";
 import type * as helpers_quota from "../helpers/quota.js";
 import type * as http from "../http.js";
@@ -31,6 +32,7 @@ declare const fullApi: ApiFromModules<{
   "admin/organizations": typeof admin_organizations;
   bugs: typeof bugs;
   "helpers/auth": typeof helpers_auth;
+  "helpers/authenticated": typeof helpers_authenticated;
   "helpers/getUser": typeof helpers_getUser;
   "helpers/quota": typeof helpers_quota;
   http: typeof http;

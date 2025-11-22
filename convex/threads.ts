@@ -10,12 +10,13 @@ import {
   getOrganizationBillingCycle,
 } from "./helpers/quota";
 import { ensureServerSecret } from "./helpers/auth";
+import { AuthMutation, AuthOrgMutation, AuthQuery } from "./helpers/authenticated";
 
 /**
  * Create a new thread with an initial message.
  * This mutation is secure and only allows authenticated users to create threads.
  */
-export const createThread = mutation({
+export const createThread = AuthOrgMutation({
   args: {
     threadId: v.string(), // Client-generated thread ID
     model: v.string(),
@@ -47,21 +48,7 @@ export const createThread = mutation({
     threadDocId: v.id("threads"),
   }),
   handler: async (ctx, args) => {
-    // Get the authenticated user ID using the helper
-    const userId = await getAuthUserId(ctx);
-
-    // Validate user has an organization
-    const identity = await getAuthUserIdentity(ctx);
-    if (!identity) {
-      throw new Error("User authentication identity not found");
-    }
-
-    const orgId = extractOrganizationIdFromJWT(identity);
-    if (!orgId) {
-      throw new Error(
-        "No organization found. User must be part of an organization to create threads."
-      );
-    }
+    const userId = ctx.identity.subject;
 
     // Get current timestamp
     const now = Date.now();
@@ -159,7 +146,7 @@ export const getUserThreadsPaginatedSafe = query({
  * Get thread information (without messages).
  * This query is secure and only returns data for the authenticated user.
  */
-export const getThreadInfo = query({
+export const getThreadInfo = AuthQuery({
   args: {
     threadId: v.string(),
   },
@@ -198,8 +185,7 @@ export const getThreadInfo = query({
     v.null(),
   ),
   handler: async (ctx, args) => {
-    // Get the authenticated user ID using the helper
-    const userId = await getAuthUserId(ctx);
+    const userId = ctx.identity.subject;
 
     // Get the thread, ensuring it belongs to the authenticated user
     const thread = await ctx.db
@@ -216,7 +202,7 @@ export const getThreadInfo = query({
 /**
  * Update the response style for a thread.
  */
-export const updateThreadResponseStyle = mutation({
+export const updateThreadResponseStyle = AuthMutation({
   args: {
     threadId: v.string(),
     responseStyle: v.union(
@@ -228,8 +214,7 @@ export const updateThreadResponseStyle = mutation({
   },
   returns: v.union(v.object({ success: v.literal(true) }), v.null()),
   handler: async (ctx, args) => {
-    // Get the authenticated user ID using the helper
-    const userId = await getAuthUserId(ctx);
+    const userId = ctx.identity.subject;
 
     // Get the thread, ensuring it belongs to the authenticated user
     const thread = await ctx.db
@@ -338,14 +323,14 @@ export const getThreadMessagesPaginatedSafe = query({
  * This mutation is secure and only allows authenticated users to rename their own threads.
  */
 
-export const renameThread = mutation({
+export const renameThread = AuthMutation({
   args: {
     threadId: v.string(),
     title: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = ctx.identity.subject;
 
     const thread = await ctx.db
       .query("threads")
@@ -371,13 +356,13 @@ export const renameThread = mutation({
  * Toggle pin status of a thread.
  * This mutation is secure and only allows authenticated users to pin/unpin their own threads.
  */
-export const togglePinThread = mutation({
+export const togglePinThread = AuthMutation({
   args: {
     threadId: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = ctx.identity.subject;
 
     const thread = await ctx.db
       .query("threads")
@@ -403,13 +388,13 @@ export const togglePinThread = mutation({
  * Delete a thread.
  * This mutation is secure and only allows authenticated users to delete their own threads.
  */
-export const deleteThread = mutation({
+export const deleteThread = AuthMutation({
   args: {
     threadId: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = ctx.identity.subject;
 
     const thread = await ctx.db
       .query("threads")
@@ -441,14 +426,14 @@ export const deleteThread = mutation({
 /**
  * Agent update thread title
  */
-export const autoUpdateThreadTitle = mutation({
+export const autoUpdateThreadTitle = AuthMutation({
   args: {
     threadId: v.string(),
     title: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = ctx.identity.subject;
 
     const thread = await ctx.db
       .query("threads")
@@ -884,13 +869,13 @@ export const serverFinalizeAssistantMessage = mutation({
 /**
  * Delete a specific message by messageId
  */
-export const deleteMessage = mutation({
+export const deleteMessage = AuthMutation({
   args: {
     messageId: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = ctx.identity.subject;
 
     const message = await ctx.db
       .query("messages")
@@ -913,14 +898,14 @@ export const deleteMessage = mutation({
  * Update a user's own message content (edit message).
  * Ensures the message belongs to the authenticated user and patches content safely.
  */
-export const updateUserMessageContent = mutation({
+export const updateUserMessageContent = AuthMutation({
   args: {
     messageId: v.string(),
     content: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = ctx.identity.subject;
 
     const message = await ctx.db
       .query("messages")
@@ -989,7 +974,7 @@ export const incrementToolCallQuotaMutation = internalMutation({
 /**
  * Create an attachment record for an uploaded file with data URL.
  */
-export const createAttachment = mutation({
+export const createAttachment = AuthMutation({
   args: {
     dataUrl: v.string(),
     fileName: v.string(),
@@ -998,7 +983,7 @@ export const createAttachment = mutation({
   },
   returns: v.id("attachments"),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = ctx.identity.subject;
     
     // Generate a unique file key
     const fileKey = `${userId}-${Date.now()}-${args.fileName}`;
@@ -1024,7 +1009,7 @@ export const createAttachment = mutation({
 /**
  * Get attachment details by ID.
  */
-export const getAttachment = query({
+export const getAttachment = AuthQuery({
   args: {
     attachmentId: v.id("attachments"),
   },
@@ -1040,20 +1025,20 @@ export const getAttachment = query({
     v.null()
   ),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = ctx.identity.subject;
     
     const attachment = await ctx.db.get(args.attachmentId);
     if (!attachment || attachment.userId !== userId) {
       return null;
     }
     
-        return {
-          attachmentId: attachment._id,
-          fileName: attachment.fileName,
-          mimeType: attachment.mimeType,
-          fileSize: attachment.fileSize,
-          attachmentUrl: attachment.attachmentUrl,
-          attachmentType: attachment.attachmentType,
-        };
+    return {
+      attachmentId: attachment._id,
+      fileName: attachment.fileName,
+      mimeType: attachment.mimeType,
+      fileSize: attachment.fileSize,
+      attachmentUrl: attachment.attachmentUrl,
+      attachmentType: attachment.attachmentType,
+    };
   },
 });

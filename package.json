@@ -87,7 +87,7 @@
     "shiki": "3.13.0",
     "sonner": "^2.0.7",
     "streamdown": "^1.5.1",
-    "stripe": "^18.5.0",
+    "stripe": "20.0.0",
     "supermemory": "^3.4.0",
     "tailwind-merge": "^3.4.0",
     "use-stick-to-bottom": "^1.1.1",

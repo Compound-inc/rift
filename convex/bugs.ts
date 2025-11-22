@@ -1,9 +1,7 @@
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
-import { getAuthUserId, getAuthUserIdentity } from "./helpers/getUser";
-import { extractOrganizationIdFromJWT } from "./helpers/quota";
+import { AuthOrgMutation } from "./helpers/authenticated";
 
-export const report = mutation({
+export const report = AuthOrgMutation({
   args: {
     title: v.string(),
     description: v.string(),
@@ -11,22 +9,16 @@ export const report = mutation({
     priority: v.union(v.literal("low"), v.literal("medium"), v.literal("high"), v.literal("critical")),
     browserDetails: v.string(),
   },
+  returns: v.object({ ok: v.literal(true) }),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    const identity = await getAuthUserIdentity(ctx);
-    if (!identity) {
-      throw new Error("Unauthenticated");
-    }
-    const orgId = extractOrganizationIdFromJWT(identity);
-    if (!orgId) {
-      throw new Error("No organization found in auth identity");
-    }
+    const userId = ctx.identity.subject;
+    const orgId = ctx.orgId;
 
     const user = await ctx.db
       .query("users")
       .withIndex("by_workos_id", (q) => q.eq("workos_id", userId))
       .unique();
-    const userEmail = user?.email || identity.email || "";
+    const userEmail = user?.email || ctx.identity.email || "";
 
     const now = Date.now();
     await ctx.db.insert("bugs", {
@@ -41,7 +33,7 @@ export const report = mutation({
       reportedAt: now,
     });
 
-    return { ok: true } as const;
+    return { ok: true };
   },
 });
 

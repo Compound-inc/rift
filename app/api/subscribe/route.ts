@@ -1,6 +1,7 @@
 import { stripe } from '@/app/api/stripe';
 import { workos } from '@/app/api/workos';
 import { NextRequest, NextResponse } from 'next/server';
+import type Stripe from 'stripe';
 
 const MAX_SEAT_QUANTITY = 150;
 
@@ -103,12 +104,17 @@ export const POST = async (req: NextRequest) => {
 
     // Create Stripe customer only if one doesn't exist
     if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: user.email,
-        metadata: {
-          workOSOrganizationId: targetOrganizationId,
+      const customer = await stripe.customers.create(
+        {
+          email: user.email,
+          metadata: {
+            workOSOrganizationId: targetOrganizationId,
+          },
         },
-      });
+        {
+          idempotencyKey: `create_stripe_customer_${targetOrganizationId}`,
+        },
+      );
       customerId = customer.id;
 
       // Update WorkOS organization with Stripe customer ID
@@ -153,8 +159,8 @@ export const POST = async (req: NextRequest) => {
         },
       ],
       mode: 'subscription',
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/pricing`,
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/chat`,
+      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/`,
     });
 
     return NextResponse.json({ url: session.url });

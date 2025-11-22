@@ -36,7 +36,7 @@ export default defineSchema({
     standardQuotaLimit: v.optional(v.number()),
     premiumQuotaLimit: v.optional(v.number()),
     // Plan field based on Stripe price lookup key
-    plan: v.optional(v.union(v.literal("plus"), v.literal("pro"))),
+    plan: v.optional(v.union(v.literal("plus"), v.literal("pro"), v.literal("enterprise"))),
     seatQuantity: v.optional(v.number()),
     // Stripe subscription data
     subscriptionId: v.optional(v.string()),

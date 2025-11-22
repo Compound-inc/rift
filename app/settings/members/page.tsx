@@ -1,13 +1,11 @@
 import { MembersList } from "@/components/settings/MembersList";
 import { Box, Card, Flex, Heading, Text } from "@radix-ui/themes";
 import { withAuth } from "@workos-inc/authkit-nextjs";
-import { workos } from "@/app/api/workos";
 import { hasPermission } from "@/lib/permissions";
 import "./table.css";
 import { getAuditLogPortalLink } from "@/actions/getAuditLogPortalLink";
 import { SettingsSection } from "@/components/settings";
-import { getOrganizationMembers, OrganizationMembershipWithUser } from "@/actions/getOrganizationMembers";
-import { Invitation } from "@workos-inc/node";
+import { getPaginatedOrganizationMembers, PaginatedOrganizationData, getOrganizationMemberCount } from "@/actions/getOrganizationMembers";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 
@@ -34,24 +32,37 @@ export default async function MembersPage() {
   const userHasPermission = await hasPermission("WIDGETS_USERS_TABLE_MANAGE");
   const canViewAuditLogs = await hasPermission("AUDIT_LOGS");
 
-  let members: OrganizationMembershipWithUser[] = [];
-  let invitations: Invitation[] = [];
+  let initialData: PaginatedOrganizationData = { members: [], invitations: [], nextCursor: null, prevCursor: null };
   let seatQuantity: number | null = null;
+  let totalMemberCount: number = 0;
+  let plan: "plus" | "pro" | "enterprise" | null = null;
 
   if (userHasPermission) {
-    const [data, seats] = await Promise.all([
-      getOrganizationMembers(organizationId),
+    const [data, seats, count, planResult] = await Promise.all([
+      getPaginatedOrganizationMembers(organizationId, 50),
       fetchQuery(api.organizations.getOrganizationSeats, { 
         workos_id: organizationId,
         secret: process.env.CONVEX_SECRET_TOKEN!
       }).catch((e) => {
         console.error("Error fetching seat quantity:", e);
         return null;
+      }),
+      getOrganizationMemberCount(organizationId).catch((e) => {
+        console.error("Error fetching member count:", e);
+        return 0;
+      }),
+      fetchQuery(api.organizations.getOrganizationPlan, {
+        workos_id: organizationId,
+        secret: process.env.CONVEX_SECRET_TOKEN!
+      }).catch((e) => {
+        console.error("Error fetching plan:", e);
+        return null;
       })
     ]);
-    members = data.members;
-    invitations = data.invitations;
+    initialData = data;
     seatQuantity = seats;
+    totalMemberCount = count;
+    plan = planResult;
   }
 
   let auditLogsLink: string | null = null;
@@ -88,7 +99,14 @@ export default async function MembersPage() {
       
       <div className="w-full">
         {userHasPermission ? (
-          <MembersList members={members} invitations={invitations} organizationId={organizationId} currentUserId={user.id} seatQuantity={seatQuantity} />
+          <MembersList 
+            initialData={initialData} 
+            organizationId={organizationId} 
+            currentUserId={user.id} 
+            seatQuantity={seatQuantity} 
+            totalMemberCount={totalMemberCount}
+            plan={plan}
+          />
         ) : (
           <Card>
             <Text>No tienes permisos para ver la lista de miembros.</Text>

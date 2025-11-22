@@ -1,13 +1,14 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { CaretDownIcon, CaretSortIcon, CaretUpIcon, DotsHorizontalIcon, MagnifyingGlassIcon, PlusIcon, CheckCircledIcon, ExclamationTriangleIcon, ReloadIcon } from "@radix-ui/react-icons"
+import { useMemo, useState, useEffect, useCallback } from "react"
+import { CaretDownIcon, CaretSortIcon, CaretUpIcon, DotsHorizontalIcon, MagnifyingGlassIcon, PlusIcon, CheckCircledIcon, ExclamationTriangleIcon, ReloadIcon, ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons"
 import { OrganizationMembership, User, Invitation as WorkOSInvitation } from "@workos-inc/node"
 import { inviteUser } from "@/actions/inviteUser"
 import { updateRole } from "@/actions/updateRole"
 import { removeMember } from "@/actions/removeMember"
 import { useRouter } from "next/navigation"
 import { revokeInvitation } from "@/actions/revokeInvitation"
+import { getPaginatedOrganizationMembers, PaginatedOrganizationData, OrganizationMembershipWithUser } from "@/actions/getOrganizationMembers"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ai/ui/avatar"
 import { Badge } from "@/components/ai/ui/badge"
@@ -39,36 +40,27 @@ import { Input } from "@/components/ai/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ai/ui/table"
 import { cn } from "@/lib/utils"
 
-export interface OrganizationMembershipWithUser extends OrganizationMembership {
-  user: User | null
-}
-
 interface MembersListProps {
-  members: OrganizationMembershipWithUser[]
-  invitations?: WorkOSInvitation[]
+  initialData: PaginatedOrganizationData
   organizationId: string
   currentUserId: string
   seatQuantity?: number | null
+  totalMemberCount: number
+  plan?: "plus" | "pro" | "enterprise" | null
 }
-
-type SortField = "name" | "email" | "role" | "status"
-type SortDirection = "asc" | "desc"
 
 interface InvitationFormData {
   email: string
   role: string
 }
 
-export function MembersList({ members, invitations = [], organizationId, currentUserId, seatQuantity }: MembersListProps) {
+export function MembersList({ initialData, organizationId, currentUserId, seatQuantity, totalMemberCount, plan }: MembersListProps) {
   const router = useRouter()
+  const [data, setData] = useState<PaginatedOrganizationData>(initialData)
+  const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
-  const [sortField, setSortField] = useState<SortField>("name")
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
-  const [isInviteOpen, setIsInviteOpen] = useState(false)
-  
-  const currentMemberCount = members.length + invitations.length;
-  const isLimitReached = typeof seatQuantity === 'number' && currentMemberCount >= seatQuantity;
 
+  const [isInviteOpen, setIsInviteOpen] = useState(false)
   
   // State for invite dialog
   const [invitationForms, setInvitationForms] = useState<InvitationFormData[]>([
@@ -97,11 +89,41 @@ export function MembersList({ members, invitations = [], organizationId, current
   const [isRevoking, setIsRevoking] = useState(false)
   const [revokeError, setRevokeError] = useState<string | null>(null)
 
+  const isLimitReached = typeof seatQuantity === 'number' && totalMemberCount >= seatQuantity;
+
+  const fetchMembers = useCallback(async (after?: string, before?: string) => {
+    setLoading(true)
+    try {
+        const newData = await getPaginatedOrganizationMembers(organizationId, 50, after, before)
+        setData(newData)
+    } catch (e) {
+        console.error("Failed to fetch members", e)
+    } finally {
+        setLoading(false)
+    }
+  }, [organizationId])
+
+  const handleNextPage = () => {
+    if (data.nextCursor) {
+        fetchMembers(data.nextCursor, undefined)
+    }
+  }
+
+  const handlePrevPage = () => {
+    if (data.prevCursor) {
+        fetchMembers(undefined, data.prevCursor)
+    }
+  }
+  
+  const refreshData = () => {
+      router.refresh()
+      fetchMembers(undefined, undefined)
+  }
+
   const handleAddInvitation = () => {
-    const currentCount = members.length + invitations.length + invitationForms.length;
+    const currentCount = totalMemberCount + invitationForms.length;
     
     if (typeof seatQuantity === 'number' && currentCount >= seatQuantity) {
-      // Don't add more if we reached the seat limit
       return;
     }
 
@@ -126,8 +148,7 @@ export function MembersList({ members, invitations = [], organizationId, current
 
       // Client-side check before sending
       if (typeof seatQuantity === 'number') {
-          const currentCount = members.length + invitations.length;
-          const availableSeats = seatQuantity - currentCount;
+          const availableSeats = seatQuantity - totalMemberCount;
           
           if (validInvitations.length > availableSeats) {
               setInviteError(`No puedes enviar ${validInvitations.length} invitaciones. Solo tienes ${availableSeats} asiento${availableSeats !== 1 ? 's' : ''} disponible${availableSeats !== 1 ? 's' : ''}.`);
@@ -145,7 +166,7 @@ export function MembersList({ members, invitations = [], organizationId, current
       
       if (failures.length === 0) {
         setIsSuccess(true)
-        router.refresh()
+        refreshData()
       } else {
         const firstError = failures[0].error
         if (firstError && firstError.includes("Email already invited")) {
@@ -193,7 +214,7 @@ export function MembersList({ members, invitations = [], organizationId, current
       const result = await updateRole(memberToUpdate.id, newRole)
       if (result.success) {
         setIsUpdateRoleOpen(false)
-        router.refresh()
+        refreshData()
       } else {
         setUpdateError("Error al actualizar el rol: " + result.error)
       }
@@ -220,7 +241,7 @@ export function MembersList({ members, invitations = [], organizationId, current
       const result = await removeMember(memberToRemove.id)
       if (result.success) {
         setIsRemoveOpen(false)
-        router.refresh()
+        refreshData()
       } else {
         setRemoveError("Error al eliminar el miembro: " + result.error)
       }
@@ -247,7 +268,7 @@ export function MembersList({ members, invitations = [], organizationId, current
       const result = await revokeInvitation(invitationToRevoke.id)
       if (result.success) {
         setIsRevokeOpen(false)
-        router.refresh()
+        refreshData()
       } else {
         setRevokeError("Error al revocar la invitación: " + result.error)
       }
@@ -259,28 +280,9 @@ export function MembersList({ members, invitations = [], organizationId, current
     }
   }
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
-    } else {
-      setSortField(field)
-      setSortDirection("asc")
-    }
-  }
-
-  const getSortIcon = (field: SortField) => {
-    if (sortField !== field) return <CaretSortIcon className="size-4 text-muted-foreground" />
-    return sortDirection === "asc" ? (
-      <CaretUpIcon className="size-4 text-primary" />
-    ) : (
-      <CaretDownIcon className="size-4 text-primary" />
-    )
-  }
-
+  // Mapping data for render with client-side search filtering
   const processedData = useMemo(() => {
-    const query = searchQuery.toLowerCase()
-
-    const memberRows = members.map(m => ({
+    const memberRows = data.members.map(m => ({
         id: m.id,
         name: m.user ? (m.user.firstName && m.user.lastName ? `${m.user.firstName} ${m.user.lastName}` : m.user.firstName || m.user.lastName || "Nombre Desconocido") : "Usuario Desconocido",
         email: m.user?.email || "",
@@ -293,11 +295,11 @@ export function MembersList({ members, invitations = [], organizationId, current
         isInvitation: false
     }))
 
-    const invitationRows = invitations.map(i => ({
+    const invitationRows = data.invitations.map(i => ({
         id: i.id,
         name: i.email, 
         email: i.email,
-        role: "member", // Invitations from list might not have role easily
+        role: "member", 
         status: "pending",
         lastActivity: i.createdAt,
         avatarUrl: undefined,
@@ -306,110 +308,55 @@ export function MembersList({ members, invitations = [], organizationId, current
         isInvitation: true
     }))
 
-    const all = [...memberRows, ...invitationRows]
+    // Combine members and invitations
+    let combined = [...memberRows, ...invitationRows]
 
-    const filtered = all.filter((item) => {
-      return item.name.toLowerCase().includes(query) || item.email.toLowerCase().includes(query)
-    })
-
-    return filtered.sort((a, b) => {
-      const nameA = a.name
-      const nameB = b.name
-      const emailA = a.email
-      const emailB = b.email
-      const roleA = a.role
-      const roleB = b.role
-      const statusA = a.status
-      const statusB = b.status
-
-      let comparison = 0
-      switch (sortField) {
-        case "name":
-          comparison = nameA.localeCompare(nameB)
-          break
-        case "email":
-          comparison = emailA.localeCompare(emailB)
-          break
-        case "role":
-          comparison = roleA.localeCompare(roleB)
-          break
-        case "status":
-          comparison = statusA.localeCompare(statusB)
-          break
-      }
-
-      return sortDirection === "asc" ? comparison : -comparison
-    })
-  }, [members, invitations, searchQuery, sortField, sortDirection])
-
-  const renderDate = (date?: string | null) => {
-    if (!date) return "Nunca"
-    try {
-      return new Date(date).toLocaleDateString("es-ES", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
+    // Client-side search filtering by name or email
+    if (searchQuery.trim()) {
+      const normalizedQuery = searchQuery.toLowerCase().trim()
+      combined = combined.filter(item => {
+        const nameMatch = item.name.toLowerCase().includes(normalizedQuery)
+        const emailMatch = item.email.toLowerCase().includes(normalizedQuery)
+        return nameMatch || emailMatch
       })
-    } catch {
-      return "Nunca"
     }
-  }
+
+    return combined
+  }, [data, searchQuery])
 
   const rolePillStyles: Record<string, string> = {
-    owner:
-      "bg-[#F3E8FF] text-[#4C1D95] border border-[#E4C7FF]/70 dark:bg-[#2B0F49] dark:text-[#E8D7FF] dark:border-[#5B21B6]/70",
-    admin:
-      "bg-[#E0ECFF] text-[#1D4ED8] border border-[#C3DAFF]/70 dark:bg-[#102347] dark:text-[#C3DAFF] dark:border-[#3B82F6]/50",
-    manager:
-      "bg-[#DEF7EC] text-[#047857] border border-[#ACEAD3]/70 dark:bg-[#0E3A2F] dark:text-[#BBF7D0] dark:border-[#10B981]/60",
-    member:
-      "bg-[#F5F5F7] text-[#3F3F46] border border-[#E4E4E7]/70 dark:bg-[#27272A] dark:text-[#E4E4E7] dark:border-[#52525B]/70",
-    guest:
-      "bg-[#FFF1DA] text-[#A8550B] border border-[#FFD4A8]/70 dark:bg-[#3B2411] dark:text-[#FFD9B0] dark:border-[#F97316]/60",
-    default:
-      "bg-muted/60 text-muted-foreground border border-border/70 dark:bg-[#1F1F22] dark:text-[#D4D4D8] dark:border-[#3F3F46]/60",
+    owner: "bg-[#F3E8FF] text-[#4C1D95] border border-[#E4C7FF]/70 dark:bg-[#2B0F49] dark:text-[#E8D7FF] dark:border-[#5B21B6]/70",
+    admin: "bg-[#E0ECFF] text-[#1D4ED8] border border-[#C3DAFF]/70 dark:bg-[#102347] dark:text-[#C3DAFF] dark:border-[#3B82F6]/50",
+    manager: "bg-[#DEF7EC] text-[#047857] border border-[#ACEAD3]/70 dark:bg-[#0E3A2F] dark:text-[#BBF7D0] dark:border-[#10B981]/60",
+    member: "bg-[#F5F5F7] text-[#3F3F46] border border-[#E4E4E7]/70 dark:bg-[#27272A] dark:text-[#E4E4E7] dark:border-[#52525B]/70",
+    guest: "bg-[#FFF1DA] text-[#A8550B] border border-[#FFD4A8]/70 dark:bg-[#3B2411] dark:text-[#FFD9B0] dark:border-[#F97316]/60",
+    default: "bg-muted/60 text-muted-foreground border border-border/70 dark:bg-[#1F1F22] dark:text-[#D4D4D8] dark:border-[#3F3F46]/60",
   }
 
   const statusPillStyles: Record<string, string> = {
-    active:
-      "bg-[#DEF7EC] text-[#047857] border border-[#ACEAD3]/70 dark:bg-[#0E3A2F] dark:text-[#BBF7D0] dark:border-[#10B981]/60",
-    inactive:
-      "bg-[#F5F5F7] text-[#3F3F46] border border-[#E4E4E7]/70 dark:bg-[#27272A] dark:text-[#E4E4E7] dark:border-[#52525B]/70",
-    pending:
-      "bg-[#FFF1DA] text-[#A8550B] border border-[#FFD4A8]/70 dark:bg-[#3B2411] dark:text-[#FFD9B0] dark:border-[#F97316]/60",
-    default:
-      "bg-muted/60 text-muted-foreground border border-border/70 dark:bg-[#1F1F22] dark:text-[#D4D4D8] dark:border-[#3F3F46]/60",
+    active: "bg-[#DEF7EC] text-[#047857] border border-[#ACEAD3]/70 dark:bg-[#0E3A2F] dark:text-[#BBF7D0] dark:border-[#10B981]/60",
+    inactive: "bg-[#F5F5F7] text-[#3F3F46] border border-[#E4E4E7]/70 dark:bg-[#27272A] dark:text-[#E4E4E7] dark:border-[#52525B]/70",
+    pending: "bg-[#FFF1DA] text-[#A8550B] border border-[#FFD4A8]/70 dark:bg-[#3B2411] dark:text-[#FFD9B0] dark:border-[#F97316]/60",
+    default: "bg-muted/60 text-muted-foreground border border-border/70 dark:bg-[#1F1F22] dark:text-[#D4D4D8] dark:border-[#3F3F46]/60",
   }
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case "active":
-        return "Activo"
-      case "inactive":
-        return "Inactivo"
-      case "pending":
-        return "Pendiente"
-      default:
-        return status
+      case "active": return "Activo"
+      case "inactive": return "Inactivo"
+      case "pending": return "Pendiente"
+      default: return status
     }
   }
 
   const getRoleLabel = (role: string) => {
     switch (role.toLowerCase()) {
-      case "owner":
-        return "Owner"
-      case "admin":
-        return "Admin"
-      case "manager":
-        return "Gerente"
-      case "member":
-        return "Miembro"
-      case "guest":
-        return "Invitado"
-      default:
-        return role
+      case "owner": return "Owner"
+      case "admin": return "Admin"
+      case "manager": return "Gerente"
+      case "member": return "Miembro"
+      case "guest": return "Invitado"
+      default: return role
     }
   }
 
@@ -419,8 +366,8 @@ export function MembersList({ members, invitations = [], organizationId, current
         <div>
           <p className="text-sm font-medium text-muted-foreground">
             {typeof seatQuantity === 'number' 
-              ? `${currentMemberCount}/${seatQuantity} ${currentMemberCount === 1 ? "miembro" : "miembros"}`
-              : `${processedData.length} ${processedData.length === 1 ? "miembro" : "miembros"}`
+              ? `${totalMemberCount}/${seatQuantity} ${totalMemberCount === 1 ? "miembro" : "miembros"}`
+              : `${totalMemberCount} ${totalMemberCount === 1 ? "miembro" : "miembros"}`
             }
           </p>
         </div>
@@ -429,7 +376,7 @@ export function MembersList({ members, invitations = [], organizationId, current
               <div className="pointer-events-none absolute inset-0 rounded-md border border-border/60 bg-white/90 shadow-sm shadow-black/5 dark:bg-popover-secondary/75 dark:shadow-black/30" />
               <MagnifyingGlassIcon className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 z-[1] size-4 -translate-y-1/2" />
               <Input
-                placeholder="Buscar miembros..."
+                placeholder="Buscar por correo..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="relative z-[1] border-none bg-transparent pl-9 focus:outline-none focus:ring-0"
@@ -446,14 +393,15 @@ export function MembersList({ members, invitations = [], organizationId, current
             }}>
               <DialogTrigger asChild>
                 <Button 
-                  disabled={isLimitReached}
+                  disabled={isLimitReached || plan !== "enterprise"}
                   className="cursor-pointer gap-2 rounded-md border border-border/60 bg-white/90 shadow-sm shadow-black/5 dark:bg-popover-secondary/75 dark:shadow-black/30 hover:bg-black/[0.04] dark:hover:bg-hover/30 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <span className="hidden sm:inline">Invitar Miembros</span>
                   <span className="sm:hidden">Invitar</span>
                 </Button>
               </DialogTrigger>
-            <DialogContent className="max-w-3xl rounded-2xl border border-border/50 bg-white/95 dark:bg-popover-main shadow-2xl dark:shadow-2xl">
+              {/* Dialog Content for Invite */}
+              <DialogContent className="max-w-3xl rounded-2xl border border-border/50 bg-white/95 dark:bg-popover-main shadow-2xl dark:shadow-2xl">
               {isSuccess ? (
                  <div className="flex flex-col items-center justify-center py-10 px-4 space-y-6 text-center animate-in fade-in zoom-in-95 duration-300">
                     <div className="rounded-full bg-green-100 p-3 dark:bg-green-900/30">
@@ -464,7 +412,7 @@ export function MembersList({ members, invitations = [], organizationId, current
                         ¡Invitaciones enviadas!
                       </DialogTitle>
                       <DialogDescription className="text-base text-muted-foreground max-w-md">
-                        Hemos enviado las invitaciones correctamente a los correos electrónicos proporcionados.
+                        Hemos enviado las invitaciones correctamente.
                       </DialogDescription>
                     </div>
                     <div className="flex items-center gap-4 pt-4">
@@ -505,7 +453,7 @@ export function MembersList({ members, invitations = [], organizationId, current
                           type="email"
                           value={invitation.email}
                           onChange={(e) => handleInvitationChange(index, "email", e.target.value)}
-                          required={index === 0} // Only first one required initially
+                          required={index === 0} 
                           className="bg-white/50 dark:bg-popover-main/50 border-border/60 focus:border-primary/50"
                         />
                         <Select 
@@ -531,8 +479,8 @@ export function MembersList({ members, invitations = [], organizationId, current
                       type="button"
                       onClick={handleAddInvitation}
                       disabled={
-                        invitationForms.length >= 10 || 
-                        (typeof seatQuantity === 'number' && (members.length + invitations.length + invitationForms.length) >= seatQuantity)
+                          invitationForms.length >= 10 || 
+                          (typeof seatQuantity === 'number' && (totalMemberCount + invitationForms.length) >= seatQuantity)
                       }
                       className="cursor-pointer rounded-lg font-medium gap-2 min-w-[150px]"
                     >
@@ -554,15 +502,7 @@ export function MembersList({ members, invitations = [], organizationId, current
                         disabled={isInviting}
                         className="cursor-pointer rounded-lg font-medium gap-2 min-w-[150px]"
                       >
-                        {isInviting ? (
-                          <>
-                            Enviando
-                          </>
-                        ) : (
-                          <>
-                            Enviar Invitaciones
-                          </>
-                        )}
+                        {isInviting ? "Enviando" : "Enviar Invitaciones"}
                       </Button>
                     </div>
                   </div>
@@ -570,13 +510,15 @@ export function MembersList({ members, invitations = [], organizationId, current
               </div>
               )}
             </DialogContent>
-          </Dialog>
+            </Dialog>
         </div>
       </div>
-
+      
+      {/* ... Update/Remove/Revoke Dialogs ... */}
       {/* Update Role Dialog */}
       <Dialog open={isUpdateRoleOpen} onOpenChange={setIsUpdateRoleOpen}>
         <DialogContent className="max-w-md rounded-2xl border border-border/50 bg-white/95 dark:bg-popover-main shadow-2xl">
+          {/* ... Content same as before ... */}
           <div className="space-y-6 p-2">
             <DialogHeader className="space-y-2">
               <DialogTitle className="text-2xl font-bold text-foreground dark:text-popover-text">
@@ -621,15 +563,7 @@ export function MembersList({ members, invitations = [], organizationId, current
                   disabled={isUpdating}
                   className="cursor-pointer rounded-lg font-medium gap-2 min-w-[120px]"
                 >
-                  {isUpdating ? (
-                    <>
-                      Actualizando
-                    </>
-                  ) : (
-                    <>
-                      Actualizar
-                    </>
-                  )}
+                  {isUpdating ? "Actualizando" : "Actualizar"}
                 </Button>
               </div>
             </form>
@@ -640,7 +574,7 @@ export function MembersList({ members, invitations = [], organizationId, current
       {/* Remove Member Dialog */}
       <Dialog open={isRemoveOpen} onOpenChange={setIsRemoveOpen}>
         <DialogContent className="max-w-md rounded-2xl border border-border/50 bg-white/95 dark:bg-popover-main shadow-2xl">
-          <div className="space-y-6 p-2">
+             <div className="space-y-6 p-2">
             <DialogHeader className="space-y-2">
               <DialogTitle className="text-2xl font-bold text-destructive dark:text-destructive">
                 Eliminar miembro
@@ -667,15 +601,7 @@ export function MembersList({ members, invitations = [], organizationId, current
                 disabled={isRemoving}
                 className="cursor-pointer rounded-lg font-medium gap-2 min-w-[120px]"
               >
-                {isRemoving ? (
-                  <>
-                    Eliminando
-                  </>
-                ) : (
-                  <>
-                    Eliminar
-                  </>
-                )}
+                {isRemoving ? "Eliminando" : "Eliminar"}
               </Button>
             </div>
           </div>
@@ -685,7 +611,7 @@ export function MembersList({ members, invitations = [], organizationId, current
       {/* Revoke Invitation Dialog */}
       <Dialog open={isRevokeOpen} onOpenChange={setIsRevokeOpen}>
         <DialogContent className="max-w-md rounded-2xl border border-border/50 bg-white/95 dark:bg-popover-main shadow-2xl">
-          <div className="space-y-6 p-2">
+            <div className="space-y-6 p-2">
             <DialogHeader className="space-y-2">
               <DialogTitle className="text-2xl font-bold text-destructive dark:text-destructive">
                 Revocar invitación
@@ -712,15 +638,7 @@ export function MembersList({ members, invitations = [], organizationId, current
                 disabled={isRevoking}
                 className="cursor-pointer rounded-lg font-medium gap-2 min-w-[120px]"
               >
-                {isRevoking ? (
-                  <>
-                    Revocando
-                  </>
-                ) : (
-                  <>
-                    Revocar
-                  </>
-                )}
+                {isRevoking ? "Revocando" : "Revocar"}
               </Button>
             </div>
           </div>
@@ -731,50 +649,24 @@ export function MembersList({ members, invitations = [], organizationId, current
         <Table className="min-w-full">
           <TableHeader>
             <TableRow className="text-muted-foreground border-b border-border/50 bg-gradient-to-r from-white/90 via-white/70 to-white/40 dark:from-transparent dark:via-transparent dark:to-transparent">
-              <TableHead className="w-0 pr-0">
-                <span className="sr-only">Avatar</span>
-              </TableHead>
-              <TableHead
-                className="group cursor-pointer select-none"
-                onClick={() => handleSort("name")}
-              >
-                <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide">
-                  Usuario
-                  {getSortIcon("name")}
-                </span>
-              </TableHead>
-              <TableHead
-                className="group cursor-pointer select-none"
-                onClick={() => handleSort("email")}
-              >
-                <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide">
-                  Correo
-                  {getSortIcon("email")}
-                </span>
-              </TableHead>
-              <TableHead
-                className="group cursor-pointer select-none"
-                onClick={() => handleSort("role")}
-              >
-                <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide">
-                  Rol
-                  {getSortIcon("role")}
-                </span>
-              </TableHead>
-              <TableHead
-                className="group cursor-pointer select-none"
-                onClick={() => handleSort("status")}
-              >
-                <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide">
-                  Estado
-                  {getSortIcon("status")}
-                </span>
-              </TableHead>
+              <TableHead className="w-0 pr-0"><span className="sr-only">Avatar</span></TableHead>
+              <TableHead><span className="text-xs font-semibold uppercase tracking-wide">Usuario</span></TableHead>
+              <TableHead><span className="text-xs font-semibold uppercase tracking-wide">Correo</span></TableHead>
+              <TableHead><span className="text-xs font-semibold uppercase tracking-wide">Rol</span></TableHead>
+              <TableHead><span className="text-xs font-semibold uppercase tracking-wide">Estado</span></TableHead>
               <TableHead className="w-12" />
             </TableRow>
           </TableHeader>
 
           <TableBody>
+            {loading ? (
+               <TableRow>
+                 <TableCell colSpan={6} className="h-24 text-center">
+                   <ReloadIcon className="mr-2 size-4 animate-spin inline" /> Cargando...
+                 </TableCell>
+               </TableRow>
+            ) : (
+            <>
             {processedData.map((item, index) => {
               const name = item.name
               const email = item.email
@@ -888,8 +780,32 @@ export function MembersList({ members, invitations = [], organizationId, current
                 </TableCell>
               </TableRow>
             )}
+            </>
+            )}
           </TableBody>
         </Table>
+      </div>
+      
+      {/* Pagination Controls */}
+      <div className="flex items-center justify-end space-x-2 py-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handlePrevPage}
+          disabled={!data.prevCursor || loading}
+        >
+          <ChevronLeftIcon className="h-4 w-4" />
+          Anterior
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleNextPage}
+          disabled={!data.nextCursor || loading}
+        >
+          Siguiente
+          <ChevronRightIcon className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   )

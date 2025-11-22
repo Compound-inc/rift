@@ -9,6 +9,7 @@ import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { getAuthUserIdentity } from "./helpers/getUser";
 import { extractOrganizationIdFromJWT } from "./helpers/quota";
+import { PermissionQuery, AuthOrgQuery } from "./helpers/authenticated";
 import type Stripe from "stripe";
 import { serverSecretArg, ensureServerSecret } from "./helpers/auth";
 
@@ -52,7 +53,7 @@ export const updateOrganization = internalMutation({
       stripeCustomerId: v.optional(v.string()),
       billingCycleStart: v.optional(v.number()),
       billingCycleEnd: v.optional(v.number()),
-      plan: v.optional(v.union(v.literal("plus"), v.literal("pro"))),
+      plan: v.optional(v.union(v.literal("plus"), v.literal("pro"), v.literal("enterprise"))),
       standardQuotaLimit: v.optional(v.number()),
       premiumQuotaLimit: v.optional(v.number()),
       seatQuantity: v.optional(v.number()),
@@ -79,6 +80,18 @@ export const getOrganizationSeats = query({
       .withIndex("by_workos_id", (q) => q.eq("workos_id", args.workos_id))
       .first();
     return organization?.seatQuantity ?? null;
+  },
+});
+
+export const getOrganizationPlan = query({
+  args: { workos_id: v.string(), ...serverSecretArg },
+  handler: async (ctx, args) => {
+    ensureServerSecret(args.secret);
+    const organization = await ctx.db
+      .query("organizations")
+      .withIndex("by_workos_id", (q) => q.eq("workos_id", args.workos_id))
+      .first();
+    return organization?.plan ?? null;
   },
 });
 
@@ -225,7 +238,7 @@ export const syncStripeSubscriptionData = internalMutation({
       paymentMethodLast4?: string;
       billingCycleStart?: number;
       billingCycleEnd?: number;
-      plan?: "plus" | "pro";
+      plan?: "plus" | "pro" | "enterprise";
       standardQuotaLimit?: number;
       premiumQuotaLimit?: number;
       seatQuantity?: number;
@@ -447,25 +460,13 @@ export const getSubscriptionData = internalQuery({
   },
 });
 
-export const getCurrentOrganizationPlan = query({
+export const getCurrentOrganizationPlan = AuthOrgQuery({
   args: {},
   handler: async (ctx) => {
     try {
-      const identity = await getAuthUserIdentity(ctx);
-
-      if (!identity) {
-        return null;
-      }
-
-      const orgId = extractOrganizationIdFromJWT(identity);
-
-      if (!orgId) {
-        return null;
-      }
-
       const organization = await ctx.db
         .query("organizations")
-        .withIndex("by_workos_id", (q) => q.eq("workos_id", orgId))
+        .withIndex("by_workos_id", (q) => q.eq("workos_id", ctx.orgId))
         .first();
 
       if (!organization) {
@@ -484,25 +485,13 @@ export const getCurrentOrganizationPlan = query({
 });
 
 // Get current organization information for display
-export const getCurrentOrganizationInfo = query({
+export const getCurrentOrganizationInfo = AuthOrgQuery({
   args: {},
   handler: async (ctx) => {
     try {
-      const identity = await getAuthUserIdentity(ctx);
-
-      if (!identity) {
-        return null;
-      }
-
-      const orgId = extractOrganizationIdFromJWT(identity);
-
-      if (!orgId) {
-        return null;
-      }
-
       const organization = await ctx.db
         .query("organizations")
-        .withIndex("by_workos_id", (q) => q.eq("workos_id", orgId))
+        .withIndex("by_workos_id", (q) => q.eq("workos_id", ctx.orgId))
         .first();
 
       if (!organization) {
@@ -521,24 +510,43 @@ export const getCurrentOrganizationInfo = query({
   },
 });
 
+export const getOrganizationBillingInfo = PermissionQuery({
+  args: {},
+  permissions: ["MANAGE_BILLING"],
+  handler: async (ctx) => {
+    const organization = await ctx.db
+      .query("organizations")
+      .withIndex("by_workos_id", (q) => q.eq("workos_id", ctx.orgId))
+      .first();
+
+    if (!organization) {
+      return null;
+    }
+
+    return {
+      subscriptionId: organization.subscriptionId,
+      subscriptionStatus: organization.subscriptionStatus || "none",
+      priceId: organization.priceId,
+      plan: organization.plan,
+      standardQuotaLimit: organization.standardQuotaLimit,
+      premiumQuotaLimit: organization.premiumQuotaLimit,
+      seatQuantity: organization.seatQuantity,
+      billingCycleStart: organization.billingCycleStart,
+      billingCycleEnd: organization.billingCycleEnd,
+      cancelAtPeriodEnd: organization.cancelAtPeriodEnd,
+      paymentMethodBrand: organization.paymentMethodBrand,
+      paymentMethodLast4: organization.paymentMethodLast4,
+      stripeCustomerId: organization.stripeCustomerId,
+      name: organization.name,
+    };
+  },
+});
 
 // Get total user count for organization
-export const getOrganizationUserCount = query({
+export const getOrganizationUserCount = AuthOrgQuery({
   args: {},
   handler: async (ctx) => {
     try {
-      const identity = await getAuthUserIdentity(ctx);
-
-      if (!identity) {
-        return null;
-      }
-
-      const orgId = extractOrganizationIdFromJWT(identity);
-
-      if (!orgId) {
-        return null;
-      }
-
       // Count users in the organization by checking all users with the same org_id
       // Note: This is a simple count based on the assumption that users belong to organizations
       // In a real WorkOS setup, you might need to query WorkOS API for accurate user counts

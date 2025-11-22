@@ -54,10 +54,12 @@ export default async function SettingsLayout({
     "WIDGETS_USERS_TABLE_MANAGE",
     "WIDGETS_DOMAIN_VERIFICATION_MANAGE",
     "VIEW_ORG_ANALYTICS",
+    "MANAGE_BILLING",
   ]);
   const canManageMembers = batch.WIDGETS_USERS_TABLE_MANAGE;
   const canManageDomainSso = batch.WIDGETS_DOMAIN_VERIFICATION_MANAGE;
   const canViewAnalytics = batch.VIEW_ORG_ANALYTICS;
+  const canManageBilling = batch.MANAGE_BILLING;
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: scrollbarStyles }} />
@@ -66,6 +68,7 @@ export default async function SettingsLayout({
           canManageMembers={canManageMembers}
           canManageDomainSso={canManageDomainSso}
           canViewAnalytics={canViewAnalytics}
+          canManageBilling={canManageBilling}
         />
         <main className="flex-1 overflow-y-auto relative bg-background dark:bg-popover-main settings-scroll-container">
           {/* Close button - positioned fixed in top right to stay visible when scrolling */}

@@ -154,11 +154,11 @@ const settingsSections: SettingsSection[] = [
         href: "/settings/domain-sso",
         icon: Building2,
       },
-      // {
-      //   title: "Planes",
-      //   href: "/settings/plans",
-      //   icon: ReceiptText,
-      // },
+      {
+        title: "Suscripción",
+        href: "/settings/billing",
+        icon: ReceiptText,
+      },
     ],
   },
   {
@@ -244,10 +244,12 @@ export function SettingsSidebar({
   canManageMembers = false,
   canManageDomainSso = false,
   canViewAnalytics = false,
+  canManageBilling = false,
 }: {
   canManageMembers?: boolean;
   canManageDomainSso?: boolean;
   canViewAnalytics?: boolean;
+  canManageBilling?: boolean;
 }) {
   const handleLogout = async () => {
     try {
@@ -275,6 +277,9 @@ export function SettingsSidebar({
                       }
                       if (item.href === "/settings/insights") {
                         return canViewAnalytics;
+                      }
+                      if (item.href === "/settings/billing") {
+                        return canManageBilling;
                       }
                       return true;
                     })
