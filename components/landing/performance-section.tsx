@@ -6,6 +6,10 @@ import {
 
 import { GlobeIcon } from "@/components/ui/icons/svg-icons";
 import { MockChatDemo } from "./mock-chat-demo";
+import { ModelsMarquee } from "./models-marquee";
+import { ArrowRightIcon } from "lucide-react";
+import { Button } from "@/components/ai/ui/button";
+import Link from "next/link";
 
 export default function PerformanceSection() {
   return (
@@ -24,8 +28,8 @@ export default function PerformanceSection() {
           <div className="flex flex-col">
             <p className="text-landing-text-secondary mb-5">
               Desde la creacion de RIFT, sabiamos que la velocidad era un factor
-              clave para la eficiencia de los equipos. Por eso, hemos
-              desarrollado una plataforma que permite a los equipos trabajar más
+              clave para la eficiencia de los equipos. Por eso, RIFT
+              es una plataforma que te permite trabajar más
               rápido y eficientemente.
             </p>
 
@@ -105,6 +109,27 @@ export default function PerformanceSection() {
                     la potencia de múltiples modelos de IA.
                   </p>
                 </div>
+              </div>
+            </div>
+
+            <div className="w-full mt-16 border-t border-gray-100 dark:border-white/5 pt-16">
+               <div className="text-center mb-12">
+                  <h3 className="text-2xl font-bold mb-4">Explora nuestro catálogo</h3>
+                  <p className="text-landing-text-secondary max-w-2xl mx-auto">
+                    Contamos con una de las bibliotecas más completas de modelos de Inteligencia Artificial, actualizada constantemente.
+                  </p>
+               </div>
+               
+               <div className="relative w-screen left-1/2 -translate-x-1/2 overflow-hidden bg-gradient-to-b from-transparent to-gray-50/50 dark:to-white/5">
+                  <ModelsMarquee />
+               </div>
+               <div className="flex justify-center mt-8">
+                <Button asChild variant="accent" size="lg" className="font-semibold">
+                  <Link href="/models" className="inline-flex items-center gap-2">
+                    Conocer todos los modelos
+                    <ArrowRightIcon className="size-4" />
+                  </Link>
+                </Button>
               </div>
             </div>
           </div>

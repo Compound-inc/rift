@@ -3,51 +3,13 @@ import { workos } from '@/app/api/workos';
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 
-const MAX_SEAT_QUANTITY = 150;
-
-const parseSeatQuantity = (value: unknown): number | null => {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return Math.floor(value);
-  }
-
-  if (typeof value === "string") {
-    const parsed = Number.parseInt(value, 10);
-    if (!Number.isNaN(parsed)) {
-      return parsed;
-    }
-  }
-
-  return null;
-};
-
-const normalizeSeatQuantity = (value: unknown) => {
-  const parsed = parseSeatQuantity(value);
-
-  if (parsed !== null) {
-    return Math.min(MAX_SEAT_QUANTITY, Math.max(1, parsed));
-  }
-
-  return 1;
-};
-
 export const POST = async (req: NextRequest) => {
   const {
     userId,
     orgName,
     subscriptionLevel,
     organizationId: providedOrgId,
-    seatQuantity: seatQuantityRaw,
   } = await req.json();
-  const parsedSeatQuantity = parseSeatQuantity(seatQuantityRaw);
-
-  if (parsedSeatQuantity !== null && parsedSeatQuantity > MAX_SEAT_QUANTITY) {
-    return NextResponse.json(
-      { error: `Seat quantity cannot exceed ${MAX_SEAT_QUANTITY}` },
-      { status: 400 },
-    );
-  }
-
-  const seatQuantity = normalizeSeatQuantity(seatQuantityRaw);
 
   try {
     let targetOrganizationId = providedOrgId;
@@ -155,7 +117,7 @@ export const POST = async (req: NextRequest) => {
       line_items: [
         {
           price: priceId,
-          quantity: seatQuantity,
+          quantity: 1,
         },
       ],
       mode: 'subscription',

@@ -30,7 +30,7 @@ export default function ArchitectureSection() {
             <p className="text-landing-text-secondary m-0">
               Cuando tu mandas un mensaje, RIFT se encarga de contrar el servidor de
               IA mas rapido disponible en el momento para responder a tu mensaje en
-              question de milisegundos.
+              cuestión de milisegundos.
             </p>
           </div>
         </div>
@@ -51,7 +51,7 @@ export default function ArchitectureSection() {
           </div>
         </div>
 
-        <div className="flex items-start gap-4">
+        {/* <div className="flex items-start gap-4">
           <div className="flex-shrink-0">
             <CentroConocimientoIcon className="w-12 h-12 text-purple-500" />
           </div>
@@ -68,7 +68,7 @@ export default function ArchitectureSection() {
               resultados.
             </p>
           </div>
-        </div>
+        </div> */}
 
         <div className="flex items-start gap-4">
           <div className="flex-shrink-0">
@@ -95,7 +95,7 @@ export default function ArchitectureSection() {
               Integraciones Avanzadas
             </h4>
             <p className="text-landing-text-secondary m-0">
-              Contamos con SCIM, JIT, Directory Sync, SSO/SAML/OIDC, audit logs y
+              Contamos con SCIM, JIT, Directory Sync, SSO/SAML/OIDC, Registros de auditoria y
               muchas mas funcionalidades para organizaciones
             </p>
           </div>
