@@ -12,15 +12,15 @@ import { cn } from "@/lib/utils";
 function getPlanBadgeStyles(plan: string) {
   switch (plan) {
     case "free":
-      return "border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 text-zinc-500 dark:text-zinc-400";
+      return "border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 text-zinc-500 dark:text-zinc-400 group-hover:bg-zinc-100 group-hover:dark:bg-zinc-900/70";
     case "plus":
-      return "border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-300";
+      return "border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-300 group-hover:bg-blue-100 group-hover:dark:bg-blue-900/40 group-hover:text-blue-700";
     case "pro":
-      return "border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-300";
+      return "border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-300 group-hover:bg-purple-100 group-hover:dark:bg-purple-900/40 group-hover:text-purple-700";
     case "enterprise":
-      return "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-300";
+      return "border-amber-300 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 group-hover:bg-amber-100 group-hover:dark:bg-amber-900/40 group-hover:text-amber-800";
     default:
-      return "border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 text-zinc-500 dark:text-zinc-400";
+      return "border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 text-zinc-500 dark:text-zinc-400 group-hover:bg-zinc-100 group-hover:dark:bg-zinc-900/70";
   }
 }
 
@@ -52,7 +52,7 @@ export async function UserProfileSection() {
       {user ? (
         // Authenticated state
         <Link href="/settings/usage" className="w-full">
-          <div className="flex items-center gap-3 hover:bg-popover-main hover:text-popover-text dark:hover:bg-hover/60 rounded-lg p-2 -m-2 cursor-pointer transition-colors">
+          <div className="group flex items-center gap-3 hover:bg-popover-main hover:text-popover-text dark:hover:bg-hover/60 rounded-lg p-2 -m-2 cursor-pointer transition-colors">
             <div className="h-8 w-8 rounded-full overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 flex-shrink-0">
               {user.profilePictureUrl ? (
                 <Image

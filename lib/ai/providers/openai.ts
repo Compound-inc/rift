@@ -56,25 +56,6 @@ export const DEFAULT_OPENAI_SETTINGS: OpenAISettings = {
 // OpenAI model configurations
 export const OPENAI_MODELS: BaseModelConfig[] = [
   {
-    id: "openai/gpt-5",
-    name: "GPT-5",
-    provider: "openai",
-    description:
-      "El mejor modelo de OpenAI para tareas complejas",
-    contextWindow: 400000,
-    isPremium: true,
-    capabilities: mergeCapabilities({
-      supportsTools: true,
-      supportsStreaming: true,
-      supportsReasoning: true,
-      supportsImageInput: true,
-      supportsImageOutput: true,
-      supportsPDFInput: true,
-      supportsObjectGeneration: true,
-      maxTokens: 16384,
-    }),
-  },
-  {
     id: "openai/gpt-5.1-instant",
     name: "GPT-5.1 Instant",
     provider: "openai",
@@ -110,6 +91,25 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       supportsPDFInput: true,
       supportsObjectGeneration: true,
       maxTokens: 409600,
+    }),
+  },
+  {
+    id: "openai/gpt-5",
+    name: "GPT-5",
+    provider: "openai",
+    description:
+      "El mejor modelo de OpenAI para tareas complejas",
+    contextWindow: 400000,
+    isPremium: true,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsImageOutput: true,
+      supportsPDFInput: true,
+      supportsObjectGeneration: true,
+      maxTokens: 16384,
     }),
   },
   {

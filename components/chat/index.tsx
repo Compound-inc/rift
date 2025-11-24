@@ -784,7 +784,6 @@ function ChatInterfaceInternal({
       <ChatInputArea
         disableInput={disableInput || !isAuthenticated || authLoading}
         selectedModel={selectedModel}
-        orgName={`orgName`}
         onModelChange={setSelectedModel}
         onSubmit={handleSubmit}
         onStop={handleStop}

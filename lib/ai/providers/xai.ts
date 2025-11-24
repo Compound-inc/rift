@@ -45,31 +45,32 @@ export const DEFAULT_XAI_SETTINGS: XAISettings = {
 // xAI model configurations
 export const XAI_MODELS: BaseModelConfig[] = [
   {
-    id: "xai/grok-4",
-    name: "Grok 4",
+    id: "xai/grok-4.1-fast-non-reasoning",
+    name: "Grok 4.1 Fast",
     provider: "xai",
     description:
-      "El modelo insignia más reciente que ofrece un rendimiento sin igual en lenguaje natural, matemáticas y razonamiento",
-    contextWindow: 256000,
-    isPremium: true,
+      "Perfecto para problemas del mundo real complejos optimizado para velocidad.",
+    contextWindow: 2000000,
+    isPremium: false,
     capabilities: mergeCapabilities({
       supportsTools: true,
+      supportsImageInput: true,
       supportsStreaming: true,
-      supportsReasoning: false,
       supportsObjectGeneration: true,
       maxTokens: 16384,
     }),
   },
   {
-    id: "xai/grok-code-fast-1",
-    name: "Grok Code Fast 1",
+    id: "xai/grok-4.1-fast-reasoning",
+    name: "Grok 4.1 Fast Reasoning",
     provider: "xai",
     description:
-      "Modelo de razonamiento rápido y económico que sobresale en tareas de programación agéntica",
-    contextWindow: 256000,
-    isPremium: false,
+      "Modelo de razonamiento rápido y económico que sobresale en tareas de programación.",
+    contextWindow: 2000000,
+    isPremium: true,
     capabilities: mergeCapabilities({
       supportsTools: true,
+      supportsImageInput: true,
       supportsStreaming: true,
       supportsReasoning: true,
       supportsObjectGeneration: true,
@@ -88,6 +89,39 @@ export const XAI_MODELS: BaseModelConfig[] = [
       supportsTools: true,
       supportsStreaming: true,
       supportsImageInput: true,
+      supportsObjectGeneration: true,
+      maxTokens: 16384,
+    }),
+  },
+  {
+    id: "xai/grok-4",
+    name: "Grok 4",
+    provider: "xai",
+    description:
+      "El modelo insignia más reciente que ofrece un rendimiento sin igual en lenguaje natural, matemáticas y razonamiento",
+    contextWindow: 256000,
+    isPremium: true,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsImageInput: true,
+      supportsReasoning: false,
+      supportsObjectGeneration: true,
+      maxTokens: 16384,
+    }),
+  },
+  {
+    id: "xai/grok-code-fast-1",
+    name: "Grok Code Fast 1",
+    provider: "xai",
+    description:
+      "Modelo de razonamiento rápido y económico que sobresale en tareas de programación agéntica",
+    contextWindow: 256000,
+    isPremium: false,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
       supportsObjectGeneration: true,
       maxTokens: 16384,
     }),

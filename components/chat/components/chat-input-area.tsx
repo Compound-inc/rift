@@ -33,7 +33,6 @@ import { toast } from "sonner";
 interface ChatInputAreaProps {
   disableInput: boolean;
   selectedModel: string;
-  orgName?: string;
   onModelChange: (model: string) => void;
   onSubmit: (e?: React.FormEvent) => void;
   onStop: () => void;
@@ -42,7 +41,6 @@ interface ChatInputAreaProps {
 export const ChatInputArea = React.memo(function ChatInputArea({
   disableInput,
   selectedModel,
-  orgName,
   onModelChange,
   onSubmit,
   onStop,
@@ -96,7 +94,6 @@ export const ChatInputArea = React.memo(function ChatInputArea({
         <NoSubscriptionDialog
           isOpen={showNoSubscriptionDialog}
           onClose={() => setShowNoSubscriptionDialog(false)}
-          orgName={orgName}
         />
         
         {/* Quota Error Message */}
@@ -329,7 +326,6 @@ export const ChatInputArea = React.memo(function ChatInputArea({
     prevProps.selectedModel === nextProps.selectedModel &&
     prevProps.onSubmit === nextProps.onSubmit &&
     prevProps.onStop === nextProps.onStop &&
-    prevProps.onModelChange === nextProps.onModelChange &&
-    prevProps.orgName === nextProps.orgName
+    prevProps.onModelChange === nextProps.onModelChange
   );
 });

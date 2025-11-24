@@ -422,8 +422,10 @@ export default async function PrivacyPolicyPage() {
                 </p>
                 <div className="text-gray-700 dark:text-gray-300 text-sm leading-6">
                   <p>The Unreal Compound SA de CV</p>
-                  <p>Av Ejercito Nacional 843B</p>
-                  <p>Miguel Hidalgo, CDMX, Mexico 11520</p>
+                  <p>Av. Lago Zurich 219,</p>
+                  <p>Torre Carso II, Piso 12,</p>
+                  <p>Col. Ampliacion Granada,</p>
+                  <p>Miguel Hidalgo, CDMX, MX. 11529</p>
                   <p className="mt-2">Correo electrónico: <a href="mailto:privacy@rift.mx" className="text-blue-600 dark:text-blue-400 hover:underline">privacy@rift.mx</a></p>
                 </div>
               </section>

@@ -11,6 +11,7 @@ import { XAiIcon } from "@/components/ui/icons/xai-icon";
 import { DeepSeekIcon } from "@/components/ui/icons/deepseek-icon";
 import { LogosMistralAiIcon } from "@/components/ui/icons/mistral-icon";
 import { MoonshotIcon } from "@/components/ui/icons/moonshot-icon";
+import { ZaiIcon } from "@/components/ui/icons/zai-icon";
 import { Button } from "@/components/ai/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +26,7 @@ const MarqueeCard = ({ model }: { model: typeof MODELS[0] }) => {
     mistral: LogosMistralAiIcon,
     moonshot: MoonshotIcon,
     moonshotai: MoonshotIcon, // Add the 'moonshotai' key to match the provider string in config
+    zai: ZaiIcon,
   } as const;
 
   const ProviderIcon = providerIcons[model.provider as keyof typeof providerIcons];
@@ -67,9 +69,13 @@ const MarqueeCard = ({ model }: { model: typeof MODELS[0] }) => {
                 <ProviderIcon className="size-5 text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/1)] dark:text-white" />
               ) : null}
               <span className="text-xs font-medium text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/0.6)] dark:text-zinc-400 capitalize">
-                {model.provider === 'xai' ? 'xAI' : 
-                 model.provider === 'moonshotai' ? 'Moonshot' :
-                 model.provider.charAt(0).toUpperCase() + model.provider.slice(1)}
+                {model.provider === 'xai'
+                  ? 'xAI'
+                  : model.provider === 'moonshotai'
+                    ? 'Moonshot'
+                    : model.provider === 'zai'
+                      ? 'Z.AI'
+                      : model.provider.charAt(0).toUpperCase() + model.provider.slice(1)}
               </span>
             </div>
           </div>

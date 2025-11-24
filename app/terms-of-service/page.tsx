@@ -266,8 +266,10 @@ export default async function TermsOfServicePage() {
                         <div className="mt-2 pl-4 border-l-2 border-gray-300 dark:border-border">
                           <p>Copyright Agent</p>
                           <p>The Unreal Compound SA de CV</p>
-                          <p>Av Ejercito Nacional 843B</p>
-                          <p>Miguel Hidalgo, CDMX, Mexico 11520</p>
+                          <p>Av. Lago Zurich 219,</p>
+                          <p>Torre Carso II, Piso 12,</p>
+                          <p>Col. Ampliacion Granada,</p>
+                          <p>Miguel Hidalgo, CDMX, MX. 11529</p>
                           <p><a href="mailto:legal@rift.mx" className="text-blue-600 dark:text-blue-400 hover:underline">legal@rift.mx</a></p>
                         </div>
                       </li>

@@ -1,4 +1,5 @@
 import { QueryCtx, MutationCtx } from "../_generated/server";
+import { Doc } from "../_generated/dataModel";
 
 /**
  * Extract organization ID from JWT token claims
@@ -62,7 +63,7 @@ export async function getOrganizationQuotaLimit(
   ctx: QueryCtx | MutationCtx,
   orgWorkosId: string,
   quotaType: "standard" | "premium",
-): Promise<number | null> {
+): Promise<{ organization: Doc<"organizations"> | null; messageLimit: number | null }> {
   try {
     const organization = await ctx.db
       .query("organizations")
@@ -70,17 +71,18 @@ export async function getOrganizationQuotaLimit(
       .unique();
 
     if (!organization) {
-      return null;
+      return { organization: null, messageLimit: null };
     }
 
-    if (quotaType === "standard") {
-      return organization.standardQuotaLimit || null;
-    } else {
-      return organization.premiumQuotaLimit || null;
-    }
+    const messageLimit =
+      quotaType === "standard"
+        ? organization.standardQuotaLimit || null
+        : organization.premiumQuotaLimit || null;
+
+    return { organization, messageLimit };
   } catch (error) {
     console.error(`Error getting organization ${quotaType} quota:`, error);
-    return null;
+    return { organization: null, messageLimit: null };
   }
 }
 
@@ -95,12 +97,38 @@ export async function checkQuotaLimit(
   billingCycleStart?: number,
 ): Promise<{ allowed: boolean; currentUsage: number; limit: number; quotaConfigured: boolean }> {
   try {
-    // Get organization's quota limit by type
-    const messageLimit = await getOrganizationQuotaLimit(
+    // Get organization data + quota limit by type
+    const { organization, messageLimit } = await getOrganizationQuotaLimit(
       ctx,
       orgWorkosId,
       quotaType,
     );
+
+    if (!organization) {
+      console.warn(`Organization not found for workos_id: ${orgWorkosId}`);
+      return {
+        allowed: false,
+        currentUsage: 0,
+        limit: 0,
+        quotaConfigured: false,
+      };
+    }
+
+    const subscriptionStatus = organization.subscriptionStatus || "none";
+    const hasValidSubscription =
+      subscriptionStatus === "active" || subscriptionStatus === "trialing";
+
+    if (!hasValidSubscription) {
+      console.warn(
+        `Organization ${orgWorkosId} has inactive subscription status: ${subscriptionStatus}`,
+      );
+      return {
+        allowed: false,
+        currentUsage: 0,
+        limit: 0,
+        quotaConfigured: false,
+      };
+    }
     
     // If no quota limit is defined for the organization, deny usage
     // Organizations must have proper quota configuration to use the service

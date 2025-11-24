@@ -6,10 +6,46 @@ import { GOOGLE_MODELS, getReasoningSettings } from "./providers/google";
 import { DEEPSEEK_MODELS } from "./providers/deepseek";
 import { MISTRAL_MODELS } from "./providers/mistral";
 import { MOONSHOT_MODELS } from "./providers/moonshot";
+import { ZAI_MODELS } from "./providers/zai";
 import { type BaseModelConfig, type ModelCapabilities } from "./config/base";
 
 // All models in one array
-export const MODELS: BaseModelConfig[] = [...OPENAI_MODELS, ...XAI_MODELS, ...ANTHROPIC_MODELS, ...GOOGLE_MODELS, ...DEEPSEEK_MODELS, ...MISTRAL_MODELS, ...MOONSHOT_MODELS];
+export const MODELS: BaseModelConfig[] = [
+  ...OPENAI_MODELS,
+  ...XAI_MODELS,
+  ...ANTHROPIC_MODELS,
+  ...GOOGLE_MODELS,
+  ...DEEPSEEK_MODELS,
+  ...MISTRAL_MODELS,
+  ...MOONSHOT_MODELS,
+  ...ZAI_MODELS,
+];
+
+const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
+  openai: "OpenAI",
+  anthropic: "Anthropic",
+  google: "Google",
+  xai: "xAI",
+  openrouter: "OpenRouter",
+  deepseek: "DeepSeek",
+  mistral: "Mistral",
+  moonshotai: "Moonshot",
+  zai: "Z.AI",
+};
+
+const toTitleCase = (value: string) =>
+  value
+    .split(/[-_/]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+
+export const getProviderDisplayName = (provider?: string) => {
+  if (!provider) {
+    return "your provider";
+  }
+  return PROVIDER_DISPLAY_NAMES[provider] ?? toTitleCase(provider);
+};
 
 // Configure gateway provider with app attribution headers
 export const gateway = createGateway({
@@ -99,6 +135,7 @@ export const getProviderOptions = (modelId: string) => {
         }
       : baseOptions,
     moonshotai: baseOptions,
+    zai: baseOptions,
   };
 };
 
@@ -120,4 +157,5 @@ export const modelSupportsReasoning = supportsReasoning;
 export const getModelCapabilities = getCapabilities;
 export const isModelCapable = isCapable;
 export const getDefaultProviderOptions = getProviderOptions;
+export const getProviderName = getProviderDisplayName;
 

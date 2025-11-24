@@ -17,7 +17,7 @@ const siteUrl = deploymentDomain
 const pageUrl = new URL("/models", siteUrl).toString();
 
 export const metadata: Metadata = {
-  title: "Catálogo de Modelos de IA | RIFT",
+  title: "Catálogo de Modelos",
   description: "Explora todos los modelos de inteligencia artificial disponibles en RIFT, desde GPT-5.1 Thinking hasta Gemini 3 Pro y Mistral, en una sola plataforma.",
   alternates: {
     canonical: "/models",
