@@ -10,3 +10,4 @@ export { default as Footer } from "./footer";
 export { default as CTASection } from "./cta-section";
 export { default as ScrollRiveAnimation } from "./scroll-rive-animation";
 export { default as PricingSection } from "./pricing-section";
+export { default as FaqSection } from "./faq-section";

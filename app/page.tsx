@@ -9,6 +9,7 @@ import {
   Footer,
   CTASection,
   PricingSection,
+  FaqSection,
 } from "@/components/landing";
 import { landingPlans } from "@/components/landing/data/pricing";
 
@@ -96,7 +97,7 @@ const whatIsRiftStructuredData = {
     name: "RIFT",
     applicationCategory: "BusinessApplication",
     offers: softwareApplicationStructuredData.offers,
-  },
+    },
   mainEntity: {
     "@type": "Organization",
     name: "RIFT",
@@ -110,26 +111,34 @@ const faqStructuredData = {
   mainEntity: [
     {
       "@type": "Question",
-      name: "¿Qué modelos de IA puedo usar dentro de RIFT?",
+      name: "¿Qué es RIFT?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Tienes acceso a los principales modelos de OpenAI, Anthropic, Google, xAI, DeepSeek, Mistral y otros proveedores emergentes, todo desde una sola suscripción.",
+        text: "RIFT es una plataforma unificada que te da acceso a los modelos de inteligencia artificial más avanzados del mundo (como GPT-4, Claude 3.5, Gemini 1.5, etc.) bajo una sola suscripción.",
       },
     },
     {
       "@type": "Question",
-      name: "¿Cómo funcionan los precios de los planes?",
+      name: "¿Qué modelos de IA están disponibles?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "RIFT ofrece planes Plus y Pro con cuotas mensuales transparentes en MXN, además de una opción Enterprise personalizada que incluye límites flexibles, SSO/SCIM, SLA y soporte dedicado.",
+        text: "Ofrecemos acceso a una amplia gama de modelos líderes en la industria, incluyendo la familia GPT de OpenAI, Claude de Anthropic, Gemini de Google, y modelos de código abierto como Llama y Mistral.",
       },
     },
     {
       "@type": "Question",
-      name: "¿RIFT está listo para organizaciones?",
+      name: "¿Cómo funciona la suscripción?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Sí. Contamos con integraciones SCIM, Directory Sync, SSO basados en SAML/OIDC, registros de auditoría y controles para Google Workspace, Microsoft y otros proveedores empresariales.",
+        text: "Con RIFT pagas una sola cuota mensual (desde $190 MXN) y tienes acceso a todos los modelos en una sola interfaz, ahorrando en múltiples suscripciones.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "¿Puedo cancelar en cualquier momento?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Sí, puedes cancelar tu suscripción en cualquier momento desde tu panel de control. No hay contratos a largo plazo.",
       },
     },
   ],
@@ -158,6 +167,7 @@ export default function LandingPage() {
         <ArchitectureSection />
         <PerformanceSection />
         <IntegrationsSection />
+        <FaqSection />
         <CTASection />
       </main>
 
