@@ -22,6 +22,24 @@ export default function UpdatesPage() {
   // Static data - in a real app, this could come from a CMS or API
   const updates: UpdateItem[] = [
     {
+      id: '1.1.0',
+      version: '1.1.0',
+      date: '2024-11-24',
+      title: 'Actualización de Noviembre',
+      description: 'Nueva actualización con mejoras al sistema de cuotas, nuevos modelos de IA y múltiples correcciones.',
+      features: [
+        'Mejoras significativas al sistema de gestión de cuotas',
+        'Nuevo modelo Grok 4.1 de xAI',
+        'Nuevo modelo Gemini 3 Pro de Google',
+        'Soporte para modelos GLM',
+        'Integración de Moonshot Kimi K2',
+        'Nuevos modelos GPT 5.1 Instant y GPT 5.1 Thinking',
+        'Múltiples correcciones y hotfixes de estabilidad',
+        'Optimizaciones de rendimiento en el procesamiento de solicitudes',
+      ],
+      isInstalled: true
+    },
+    {
       id: '1.0.0',
       version: '1.0.0',
       date: '2025-10-13',
