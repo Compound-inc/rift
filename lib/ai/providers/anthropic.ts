@@ -149,7 +149,7 @@ export const ANTHROPIC_MODELS: BaseModelConfig[] = [
     provider: "anthropic",
     description: "Haiku 3.5 es la próxima generación del modelo más rápido de Anthropic.",
     contextWindow: 200000,
-    isPremium: true,
+    isPremium: false,
     capabilities: mergeCapabilities({
       supportsTools: true,
       supportsStreaming: true,

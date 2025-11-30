@@ -16,7 +16,7 @@ export default async function MembersPage() {
 
   if (!organizationId) {
     return (
-      <div className="pt-12 pb-12 pl-12 pr-12 flex flex-col max-w-4xl min-w-[520px] w-full min-h-full box-border">
+      <div className="py-6 px-4 md:py-12 md:px-12 flex flex-col max-w-4xl min-w-0 md:min-w-[520px] w-full min-h-full box-border">
         <Flex direction="column" gap="3" width="100%">
           <Box>
             <Heading>Gestión de Miembros</Heading>
@@ -89,7 +89,7 @@ export default async function MembersPage() {
   // If the user has NEITHER permission, show access denied
   if (!userHasPermission && !canViewAuditLogs) {
     return (
-      <div className="pt-12 pb-12 pl-12 pr-12 flex flex-col max-w-4xl min-w-[520px] w-full min-h-full box-border">
+      <div className="py-6 px-4 md:py-12 md:px-12 flex flex-col max-w-4xl min-w-0 md:min-w-[520px] w-full min-h-full box-border">
         <Flex direction="column" gap="3" width="100%">
           <Box>
             <Heading>Gestión de Miembros</Heading>
@@ -103,7 +103,7 @@ export default async function MembersPage() {
   }
 
   return (
-    <div className="pt-12 pb-12 pl-12 pr-12 flex flex-col max-w-4xl min-w-[520px] w-full min-h-full box-border">
+    <div className="py-6 px-4 md:py-12 md:px-12 flex flex-col max-w-4xl min-w-0 md:min-w-[520px] w-full min-h-full box-border">
       <Box className="mb-6">
         <Heading size="6" mb="2">Gestión de Miembros</Heading>
         <Text color="gray" size="2">Gestiona los miembros de tu organización.</Text>

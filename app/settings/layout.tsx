@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { hasPermissions } from "@/lib/permissions";
 import { SettingsEscapeHandler } from "./settings-escape-handler";
+import { SettingsShell } from "@/components/settings/settings-shell";
 
 // Custom scrollbar styles matching the chat interface
 const scrollbarStyles = `
@@ -60,43 +61,45 @@ export default async function SettingsLayout({
   const canManageDomainSso = batch.WIDGETS_DOMAIN_VERIFICATION_MANAGE;
   const canViewAnalytics = batch.VIEW_ORG_ANALYTICS;
   const canManageBilling = batch.MANAGE_BILLING;
+  
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: scrollbarStyles }} />
-      <div className="h-screen flex bg-background dark:bg-popover-main">
-        <SettingsSidebar 
-          canManageMembers={canManageMembers}
-          canManageDomainSso={canManageDomainSso}
-          canViewAnalytics={canViewAnalytics}
-          canManageBilling={canManageBilling}
-        />
-        <main className="flex-1 overflow-y-auto relative bg-background dark:bg-popover-main settings-scroll-container">
-          {/* Close button - positioned fixed in top right to stay visible when scrolling */}
-          <div className="fixed top-4 right-4 z-50">
-            <Link 
-              href="/chat"
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-background-settings dark:bg-popover-main border dark:border-border shadow-container-small-n hover:bg-hover dark:hover:bg-hover/60 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-border"
-              title="Cerrar Ajustes"
+      <SettingsShell
+        sidebar={
+          <SettingsSidebar 
+            canManageMembers={canManageMembers}
+            canManageDomainSso={canManageDomainSso}
+            canViewAnalytics={canViewAnalytics}
+            canManageBilling={canManageBilling}
+          />
+        }
+      >
+        {/* Close button - positioned fixed in top right to stay visible when scrolling */}
+        <div className="fixed top-4 right-4 z-30">
+          <Link 
+            href="/chat"
+            className="flex items-center justify-center w-10 h-10 rounded-full bg-background-settings dark:bg-popover-main border dark:border-border shadow-container-small-n hover:bg-hover dark:hover:bg-hover/60 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-border"
+            title="Cerrar Ajustes"
+          >
+            <svg 
+              className="w-5 h-5 text-gray-500 dark:text-text-muted group-hover:text-gray-700 dark:group-hover:text-white" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
             >
-              <svg 
-                className="w-5 h-5 text-gray-500 dark:text-text-muted group-hover:text-gray-700 dark:group-hover:text-white" 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={2} 
-                  d="M6 18L18 6M6 6l12 12" 
-                />
-              </svg>
-            </Link>
-          </div>
-          <SettingsEscapeHandler />
-          {children}
-        </main>
-      </div>
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M6 18L18 6M6 6l12 12" 
+              />
+            </svg>
+          </Link>
+        </div>
+        <SettingsEscapeHandler />
+        {children}
+      </SettingsShell>
     </>
   );
 }

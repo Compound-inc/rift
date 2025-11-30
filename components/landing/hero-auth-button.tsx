@@ -14,7 +14,7 @@ export default function HeroAuthButton() {
       </AuthLoading>
       
       <Authenticated>
-        <Button asChild variant="accent" size="lg" className="font-semibold rounded-lg">
+        <Button asChild variant="accent" size="lg" className="font-semibold rounded-lg cursor-pointer">
           <Link href="/chat" className="font-semibold">Ir al chat</Link>
         </Button>
       </Authenticated>

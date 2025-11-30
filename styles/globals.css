@@ -178,10 +178,13 @@
   }
   html {
     background-color: var(--background);
+    overscroll-behavior: none;
+    touch-action: pan-x pan-y;
   }
   body {
     @apply bg-background text-foreground;
-    overscroll-behavior-y: none;
+    overscroll-behavior: none;
+    touch-action: pan-x pan-y;
   }
 
   /* Text selection styles */

@@ -21,6 +21,7 @@ import {
   BarChart3,
   File,
   Bug,
+  TrendingUp,
 } from "lucide-react";
 interface SettingsNavItem {
   title: string;
@@ -155,6 +156,11 @@ const settingsSections: SettingsSection[] = [
         icon: Building2,
       },
       {
+        title: "Analytics",
+        href: "/settings/insights",
+        icon: TrendingUp,
+      },
+      {
         title: "Suscripción",
         href: "/settings/billing",
         icon: ReceiptText,
@@ -260,8 +266,8 @@ export function SettingsSidebar({
   };
 
   return (
-    <div className="w-80 bg-background-settings dark:bg-popover-main dark:backdrop-blur-sm h-screen overflow-y-auto scrollbar-hide select-none pr-6">
-      <nav className="py-12 flex flex-col w-48 ml-auto">
+    <div className="w-full md:w-80 bg-background-settings dark:bg-popover-main dark:backdrop-blur-sm h-full md:h-screen overflow-y-auto scrollbar-hide select-none px-4 md:px-0 md:pr-6">
+      <nav className="py-6 md:py-12 flex flex-col w-full md:w-48 md:ml-auto">
         <div className="relative">
           <ul className="flex flex-col -mt-1.5 list-none p-0">
             {/* Navigation Sections */}

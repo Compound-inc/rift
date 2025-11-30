@@ -32,7 +32,7 @@ export type PromptInputProps = HTMLAttributes<HTMLFormElement>;
 export const PromptInput = ({ className, ...props }: PromptInputProps) => (
   <form
     className={cn(
-      "w-full divide-y overflow-hidden rounded-t-xl border bg-background shadow-sm dark:bg-popover-main dark:backdrop-blur-sm",
+      "w-full divide-y overflow-hidden rounded-none md:rounded-t-xl rounded-b-none border bg-background shadow-sm dark:bg-popover-main dark:backdrop-blur-sm",
       className,
     )}
     {...props}
@@ -67,9 +67,22 @@ export const PromptInputTextarea = ({
     if (e.key === "Enter") {
       if (e.nativeEvent.isComposing) return;
 
+      // Check if device is mobile/touch device
+      const isMobile = typeof window !== "undefined" && (
+        window.matchMedia("(max-width: 768px)").matches || 
+        'ontouchstart' in window || 
+        (navigator.maxTouchPoints && navigator.maxTouchPoints > 0)
+      );
+
+      if (isMobile) {
+        // On mobile, Enter always adds a new line
+        return;
+      }
+
+      // Desktop behavior: Enter submits, Shift+Enter adds newline
       if (e.shiftKey) return; // Allow newline with Shift+Enter
 
-      // Submit on Enter
+      // Submit on Enter (desktop)
       e.preventDefault();
       const form = e.currentTarget.form;
       if (form) form.requestSubmit();
@@ -105,7 +118,7 @@ export const PromptInputToolbar = ({
   ...props
 }: PromptInputToolbarProps) => (
   <div
-    className={cn("flex items-center justify-between p-1", className)}
+    className={cn("flex items-center justify-between px-3 py-2 md:p-1 pb-[max(env(safe-area-inset-bottom),1rem)] md:pb-1", className)}
     {...props}
   />
 );
@@ -286,6 +299,8 @@ export const PromptInputFileUpload = ({
       disabled={disabled}
       onChange={handleFileChange}
       className={cn("hidden", className)}
+      tabIndex={-1}
+      aria-hidden="true"
       {...props}
     />
   );

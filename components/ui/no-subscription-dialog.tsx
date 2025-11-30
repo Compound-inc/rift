@@ -12,6 +12,7 @@ import { Button } from "@/components/ai/ui/button";
 import { createStripePortalSession } from "@/actions/createStripePortalSession";
 import { useConvexAuth, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { generateUUID } from "@/lib/utils";
 
 interface NoSubscriptionDialogProps {
   isOpen: boolean;
@@ -107,7 +108,7 @@ export function NoSubscriptionDialog({
     isAuthenticated ? {} : "skip",
   );
 
-  const idempotencyKey = useMemo(() => crypto.randomUUID(), []);
+  const idempotencyKey = useMemo(() => generateUUID(), []);
 
   const resolved = useMemo(() => {
     const defaultOrgName = orgName ?? organizationInfo?.name ?? billingInfo?.name ?? null;

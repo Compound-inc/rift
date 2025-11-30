@@ -16,7 +16,7 @@ export default async function DomainSsoPage() {
   const userHasPermission = await hasPermission("WIDGETS_DOMAIN_VERIFICATION_MANAGE");
   if (!userHasPermission) {
     return (
-      <div className="pt-12 pb-12 pl-12 pr-12 flex flex-col max-w-4xl min-w-[520px] w-full min-h-full box-border">
+      <div className="py-6 px-4 md:py-12 md:px-12 flex flex-col max-w-4xl min-w-0 md:min-w-[520px] w-full min-h-full box-border">
         <Flex direction="column" gap="3" width="100%">
           <Box>
             <Heading>Gestión de Dominio y SSO</Heading>
@@ -31,7 +31,7 @@ export default async function DomainSsoPage() {
 
   if (!organizationId) {
     return (
-      <div className="pt-12 pb-12 pl-12 pr-12 flex flex-col max-w-4xl min-w-[520px] w-full min-h-full box-border">
+      <div className="py-6 px-4 md:py-12 md:px-12 flex flex-col max-w-4xl min-w-0 md:min-w-[520px] w-full min-h-full box-border">
         <Flex direction="column" gap="3" width="100%">
           <Box>
             <Heading>Gestión de Dominio y SSO</Heading>
@@ -82,7 +82,7 @@ export default async function DomainSsoPage() {
   );
 
   return (
-    <div className="pt-12 pb-12 pl-12 pr-12 flex flex-col max-w-4xl min-w-[520px] w-full min-h-full box-border">
+    <div className="py-6 px-4 md:py-12 md:px-12 flex flex-col max-w-4xl min-w-0 md:min-w-[520px] w-full min-h-full box-border">
       {/* Domain Verification Section */}
       <SettingsSection
         title="Verificación de Dominio"

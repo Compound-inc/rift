@@ -289,23 +289,23 @@ function ModelSelector({
               setActiveTab(value as "recomendado" | "avanzado")
             }
           >
-            <TabsList className="w-full md:w-fit mx-auto justify-start md:justify-center bg-popover-secondary p-1 mt-4 overflow-x-auto scrollbar-none">
+            <TabsList className="w-[calc(100%-2rem)] md:w-fit mx-auto justify-start md:justify-center bg-popover-secondary p-1 mt-4 overflow-x-auto scrollbar-none rounded-lg">
               <TabsTrigger
                 value="recomendado"
-                className="text-secondary data-[state=active]:bg-popover-main data-[state=active]:text-white px-4 py-3 min-w-max flex-shrink-0"
+                className="text-secondary data-[state=active]:bg-popover-main data-[state=active]:text-white px-4 py-3 min-w-max flex-shrink-0 rounded-md"
               >
                 Recomendado
               </TabsTrigger>
               <TabsTrigger
                 value="avanzado"
-                className="text-secondary data-[state=active]:bg-popover-main data-[state=active]:text-white px-4 py-3 min-w-max flex-shrink-0"
+                className="text-secondary data-[state=active]:bg-popover-main data-[state=active]:text-white px-4 py-3 min-w-max flex-shrink-0 rounded-md"
               >
                 Avanzado
               </TabsTrigger>
             </TabsList>
           </Tabs>
 
-          <SelectPrimitive.Viewport className="max-h-[80vh] overflow-y-auto p-0">
+          <SelectPrimitive.Viewport className="h-[500px] max-h-[80vh] overflow-y-auto p-0">
             {activeTab === "recomendado" && (
               <div className="px-4 py-4 md:px-6 md:py-6 space-y-4 md:space-y-6">
                 <div className="text-center mb-4 md:mb-6">

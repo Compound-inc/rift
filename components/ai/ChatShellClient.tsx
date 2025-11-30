@@ -1,10 +1,24 @@
 "use client";
 
-import { useCallback, useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect, createContext, useContext } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronLeftIcon, ChevronRightIcon, XIcon } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useIsMobile } from "@/hooks/use-mobile";
+
+type SidebarControlContextValue = {
+  closeSidebar: () => void;
+  isMobile: boolean;
+};
+
+const SidebarControlContext = createContext<SidebarControlContextValue>({
+  closeSidebar: () => {},
+  isMobile: false,
+});
+
+export function useChatSidebarControls() {
+  return useContext(SidebarControlContext);
+}
 
 type ChatShellClientProps = {
   children: React.ReactNode;
@@ -38,12 +52,21 @@ export function ChatShellClient({ children, className, sidebar }: ChatShellClien
   }, []);
 
   const toggle = useCallback(() => setIsOpen((v) => !v), []);
+  const closeSidebar = useCallback(() => setIsOpen(false), []);
 
   const sidebarWidth = 280; // px
 
   const sidebarStyle = useMemo<React.CSSProperties>(
     () => isMobile ? {} : ({ width: isOpen ? sidebarWidth : 0 }),
     [isOpen, isMobile]
+  );
+
+  const sidebarContextValue = useMemo(
+    () => ({
+      closeSidebar,
+      isMobile,
+    }),
+    [closeSidebar, isMobile],
   );
 
   return (
@@ -64,24 +87,26 @@ export function ChatShellClient({ children, className, sidebar }: ChatShellClien
           )}
           style={sidebarStyle}
         >
-          {isMobile && isOpen && (
-            <button
-              onClick={toggle}
-              className="absolute top-4 right-4 z-10 flex h-8 w-8 items-center justify-center rounded-md border bg-background/80 backdrop-blur-sm transition-colors shadow-sm hover:bg-accent dark:bg-popover-main dark:border-border"
-            >
-              <XIcon className="h-4 w-4" />
-            </button>
-          )}
-          <div className={cn(
-            "absolute inset-0 overflow-y-auto",
-            !isOpen && "invisible"
-          )}>
-            {sidebar}
-          </div>
+          <SidebarControlContext.Provider value={sidebarContextValue}>
+            {isMobile && isOpen && (
+              <button
+                onClick={toggle}
+                className="absolute top-4 right-4 z-10 flex h-8 w-8 items-center justify-center rounded-md border bg-background/80 backdrop-blur-sm transition-colors shadow-sm hover:bg-accent dark:bg-popover-main dark:border-border"
+              >
+                <XIcon className="h-4 w-4" />
+              </button>
+            )}
+            <div className={cn(
+              "absolute inset-0 overflow-y-auto",
+              !isOpen && "invisible"
+            )}>
+              {sidebar}
+            </div>
+          </SidebarControlContext.Provider>
         </aside>
         {isMobile && isOpen && (
           <div 
-            className="fixed inset-0 z-40 bg-black/50 md:hidden"
+            className="fixed inset-0 z-40 md:hidden backdrop-blur-sm"
             onClick={toggle}
           />
         )}

@@ -78,7 +78,7 @@ export default function UpdatesPage() {
   };
 
   return (
-    <div className="pt-12 pb-12 pl-12 pr-12 flex flex-col max-w-4xl min-w-[520px] w-full min-h-full box-border bg-background dark:bg-popover-main">
+    <div className="py-6 px-4 md:py-12 md:px-12 flex flex-col max-w-4xl min-w-0 md:min-w-[520px] w-full min-h-full box-border bg-background dark:bg-popover-main">
       {/* Updates Management */}
       <SettingsSection
         title="Actualizaciones"

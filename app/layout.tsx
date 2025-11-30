@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "@/styles/globals.css";
 import { ConvexClientProvider } from "@/components/ConvexClientProvider";
-import { ThemeColorUpdater } from "@/components/theme-color-updater";
 import { ThemeProvider } from "next-themes";
 import { Providers } from "./providers";
 import { cookies } from "next/headers";
@@ -18,10 +17,12 @@ const baseUrl = productionDomain ? `https://${productionDomain}` : "http://local
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 5,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "white" },
-    { media: "(prefers-color-scheme: dark)", color: "black" },
+    { media: "(prefers-color-scheme: light)", color: "#fbfbfb" },
+    { media: "(prefers-color-scheme: dark)", color: "#171717" },
   ],
 };
 
@@ -33,6 +34,11 @@ export const metadata: Metadata = {
   description: "Plataforma que unifica todos los modelos de IA en una sola app empresarial.",
   applicationName: "Rift",
   metadataBase: baseUrl,
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Rift",
+  },
   alternates: {
     canonical: "/",
   },
@@ -92,7 +98,7 @@ export default async function RootLayout({
 
   return (
     <html lang="es" className={`${inter.className}`} suppressHydrationWarning>
-      <body className={`bg-background relative antialiased`}>
+      <body className={`bg-[#FBFBFB] dark:bg-[#111113] relative antialiased`}>
         <ConvexClientProvider>
           <ThemeProvider
             attribute="class"
@@ -100,7 +106,6 @@ export default async function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <ThemeColorUpdater />
             <Providers initialModel={initialModel}>{children}</Providers>
           </ThemeProvider>
         </ConvexClientProvider>

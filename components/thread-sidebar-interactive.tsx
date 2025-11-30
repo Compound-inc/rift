@@ -8,6 +8,7 @@ import { Button } from "@/components/ai/ui/button";
 import { Loader } from "@/components/ai/loader";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useChatSidebarControls } from "@/components/ai/ChatShellClient";
 import { logThreadRemoved, logThreadRenamed } from "@/actions/audit";
 import { CheckIcon, AlertTriangleIcon } from "lucide-react";
 import { EditIcon, DeleteIcon, PinIcon } from "@/components/ui/icons/svg-icons";
@@ -84,6 +85,7 @@ export function ThreadSidebarInteractive({
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const { closeSidebar, isMobile: isMobileViewport } = useChatSidebarControls();
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -418,6 +420,16 @@ export function ThreadSidebarInteractive({
     }
   }, []);
 
+  const handleThreadNavigation = useCallback(
+    (threadId: string) => {
+      router.push(`/chat/${threadId}`);
+      if (isMobileViewport) {
+        closeSidebar();
+      }
+    },
+    [router, closeSidebar, isMobileViewport],
+  );
+
   const renderThreadItem = (thread: Thread) => {
     const isEditing = editingThreadId === thread.threadId;
 
@@ -425,7 +437,7 @@ export function ThreadSidebarInteractive({
       <ContextMenu key={thread.threadId}>
         <ContextMenuTrigger>
           <div
-            onClick={isEditing ? handleContainerClick : () => !isEditing && router.push(`/chat/${thread.threadId}`)}
+            onClick={isEditing ? handleContainerClick : () => handleThreadNavigation(thread.threadId)}
             className={cn(
               "group relative mb-1 flex cursor-pointer items-center gap-2 overflow-hidden rounded-lg p-2.5 transition-colors",
               "hover:bg-hover hover:text-accent-foreground",

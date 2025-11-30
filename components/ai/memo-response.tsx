@@ -15,7 +15,7 @@ export const MemoResponse = memo(
       messageId={messageId}
       partIdx={partIdx}
       className={cn(
-        'size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 text-[16px] leading-[28px] font-normal tracking-[0.015em] proportional-nums',
+        'size-full min-w-0 max-w-full break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 text-[16px] leading-[28px] font-normal tracking-[0.015em] proportional-nums',
         className
       )}
       {...props}

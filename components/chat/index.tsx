@@ -710,7 +710,7 @@ function ChatInterfaceInternal({
     >
       <div className="flex-1 min-h-0">
         <Conversation>
-          <ConversationContent className="mx-auto w-full max-w-3xl p-4 pb-35">
+          <ConversationContent className="mx-auto w-full max-w-full md:max-w-3xl p-4 pb-[140px] md:pb-35">
             {/* Load More button for threads */}
             {isThread && (paginationStatus === "CanLoadMore" || (initialMessages && hasMoreMessages && !enableClientPagination)) && (
               <div className="flex justify-center mb-4">

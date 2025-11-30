@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
             } else {
                 // Cancel old subscription and create new one (Upgrade/Switch)
                 const itemId = existingSubscription.items.data[0].id;
-                await stripe.subscriptions.update(existingSubscription.id, {
+                const updatedSubscription = await stripe.subscriptions.update(existingSubscription.id, {
                     items: [{
                         id: itemId,
                         price: priceId,
@@ -105,6 +105,7 @@ export async function POST(request: NextRequest) {
                     payment_behavior: 'default_incomplete',
                     expand: ['latest_invoice.payment_intent'],
                 });
+                subscriptionId = updatedSubscription.id;
             }
         } else {
             // No active subscription, create new one

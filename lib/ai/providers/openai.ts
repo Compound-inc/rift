@@ -21,7 +21,7 @@ export interface OpenAISettings {
   parallelToolCalls?: boolean;
   store?: boolean;
   user?: string;
-  reasoningEffort?: "minimal" | "low" | "medium" | "high";
+  reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
   reasoningSummary?: "auto" | "detailed";
   strictJsonSchema?: boolean;
   serviceTier?: "auto" | "flex" | "priority";
@@ -45,7 +45,7 @@ export const DEFAULT_OPENAI_SETTINGS: OpenAISettings = {
   ...DEFAULT_PROVIDER_SETTINGS,
   parallelToolCalls: true,
   store: true,
-  reasoningEffort: "medium",
+  reasoningEffort: "minimal",
   strictJsonSchema: false,
   serviceTier: "auto",
   textVerbosity: "medium",
@@ -81,7 +81,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     description:
       "Modelo de razonamiento avanzado con tiempo de procesamiento extendido para problemas complejos",
     contextWindow: 400000,
-    isPremium: true,
+    isPremium: false,
     capabilities: mergeCapabilities({
       supportsTools: true,
       supportsStreaming: true,
@@ -187,7 +187,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     description:
       "Modelo de razonamiento rápido y eficiente en costos, precedido por GPT-5 mini",
     contextWindow: 200000,
-    isPremium: false,
+    isPremium: true,
     capabilities: mergeCapabilities({
       supportsTools: true,
       supportsReasoning: true,

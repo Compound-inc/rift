@@ -1,0 +1,1169 @@
+[
+  {
+    "model": "xai/grok-4.1-fast-non-reasoning",
+    "provider": "xai",
+    "small": {
+      "inputTokens": 217,
+      "outputTokens": 34,
+      "totalTokens": 251,
+      "totalCost": "0.00003625",
+      "durationSeconds": 2.489
+    },
+    "medium": {
+      "inputTokens": 225,
+      "outputTokens": 190,
+      "totalTokens": 415,
+      "totalCost": "0.00011585",
+      "durationSeconds": 4.181
+    },
+    "big": {
+      "inputTokens": 1447,
+      "outputTokens": 1548,
+      "totalTokens": 2995,
+      "totalCost": "0.00103925",
+      "durationSeconds": 22.527
+    },
+    "isPremium": false
+  },
+  {
+    "model": "xai/grok-4.1-fast-reasoning",
+    "provider": "xai",
+    "small": {
+      "inputTokens": 205,
+      "outputTokens": 32,
+      "totalTokens": 237,
+      "totalCost": "0.00012335",
+      "durationSeconds": 3.713
+    },
+    "medium": {
+      "inputTokens": 213,
+      "outputTokens": 191,
+      "totalTokens": 404,
+      "totalCost": "0.00031495",
+      "durationSeconds": 9.086
+    },
+    "big": {
+      "inputTokens": 1435,
+      "outputTokens": 1694,
+      "totalTokens": 3129,
+      "totalCost": "0.00145605",
+      "durationSeconds": 34.099
+    },
+    "isPremium": false
+  },
+  {
+    "model": "anthropic/claude-opus-4.5",
+    "provider": "anthropic",
+    "small": {
+      "inputTokens": 66,
+      "outputTokens": 51,
+      "totalTokens": 117,
+      "totalCost": "0.001605",
+      "durationSeconds": 3.644
+    },
+    "medium": {
+      "inputTokens": 68,
+      "outputTokens": 315,
+      "totalTokens": 383,
+      "totalCost": "0.008215",
+      "durationSeconds": 10.01
+    },
+    "big": {
+      "inputTokens": 1490,
+      "outputTokens": 2726,
+      "totalTokens": 4216,
+      "totalCost": "0.0756",
+      "durationSeconds": 65.252
+    },
+    "isPremium": true
+  },
+  {
+    "model": "anthropic/claude-sonnet-4.5",
+    "provider": "anthropic",
+    "small": {
+      "inputTokens": 66,
+      "outputTokens": 116,
+      "totalTokens": 182,
+      "totalCost": "0.001938",
+      "durationSeconds": 4.846
+    },
+    "medium": {
+      "inputTokens": 68,
+      "outputTokens": 272,
+      "totalTokens": 340,
+      "totalCost": "0.004284",
+      "durationSeconds": 9.203
+    },
+    "big": {
+      "inputTokens": 1490,
+      "outputTokens": 2258,
+      "totalTokens": 3748,
+      "totalCost": "0.03834",
+      "durationSeconds": 54.973
+    },
+    "isPremium": true
+  },
+  {
+    "model": "anthropic/claude-sonnet-4",
+    "provider": "anthropic",
+    "small": {
+      "inputTokens": 66,
+      "outputTokens": 101,
+      "totalTokens": 167,
+      "totalCost": "0.001713",
+      "durationSeconds": 3.784
+    },
+    "medium": {
+      "inputTokens": 68,
+      "outputTokens": 258,
+      "totalTokens": 326,
+      "totalCost": "0.004074",
+      "durationSeconds": 9.113
+    },
+    "big": {
+      "inputTokens": 1490,
+      "outputTokens": 1170,
+      "totalTokens": 2660,
+      "totalCost": "0.02202",
+      "durationSeconds": 29.592
+    },
+    "isPremium": true
+  },
+  {
+    "model": "anthropic/claude-3.7-sonnet",
+    "provider": "anthropic",
+    "small": {
+      "inputTokens": 66,
+      "outputTokens": 92,
+      "totalTokens": 158,
+      "totalCost": "0.001578",
+      "durationSeconds": 2.672
+    },
+    "medium": {
+      "inputTokens": 68,
+      "outputTokens": 267,
+      "totalTokens": 335,
+      "totalCost": "0.004209",
+      "durationSeconds": 6.74
+    },
+    "big": {
+      "inputTokens": 1490,
+      "outputTokens": 1513,
+      "totalTokens": 3003,
+      "totalCost": "0.027165",
+      "durationSeconds": 30.524
+    },
+    "isPremium": true
+  },
+  {
+    "model": "anthropic/claude-3.5-sonnet",
+    "provider": "anthropic",
+    "small": {
+      "inputTokens": 66,
+      "outputTokens": 46,
+      "totalTokens": 112,
+      "totalCost": "0.000888",
+      "durationSeconds": 1.95
+    },
+    "medium": {
+      "inputTokens": 68,
+      "outputTokens": 212,
+      "totalTokens": 280,
+      "totalCost": "0.003384",
+      "durationSeconds": 5.319
+    },
+    "big": {
+      "inputTokens": 1490,
+      "outputTokens": 633,
+      "totalTokens": 2123,
+      "totalCost": "0.013965",
+      "durationSeconds": 13.706
+    },
+    "isPremium": true
+  },
+  {
+    "model": "anthropic/claude-haiku-4.5",
+    "provider": "anthropic",
+    "small": {
+      "inputTokens": 66,
+      "outputTokens": 105,
+      "totalTokens": 171,
+      "totalCost": "0.000591",
+      "durationSeconds": 2.378
+    },
+    "medium": {
+      "inputTokens": 68,
+      "outputTokens": 234,
+      "totalTokens": 302,
+      "totalCost": "0.001238",
+      "durationSeconds": 4.708
+    },
+    "big": {
+      "inputTokens": 1490,
+      "outputTokens": 2702,
+      "totalTokens": 4192,
+      "totalCost": "0.015",
+      "durationSeconds": 34.759
+    },
+    "isPremium": true
+  },
+  {
+    "model": "anthropic/claude-3.5-haiku",
+    "provider": "anthropic",
+    "small": {
+      "inputTokens": 66,
+      "outputTokens": 46,
+      "totalTokens": 112,
+      "totalCost": "0.0002368",
+      "durationSeconds": 2.024
+    },
+    "medium": {
+      "inputTokens": 68,
+      "outputTokens": 205,
+      "totalTokens": 273,
+      "totalCost": "0.0008744",
+      "durationSeconds": 6.421
+    },
+    "big": {
+      "inputTokens": 1490,
+      "outputTokens": 668,
+      "totalTokens": 2158,
+      "totalCost": "0.003864",
+      "durationSeconds": 15.772
+    },
+    "isPremium": false
+  },
+  {
+    "model": "anthropic/claude-3-haiku",
+    "provider": "anthropic",
+    "small": {
+      "inputTokens": 66,
+      "outputTokens": 88,
+      "totalTokens": 154,
+      "totalCost": "0.0001265",
+      "durationSeconds": 1.417
+    },
+    "medium": {
+      "inputTokens": 68,
+      "outputTokens": 227,
+      "totalTokens": 295,
+      "totalCost": "0.00030075",
+      "durationSeconds": 2.135
+    },
+    "big": {
+      "inputTokens": 1490,
+      "outputTokens": 1540,
+      "totalTokens": 3030,
+      "totalCost": "0.0022975",
+      "durationSeconds": 12.11
+    },
+    "isPremium": false
+  },
+  {
+    "model": "google/gemini-3-pro-preview",
+    "provider": "google",
+    "small": {
+      "inputTokens": 56,
+      "outputTokens": 215,
+      "totalTokens": 271,
+      "totalCost": "0.012724",
+      "durationSeconds": 11.036
+    },
+    "medium": {
+      "inputTokens": 56,
+      "outputTokens": 322,
+      "totalTokens": 378,
+      "totalCost": "0.017404",
+      "durationSeconds": 15.036
+    },
+    "big": {
+      "inputTokens": 1395,
+      "outputTokens": 1143,
+      "totalTokens": 2538,
+      "totalCost": "0.037482",
+      "durationSeconds": 29.703
+    },
+    "isPremium": true
+  },
+  {
+    "model": "google/gemini-2.5-pro",
+    "provider": "google",
+    "small": {
+      "inputTokens": 56,
+      "outputTokens": 249,
+      "totalTokens": 305,
+      "totalCost": "0.01584",
+      "durationSeconds": 14.829
+    },
+    "medium": {
+      "inputTokens": 56,
+      "outputTokens": 461,
+      "totalTokens": 517,
+      "totalCost": "0.02115",
+      "durationSeconds": 28.315
+    },
+    "big": {
+      "inputTokens": 1395,
+      "outputTokens": 1687,
+      "totalTokens": 3082,
+      "totalCost": "0.04395375",
+      "durationSeconds": 55.396
+    },
+    "isPremium": true
+  },
+  {
+    "model": "google/gemini-2.5-flash",
+    "provider": "google",
+    "small": {
+      "inputTokens": 56,
+      "outputTokens": 214,
+      "totalTokens": 270,
+      "totalCost": "0.0028393",
+      "durationSeconds": 6.348
+    },
+    "medium": {
+      "inputTokens": 56,
+      "outputTokens": 341,
+      "totalTokens": 397,
+      "totalCost": "0.0037168",
+      "durationSeconds": 10.107
+    },
+    "big": {
+      "inputTokens": 1395,
+      "outputTokens": 2118,
+      "totalTokens": 3513,
+      "totalCost": "0.012696",
+      "durationSeconds": 27.033
+    },
+    "isPremium": false
+  },
+  {
+    "model": "google/gemini-2.0-flash",
+    "provider": "google",
+    "small": {
+      "inputTokens": 56,
+      "outputTokens": 456,
+      "totalTokens": 512,
+      "totalCost": "0.000282",
+      "durationSeconds": 4.445
+    },
+    "medium": {
+      "inputTokens": 56,
+      "outputTokens": 317,
+      "totalTokens": 373,
+      "totalCost": "0.0001986",
+      "durationSeconds": 3.173
+    },
+    "big": {
+      "inputTokens": 1395,
+      "outputTokens": 1295,
+      "totalTokens": 2690,
+      "totalCost": "0.00098625",
+      "durationSeconds": 10.123
+    },
+    "isPremium": false
+  },
+  {
+    "model": "google/gemini-2.0-flash-lite",
+    "provider": "google",
+    "small": {
+      "inputTokens": 56,
+      "outputTokens": 46,
+      "totalTokens": 102,
+      "totalCost": "0.000018",
+      "durationSeconds": 1.201
+    },
+    "medium": {
+      "inputTokens": 56,
+      "outputTokens": 305,
+      "totalTokens": 361,
+      "totalCost": "0.0000957",
+      "durationSeconds": 3.205
+    },
+    "big": {
+      "inputTokens": 1395,
+      "outputTokens": 1257,
+      "totalTokens": 2652,
+      "totalCost": "0.000481725",
+      "durationSeconds": 9.325
+    },
+    "isPremium": false
+  },
+  {
+    "model": "deepseek/deepseek-v3.1",
+    "provider": "deepseek",
+    "small": {
+      "inputTokens": 58,
+      "outputTokens": 508,
+      "totalTokens": 566,
+      "totalCost": "0.000791",
+      "durationSeconds": 3.255
+    },
+    "medium": {
+      "inputTokens": 61,
+      "outputTokens": 266,
+      "totalTokens": 327,
+      "totalCost": "0.0004295",
+      "durationSeconds": 2.253
+    },
+    "big": {
+      "inputTokens": 1330,
+      "outputTokens": 1276,
+      "totalTokens": 2606,
+      "totalCost": "0.002579",
+      "durationSeconds": 6.472
+    },
+    "isPremium": false
+  },
+  {
+    "model": "deepseek/deepseek-v3",
+    "provider": "deepseek",
+    "small": {
+      "inputTokens": 59,
+      "outputTokens": 199,
+      "totalTokens": 258,
+      "totalCost": "0.00019866",
+      "durationSeconds": 4.914
+    },
+    "medium": {
+      "inputTokens": 62,
+      "outputTokens": 218,
+      "totalTokens": 280,
+      "totalCost": "0.0002156",
+      "durationSeconds": 4.705
+    },
+    "big": {
+      "inputTokens": 1331,
+      "outputTokens": 759,
+      "totalTokens": 2090,
+      "totalCost": "0.0016093",
+      "durationSeconds": 11.662
+    },
+    "isPremium": false
+  },
+  {
+    "model": "mistral/mistral-medium",
+    "provider": "mistral",
+    "small": {
+      "inputTokens": 58,
+      "outputTokens": 167,
+      "totalTokens": 225,
+      "totalCost": "0.0003572",
+      "durationSeconds": 2.425
+    },
+    "medium": {
+      "inputTokens": 62,
+      "outputTokens": 302,
+      "totalTokens": 364,
+      "totalCost": "0.0006288",
+      "durationSeconds": 5.049
+    },
+    "big": {
+      "inputTokens": 1392,
+      "outputTokens": 2849,
+      "totalTokens": 4241,
+      "totalCost": "0.0062548",
+      "durationSeconds": 29.087
+    },
+    "isPremium": false
+  },
+  {
+    "model": "mistral/codestral",
+    "provider": "mistral",
+    "small": {
+      "inputTokens": 58,
+      "outputTokens": 95,
+      "totalTokens": 153,
+      "totalCost": "0.0001029",
+      "durationSeconds": 1.435
+    },
+    "medium": {
+      "inputTokens": 62,
+      "outputTokens": 274,
+      "totalTokens": 336,
+      "totalCost": "0.0002652",
+      "durationSeconds": 2.346
+    },
+    "big": {
+      "inputTokens": 1392,
+      "outputTokens": 887,
+      "totalTokens": 2279,
+      "totalCost": "0.0012159",
+      "durationSeconds": 5.64
+    },
+    "isPremium": false
+  },
+  {
+    "model": "moonshotai/kimi-k2",
+    "provider": "moonshotai",
+    "small": {
+      "inputTokens": 80,
+      "outputTokens": 35,
+      "totalTokens": 115,
+      "totalCost": "0.00011",
+      "durationSeconds": 1.636
+    },
+    "medium": {
+      "inputTokens": 86,
+      "outputTokens": 219,
+      "totalTokens": 305,
+      "totalCost": "0.000481",
+      "durationSeconds": 11.272
+    },
+    "big": {
+      "inputTokens": 1322,
+      "outputTokens": 1019,
+      "totalTokens": 2341,
+      "totalCost": "0.002699",
+      "durationSeconds": 19.249
+    },
+    "isPremium": false
+  },
+  {
+    "model": "moonshotai/kimi-k2-thinking",
+    "provider": "moonshotai",
+    "small": {
+      "inputTokens": 58,
+      "outputTokens": 378,
+      "totalTokens": 436,
+      "totalCost": "0.0009798",
+      "durationSeconds": 29.988
+    },
+    "medium": {
+      "inputTokens": 64,
+      "outputTokens": 1122,
+      "totalTokens": 1186,
+      "totalCost": "0.0028434",
+      "durationSeconds": 84.78
+    },
+    "big": {
+      "error": "Invalid error response format: Gateway request failed: The operation timed out.",
+      "durationSeconds": 300.027
+    },
+    "isPremium": true
+  },
+  {
+    "model": "zai/glm-4.6",
+    "provider": "zai",
+    "small": {
+      "inputTokens": 59,
+      "outputTokens": 1973,
+      "totalTokens": 2032,
+      "totalCost": "0.00357795",
+      "durationSeconds": 23.606
+    },
+    "medium": {
+      "inputTokens": 62,
+      "outputTokens": 1969,
+      "totalTokens": 2031,
+      "totalCost": "0.0035721",
+      "durationSeconds": 22.602
+    },
+    "big": {
+      "inputTokens": 1317,
+      "outputTokens": 3914,
+      "totalTokens": 5231,
+      "totalCost": "0.00763785",
+      "durationSeconds": 81.167
+    },
+    "isPremium": false
+  },
+  {
+    "model": "zai/glm-4.5v",
+    "provider": "zai",
+    "small": {
+      "inputTokens": 61,
+      "outputTokens": 642,
+      "totalTokens": 703,
+      "totalCost": "0.0011922",
+      "durationSeconds": 31.377
+    },
+    "medium": {
+      "inputTokens": 64,
+      "outputTokens": 998,
+      "totalTokens": 1062,
+      "totalCost": "0.0018348",
+      "durationSeconds": 33.268
+    },
+    "big": {
+      "inputTokens": 1319,
+      "outputTokens": 2062,
+      "totalTokens": 3381,
+      "totalCost": "0.004503",
+      "durationSeconds": 63.557
+    },
+    "isPremium": false
+  },
+  {
+    "model": "zai/glm-4.5",
+    "provider": "zai",
+    "small": {
+      "inputTokens": 59,
+      "outputTokens": 734,
+      "totalTokens": 793,
+      "totalCost": "0.0016502",
+      "durationSeconds": 9.113
+    },
+    "medium": {
+      "inputTokens": 62,
+      "outputTokens": 1017,
+      "totalTokens": 1079,
+      "totalCost": "0.0022746",
+      "durationSeconds": 10.947
+    },
+    "big": {
+      "inputTokens": 1317,
+      "outputTokens": 4492,
+      "totalTokens": 5809,
+      "totalCost": "0.0106726",
+      "durationSeconds": 76.317
+    },
+    "isPremium": false
+  },
+  {
+    "model": "zai/glm-4.5-air",
+    "provider": "zai",
+    "small": {
+      "inputTokens": 59,
+      "outputTokens": 667,
+      "totalTokens": 726,
+      "totalCost": "0.0007455",
+      "durationSeconds": 15.074
+    },
+    "medium": {
+      "inputTokens": 62,
+      "outputTokens": 649,
+      "totalTokens": 711,
+      "totalCost": "0.0007263",
+      "durationSeconds": 21.353
+    },
+    "big": {
+      "inputTokens": 1317,
+      "outputTokens": 2415,
+      "totalTokens": 3732,
+      "totalCost": "0.0029199",
+      "durationSeconds": 22.53
+    },
+    "isPremium": false
+  },
+  {
+    "model": "prime-intellect/intellect-3",
+    "provider": "prime-intellect",
+    "small": {
+      "inputTokens": 63,
+      "outputTokens": 769,
+      "totalTokens": 832,
+      "totalCost": "0.0008585",
+      "durationSeconds": 17.221
+    },
+    "medium": {
+      "inputTokens": 66,
+      "outputTokens": 917,
+      "totalTokens": 983,
+      "totalCost": "0.0010219",
+      "durationSeconds": 18.393
+    },
+    "big": {
+      "inputTokens": 1321,
+      "outputTokens": 4612,
+      "totalTokens": 5933,
+      "totalCost": "0.0053374",
+      "durationSeconds": 95.558
+    },
+    "isPremium": false
+  },
+  {
+    "model": "xai/grok-4-fast-non-reasoning",
+    "provider": "xai",
+    "small": {
+      "inputTokens": 217,
+      "outputTokens": 42,
+      "totalTokens": 259,
+      "totalCost": "0.00004025",
+      "durationSeconds": 0.932
+    },
+    "medium": {
+      "inputTokens": 225,
+      "outputTokens": 209,
+      "totalTokens": 434,
+      "totalCost": "0.00012535",
+      "durationSeconds": 1.726
+    },
+    "big": {
+      "inputTokens": 1447,
+      "outputTokens": 1878,
+      "totalTokens": 3325,
+      "totalCost": "0.00120395",
+      "durationSeconds": 9.83
+    },
+    "isPremium": false
+  },
+  {
+    "model": "xai/grok-4",
+    "provider": "xai",
+    "small": {
+      "inputTokens": 733,
+      "outputTokens": 47,
+      "totalTokens": 780,
+      "totalCost": "0.003372",
+      "durationSeconds": 8.611
+    },
+    "medium": {
+      "inputTokens": 741,
+      "outputTokens": 228,
+      "totalTokens": 969,
+      "totalCost": "0.009351",
+      "durationSeconds": 18.628
+    },
+    "big": {
+      "inputTokens": 1963,
+      "outputTokens": 2235,
+      "totalTokens": 4198,
+      "totalCost": "0.044121",
+      "durationSeconds": 84.62
+    },
+    "isPremium": true
+  },
+  {
+    "model": "xai/grok-code-fast-1",
+    "provider": "xai",
+    "small": {
+      "inputTokens": 253,
+      "outputTokens": 30,
+      "totalTokens": 283,
+      "totalCost": "0.00035504",
+      "durationSeconds": 2.552
+    },
+    "medium": {
+      "inputTokens": 261,
+      "outputTokens": 214,
+      "totalTokens": 475,
+      "totalCost": "0.00057012",
+      "durationSeconds": 4.463
+    },
+    "big": {
+      "inputTokens": 1483,
+      "outputTokens": 1575,
+      "totalTokens": 3058,
+      "totalCost": "0.00289814",
+      "durationSeconds": 16.711
+    },
+    "isPremium": false
+  },
+  {
+    "model": "xai/grok-3",
+    "provider": "xai",
+    "small": {
+      "inputTokens": 55,
+      "outputTokens": 57,
+      "totalTokens": 112,
+      "totalCost": "0.001014",
+      "durationSeconds": 3.414
+    },
+    "medium": {
+      "inputTokens": 63,
+      "outputTokens": 279,
+      "totalTokens": 342,
+      "totalCost": "0.004368",
+      "durationSeconds": 9.219
+    },
+    "big": {
+      "inputTokens": 1285,
+      "outputTokens": 2060,
+      "totalTokens": 3345,
+      "totalCost": "0.034749",
+      "durationSeconds": 49.61
+    },
+    "isPremium": true
+  },
+  {
+    "model": "xai/grok-3-mini",
+    "provider": "xai",
+    "small": {
+      "inputTokens": 56,
+      "outputTokens": 56,
+      "totalTokens": 112,
+      "totalCost": "0.0002352",
+      "durationSeconds": 4.307
+    },
+    "medium": {
+      "inputTokens": 64,
+      "outputTokens": 212,
+      "totalTokens": 276,
+      "totalCost": "0.0003181",
+      "durationSeconds": 5.443
+    },
+    "big": {
+      "inputTokens": 1286,
+      "outputTokens": 2049,
+      "totalTokens": 3335,
+      "totalCost": "0.0013298",
+      "durationSeconds": 20.461
+    },
+    "isPremium": false
+  },
+  {
+    "model": "openai/gpt-5.1-instant",
+    "provider": "openai",
+    "isPremium": false,
+    "small": {
+      "inputTokens": 56,
+      "outputTokens": 38,
+      "totalTokens": 94,
+      "totalCost": "0.00045",
+      "durationSeconds": 1.912
+    },
+    "medium": {
+      "inputTokens": 63,
+      "outputTokens": 108,
+      "totalTokens": 171,
+      "totalCost": "0.00115875",
+      "durationSeconds": 2.457
+    },
+    "big": {
+      "inputTokens": 1295,
+      "outputTokens": 840,
+      "totalTokens": 2135,
+      "totalCost": "0.01001875",
+      "durationSeconds": 12.411
+    }
+  },
+  {
+    "model": "openai/gpt-5.1-thinking",
+    "provider": "openai",
+    "isPremium": true,
+    "small": {
+      "inputTokens": 56,
+      "outputTokens": 61,
+      "totalTokens": 117,
+      "totalCost": "0.00068",
+      "durationSeconds": 1.831
+    },
+    "medium": {
+      "inputTokens": 63,
+      "outputTokens": 192,
+      "totalTokens": 255,
+      "totalCost": "0.00199875",
+      "durationSeconds": 3.983
+    },
+    "big": {
+      "inputTokens": 1295,
+      "outputTokens": 3957,
+      "totalTokens": 5252,
+      "totalCost": "0.04118875",
+      "durationSeconds": 57.787
+    }
+  },
+  {
+    "model": "openai/gpt-5",
+    "provider": "openai",
+    "isPremium": true,
+    "small": {
+      "inputTokens": 56,
+      "outputTokens": 315,
+      "totalTokens": 371,
+      "totalCost": "0.00578",
+      "durationSeconds": 6.33
+    },
+    "medium": {
+      "inputTokens": 63,
+      "outputTokens": 1068,
+      "totalTokens": 1131,
+      "totalCost": "0.01907875",
+      "durationSeconds": 23.55
+    },
+    "big": {
+      "inputTokens": 1295,
+      "outputTokens": 5925,
+      "totalTokens": 7220,
+      "totalCost": "0.09798875",
+      "durationSeconds": 114.062
+    }
+  },
+  {
+    "model": "openai/gpt-5-mini",
+    "provider": "openai",
+    "isPremium": false,
+    "small": {
+      "inputTokens": 56,
+      "outputTokens": 318,
+      "totalTokens": 374,
+      "totalCost": "0.001162",
+      "durationSeconds": 5.318
+    },
+    "medium": {
+      "inputTokens": 63,
+      "outputTokens": 707,
+      "totalTokens": 770,
+      "totalCost": "0.00232575",
+      "durationSeconds": 11.95
+    },
+    "big": {
+      "inputTokens": 1295,
+      "outputTokens": 4002,
+      "totalTokens": 5297,
+      "totalCost": "0.01127175",
+      "durationSeconds": 58.475
+    }
+  },
+  {
+    "model": "openai/gpt-5-nano",
+    "provider": "openai",
+    "isPremium": false,
+    "small": {
+      "inputTokens": 56,
+      "outputTokens": 885,
+      "totalTokens": 941,
+      "totalCost": "0.0006896",
+      "durationSeconds": 9.656
+    },
+    "medium": {
+      "inputTokens": 63,
+      "outputTokens": 2184,
+      "totalTokens": 2247,
+      "totalCost": "0.00164475",
+      "durationSeconds": 23.245
+    },
+    "big": {
+      "inputTokens": 1295,
+      "outputTokens": 6199,
+      "totalTokens": 7494,
+      "totalCost": "0.00441315",
+      "durationSeconds": 67.836
+    }
+  },
+  {
+    "model": "openai/o3",
+    "provider": "openai",
+    "isPremium": true,
+    "small": {
+      "inputTokens": 56,
+      "outputTokens": 52,
+      "totalTokens": 108,
+      "totalCost": "0.000528",
+      "durationSeconds": 2.879
+    },
+    "medium": {
+      "inputTokens": 63,
+      "outputTokens": 343,
+      "totalTokens": 406,
+      "totalCost": "0.003894",
+      "durationSeconds": 4.676
+    },
+    "big": {
+      "inputTokens": 1295,
+      "outputTokens": 1782,
+      "totalTokens": 3077,
+      "totalCost": "0.020942",
+      "durationSeconds": 17.19
+    }
+  },
+  {
+    "model": "openai/o3-mini",
+    "provider": "openai",
+    "isPremium": true,
+    "small": {
+      "inputTokens": 56,
+      "outputTokens": 171,
+      "totalTokens": 227,
+      "totalCost": "0.0013772",
+      "durationSeconds": 2.846
+    },
+    "medium": {
+      "inputTokens": 63,
+      "outputTokens": 409,
+      "totalTokens": 472,
+      "totalCost": "0.0029953",
+      "durationSeconds": 4.571
+    },
+    "big": {
+      "inputTokens": 1295,
+      "outputTokens": 3023,
+      "totalTokens": 4318,
+      "totalCost": "0.0200761",
+      "durationSeconds": 26.976
+    }
+  },
+  {
+    "model": "openai/o4-mini",
+    "provider": "openai",
+    "isPremium": true,
+    "small": {
+      "inputTokens": 56,
+      "outputTokens": 310,
+      "totalTokens": 366,
+      "totalCost": "0.002552",
+      "durationSeconds": 3.461
+    },
+    "medium": {
+      "inputTokens": 63,
+      "outputTokens": 499,
+      "totalTokens": 562,
+      "totalCost": "0.0036729",
+      "durationSeconds": 5.036
+    },
+    "big": {
+      "inputTokens": 1295,
+      "outputTokens": 1859,
+      "totalTokens": 3154,
+      "totalCost": "0.0121385",
+      "durationSeconds": 13.62
+    }
+  },
+  {
+    "model": "openai/gpt-4.1",
+    "provider": "openai",
+    "isPremium": true,
+    "small": {
+      "inputTokens": 57,
+      "outputTokens": 66,
+      "totalTokens": 123,
+      "totalCost": "0.000642",
+      "durationSeconds": 2.871
+    },
+    "medium": {
+      "inputTokens": 64,
+      "outputTokens": 171,
+      "totalTokens": 235,
+      "totalCost": "0.001496",
+      "durationSeconds": 2.577
+    },
+    "big": {
+      "inputTokens": 1296,
+      "outputTokens": 1308,
+      "totalTokens": 2604,
+      "totalCost": "0.013056",
+      "durationSeconds": 19.41
+    }
+  },
+  {
+    "model": "openai/gpt-4.1-mini",
+    "provider": "openai",
+    "isPremium": false,
+    "small": {
+      "inputTokens": 57,
+      "outputTokens": 65,
+      "totalTokens": 122,
+      "totalCost": "0.0001268",
+      "durationSeconds": 2.535
+    },
+    "medium": {
+      "inputTokens": 64,
+      "outputTokens": 136,
+      "totalTokens": 200,
+      "totalCost": "0.0002432",
+      "durationSeconds": 3.119
+    },
+    "big": {
+      "inputTokens": 1296,
+      "outputTokens": 1546,
+      "totalTokens": 2842,
+      "totalCost": "0.002992",
+      "durationSeconds": 19.989
+    }
+  },
+  {
+    "model": "openai/gpt-4o",
+    "provider": "openai",
+    "isPremium": true,
+    "small": {
+      "inputTokens": 57,
+      "outputTokens": 60,
+      "totalTokens": 117,
+      "totalCost": "0.0007425",
+      "durationSeconds": 2.684
+    },
+    "medium": {
+      "inputTokens": 64,
+      "outputTokens": 171,
+      "totalTokens": 235,
+      "totalCost": "0.00187",
+      "durationSeconds": 3.434
+    },
+    "big": {
+      "inputTokens": 1296,
+      "outputTokens": 648,
+      "totalTokens": 1944,
+      "totalCost": "0.00972",
+      "durationSeconds": 11.366
+    }
+  },
+  {
+    "model": "openai/gpt-4o-mini",
+    "provider": "openai",
+    "isPremium": false,
+    "small": {
+      "inputTokens": 57,
+      "outputTokens": 88,
+      "totalTokens": 145,
+      "totalCost": "0.00006135",
+      "durationSeconds": 2.588
+    },
+    "medium": {
+      "inputTokens": 64,
+      "outputTokens": 229,
+      "totalTokens": 293,
+      "totalCost": "0.000147",
+      "durationSeconds": 6.217
+    },
+    "big": {
+      "inputTokens": 1296,
+      "outputTokens": 847,
+      "totalTokens": 2143,
+      "totalCost": "0.0007026",
+      "durationSeconds": 22.647
+    }
+  },
+  {
+    "model": "openai/gpt-oss-120b",
+    "provider": "openai",
+    "isPremium": false,
+    "small": {
+      "inputTokens": 117,
+      "outputTokens": 113,
+      "totalTokens": 230,
+      "totalCost": "0.00010722",
+      "durationSeconds": 0.87
+    },
+    "medium": {
+      "inputTokens": 124,
+      "outputTokens": 286,
+      "totalTokens": 410,
+      "totalCost": "0.00022834",
+      "durationSeconds": 1.013
+    },
+    "big": {
+      "inputTokens": 1356,
+      "outputTokens": 2957,
+      "totalTokens": 4313,
+      "totalCost": "0.00237933",
+      "durationSeconds": 2.561
+    }
+  },
+  {
+    "model": "openai/gpt-oss-20b",
+    "provider": "openai",
+    "isPremium": false,
+    "small": {
+      "inputTokens": 119,
+      "outputTokens": 108,
+      "totalTokens": 227,
+      "totalCost": "0.00004073",
+      "durationSeconds": 1.885
+    },
+    "medium": {
+      "inputTokens": 126,
+      "outputTokens": 293,
+      "totalTokens": 419,
+      "totalCost": "0.00009672",
+      "durationSeconds": 3.571
+    },
+    "big": {
+      "inputTokens": 1358,
+      "outputTokens": 2339,
+      "totalTokens": 3697,
+      "totalCost": "0.00079676",
+      "durationSeconds": 14.551
+    }
+  }
+]

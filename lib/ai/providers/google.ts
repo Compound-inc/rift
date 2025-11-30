@@ -188,7 +188,7 @@ export function getReasoningSettings(
 
   return {
     thinkingConfig: {
-      thinkingBudget: 3200,
+      thinkingBudget: 1000,
       includeThoughts: true,
     },
   };

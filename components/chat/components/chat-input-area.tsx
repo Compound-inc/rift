@@ -88,8 +88,8 @@ export const ChatInputArea = React.memo(function ChatInputArea({
   }, [isSendingMessage, uploadedAttachments, uploadingFiles]);
 
   return (
-    <div className="absolute bottom-0 left-0 right-0">
-      <div className="mx-auto w-full max-w-3xl px-2">
+    <div className="absolute bottom-0 left-0 right-0 md:pb-0">
+      <div className="mx-auto w-full max-w-full md:max-w-3xl px-0 md:px-2 pb-0 md:pb-0">
         {/* No Subscription Dialog */}
         <NoSubscriptionDialog
           isOpen={showNoSubscriptionDialog}

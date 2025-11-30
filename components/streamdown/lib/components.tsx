@@ -215,14 +215,16 @@ MemoH6.displayName = 'MarkdownH6';
 type TableProps = WithNode<React.JSX.IntrinsicElements['table']>;
 const MemoTable = memo<TableProps>(
   ({ children, className, ...props }: TableProps) => (
-    <div className="my-4 overflow-hidden rounded-lg border border-border/50 bg-gray-50 dark:bg-[#1e1e1e] shadow-lg">
-      <div className="overflow-x-auto bg-white dark:bg-[#1e1e1e]">
-        <table
-          className={cn('w-full border-collapse text-[14px]', className)}
-          {...props}
-        >
-          {children}
-        </table>
+    <div className="my-4 w-full min-w-0 max-w-full">
+      <div className="overflow-x-auto rounded-lg border border-border/50 bg-gray-50 dark:bg-[#1e1e1e] shadow-lg">
+        <div className="min-w-full">
+          <table
+            className={cn('w-full border-collapse text-[14px] table-auto', className)}
+            {...props}
+          >
+            {children}
+          </table>
+        </div>
       </div>
     </div>
   ),
@@ -267,7 +269,10 @@ type ThProps = WithNode<React.JSX.IntrinsicElements['th']>;
 const MemoTh = memo<ThProps>(
   ({ children, className, ...props }: ThProps) => (
     <th
-      className={cn('px-4 py-2 text-left font-semibold text-sm text-gray-700 dark:text-white', className)}
+      className={cn(
+        'px-4 py-2 text-left font-semibold text-sm text-gray-700 dark:text-white align-top break-words whitespace-normal',
+        className
+      )}
       {...props}
     >
       {children}
@@ -280,7 +285,13 @@ MemoTh.displayName = 'MarkdownTh';
 type TdProps = WithNode<React.JSX.IntrinsicElements['td']>;
 const MemoTd = memo<TdProps>(
   ({ children, className, ...props }: TdProps) => (
-    <td className={cn('px-4 py-2 text-sm', className)} {...props}>
+    <td
+      className={cn(
+        'px-4 py-2 text-sm align-top break-words whitespace-normal',
+        className
+      )}
+      {...props}
+    >
       {children}
     </td>
   ),

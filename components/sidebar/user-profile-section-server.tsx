@@ -51,7 +51,7 @@ export async function UserProfileSection() {
     >
       {user ? (
         // Authenticated state
-        <Link href="/settings/usage" className="w-full">
+        <Link href="/settings/usage?sidebar=true" className="w-full">
           <div className="group flex items-center gap-3 hover:bg-popover-main hover:text-popover-text dark:hover:bg-hover/60 rounded-lg p-2 -m-2 cursor-pointer transition-colors">
             <div className="h-8 w-8 rounded-full overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 flex-shrink-0">
               {user.profilePictureUrl ? (

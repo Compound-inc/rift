@@ -67,7 +67,7 @@ export const XAI_MODELS: BaseModelConfig[] = [
     description:
       "Modelo de razonamiento rápido y económico que sobresale en tareas de programación.",
     contextWindow: 2000000,
-    isPremium: true,
+    isPremium: false,
     capabilities: mergeCapabilities({
       supportsTools: true,
       supportsImageInput: true,

@@ -62,8 +62,8 @@ globalThis.AI_SDK_DEFAULT_PROVIDER = gateway;
 
 // Model resolution
 const SHORTCUTS: Record<string, string> = {
-  automatico: "openai/gpt-5-mini",
-  problemas_dificiles: "openai/gpt-5",
+  automatico: "openai/gpt-5.1-instant",
+  problemas_dificiles: "openai/gpt-5.1-thinking",
   escritura: "google/gemini-2.5-flash",
   sorpresa: "mistral/mistral-medium",
 };
@@ -118,7 +118,7 @@ export const getProviderOptions = (modelId: string) => {
     openai: isOpenAIModel && supportsReasoning(modelId)
       ? {
           ...baseOptions,
-          reasoningEffort: "medium" as const,
+          reasoningEffort: "low" as const,
           reasoningSummary: "detailed" as const,
         }
       : baseOptions,
