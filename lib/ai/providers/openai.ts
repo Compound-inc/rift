@@ -62,7 +62,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     description:
       "Versión conversacional y cálida con razonamiento adaptativo y mejor seguimiento de instrucciones",
     contextWindow: 128000,
-    isPremium: true,
+    isPremium: false,
     capabilities: mergeCapabilities({
       supportsTools: true,
       supportsStreaming: true,
@@ -81,7 +81,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     description:
       "Modelo de razonamiento avanzado con tiempo de procesamiento extendido para problemas complejos",
     contextWindow: 400000,
-    isPremium: false,
+    isPremium: true,
     capabilities: mergeCapabilities({
       supportsTools: true,
       supportsStreaming: true,

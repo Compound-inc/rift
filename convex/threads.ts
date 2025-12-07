@@ -945,29 +945,17 @@ export const updateUserMessageContent = AuthMutation({
  * Increment tool call quota for a user (server-side only)
  * This mutation is secured with a secret token to prevent client-side abuse
  */
-export const incrementToolCallQuotaMutation = internalMutation({
+export const serverIncrementToolCallQuota = mutation({
   args: {
-    secretToken: v.string(),
+    secret: v.string(),
     userId: v.string(),
     toolCallCount: v.number(),
   },
-  returns: v.object({
-    newUsage: v.number(),
-  }),
+  returns: v.null(),
   handler: async (ctx, args) => {
-    // Validate secret token first
-    const expectedToken = process.env.CONVEX_SECRET_TOKEN;
-    
-    if (args.secretToken !== expectedToken) {
-      throw new Error("Unauthorized - just stop here");
-    }
-
-    // Increment tool call quota using the provided userId
-    const newUsage = await incrementToolCallQuota(ctx, args.userId, args.toolCallCount);
-
-    return {
-      newUsage,
-    };
+    ensureServerSecret(args.secret);
+    await incrementToolCallQuota(ctx, args.userId, args.toolCallCount);
+    return null;
   },
 });
 

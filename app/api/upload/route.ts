@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Effect, Data, Schedule, Duration } from "effect";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { fetchMutation } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
@@ -8,80 +9,218 @@ import { logAttachmentUploaded } from "@/actions/audit";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-// Maximum file size: 10MB
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+// ============================================================================
+// Configuration
+// ============================================================================
 
-// R2 S3 client
-const r2Client = new S3Client({
-  region: "auto",
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-  },
-});
+const CONFIG = {
+  /** Maximum file size in bytes (10MB) */
+  MAX_FILE_SIZE: 10 * 1024 * 1024,
+  /** Request timeout in milliseconds */
+  TIMEOUT_MS: 150_000,
+  /** Allowed MIME types */
+  ALLOWED_TYPES: [
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "application/pdf",
+  ] as const,
+} as const;
 
-// Allowed file types
-const ALLOWED_TYPES = [
-  "image/jpeg",
-  "image/jpg", 
-  "image/png",
-  "image/gif",
-  "image/webp",
-  "application/pdf",
-];
+// ============================================================================
+// Error Types
+// ============================================================================
 
-interface UploadResponse {
-  success: boolean;
-  attachmentId?: string;
-  url?: string;
-  error?: string;
+class AuthenticationError extends Data.TaggedError("AuthenticationError")<{
+  readonly message: string;
+}> {}
+
+class ValidationError extends Data.TaggedError("ValidationError")<{
+  readonly message: string;
+  readonly field?: string;
+}> {}
+
+class StorageError extends Data.TaggedError("StorageError")<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+class DatabaseError extends Data.TaggedError("DatabaseError")<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+class TimeoutError extends Data.TaggedError("TimeoutError")<{
+  readonly message: string;
+}> {}
+
+type UploadError =
+  | AuthenticationError
+  | ValidationError
+  | StorageError
+  | DatabaseError
+  | TimeoutError;
+
+// ============================================================================
+// R2 Client (lazy initialization)
+// ============================================================================
+
+let _r2Client: S3Client | null = null;
+
+const getR2Client = (): S3Client => {
+  if (!_r2Client) {
+    _r2Client = new S3Client({
+      region: "auto",
+      endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+      },
+    });
+  }
+  return _r2Client;
+};
+
+// ============================================================================
+// Retry Schedules
+// ============================================================================
+
+const storageRetrySchedule = Schedule.exponential("100 millis").pipe(
+  Schedule.jittered,
+  Schedule.compose(Schedule.recurs(2))
+);
+
+const databaseRetrySchedule = Schedule.exponential("200 millis").pipe(
+  Schedule.jittered,
+  Schedule.compose(Schedule.recurs(3))
+);
+
+// ============================================================================
+// Logging
+// ============================================================================
+
+interface LogContext {
+  requestId: string;
+  userId?: string;
+  fileName?: string;
 }
 
-export async function POST(req: NextRequest): Promise<NextResponse<UploadResponse>> {
-  try {
-    // Authenticate user
-    const auth = await withAuth();
-    if (!auth.accessToken || !auth.user?.id) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
+const logger = {
+  info: (message: string, context: LogContext, data?: unknown) => {
+    console.log(JSON.stringify({ level: "INFO", message, ...context, data }));
+  },
+  error: (message: string, context: LogContext, error?: unknown) => {
+    const errorData = error instanceof Error
+      ? { name: error.name, message: error.message, stack: error.stack }
+      : error;
+    console.error(JSON.stringify({ level: "ERROR", message, ...context, error: errorData }));
+  },
+  debug: (message: string, _context: LogContext, data?: unknown) => {
+    if (process.env.NODE_ENV !== "production") {
+      if (data) {
+        console.debug(`[DEBUG] ${message}`, data);
+      } else {
+        console.debug(`[DEBUG] ${message}`);
+      }
+    }
+  },
+};
+
+// ============================================================================
+// Request ID Generation
+// ============================================================================
+
+const generateRequestId = (): string => {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 8);
+  return `upl_${timestamp}_${random}`;
+};
+
+// ============================================================================
+// Service Functions
+// ============================================================================
+
+interface AuthContext {
+  userId: string;
+  accessToken: string;
+}
+
+const getAuthContext = (): Effect.Effect<AuthContext, AuthenticationError> =>
+  Effect.tryPromise({
+    try: () => withAuth(),
+    catch: () => new AuthenticationError({ message: "Authentication failed" }),
+  }).pipe(
+    Effect.flatMap((auth) => {
+      if (!auth.accessToken || !auth.user?.id) {
+        return Effect.fail(new AuthenticationError({ message: "Unauthorized" }));
+      }
+      return Effect.succeed({
+        userId: auth.user.id,
+        accessToken: auth.accessToken,
+      });
+    })
+  );
+
+const parseFormData = (
+  req: NextRequest
+): Effect.Effect<File, ValidationError> =>
+  Effect.tryPromise({
+    try: () => req.formData(),
+    catch: () => new ValidationError({ message: "Failed to parse form data" }),
+  }).pipe(
+    Effect.flatMap((formData) => {
+      const file = formData.get("file") as File | null;
+      if (!file) {
+        return Effect.fail(new ValidationError({ message: "No file provided", field: "file" }));
+      }
+      return Effect.succeed(file);
+    })
+  );
+
+const validateFile = (file: File): Effect.Effect<File, ValidationError> =>
+  Effect.gen(function* () {
+    if (file.size > CONFIG.MAX_FILE_SIZE) {
+      return yield* Effect.fail(
+        new ValidationError({
+          message: `File too large. Maximum size is ${CONFIG.MAX_FILE_SIZE / 1024 / 1024}MB.`,
+          field: "file",
+        })
       );
     }
 
-    // Parse form data
-    const formData = await req.formData();
-    const file = formData.get("file") as File;
-    
-    if (!file) {
-      return NextResponse.json(
-        { success: false, error: "No file provided" },
-        { status: 400 }
+    if (!CONFIG.ALLOWED_TYPES.includes(file.type as typeof CONFIG.ALLOWED_TYPES[number])) {
+      return yield* Effect.fail(
+        new ValidationError({
+          message: "File type not supported. Only images and PDFs are allowed.",
+          field: "file",
+        })
       );
     }
 
-    // Validate file size
-    if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { success: false, error: "File too large. Maximum size is 10MB." },
-        { status: 400 }
-      );
-    }
+    return file;
+  });
 
-    // Validate file type
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      return NextResponse.json(
-        { success: false, error: "File type not supported. Only images and PDFs are allowed." },
-        { status: 400 }
-      );
-    }
+const generateFileKey = (userId: string, fileName: string): string => {
+  const fileExtension = fileName.split(".").pop() || "bin";
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 8);
+  return `uploads/${userId}/${timestamp}-${random}.${fileExtension}`;
+};
 
-    // Generate unique file key for R2
-    const fileExtension = file.name.split('.').pop();
-    const fileKey = `uploads/${auth.user.id}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExtension}`;
-    
-    // Upload to R2
-    const arrayBuffer = await file.arrayBuffer();
+const uploadToR2 = (
+  file: File,
+  fileKey: string,
+  logContext: LogContext
+): Effect.Effect<string, StorageError> =>
+  Effect.gen(function* () {
+    const arrayBuffer = yield* Effect.tryPromise({
+      try: () => file.arrayBuffer(),
+      catch: (error) =>
+        new StorageError({ message: "Failed to read file data", cause: error }),
+    });
+
     const uploadCommand = new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME!,
       Key: fileKey,
@@ -90,36 +229,220 @@ export async function POST(req: NextRequest): Promise<NextResponse<UploadRespons
       ContentDisposition: `inline; filename="${file.name}"`,
     });
 
-    await r2Client.send(uploadCommand);
-
-    // Generate public URL using the configured R2.dev subdomain
-    const publicUrl = `${process.env.R2_PUBLIC_BASE_URL}/${fileKey}`;
-
-    // Create attachment record with R2 URL
-    const attachmentId = await fetchMutation(
-      api.threads.createAttachment,
-      {
-        dataUrl: publicUrl, // Store R2 URL instead of base64
-        fileName: file.name,
-        mimeType: file.type,
-        fileSize: file.size.toString(),
-      },
-      { token: auth.accessToken }
+    yield* Effect.tryPromise({
+      try: () => getR2Client().send(uploadCommand),
+      catch: (error) =>
+        new StorageError({ message: "Failed to upload to DB", cause: error }),
+    }).pipe(
+      Effect.retry(storageRetrySchedule),
+      Effect.tapError((error) =>
+        Effect.sync(() => logger.error("DB upload failed", logContext, error))
+      )
     );
 
-    await logAttachmentUploaded(String(attachmentId), file.name, file.type, file.size);
+    const publicUrl = `${process.env.R2_PUBLIC_BASE_URL}/${fileKey}`;
+    return publicUrl;
+  });
 
-    return NextResponse.json({
-      success: true,
-      attachmentId,
-      url: publicUrl,
+const createAttachmentRecord = (
+  accessToken: string,
+  publicUrl: string,
+  file: File,
+  logContext: LogContext
+): Effect.Effect<string, DatabaseError> =>
+  Effect.tryPromise({
+    try: () =>
+      fetchMutation(
+        api.threads.createAttachment,
+        {
+          dataUrl: publicUrl,
+          fileName: file.name,
+          mimeType: file.type,
+          fileSize: file.size.toString(),
+        },
+        { token: accessToken }
+      ),
+    catch: (error) =>
+      new DatabaseError({ message: "Failed to create attachment record", cause: error }),
+  }).pipe(
+    Effect.retry(databaseRetrySchedule),
+    Effect.tapError((error) =>
+      Effect.sync(() => logger.error("Database operation failed", logContext, error))
+    )
+  );
+
+const logAuditEvent = (
+  attachmentId: string,
+  file: File
+): Effect.Effect<void, never> =>
+  Effect.tryPromise({
+    try: () => logAttachmentUploaded(attachmentId, file.name, file.type, file.size),
+    catch: () => undefined, // Audit logging failures are non-critical
+  }).pipe(
+    Effect.catchAll(() => Effect.void) // Silently ignore audit failures
+  );
+
+// ============================================================================
+// Response Helpers
+// ============================================================================
+
+interface UploadResponse {
+  success: boolean;
+  attachmentId?: string;
+  url?: string;
+  error?: string;
+  requestId?: string;
+}
+
+const successResponse = (
+  attachmentId: string,
+  url: string,
+  requestId: string
+): NextResponse<UploadResponse> =>
+  NextResponse.json(
+    { success: true, attachmentId, url, requestId },
+    {
+      status: 200,
+      headers: { "X-Request-ID": requestId },
+    }
+  );
+
+const errorToResponse = (
+  error: UploadError,
+  requestId: string
+): NextResponse<UploadResponse> => {
+  const headers = { "X-Request-ID": requestId };
+
+  switch (error._tag) {
+    case "AuthenticationError":
+      return NextResponse.json(
+        { success: false, error: error.message, requestId },
+        { status: 401, headers }
+      );
+
+    case "ValidationError":
+      return NextResponse.json(
+        { success: false, error: error.message, requestId },
+        { status: 400, headers }
+      );
+
+    case "TimeoutError":
+      return NextResponse.json(
+        { success: false, error: error.message, requestId },
+        { status: 504, headers }
+      );
+
+    case "StorageError":
+    case "DatabaseError":
+    default:
+      return NextResponse.json(
+        { success: false, error: "Upload failed. Please try again.", requestId },
+        { status: 500, headers }
+      );
+  }
+};
+
+// ============================================================================
+// Main Handler
+// ============================================================================
+
+const handleUpload = (req: NextRequest, requestId: string) =>
+  Effect.gen(function* () {
+    const logContext: LogContext = { requestId };
+
+    // Authenticate
+    const auth = yield* getAuthContext();
+    logContext.userId = auth.userId;
+
+    logger.debug("Authentication complete", logContext);
+
+    // Parse and validate file
+    const file = yield* parseFormData(req);
+    logContext.fileName = file.name;
+
+    logger.debug("File received", logContext, {
+      size: file.size,
+      type: file.type,
     });
 
-  } catch (error) {
-    console.error("Upload error:", error);
-    return NextResponse.json(
-      { success: false, error: `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}` },
-      { status: 500 }
+    yield* validateFile(file);
+
+    // Generate unique file key
+    const fileKey = generateFileKey(auth.userId, file.name);
+
+    // Upload to R2
+    const publicUrl = yield* uploadToR2(file, fileKey, logContext);
+
+    logger.debug("R2 upload complete", logContext, { url: publicUrl });
+
+    // Create database record
+    const attachmentId = yield* createAttachmentRecord(
+      auth.accessToken,
+      publicUrl,
+      file,
+      logContext
     );
-  }
+
+    logger.debug("Attachment record created", logContext, { attachmentId });
+
+    // Audit logging
+    Effect.runPromise(logAuditEvent(String(attachmentId), file)).catch(() => {});
+
+    logger.info("Upload complete", logContext, {
+      attachmentId,
+      fileSize: file.size,
+      mimeType: file.type,
+    });
+
+    return successResponse(String(attachmentId), publicUrl, requestId);
+  });
+
+// ============================================================================
+// Export POST Handler
+// ============================================================================
+
+export async function POST(req: NextRequest): Promise<NextResponse<UploadResponse>> {
+  const requestId = generateRequestId();
+  const logContext: LogContext = { requestId };
+
+  const program = handleUpload(req, requestId).pipe(
+    // Add timeout
+    Effect.timeout(Duration.millis(CONFIG.TIMEOUT_MS)),
+    Effect.catchTag("TimeoutException", () =>
+      Effect.fail(
+        new TimeoutError({
+          message: "Upload timed out. Please try again with a smaller file.",
+        })
+      )
+    ),
+    // Handle all typed errors
+    Effect.catchTags({
+      AuthenticationError: (e: AuthenticationError) =>
+        Effect.succeed(errorToResponse(e, requestId)),
+      ValidationError: (e: ValidationError) =>
+        Effect.succeed(errorToResponse(e, requestId)),
+      StorageError: (e: StorageError) => {
+        logger.error("Storage error", logContext, e);
+        return Effect.succeed(errorToResponse(e, requestId));
+      },
+      DatabaseError: (e: DatabaseError) => {
+        logger.error("Database error", logContext, e);
+        return Effect.succeed(errorToResponse(e, requestId));
+      },
+      TimeoutError: (e: TimeoutError) =>
+        Effect.succeed(errorToResponse(e, requestId)),
+    }),
+    // Catch any unexpected errors
+    Effect.catchAll((error: unknown) => {
+      logger.error("Unhandled upload error", logContext, error);
+      return Effect.succeed(
+        NextResponse.json(
+          { success: false, error: "Upload failed", requestId },
+          { status: 500, headers: { "X-Request-ID": requestId } }
+        )
+      );
+    })
+  );
+
+  return Effect.runPromise(program);
 }

@@ -389,50 +389,6 @@ http.route({
   }),
 });
 
-// Tool call quota increment endpoint
-http.route({
-  path: "/increment-tool-call-quota",
-  method: "POST",
-  handler: httpAction(async (ctx, request) => {
-    const authHeader = request.headers.get("authorization") || "";
-    const expected = `Bearer ${process.env.CONVEX_SECRET_TOKEN ?? ""}`;
-    if (!process.env.CONVEX_SECRET_TOKEN || authHeader !== expected) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    const body = await request.json();
-    const { userId, toolCallCount } = body ?? {};
-    if (!userId || !toolCallCount) {
-      return new Response(JSON.stringify({ error: "Missing fields" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    try {
-      await ctx.runMutation(internal.threads.incrementToolCallQuotaMutation, {
-        secretToken: process.env.CONVEX_SECRET_TOKEN!,
-        userId,
-        toolCallCount,
-      });
-
-      return new Response(JSON.stringify({ status: "ok" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    } catch (error) {
-      console.error("Tool call quota increment error:", error);
-      return new Response(JSON.stringify({ error: "Failed to increment quota" }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-  }),
-});
-
 // Admin endpoints - protected with CONVEX_ADMIN_TOKEN
 http.route({
   path: "/admin/organizations",

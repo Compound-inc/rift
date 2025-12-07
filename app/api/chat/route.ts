@@ -1,9 +1,14 @@
+import { Effect, Schedule, Scope, Queue, Ref, Fiber, Runtime, Chunk, Duration } from "effect";
 import {
   streamText,
   convertToModelMessages,
   UIMessage,
   smoothStream,
   stepCountIs,
+  type LanguageModel,
+  type ToolSet,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
 } from "ai";
 import { withTracing } from "@posthog/ai";
 import { PostHog } from "posthog-node";
@@ -14,200 +19,288 @@ import {
   getProviderDisplayName,
   getProviderOptions,
   isPremium,
-  isCapable,
 } from "@/lib/ai/ai-providers";
 import { createToolsForModel } from "@/lib/ai/model-tools";
 import { ToolType } from "@/lib/ai/config/base";
-import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
-import { fetchAction, fetchMutation, fetchQuery } from "convex/nextjs";
-import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { withAuth } from "@workos-inc/authkit-nextjs";
 import { exaWebSearch } from "@/lib/ai/tools/exa-search";
-import { buildSystemPromptWithStyle, type ResponseStyle } from "@/lib/ai/response-styles";
+import {
+  buildSystemPromptWithStyle,
+  type ResponseStyle,
+} from "@/lib/ai/response-styles";
+
+import {
+  ValidationError,
+  AuthenticationError,
+  NoOrganizationError,
+  NoSubscriptionError,
+  QuotaExceededError,
+  StreamError,
+  DatabaseError,
+  AbortError,
+  RegenerateError,
+  ModelError,
+  ToolError,
+  TimeoutError,
+  ProviderError,
+  type ChatRouteError,
+} from "./errors";
+
+import {
+  type RequestBody,
+  type AuthContext,
+  type LogContext,
+  CONFIG,
+  logger,
+  validateRequestBody,
+  validateRegenerateRequest,
+  filterMessagesForModel,
+  getAuthContext,
+  checkUserQuota,
+  handleRegeneration,
+  sendUserMessage,
+  incrementUserQuota,
+  startAssistantMessage,
+  appendMessageDelta,
+  finalizeAssistantMessage,
+  addSourcesToMessage,
+  incrementToolCallQuota,
+  databaseRetrySchedule,
+  classifyProviderError,
+  generateIdempotencyKey,
+} from "./services";
 
 export const maxDuration = 300;
 
-interface RequestBody {
-  messages: Array<{
-    id: string;
-    role: "user" | "assistant" | "system";
-    parts?: Array<{ 
-      type: string; 
-      text?: string;
-      mediaType?: string;
-      url?: string;
-      attachmentId?: string;
-    }>;
-  }>;
-  modelId: string;
-  threadId: string;
-  enabledTools?: ToolType[];
-  responseStyle?: ResponseStyle;
-  trigger?: "submit-message" | "regenerate-message";
-  messageId?: string;
-}
+// ============================================================================
+// Request ID Generation
+// ============================================================================
 
-interface AuthContext {
-  token: string;
-  userId: string;
-  orgId: string;
-}
+const generateRequestId = (): string => {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 8);
+  return `req_${timestamp}_${random}`;
+};
 
-class StreamError extends Error {
-  constructor(
-    message: string,
-    public status: number = 500,
-  ) {
-    super(message);
-    this.name = "StreamError";
-  }
-}
+// ============================================================================
+// Response Helpers
+// ============================================================================
 
-// Helper function to filter attachments for models that don't support them
-function filterMessagesForModel(messages: UIMessage[], modelId: string): UIMessage[] {
-  const supportsImages = isCapable(modelId, "supportsImageInput");
-  const supportsPDFs = isCapable(modelId, "supportsPDFInput");
-  
-  // If model supports both images and PDFs, return messages as-is
-  if (supportsImages && supportsPDFs) {
-    return messages;
-  }
-  
-  // Filter out unsupported file types from all messages
-  return messages.map(msg => {
-    if (!msg.parts || msg.parts.length === 0) {
-      return msg;
-    }
-    
-    return {
-      ...msg,
-      parts: msg.parts.filter(part => {
-        if (part.type !== "file") {
-          return true; // Keep non-file parts
-        }
-        
-        // Check if this is an image file
-        const isImage = part.mediaType?.startsWith("image/");
-        if (isImage && !supportsImages) {
-          return false; // Remove image files if model doesn't support images
-        }
-        
-        // Check if this is a PDF file
-        const isPDF = part.mediaType === "application/pdf";
-        if (isPDF && !supportsPDFs) {
-          return false; // Remove PDF files if model doesn't support PDFs
-        }
-        
-        // Keep other file types or supported file types
-        return true;
-      }),
-    };
+const jsonResponse = (
+  body: object,
+  status: number,
+  start: number
+): Response =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "X-Response-Time": `${Date.now() - start}ms`,
+    },
   });
-}
 
-// Input validation
-function validateRequest(body: unknown): RequestBody {
-  const data = body as Record<string, unknown>;
-  if (
-    !data?.messages ||
-    !Array.isArray(data.messages) ||
-    !data.messages.length ||
-    !data?.modelId ||
-    !data?.threadId
-  ) {
-    throw new StreamError("Missing required fields", 400);
-  }
-  // TODO: Add smart Summary of the conversation instead of this:
-  // If there are more than 50 messages, keep only the latest 50 for context
-  if (data.messages.length > 50) {
-    data.messages = data.messages.slice(-50);
-  }
-
-  return data as unknown as RequestBody;
-}
-
-// Auth with error handling
-async function getAuth(): Promise<AuthContext> {
-  const auth = await withAuth();
-  if (!auth.accessToken || !auth.user?.id) {
-    throw new StreamError("Unauthorized", 401);
-  }
-
-  // Check if user has an organization
-  if (!auth.organizationId) {
-    throw new StreamError(
-      "No organization found. Please create or join an organization first.",
-      403
-    );
-  }
-
-  return {
-    token: auth.accessToken,
-    userId: auth.user.id,
-    orgId: auth.organizationId,
+/**
+ * Maps Effect errors to HTTP responses.
+ */
+const errorToResponse = (
+  error: ChatRouteError,
+  start: number,
+  requestId: string
+): Response => {
+  const baseHeaders = {
+    "Content-Type": "application/json",
+    "X-Response-Time": `${Date.now() - start}ms`,
+    "X-Request-ID": requestId,
   };
+
+  const makeResponse = (body: object, status: number) =>
+    new Response(JSON.stringify({ ...body, requestId }), {
+      status,
+      headers: baseHeaders,
+    });
+
+  switch (error._tag) {
+    case "ValidationError":
+      return makeResponse({ error: error.message, field: error.field }, 400);
+
+    case "RegenerateError":
+      return makeResponse({ error: error.message }, 400);
+
+    case "AuthenticationError":
+      return makeResponse({ error: error.message }, 401);
+
+    case "NoOrganizationError":
+      return makeResponse({ error: error.message }, 403);
+
+    case "NoSubscriptionError":
+      return makeResponse(
+        {
+          error: "No subscription",
+          message: error.message,
+          quotaType: error.quotaType,
+        },
+        403
+      );
+
+    case "QuotaExceededError":
+      return makeResponse(
+        {
+          error: "Quota exceeded",
+          message: error.message,
+          quotaType: error.quotaType,
+          quotaInfo: {
+            currentUsage: error.currentUsage,
+            limit: error.limit,
+          },
+          otherQuotaInfo: error.otherQuotaInfo,
+        },
+        429
+      );
+
+    case "AbortError":
+      return new Response("Aborted", { 
+        status: 499,
+        headers: { "X-Request-ID": requestId },
+      });
+
+    case "ModelError":
+      return makeResponse(
+        { error: error.message, modelId: error.modelId },
+        400
+      );
+
+    case "ToolError":
+      return makeResponse({ error: "Tool initialization failed" }, 500);
+
+    case "TimeoutError":
+      return makeResponse(
+        { error: error.message, timeoutMs: error.timeoutMs },
+        504
+      );
+
+    case "ProviderError":
+      const providerStatus = error.errorType === "rate_limit" ? 429 
+        : error.errorType === "content_policy" ? 400
+        : error.errorType === "token_limit" ? 400
+        : 502;
+      return makeResponse(
+        { 
+          error: error.message, 
+          errorType: error.errorType,
+          retryable: error.retryable,
+        },
+        providerStatus
+      );
+
+    case "StreamError":
+    case "DatabaseError":
+    default:
+      return makeResponse({ error: "Internal server error" }, 500);
+  }
+};
+
+// ============================================================================
+// Database Queue Implementation
+// ============================================================================
+
+interface DatabaseOperation {
+  operation: Effect.Effect<void, DatabaseError>;
+  name: string;
 }
 
-// Background database operations (non-blocking)
-class DatabaseQueue {
-  private static queue: Array<() => Promise<void>> = [];
-  private static processing = false;
+/**
+ * Creates a database queue that processes operations in background with retries.
+ * Returns enqueue function and cleanup effect.
+ */
+const createDatabaseQueue = (logContext: LogContext) =>
+  Effect.gen(function* () {
+    const queue = yield* Queue.unbounded<DatabaseOperation>();
+    const isShutdown = yield* Ref.make(false);
 
-  static async add(operation: () => Promise<void>) {
-    this.queue.push(operation);
-    if (!this.processing) {
-      this.processing = true;
-      // Process queue in background
-      setTimeout(() => this.process(), 0);
-    }
-  }
+    // Process single operation with error handling and logging
+    const processOperation = (op: DatabaseOperation) =>
+      op.operation.pipe(
+        Effect.catchAll((error) =>
+          Effect.sync(() => {
+            logger.error(`Database operation failed: ${op.name}`, logContext, error);
+          })
+        )
+      );
 
-  private static async process() {
-    while (this.queue.length > 0) {
-      const operation = this.queue.shift();
-      if (!operation) continue;
-
-      // Retry with exponential backoff for transient network errors
-      const maxAttempts = 4;
-      let attempt = 0;
-      while (attempt < maxAttempts) {
-        try {
-          await operation();
-          break; // success
-        } catch (error: any) {
-          attempt++;
-          const isTimeout =
-            error?.code === "ETIMEDOUT" ||
-            error?.name === "TimeoutError" ||
-            /fetch failed/i.test(String(error)) ||
-            /network/i.test(String(error));
-
-          if (!isTimeout || attempt >= maxAttempts) {
-            console.error("Database operation failed:", error);
+    // Background processor fiber
+    const processorFiber = yield* Effect.fork(
+      Effect.gen(function* () {
+        while (true) {
+          const shutdown = yield* Ref.get(isShutdown);
+          if (shutdown) {
+            // Drain remaining items with BOUNDED concurrency
+            const remaining = yield* Queue.takeAll(queue);
+            const remainingArray = Chunk.toArray(remaining);
+            if (remainingArray.length > 0) {
+              logger.debug(`Draining ${remainingArray.length} pending operations`, logContext);
+            }
+            yield* Effect.all(
+              remainingArray.map((op: DatabaseOperation) => processOperation(op)),
+              { concurrency: CONFIG.DRAIN_CONCURRENCY }
+            );
             break;
           }
-
-          const delayMs = Math.min(1000 * 2 ** (attempt - 1), 5000);
-          await new Promise((r) => setTimeout(r, delayMs));
+          const op = yield* Queue.take(queue);
+          yield* processOperation(op);
         }
-      }
-    }
-    this.processing = false;
-  }
+      })
+    );
+
+    const enqueue = (operation: Effect.Effect<void, DatabaseError>, name: string) =>
+      Queue.offer(queue, { operation, name }).pipe(Effect.asVoid);
+
+    const shutdown = Effect.gen(function* () {
+      yield* Ref.set(isShutdown, true);
+      // Send shutdown signal
+      yield* Queue.offer(queue, {
+        operation: Effect.void,
+        name: "shutdown-signal",
+      });
+      yield* Fiber.await(processorFiber);
+    });
+
+    return { enqueue, shutdown };
+  });
+
+// ============================================================================
+// Streaming State
+// ============================================================================
+
+interface StreamingState {
+  content: string;
+  reasoning: string;
+  isComplete: boolean;
+  toolCallCount: number;
+  pendingUpdate: { content: string; reasoning: string };
 }
 
-export async function POST(req: Request) {
+// ============================================================================
+// Main Handler Effect
+// ============================================================================
+
+const handleChatRequest = (req: Request, requestId: string) =>
+  Effect.gen(function* () {
   const start = Date.now();
 
-  try {
     // Early abort check
     if (req.signal?.aborted) {
-      return new Response("Aborted", { status: 499 });
+      return yield* Effect.fail(new AbortError({ message: "Request aborted" }));
     }
 
-    // Parse and validate request
-    const body = await req.json();
+    // Parse request body
+    const rawBody = yield* Effect.tryPromise({
+      try: () => req.json(),
+      catch: () =>
+        new ValidationError({ message: "Invalid JSON body" }),
+    });
+
+    // Validate request
+    const validated = yield* validateRequestBody(rawBody);
     const {
       messages,
       modelId,
@@ -216,41 +309,95 @@ export async function POST(req: Request) {
       responseStyle = "regular",
       trigger,
       messageId,
-    } = validateRequest(body);
-    // Validate regenerate requests
-    if (trigger === "regenerate-message" && !messageId) {
-      return new Response(JSON.stringify({ error: "Missing messageId for regenerate" }), {
-        status: 400,
-        headers: {
-          "Content-Type": "application/json",
-          "X-Response-Time": `${Date.now() - start}ms`,
-        },
-      });
-    }
+    } = validated;
 
+    // Validate regenerate request
+    yield* validateRegenerateRequest(trigger, messageId);
 
-    console.log(`Time after validation: ${Date.now() - start}ms`);
+    // Create logging context
+    const logContext: LogContext = {
+      requestId,
+      threadId,
+      modelId,
+    };
 
-    // Authentication
-    const auth = await getAuth();
+    logger.debug("Request validated", logContext, { trigger, messageCount: messages.length });
 
-    console.log(`Time after authentication: ${Date.now() - start}ms`);
+    // Authenticate
+    const auth = yield* getAuthContext();
+    logContext.userId = auth.userId;
+
+    logger.debug("Authentication complete", logContext, { 
+      timeMs: Date.now() - start 
+    });
+
+    const lastUser = messages.filter((m) => m.role === "user").pop();
+    const userText = lastUser?.parts?.find((part) => part.type === "text")?.text;
+    const userFiles = lastUser?.parts?.filter((part) => part.type === "file") || [];
 
     const quotaType = isPremium(modelId) ? "premium" : "standard";
     const newMessageId = crypto.randomUUID();
-    // Create traced model for PostHog LLM analytics
-    const baseModel = getLanguageModel(modelId);
+
+    // PostHog shutdown flag to prevent multiple shutdowns
+    const phShutdownRef = yield* Ref.make(false);
+    const shutdownPostHog = (client: PostHog | null) =>
+      Effect.gen(function* () {
+        if (!client) return;
+        const alreadyShutdown = yield* Ref.get(phShutdownRef);
+        if (alreadyShutdown) return;
+        yield* Ref.set(phShutdownRef, true);
+        yield* Effect.sync(() => client.shutdown());
+      });
+
+    // Initialize model
+    const baseModel = yield* Effect.try({
+      try: () => getLanguageModel(modelId),
+      catch: (error) =>
+        new ModelError({
+          message: `Failed to initialize model: ${modelId}`,
+          modelId,
+          cause: error,
+        }),
+    });
+
     const supermemoryEnabled = Boolean(process.env.SUPERMEMORY_API_KEY);
-    const modelWithMemory = supermemoryEnabled
+    const modelWithMemory = yield* Effect.try({
+      try: () =>
+        supermemoryEnabled
       ? withSupermemory(baseModel, auth.userId, {
           mode: "profile",
           verbose: process.env.NODE_ENV !== "production",
         })
-      : baseModel;
-    const phClient = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY || "", {
-      host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+          : baseModel,
+      catch: (error) =>
+        new ModelError({
+          message: "Failed to initialize Supermemory integration",
+          modelId,
+          cause: error,
+        }),
     });
-    const model = withTracing(modelWithMemory, phClient, {
+
+    // PostHog client - handle gracefully
+    const phClient = yield* Effect.try({
+      try: () =>
+        new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY || "", {
+          host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+        }),
+      catch: (error) => {
+        logger.warn("PostHog initialization failed, analytics disabled", logContext, error);
+        return null;
+      },
+    }).pipe(
+      Effect.catchAll(() => Effect.succeed(null))
+    );
+
+    // Ensure PostHog cleanup on scope close
+    yield* Effect.addFinalizer(() => shutdownPostHog(phClient));
+
+    const model = yield* Effect.try({
+      try: () => {
+        if (phClient) {
+          return withTracing(modelWithMemory, phClient, {
       posthogDistinctId: auth.userId,
       posthogTraceId: newMessageId,
       posthogProperties: {
@@ -259,30 +406,51 @@ export async function POST(req: Request) {
         quotaType,
         orgId: auth.orgId || null,
         trigger: trigger || "submit-message",
+              requestId,
       },
       posthogPrivacyMode: false,
       posthogGroups: auth.orgId ? { organization: auth.orgId } : undefined,
+    }) as unknown as LanguageModel;
+        }
+        return modelWithMemory as unknown as LanguageModel;
+      },
+      catch: (error) =>
+        new ModelError({
+          message: "Failed to setup model tracing",
+          modelId,
+          cause: error,
+        }),
     });
 
     const modelConfig = getModel(modelId);
     const fallbackProviderId = modelId.includes("/")
       ? modelId.split("/")[0]
       : undefined;
-    const providerDisplayName = getProviderDisplayName(
-      modelConfig?.provider ?? fallbackProviderId,
-    );
     const fallbackModelName = modelId.includes("/")
       ? modelId.split("/").pop() ?? modelId
       : modelId;
     const modelDisplayName = modelConfig?.name ?? fallbackModelName;
 
-    // Tools setup
-    const providerTools = enabledTools.length > 0
-      ? createToolsForModel(modelId, enabledTools)
-      : {};
-    
-    // Add EXA web search tool if web search is requested
-    const tools = {
+    // Tools setup - run in parallel with quota check
+    const [providerTools, _quotaResult] = yield* Effect.all([
+      // Tools initialization
+      Effect.try({
+        try: () =>
+          enabledTools.length > 0 ? createToolsForModel(modelId, enabledTools) : {},
+        catch: (error) =>
+          new ToolError({
+            message: "Failed to create tools for model",
+            cause: error,
+          }),
+      }),
+      // Quota check
+      lastUser && (userText || userFiles.length > 0)
+        ? checkUserQuota(auth.userId, auth.orgId, modelId)
+        : Effect.succeed({ allowed: true as const, quotaType }),
+    ], { concurrency: 2 });
+
+    const tools = yield* Effect.try({
+      try: () => ({
       ...providerTools,
       ...(enabledTools.includes("web_search") ? { webSearch: exaWebSearch } : {}),
       ...(process.env.SUPERMEMORY_API_KEY
@@ -290,292 +458,105 @@ export async function POST(req: Request) {
             containerTags: auth.orgId ? [auth.userId, auth.orgId] : [auth.userId],
           })
         : {}),
-    };
-    const providerOptions = getProviderOptions(modelId);
+      }),
+      catch: (error) =>
+        new ToolError({
+          message: "Failed to initialize tools",
+          cause: error,
+        }),
+    });
+    const toolSet = tools as unknown as ToolSet;
 
-    console.log(`Time after model/tools setup: ${Date.now() - start}ms`);
+    const providerOptions = yield* Effect.try({
+      try: () => getProviderOptions(modelId),
+      catch: (error) =>
+        new ModelError({
+          message: "Failed to get provider options",
+          modelId,
+          cause: error,
+        }),
+    });
 
-    // Capture identifiers needed for server-only Convex calls
-    const userId = auth.userId;
-    const orgId = auth.orgId;
+    logger.debug("Model and tools initialized", logContext, { 
+      timeMs: Date.now() - start,
+      toolCount: Object.keys(tools).length,
+    });
 
-    // Synchronous finalization with retries
-    const finalizeWithRetry = async (args: {
-      ok: boolean;
-      finalContent?: string;
-      finalReasoning?: string;
-      error?: { type: string; message: string };
-      context: string;
-    }) => {
-      const maxAttempts = 3;
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-          await fetchMutation(
-            api.threads.serverFinalizeAssistantMessage,
-            {
-              secret: process.env.CONVEX_SECRET_TOKEN!,
-              userId,
-              messageId: newMessageId,
-              ok: args.ok,
-              finalContent: args.finalContent,
-              finalReasoning: args.finalReasoning,
-              error: args.error,
-            },
-          );
-          // success
-          return;
-        } catch (e: any) {
-          const errMsg = typeof e?.message === "string" ? e.message : String(e);
-          if (attempt === maxAttempts) break;
-          const backoff = Math.min(250 * 2 ** (attempt - 1), 2000);
-          const jitter = Math.floor(Math.random() * 100);
-          await new Promise((r) => setTimeout(r, backoff + jitter));
-        }
-      }
-    };
-
-    // Handle regeneration: synchronously delete messages after the target message
+    // Handle regeneration synchronously
     if (trigger === "regenerate-message" && messageId) {
-      // First verify the user owns this thread
-      const threadInfo = await fetchQuery(
-        api.threads.serverGetThreadInfo,
-        { secret: process.env.CONVEX_SECRET_TOKEN!, userId, threadId },
-      );
-
-      if (!threadInfo) {
-        throw new Error("Thread not found or access denied");
-      }
-
-      // Await deletion to ensure persistence before streaming begins
-      await fetchMutation(
-        api.threads.serverDeleteMessagesAfter,
-        {
-          secret: process.env.CONVEX_SECRET_TOKEN!,
-          userId,
-          threadId,
-          afterMessageId: messageId,
-        },
-      );
+      yield* handleRegeneration(auth.userId, threadId, messageId);
     }
 
-    // Check quota limits BEFORE making AI request - for both new messages and regenerations
-    const lastUser = messages.filter((m) => m.role === "user").pop();
-    const userText = lastUser?.parts?.find(part => part.type === "text")?.text;
-    const userFiles = lastUser?.parts?.filter(part => part.type === "file") || [];
-    
+    // Create database queue for background operations
+    const dbQueue = yield* createDatabaseQueue(logContext);
+
+    // Ensure cleanup on scope close
+    yield* Effect.addFinalizer(() => dbQueue.shutdown);
+
+    // Persist user message or increment quota based on trigger
     if (lastUser && (userText || userFiles.length > 0)) {
-      // Check quota limits first (blocking)
-      const quotaCheck = await fetchQuery(
-        api.users.serverCheckUserQuota,
-        { secret: process.env.CONVEX_SECRET_TOKEN!, userId, orgId, quotaType },
+      const idempotencyKey = generateIdempotencyKey(
+        auth.userId, 
+        threadId, 
+        lastUser.id, 
+        trigger === "regenerate-message" ? "increment_quota" : "send_message"
       );
-
-      if (!quotaCheck.allowed) {
-        // Check if quota is not configured (no subscription)
-        if (!quotaCheck.quotaConfigured) {
-          const errorResponse = {
-            error: "No subscription",
-            message: "Organization has no active subscription configured",
-            quotaType,
-          };
-
-          return new Response(JSON.stringify(errorResponse), {
-            status: 403,
-            headers: {
-              "Content-Type": "application/json",
-              "X-Response-Time": `${Date.now() - start}ms`,
-            },
-          });
-        }
-
-        // Get both quota types for detailed error message (quota exceeded case)
-        const bothQuotas = await fetchQuery(
-          api.users.serverGetUserBothQuotas,
-          { secret: process.env.CONVEX_SECRET_TOKEN!, userId, orgId },
-        );
-
-        const errorResponse = {
-          error: "Quota exceeded",
-          message: `Message quota exceeded. Usage: ${quotaCheck.currentUsage}/${quotaCheck.limit} messages`,
-          quotaType,
-          quotaInfo: {
-            currentUsage: quotaCheck.currentUsage,
-            limit: quotaCheck.limit,
-          },
-          otherQuotaInfo: {
-            currentUsage: quotaType === "standard" 
-              ? bothQuotas.premium.currentUsage 
-              : bothQuotas.standard.currentUsage,
-            limit: quotaType === "standard" 
-              ? bothQuotas.premium.limit 
-              : bothQuotas.standard.limit,
-          },
-        };
-
-        return new Response(JSON.stringify(errorResponse), {
-          status: 429,
-          headers: {
-            "Content-Type": "application/json",
-            "X-Response-Time": `${Date.now() - start}ms`,
-          },
-        });
-      }
-
-      // Handle quota increment based on trigger type
+      
       if (trigger !== "regenerate-message") {
-        // Extract attachment IDs from file parts
         const attachmentIds = userFiles
-          .filter(part => part.attachmentId)
-          .map(part => part.attachmentId! as Id<"attachments">);
-        
-        // For new messages: persist user message (which also increments quota)
-        DatabaseQueue.add(async () => {
-          await fetchMutation(
-            api.threads.serverSendMessage,
-            {
-              secret: process.env.CONVEX_SECRET_TOKEN!,
-              userId,
-              orgId,
+          .filter((part) => part.attachmentId)
+          .map((part) => part.attachmentId! as Id<"attachments">);
+
+        yield* dbQueue.enqueue(
+          sendUserMessage({
+            userId: auth.userId,
+            orgId: auth.orgId,
               threadId,
               content: userText || "",
               model: modelId,
               messageId: lastUser.id,
               quotaType,
               attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
-            },
+          }),
+          `sendUserMessage:${idempotencyKey}`
           );
-        });
       } else {
-        // For regenerations: only increment quota (no message persistence)
-        DatabaseQueue.add(async () => {
-          await fetchMutation(
-            api.users.serverIncrementUserQuota,
-            { secret: process.env.CONVEX_SECRET_TOKEN!, userId, orgId, quotaType },
-          );
-        });
+        yield* dbQueue.enqueue(
+          incrementUserQuota(auth.userId, auth.orgId, quotaType),
+          `incrementUserQuota:${idempotencyKey}`
+        );
       }
     }
 
-    // Start streaming response
-    const stream = createUIMessageStream({
-      originalMessages: messages as UIMessage[], // Type assertion for AI SDK compatibility
-      execute: async ({ writer }) => {
-        // Start assistant UI message with the server-side generated id so UI and DB ids match
-        writer.write({ type: "start", messageId: newMessageId });
+    // Create streaming state ref
+    const stateRef = yield* Ref.make<StreamingState>({
+      content: "",
+      reasoning: "",
+      isComplete: false,
+      toolCallCount: 0,
+      pendingUpdate: { content: "", reasoning: "" },
+    });
 
-        let content = "";
-        let reasoning = "";
-        let isComplete = false;
-        let toolCallCount = 0;
-
-        // Background: Start assistant message
-        DatabaseQueue.add(async () => {
-          await fetchMutation(
-            api.threads.serverStartAssistantMessage,
-            {
-              secret: process.env.CONVEX_SECRET_TOKEN!,
-              userId,
-              threadId,
-              messageId: newMessageId,
-              model: modelId,
-            },
-          );
-        });
-
-        // Batch update mechanism for database writes
-        let pendingUpdate = { content: "", reasoning: "" };
-        const flushUpdate = async () => {
-          if (
-            (!pendingUpdate.content && !pendingUpdate.reasoning) ||
-            isComplete
-          )
-            return;
-
-          const update = { ...pendingUpdate };
-          pendingUpdate = { content: "", reasoning: "" };
-
-          if (update.content.length > 0 || update.reasoning.length > 0) {
-            DatabaseQueue.add(async () => {
-              await fetchMutation(
-                api.threads.serverAppendAssistantMessageDelta,
-                {
-                  secret: process.env.CONVEX_SECRET_TOKEN!,
-                  userId,
+    // Finalization helper with retry
+    const finalizeWithRetry = (args: {
+      ok: boolean;
+      finalContent?: string;
+      finalReasoning?: string;
+      error?: { type: string; message: string };
+    }) =>
+      finalizeAssistantMessage({
+        userId: auth.userId,
                   messageId: newMessageId,
-                  delta: update.content || " ",
-                  reasoningDelta:
-                    update.reasoning.length > 0 ? update.reasoning : undefined,
-                },
-              );
-            });
-          }
-        };
+        ...args,
+      }).pipe(
+        Effect.catchAll((error) =>
+          Effect.sync(() => {
+            console.error("Failed to finalize message:", error);
+          })
+        )
+      );
 
-        // Periodic flush (every 2 seconds)
-        const flushInterval = setInterval(() => flushUpdate(), 2000);
-
-        // Handle abort signal BEFORE the connection is severed
-        const handleAbort = () => {
-          if (isComplete) return;
-          isComplete = true;
-          cleanup();
-          
-          // Send finish event to client
-          try {
-            writer.write({ type: "finish" });
-          } catch (e) {
-            // Stream might already be closed, ignore
-          }
-          
-          // Handle remaining cleanup
-          (async () => {
-            // Flush any pending updates
-            await flushUpdate();
-            
-            // Finalize in database
-            await finalizeWithRetry({
-              ok: true,
-              finalContent: content.length > 0 ? content : undefined,
-              finalReasoning: reasoning || undefined,
-              context: "abort",
-            });
-
-            // Ensure PostHog flush
-            phClient.shutdown();
-
-            // Increment tool call quota if any tools were used
-            if (toolCallCount > 0) {
-              DatabaseQueue.add(async () => {
-                try {
-                  await fetch(`${process.env.CONVEX_SITE_URL}/increment-tool-call-quota`, {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                      "Authorization": `Bearer ${process.env.CONVEX_SECRET_TOKEN}`,
-                    },
-                    body: JSON.stringify({
-                      userId: auth.userId,
-                      toolCallCount,
-                    }),
-                  });
-                } catch (error) {
-                  console.error("Failed to increment tool call quota (abort):", error);
-                }
-              });
-            }
-          })();
-        };
-
-        const cleanup = () => {
-          clearInterval(flushInterval);
-          req.signal?.removeEventListener("abort", handleAbort);
-        };
-
-        req.signal?.addEventListener("abort", handleAbort);
-
-        console.log(`Starting streamText call: ${Date.now() - start}ms`);
-
-        try {
+    // Build system prompt
           const now = new Date();
           const dateString = now.toLocaleDateString("en-US", {
             weekday: "long",
@@ -656,17 +637,132 @@ CODE FORMATTING:
           }
 
           const baseSystemPrompt = baseSystemPromptParts.join("\n\n");
+    const systemPrompt = yield* Effect.try({
+      try: () =>
+        buildSystemPromptWithStyle(baseSystemPrompt, responseStyle as ResponseStyle),
+      catch: (error) =>
+        new ModelError({
+          message: "Failed to build system prompt",
+          cause: error,
+        }),
+    });
 
-          // Apply response style to system prompt
-          const systemPrompt = buildSystemPromptWithStyle(
-            baseSystemPrompt,
-            responseStyle as ResponseStyle
+    // Create the streaming response
+    const stream = createUIMessageStream({
+      originalMessages: messages as UIMessage[],
+      execute: async ({ writer }) => {
+        // Start assistant message with server-side generated id
+        writer.write({ type: "start", messageId: newMessageId });
+
+        // Start assistant message in database (background)
+        const startEffect = dbQueue.enqueue(
+          startAssistantMessage({
+            userId: auth.userId,
+            threadId,
+            messageId: newMessageId,
+            model: modelId,
+          }),
+          "startAssistantMessage"
+        );
+        Effect.runPromise(startEffect).catch(console.error);
+
+        // Flush pending updates to database
+        const flushUpdate = async () => {
+          const state = await Effect.runPromise(Ref.get(stateRef));
+          if (
+            (!state.pendingUpdate.content && !state.pendingUpdate.reasoning) ||
+            state.isComplete
+          ) {
+            return;
+          }
+
+          const update = { ...state.pendingUpdate };
+          await Effect.runPromise(
+            Ref.update(stateRef, (s) => ({
+              ...s,
+              pendingUpdate: { content: "", reasoning: "" },
+            }))
           );
-          
+
+          if (update.content.length > 0 || update.reasoning.length > 0) {
+            const appendEffect = dbQueue.enqueue(
+              appendMessageDelta({
+                userId: auth.userId,
+                messageId: newMessageId,
+                delta: update.content || " ",
+                reasoningDelta: update.reasoning.length > 0 ? update.reasoning : undefined,
+              }),
+              "appendMessageDelta"
+            );
+            Effect.runPromise(appendEffect).catch(console.error);
+          }
+        };
+
+        // Periodic flush (every 6 seconds)
+        const flushInterval = setInterval(() => flushUpdate(), 6000);
+
+        // Handle abort
+        const handleAbort = () => {
+          Effect.runPromise(Ref.get(stateRef)).then(async (state) => {
+            if (state.isComplete) return;
+
+            await Effect.runPromise(
+              Ref.update(stateRef, (s) => ({ ...s, isComplete: true }))
+            );
+
+            cleanup();
+
+            try {
+              writer.write({ type: "finish" });
+            } catch {
+              // Stream might be closed
+            }
+
+            // Flush and finalize
+            await flushUpdate();
+
+            const finalState = await Effect.runPromise(Ref.get(stateRef));
+            await Effect.runPromise(
+              finalizeWithRetry({
+                ok: true,
+                finalContent: finalState.content.length > 0 ? finalState.content : undefined,
+                finalReasoning: finalState.reasoning || undefined,
+              })
+            );
+
+            logger.info("Request aborted by client", logContext, {
+              contentLength: finalState.content.length,
+              toolCallCount: finalState.toolCallCount,
+            });
+
+            // Increment tool call quota if any tools were used
+            if (finalState.toolCallCount > 0) {
+              logger.debug("Incrementing tool quota (abort)", logContext, { 
+                toolCallCount: finalState.toolCallCount 
+              });
+              Effect.runPromise(
+                incrementToolCallQuota(auth.userId, finalState.toolCallCount)
+              ).catch((err) => logger.error("Failed to increment tool quota", logContext, err));
+            }
+          });
+        };
+
+        const cleanup = () => {
+          clearInterval(flushInterval);
+          req.signal?.removeEventListener("abort", handleAbort);
+        };
+
+        req.signal?.addEventListener("abort", handleAbort);
+
+        logger.debug("Starting AI stream", logContext, { timeMs: Date.now() - start });
+
+        try {
           const result = streamText({
             model,
-            messages: convertToModelMessages(filterMessagesForModel(messages as UIMessage[], modelId)), // Filter unsupported file types for non-supporting models
-            tools,
+            messages: convertToModelMessages(
+              filterMessagesForModel(messages as UIMessage[], modelId)
+            ),
+            tools: toolSet,
             system: systemPrompt,
             stopWhen: stepCountIs(50),
             experimental_transform: smoothStream({
@@ -679,15 +775,41 @@ CODE FORMATTING:
               if (req.signal?.aborted) return;
 
               if (chunk.type === "text-delta" && chunk.text) {
-                content += chunk.text;
-                pendingUpdate.content += chunk.text;
+                Effect.runPromise(
+                  Ref.update(stateRef, (s) => ({
+                    ...s,
+                    content: s.content + chunk.text,
+                    pendingUpdate: {
+                      ...s.pendingUpdate,
+                      content: s.pendingUpdate.content + chunk.text,
+                    },
+                  }))
+                );
               } else if (chunk.type === "reasoning-delta" && chunk.text) {
-                reasoning += chunk.text;
-                pendingUpdate.reasoning += chunk.text;
+                Effect.runPromise(
+                  Ref.update(stateRef, (s) => ({
+                    ...s,
+                    reasoning: s.reasoning + chunk.text,
+                    pendingUpdate: {
+                      ...s.pendingUpdate,
+                      reasoning: s.pendingUpdate.reasoning + chunk.text,
+                    },
+                  }))
+                );
               } else if (chunk.type === "tool-call") {
-                toolCallCount++;
-              } else if (chunk.type === "tool-result" && chunk.toolName === "webSearch") {
-                // Extract sources from web search tool results
+                logger.debug("Tool call detected", logContext, { 
+                  toolName: (chunk as any).toolName 
+                });
+                Effect.runPromise(
+                  Ref.update(stateRef, (s) => ({
+                    ...s,
+                    toolCallCount: s.toolCallCount + 1,
+                  }))
+                );
+              } else if (
+                chunk.type === "tool-result" &&
+                chunk.toolName === "webSearch"
+              ) {
                 const toolResult = chunk.output as any[];
                 if (Array.isArray(toolResult)) {
                   const sources = toolResult
@@ -698,7 +820,6 @@ CODE FORMATTING:
                       title: result.title || result.url,
                     }));
 
-                  // Stream sources to client
                   sources.forEach((source) => {
                     writer.write({
                       type: "source-url",
@@ -708,114 +829,125 @@ CODE FORMATTING:
                     });
                   });
 
-                  // Save sources to database
                   if (sources.length > 0) {
-                    DatabaseQueue.add(async () => {
-                      try {
-                        await fetchMutation(
-                          api.threads.serverAddSourcesToMessage,
-                          {
-                            secret: process.env.CONVEX_SECRET_TOKEN!,
-                            userId,
+                    Effect.runPromise(
+                      dbQueue.enqueue(
+                        addSourcesToMessage({
+                          userId: auth.userId,
                             messageId: newMessageId,
-                            sources: sources,
-                          },
-                        );
-                      } catch (error) {
-                        console.error("Failed to save sources to database:", error);
-                      }
-                    });
+                          sources,
+                        }),
+                        "addSourcesToMessage"
+                      )
+                    ).catch(console.error);
                   }
                 }
               }
             },
             onFinish: async () => {
-              console.log(
-                `StreamText finished (total generation time): ${Date.now() - start}ms`,
+              const totalTime = Date.now() - start;
+              
+              const state = await Effect.runPromise(Ref.get(stateRef));
+              if (state.isComplete) return;
+
+              await Effect.runPromise(
+                Ref.update(stateRef, (s) => ({ ...s, isComplete: true }))
               );
-              if (isComplete) return;
-              isComplete = true;
+
               cleanup();
 
-              // Final flush and finalization
               await flushUpdate();
 
-              const success = content.length > 0;
-              await finalizeWithRetry({
+              const finalState = await Effect.runPromise(Ref.get(stateRef));
+              const success = finalState.content.length > 0;
+
+              await Effect.runPromise(
+                finalizeWithRetry({
                 ok: success,
-                finalContent: success ? content : undefined,
-                finalReasoning: reasoning || undefined,
-                error: success ? undefined : { type: "empty", message: "No content generated" },
-                context: "onFinish",
+                  finalContent: success ? finalState.content : undefined,
+                  finalReasoning: finalState.reasoning || undefined,
+                  error: success
+                    ? undefined
+                    : { type: "empty", message: "No content generated" },
+                })
+              );
+
+              logger.info("Stream completed successfully", logContext, {
+                totalTimeMs: totalTime,
+                contentLength: finalState.content.length,
+                reasoningLength: finalState.reasoning.length,
+                toolCallCount: finalState.toolCallCount,
+                success,
               });
 
-              // Ensure PostHog flush
-              phClient.shutdown();
-
-              // Increment tool call quota if any tools were used when the assistant message is finalized
-              if (toolCallCount > 0) {
-                DatabaseQueue.add(async () => {
-                  try {
-                    await fetch(`${process.env.CONVEX_SITE_URL}/increment-tool-call-quota`, {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${process.env.CONVEX_SECRET_TOKEN}`,
-                      },
-                      body: JSON.stringify({
-                        userId: auth.userId,
-                        toolCallCount,
-                      }),
-                    });
-                    console.log(`Incremented tool call quota by ${toolCallCount} for user`);
-                  } catch (error) {
-                    console.error("Failed to increment tool call quota:", error);
-                    // Don't fail the request if quota increment fails
-                  }
+              if (finalState.toolCallCount > 0) {
+                logger.debug("Incrementing tool quota", logContext, { 
+                  toolCallCount: finalState.toolCallCount 
                 });
+                Effect.runPromise(
+                  incrementToolCallQuota(auth.userId, finalState.toolCallCount)
+                ).catch((err) => logger.error("Failed to increment tool quota", logContext, err));
               }
             },
             onError: async (error) => {
-              if (isComplete) return;
+              const state = await Effect.runPromise(Ref.get(stateRef));
+              if (state.isComplete) return;
               
               const errorObj = error.error as Error;
               const isAbort = errorObj.name === "AbortError" || req.signal?.aborted;
               
-              // Aborts are handled by the dedicated abort listener above
               if (isAbort) {
                 return;
               }
 
-              // Handle actual errors
-              isComplete = true;
+              await Effect.runPromise(
+                Ref.update(stateRef, (s) => ({ ...s, isComplete: true }))
+              );
+
               cleanup();
               
-              console.error("Stream error:", error);           
-              // Ensure PostHog flush on error
-              phClient.shutdown();            
-              await finalizeWithRetry({
-                ok: false,
-                error: {
-                  type: "generation",
-                  message: errorObj.message || "Stream failed",
-                },
-                context: "error",
+              // Classify the provider error for better debugging
+              const classifiedError = classifyProviderError(errorObj);
+              
+              logger.error("Stream error from AI provider", logContext, {
+                errorType: classifiedError.errorType,
+                retryable: classifiedError.retryable,
+                originalError: errorObj.message,
+                stack: errorObj.stack,
               });
 
+              await Effect.runPromise(
+                finalizeWithRetry({
+                ok: false,
+                error: {
+                    type: classifiedError.errorType,
+                    message: classifiedError.message,
+                },
+                })
+              );
+
               try {
+                // Provide user-friendly error message based on error type
+                const userMessage = classifiedError.retryable
+                  ? "Generation failed. Please try again."
+                  : classifiedError.message;
+                  
                 writer.write({
                   type: "error",
-                  errorText: "Generation failed. Please try again.",
+                  errorText: userMessage,
                 });
-              } catch (e) {
-                // Stream might be closed, ignore
+              } catch {
+                // Stream might be closed
               }
             },
           });
 
-          // We already sent a start with newMessageId above; stream sources and reasoning parts
           writer.merge(
-            result.toUIMessageStream({ sendStart: false, sendSources: true, sendReasoning: true })
+            result.toUIMessageStream({
+              sendStart: false,
+              sendSources: true,
+              sendReasoning: true,
+            })
           );
         } catch (error) {
           cleanup();
@@ -824,33 +956,63 @@ CODE FORMATTING:
       },
     });
 
-    const response = createUIMessageStreamResponse({
+    return createUIMessageStreamResponse({
       stream,
       headers: {
         "X-Response-Time": `${Date.now() - start}ms`,
+        "X-Request-ID": requestId,
       },
     });
+  });
 
-    return response;
-  } catch (error) {
-    console.error("Chat API error:", error);
+// ============================================================================
+// Export POST Handler
+// ============================================================================
 
-    if (error instanceof StreamError) {
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: error.status,
-        headers: {
-          "Content-Type": "application/json",
-          "X-Response-Time": `${Date.now() - start}ms`,
-        },
-      });
-    }
+export async function POST(req: Request): Promise<Response> {
+  const start = Date.now();
+  const requestId = generateRequestId();
+  
+  const logContext: LogContext = { requestId };
 
-    return new Response(JSON.stringify({ error: "Internal server error" }), {
+  const program = handleChatRequest(req, requestId).pipe(
+    Effect.scoped,
+    // Add request timeout
+    Effect.timeout(Duration.millis(CONFIG.REQUEST_TIMEOUT_MS)),
+    Effect.catchTag("TimeoutException", () =>
+      Effect.fail(
+        new TimeoutError({
+          message: "Request timed out. Please try again.",
+          timeoutMs: CONFIG.REQUEST_TIMEOUT_MS,
+        })
+      )
+    ),
+    Effect.catchTags({
+      ValidationError: (e: ValidationError) => Effect.succeed(errorToResponse(e, start, requestId)),
+      RegenerateError: (e: RegenerateError) => Effect.succeed(errorToResponse(e, start, requestId)),
+      AuthenticationError: (e: AuthenticationError) => Effect.succeed(errorToResponse(e, start, requestId)),
+      NoOrganizationError: (e: NoOrganizationError) => Effect.succeed(errorToResponse(e, start, requestId)),
+      NoSubscriptionError: (e: NoSubscriptionError) => Effect.succeed(errorToResponse(e, start, requestId)),
+      QuotaExceededError: (e: QuotaExceededError) => Effect.succeed(errorToResponse(e, start, requestId)),
+      AbortError: (e: AbortError) => Effect.succeed(errorToResponse(e, start, requestId)),
+      DatabaseError: (e: DatabaseError) => Effect.succeed(errorToResponse(e, start, requestId)),
+      ModelError: (e: ModelError) => Effect.succeed(errorToResponse(e, start, requestId)),
+      ToolError: (e: ToolError) => Effect.succeed(errorToResponse(e, start, requestId)),
+      TimeoutError: (e: TimeoutError) => Effect.succeed(errorToResponse(e, start, requestId)),
+    }),
+    Effect.catchAll((error: unknown) => {
+      logger.error("Unhandled error in chat route", logContext, error);
+      const errorResponse = new Response(JSON.stringify({ error: "Internal server error", requestId }), {
       status: 500,
       headers: {
         "Content-Type": "application/json",
         "X-Response-Time": `${Date.now() - start}ms`,
+          "X-Request-ID": requestId,
       },
     });
+      return Effect.succeed(errorResponse);
+    })
+  );
+
+  return Effect.runPromise(program);
   }
-}

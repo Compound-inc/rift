@@ -4,3 +4,5 @@ bun.lock
 /reference
 .env.local
 lib/local/
+.cursor/rules/effect.mdc
+tsconfig.tsbuildinfo
