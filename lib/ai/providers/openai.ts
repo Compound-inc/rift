@@ -69,7 +69,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       supportsReasoning: true,
       supportsImageInput: true,
       supportsImageOutput: true,
-      supportsPDFInput: true,
+      supportsPDFInput: false,
       supportsObjectGeneration: true,
       maxTokens: 131072,
     }),

@@ -70,7 +70,7 @@ export const ANTHROPIC_MODELS: BaseModelConfig[] = [
     isPremium: true,
     capabilities: mergeCapabilities({
       supportsTools: true,
-      supportsPDFInput: true,
+      supportsPDFInput: false,
       supportsStreaming: true,
       supportsReasoning: true,
       supportsImageInput: true,
@@ -89,7 +89,7 @@ export const ANTHROPIC_MODELS: BaseModelConfig[] = [
       supportsTools: true,
       supportsStreaming: true,
       supportsReasoning: true,
-      supportsPDFInput: true,
+      supportsPDFInput: false,
       supportsImageInput: true,
       supportsObjectGeneration: true,
       maxTokens: 16384,
