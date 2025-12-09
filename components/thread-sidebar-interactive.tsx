@@ -11,7 +11,7 @@ import { cn, copyToClipboard } from "@/lib/utils";
 import { useChatSidebarControls } from "@/components/ai/ChatShellClient";
 import { logThreadRemoved, logThreadRenamed } from "@/actions/audit";
 import { CheckIcon, AlertTriangleIcon } from "lucide-react";
-import { EditIcon, DeleteIcon, PinIcon, CopyIcon } from "@/components/ui/icons/svg-icons";
+import { EditIcon, DeleteIcon, PinIcon, ShareIcon } from "@/components/ui/icons/svg-icons";
 import {
   Tooltip,
   TooltipTrigger,
@@ -533,7 +533,7 @@ export function ThreadSidebarInteractive({
             </div>
           </div>
         </ContextMenuTrigger>
-        <ContextMenuContent>
+        <ContextMenuContent className="border border-zinc-200 bg-white shadow-md dark:border-zinc-800/70 dark:bg-zinc-950 dark:shadow-2xl">
           <ContextMenuItem
             className="hover:bg-hover"
             onClick={(event: React.MouseEvent) =>
@@ -550,21 +550,9 @@ export function ThreadSidebarInteractive({
               setShareDialogThread(thread);
             }}
           >
-            <CopyIcon className="mr-2 h-3 w-3" />
-            {shareState.isShared ? "Opciones de compartido" : "Compartir enlace"}
+            <ShareIcon className="mr-2 h-3 w-3" />
+            {shareState.isShared ? "Opciones de compartir" : "Compartir chat"}
           </ContextMenuItem>
-          {shareState.isShared && shareState.shareId && (
-            <ContextMenuItem
-              className="hover:bg-hover"
-              onClick={(event: React.MouseEvent) => {
-                event.stopPropagation();
-                handleCopyShareLink(shareState.shareId!);
-              }}
-            >
-              <CopyIcon className="mr-2 h-3 w-3" />
-              Copiar enlace
-            </ContextMenuItem>
-          )}
           <ContextMenuItem
             className="hover:bg-hover"
             onClick={(event: React.MouseEvent) =>

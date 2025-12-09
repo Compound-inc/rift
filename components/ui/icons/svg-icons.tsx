@@ -226,6 +226,43 @@ export function DeleteIcon({ className, ...props }: IconProps) {
   );
 }
 
+export function ShareIcon({ className, ...props }: IconProps) {
+  return (
+    <svg
+      width="44"
+      height="44"
+      viewBox="0 0 44 44"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      {...props}
+    >
+      <g clipPath="url(#clip0_93_832)">
+        <path
+          opacity="0.4"
+          d="M37.795 24.2564V26.5128C37.795 33.9585 37.795 37.6814 35.4818 39.9947C33.1687 42.3077 29.4459 42.3077 22.0002 42.3077H17.4873C10.0415 42.3077 6.31859 42.3077 4.0055 39.9947C1.69238 37.6814 1.69238 33.9585 1.69238 26.5128V22C1.69238 14.5542 1.69238 10.8313 4.0055 8.51825C6.31859 6.20514 10.0415 6.20514 17.4873 6.20514H19.7438"
+          stroke="currentColor"
+          strokeWidth="3.38462"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M26.5129 1.69232H35.5385C38.7295 1.69232 40.325 1.69232 41.3165 2.68365C42.3078 3.67498 42.3078 5.27051 42.3078 8.46155V17.4872M40.0513 3.94873L19.7437 24.2564"
+          stroke="currentColor"
+          strokeWidth="3.38462"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </g>
+      <defs>
+        <clipPath id="clip0_93_832">
+          <rect width="44" height="44" fill="white" />
+        </clipPath>
+      </defs>
+    </svg>
+  );
+}
+
 export function PlusIcon({ className, ...props }: IconProps) {
   return (
     <svg

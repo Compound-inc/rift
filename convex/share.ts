@@ -5,6 +5,7 @@ import { AuthMutation, AuthQuery } from "./helpers/authenticated";
 import { extractOrganizationIdFromJWT } from "./helpers/quota";
 import { Data, Effect } from "effect";
 import { Id } from "./_generated/dataModel";
+import { threadInfoFields } from "./threads";
 
 // ============================================================================
 // Error types
@@ -91,20 +92,18 @@ type SharedMessage = {
 const SharedThreadResponseValidator = v.object({
   status: v.literal("ok"),
   thread: v.object({
-    threadId: v.string(),
-    title: v.string(),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-    model: v.string(),
-    responseStyle: v.optional(
-      v.union(
-        v.literal("regular"),
-        v.literal("learning"),
-        v.literal("technical"),
-        v.literal("concise"),
-      ),
-    ),
+    threadId: threadInfoFields.threadId,
+    title: threadInfoFields.title,
+    createdAt: threadInfoFields.createdAt,
+    updatedAt: threadInfoFields.updatedAt,
+    model: threadInfoFields.model,
+    responseStyle: threadInfoFields.responseStyle,
     ownerName: v.optional(v.string()),
+    settings: v.object({
+      allowAttachments: v.boolean(),
+      orgOnly: v.boolean(),
+      shareName: v.boolean(),
+    }),
   }),
   messages: v.object({
     page: v.array(SharedMessageValidator),
@@ -845,6 +844,8 @@ export const getSharedThread = query({
       const orgOnly = shared.orgOnly ?? thread.orgOnly ?? false;
       const shareName = shared.shareName ?? thread.shareName ?? false;
       const ownerOrgId = shared.ownerOrgId ?? thread.ownerOrgId ?? null;
+      const allowAttachments =
+        shared.allowAttachments ?? thread.allowAttachments ?? false;
 
       if (orgOnly) {
         const viewerIdentity = yield* _(
@@ -985,6 +986,11 @@ export const getSharedThread = query({
           updatedAt: thread.updatedAt,
           model: thread.model,
           responseStyle: thread.responseStyle,
+          settings: {
+            allowAttachments,
+            orgOnly,
+            shareName,
+          },
           ownerName:
             shareName && owner
               ? `${owner.firstName ?? ""} ${owner.lastName ?? ""}`.trim() ||

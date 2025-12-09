@@ -122,12 +122,12 @@ export function ShareSettingsDialog({
     if (effectiveShareStatus === "revoked") {
       return {
         statusLabel: "Reactivando",
-        statusClass: "bg-amber-100 text-amber-800 border border-amber-200",
+        statusClass: "bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800",
       };
     }
     return {
       statusLabel: "Activa",
-      statusClass: "bg-emerald-100 text-emerald-800 border border-emerald-200",
+      statusClass: "bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800",
     };
   }, [effectiveShareStatus, isLoadingShareStatus, isShared]);
 
@@ -225,7 +225,7 @@ export function ShareSettingsDialog({
         }
       }}
     >
-      <DialogContent className="sm:max-w-xl data-[state=open]:animate-none data-[state=closed]:animate-none">
+      <DialogContent className="sm:max-w-xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-800/70 dark:bg-zinc-950/90 data-[state=open]:animate-none data-[state=closed]:animate-none">
         <DialogHeader>
           <DialogTitle>Compartir conversación</DialogTitle>
           <DialogDescription>
@@ -234,7 +234,7 @@ export function ShareSettingsDialog({
         </DialogHeader>
 
         <div className="space-y-6">
-          <div className="rounded-lg border bg-muted/30 p-4 md:p-5 space-y-3">
+          <div className="rounded-lg border bg-muted/30 p-4 md:p-5 space-y-3 dark:border-zinc-800 dark:bg-zinc-900/60">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1">
                 <p className="text-base font-semibold">Visibilidad del enlace</p>
@@ -287,7 +287,7 @@ export function ShareSettingsDialog({
             </div>
           </div>
 
-          <div className="rounded-lg border bg-card p-4 md:p-5 space-y-4">
+          <div className="rounded-lg border bg-card p-4 md:p-5 space-y-4 dark:border-zinc-800 dark:bg-zinc-900/60">
             <div className="space-y-1">
               <p className="text-sm font-semibold">Configuración de visibilidad</p>
               <p className="text-sm text-muted-foreground">

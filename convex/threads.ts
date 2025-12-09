@@ -12,6 +12,47 @@ import {
 import { ensureServerSecret } from "./helpers/auth";
 import { AuthMutation, AuthOrgMutation, AuthQuery } from "./helpers/authenticated";
 
+export const threadInfoFields = {
+  _id: v.id("threads"),
+  _creationTime: v.number(),
+  threadId: v.string(),
+  title: v.string(),
+  createdAt: v.number(),
+  updatedAt: v.number(),
+  lastMessageAt: v.number(),
+  generationStatus: v.union(
+    v.literal("pending"),
+    v.literal("generation"),
+    v.literal("compleated"),
+    v.literal("failed"),
+  ),
+  visibility: v.union(v.literal("visible"), v.literal("archived")),
+  userSetTitle: v.optional(v.boolean()),
+  userId: v.string(),
+  model: v.string(),
+  responseStyle: v.optional(
+    v.union(
+      v.literal("regular"),
+      v.literal("learning"),
+      v.literal("technical"),
+      v.literal("concise"),
+    ),
+  ),
+  pinned: v.boolean(),
+  branchParentThreadId: v.optional(v.id("threads")),
+  branchParentPublicMessageId: v.optional(v.string()),
+  backfill: v.optional(v.boolean()),
+  shareId: v.optional(v.string()),
+  shareStatus: v.optional(v.union(v.literal("active"), v.literal("revoked"))),
+  sharedAt: v.optional(v.number()),
+  allowAttachments: v.optional(v.boolean()),
+  orgOnly: v.optional(v.boolean()),
+  shareName: v.optional(v.boolean()),
+  ownerOrgId: v.optional(v.string()),
+} as const;
+
+export const threadInfoValidator = v.object(threadInfoFields);
+
 /**
  * Create a new thread with an initial message.
  * This mutation is secure and only allows authenticated users to create threads.
@@ -150,43 +191,7 @@ export const getThreadInfo = AuthQuery({
   args: {
     threadId: v.string(),
   },
-  returns: v.union(
-    v.object({
-      _id: v.id("threads"),
-      _creationTime: v.number(),
-      threadId: v.string(),
-      title: v.string(),
-      createdAt: v.number(),
-      updatedAt: v.number(),
-      lastMessageAt: v.number(),
-      generationStatus: v.union(
-        v.literal("pending"),
-        v.literal("generation"),
-        v.literal("compleated"),
-        v.literal("failed"),
-      ),
-      visibility: v.union(v.literal("visible"), v.literal("archived")),
-      userSetTitle: v.optional(v.boolean()),
-      userId: v.string(),
-      model: v.string(),
-      responseStyle: v.optional(
-        v.union(
-          v.literal("regular"),
-          v.literal("learning"),
-          v.literal("technical"),
-          v.literal("concise"),
-        ),
-      ),
-      pinned: v.boolean(),
-      branchParentThreadId: v.optional(v.id("threads")),
-      branchParentPublicMessageId: v.optional(v.string()),
-      backfill: v.optional(v.boolean()),
-      shareId: v.optional(v.string()),
-      shareStatus: v.optional(v.union(v.literal("active"), v.literal("revoked"))),
-      sharedAt: v.optional(v.number()),
-    }),
-    v.null(),
-  ),
+  returns: v.union(threadInfoValidator, v.null()),
   handler: async (ctx, args) => {
     const userId = ctx.identity.subject;
 
@@ -470,43 +475,7 @@ export const serverGetThreadInfo = query({
     userId: v.string(),
     threadId: v.string(),
   },
-  returns: v.union(
-    v.object({
-      _id: v.id("threads"),
-      _creationTime: v.number(),
-      threadId: v.string(),
-      title: v.string(),
-      createdAt: v.number(),
-      updatedAt: v.number(),
-      lastMessageAt: v.number(),
-      generationStatus: v.union(
-        v.literal("pending"),
-        v.literal("generation"),
-        v.literal("compleated"),
-        v.literal("failed"),
-      ),
-      visibility: v.union(v.literal("visible"), v.literal("archived")),
-      userSetTitle: v.optional(v.boolean()),
-      userId: v.string(),
-      model: v.string(),
-      responseStyle: v.optional(
-        v.union(
-          v.literal("regular"),
-          v.literal("learning"),
-          v.literal("technical"),
-          v.literal("concise"),
-        ),
-      ),
-      pinned: v.boolean(),
-      branchParentThreadId: v.optional(v.id("threads")),
-      branchParentPublicMessageId: v.optional(v.string()),
-      backfill: v.optional(v.boolean()),
-      shareId: v.optional(v.string()),
-      shareStatus: v.optional(v.union(v.literal("active"), v.literal("revoked"))),
-      sharedAt: v.optional(v.number()),
-    }),
-    v.null(),
-  ),
+  returns: v.union(threadInfoValidator, v.null()),
   handler: async (ctx, args) => {
     ensureServerSecret(args.secret);
     const thread = await ctx.db
