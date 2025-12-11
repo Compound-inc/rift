@@ -154,7 +154,7 @@ export function useThreadShare() {
     await Effect.runPromise(program);
   }, []);
 
-  const updateShareSettings = useCallback(
+  const handleUpdateShareSettings = useCallback(
     async (args: { threadId: string; orgOnly: boolean; shareName: boolean }) => {
       const program = Effect.tryPromise({
         try: () => updateShareSettingsMutation(args),
@@ -167,12 +167,12 @@ export function useThreadShare() {
         ),
       );
 
-      return Effect.runPromise(program);
+      await Effect.runPromise(program);
     },
     [updateShareSettingsMutation],
   );
 
-  const regenerateShareLink = useCallback(
+  const handleRegenerateShareLink = useCallback(
     async (args: { threadId: string }) => {
       const program = Effect.tryPromise({
         try: () => regenerateShareLinkMutation(args),
@@ -185,7 +185,7 @@ export function useThreadShare() {
         ),
       );
 
-      return Effect.runPromise(program);
+      return await Effect.runPromise(program);
     },
     [regenerateShareLinkMutation],
   );
@@ -194,8 +194,8 @@ export function useThreadShare() {
     resolveShareState,
     handleToggleShare,
     handleCopyShareLink,
-    updateShareSettings,
-    regenerateShareLink,
+    handleUpdateShareSettings,
+    handleRegenerateShareLink,
   };
 }
 

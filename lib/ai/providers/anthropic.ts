@@ -46,7 +46,7 @@ export const DEFAULT_ANTHROPIC_SETTINGS: AnthropicSettings = {
 export const ANTHROPIC_MODELS: BaseModelConfig[] = [
   {
     id: "anthropic/claude-opus-4.5",
-    name: "Claude Opus 4.5 (Beta)",
+    name: "Claude Opus 4.5",
     provider: "anthropic",
     description: "El modelo mas inteligente hasta la fecha, capaz de resolver problemas complejos",
     contextWindow: 200000,

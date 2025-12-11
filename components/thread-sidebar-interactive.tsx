@@ -112,8 +112,8 @@ export function ThreadSidebarInteractive({
     resolveShareState,
     handleToggleShare,
     handleCopyShareLink,
-    updateShareSettings,
-    regenerateShareLink,
+    handleUpdateShareSettings,
+    handleRegenerateShareLink,
   } = useThreadShare();
 
   useEffect(() => {
@@ -703,8 +703,8 @@ export function ThreadSidebarInteractive({
         onClose={() => setShareDialogThread(null)}
         handleToggleShare={handleToggleShare}
         handleCopyShareLink={handleCopyShareLink}
-        updateShareSettings={updateShareSettings}
-        regenerateShareLink={regenerateShareLink}
+        updateShareSettings={handleUpdateShareSettings}
+        regenerateShareLink={handleRegenerateShareLink}
       />
     </div>
   );

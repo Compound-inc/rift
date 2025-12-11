@@ -27,6 +27,21 @@ export const DEFAULT_ZAI_SETTINGS: ZAISettings = {
 
 export const ZAI_MODELS: BaseModelConfig[] = [
   {
+    id: "zai/glm-4.6v",
+    name: "GLM 4.6V",
+    provider: "zai",
+    description:
+      "Variante con visión multimodal basada en GLM 4.6, adecuada para análisis visual y contextual.",
+    contextWindow: 200000,
+    isPremium: false,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsReasoning: false,
+      supportsImageInput: true,
+      maxTokens: 16384,
+    }),
+  },
+  {
     id: "zai/glm-4.6",
     name: "GLM 4.6",
     provider: "zai",
