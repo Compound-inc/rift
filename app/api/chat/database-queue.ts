@@ -69,7 +69,8 @@ export const createDatabaseQueue = (logContext: LogContext) =>
       return withPolicy.pipe(Effect.catchAll(() => Effect.void));
     };
 
-    const processorFiber = yield* Effect.fork(
+    // Use daemon fiber so it stays alive beyond the request scope
+    const processorFiber = yield* Effect.forkDaemon(
       Effect.gen(function* () {
         while (true) {
           const shutdown = yield* Ref.get(isShutdown);

@@ -785,6 +785,7 @@ export const serverFinalizeAssistantMessage = mutation({
   args: {
     secret: v.string(),
     userId: v.string(),
+    threadId: v.string(),
     messageId: v.string(),
     ok: v.boolean(),
     finalContent: v.optional(v.string()),
@@ -805,33 +806,82 @@ export const serverFinalizeAssistantMessage = mutation({
         q.eq("messageId", args.messageId).eq("userId", args.userId),
       )
       .unique();
+    const now = Date.now();
+
+    // Fallback: create message if startAssistantMessage never succeeded
+    let targetThreadId = args.threadId;
+    let thread =
+      message?.threadId &&
+      (await ctx.db
+        .query("threads")
+        .withIndex("by_threadId", (q) => q.eq("threadId", message.threadId))
+        .unique());
+
     if (!message) {
-      throw new Error("Message not found or access denied");
+      thread =
+        thread ??
+        (await ctx.db
+          .query("threads")
+          .withIndex("by_user_and_threadId", (q) =>
+            q.eq("userId", args.userId).eq("threadId", args.threadId),
+          )
+          .unique());
+      if (!thread) {
+        throw new Error("Thread not found or access denied");
+      }
+
+      await ctx.db.insert("messages", {
+        messageId: args.messageId,
+        threadId: args.threadId,
+        userId: args.userId,
+        reasoning:
+          args.finalReasoning && args.finalReasoning.length > 0
+            ? args.finalReasoning
+            : undefined,
+        content: args.finalContent ?? "",
+        status: args.ok ? ("done" as const) : ("error" as const),
+        updated_at: now,
+        branches: undefined,
+        role: "assistant" as const,
+        created_at: now,
+        serverError: args.ok ? undefined : args.error,
+        model: thread.model,
+        attachmentsIds: [],
+        modelParams: undefined,
+        providerMetadata: undefined,
+        backfill: false,
+      });
+      targetThreadId = args.threadId;
+    } else {
+      const updateData: {
+        status: "done" | "error";
+        serverError?: { type: string; message: string };
+        updated_at: number;
+        content?: string;
+        reasoning?: string;
+      } = {
+        status: args.ok ? ("done" as const) : ("error" as const),
+        serverError: args.ok ? undefined : args.error,
+        updated_at: now,
+      };
+      if (args.finalContent !== undefined && args.finalContent.length > 0) {
+        updateData.content = args.finalContent;
+      }
+      if (args.finalReasoning !== undefined && args.finalReasoning.length > 0) {
+        updateData.reasoning = args.finalReasoning;
+      }
+      await ctx.db.patch(message._id, updateData);
+      targetThreadId = message.threadId;
     }
-    const updateData: {
-      status: "done" | "error";
-      serverError?: { type: string; message: string };
-      updated_at: number;
-      content?: string;
-      reasoning?: string;
-    } = {
-      status: args.ok ? ("done" as const) : ("error" as const),
-      serverError: args.ok ? undefined : args.error,
-      updated_at: Date.now(),
-    };
-    if (args.finalContent !== undefined && args.finalContent.length > 0) {
-      updateData.content = args.finalContent;
-    }
-    if (args.finalReasoning !== undefined && args.finalReasoning.length > 0) {
-      updateData.reasoning = args.finalReasoning;
-    }
-    await ctx.db.patch(message._id, updateData);
-    const thread = await ctx.db
-      .query("threads")
-      .withIndex("by_threadId", (q) => q.eq("threadId", message.threadId))
-      .unique();
-    if (thread) {
-      await ctx.db.patch(thread._id, {
+
+    const threadForStatus =
+      thread ??
+      (await ctx.db
+        .query("threads")
+        .withIndex("by_threadId", (q) => q.eq("threadId", targetThreadId))
+        .unique());
+    if (threadForStatus) {
+      await ctx.db.patch(threadForStatus._id, {
         generationStatus: args.ok ? ("compleated" as const) : ("failed" as const),
         updatedAt: Date.now(),
         lastMessageAt: Date.now(),

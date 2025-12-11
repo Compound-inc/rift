@@ -1,4 +1,4 @@
-import { Effect, Queue, Fiber, Schedule, Scope, Ref, Runtime, Context, Chunk, Duration } from "effect";
+import { Effect, Schedule } from "effect";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
@@ -216,11 +216,6 @@ export interface QuotaCheckResult {
   limit: number;
 }
 
-interface DatabaseOperation {
-  operation: () => Promise<void>;
-  name: string;
-}
-
 // ============================================================================
 // Retry Schedule
 // ============================================================================
@@ -267,94 +262,6 @@ export const isRetryableDatabaseError = (error: DatabaseError): boolean => {
   return true;
 };
 
-
-// ============================================================================
-// Database Queue Service
-// ============================================================================
-
-export interface DatabaseQueueService {
-  readonly _tag: "DatabaseQueueService";
-  readonly enqueue: (operation: () => Promise<void>, name: string) => Effect.Effect<void>;
-  readonly shutdown: () => Effect.Effect<void>;
-}
-
-export const DatabaseQueueService = Context.GenericTag<DatabaseQueueService>("DatabaseQueueService");
-
-/**
- * Creates a managed DatabaseQueue that processes operations in background
- * with retry logic and proper supervision.
- */
-export const makeDatabaseQueue = Effect.gen(function* () {
-  const queue = yield* Queue.unbounded<DatabaseOperation>();
-  const isShutdown = yield* Ref.make(false);
-
-  // Process a single operation with retries
-  const processOperation = (op: DatabaseOperation) =>
-    Effect.tryPromise({
-      try: () => op.operation(),
-      catch: (error) =>
-        new DatabaseError({
-          message: `Database operation failed: ${op.name}`,
-          operation: op.name,
-          cause: error,
-        }),
-    }).pipe(
-      Effect.retry({ schedule: databaseRetrySchedule, while: isRetryableDatabaseError }),
-      Effect.catchAll((error) =>
-        Effect.sync(() => {
-          console.error(`Database operation failed after retries: ${op.name}`, error);
-        })
-      )
-    );
-
-  // Background fiber that processes the queue
-  const processorFiber = yield* Effect.fork(
-    Effect.gen(function* () {
-      while (true) {
-        const shutdown = yield* Ref.get(isShutdown);
-        if (shutdown) {
-          // Drain remaining items before shutdown
-          const remaining = yield* Queue.takeAll(queue);
-          yield* Effect.all(
-            Chunk.toArray(remaining).map((op: DatabaseOperation) => processOperation(op)),
-            { concurrency: "unbounded" }
-          );
-          break;
-        }
-
-        const op = yield* Queue.take(queue);
-        yield* processOperation(op);
-      }
-    })
-  );
-
-  const enqueue = (operation: () => Promise<void>, name: string) =>
-    Queue.offer(queue, { operation, name }).pipe(Effect.asVoid);
-
-  const shutdown = Effect.gen(function* () {
-    yield* Ref.set(isShutdown, true);
-    yield* Queue.offer(queue, {
-      operation: async () => {},
-      name: "shutdown-signal",
-    });
-    yield* Fiber.await(processorFiber);
-  });
-
-  return {
-    _tag: "DatabaseQueueService" as const,
-    enqueue,
-    shutdown,
-  };
-});
-
-/**
- * Layer for DatabaseQueue with automatic cleanup on scope close.
- */
-export const DatabaseQueueLive = Effect.gen(function* () {
-  const dbQueue = yield* makeDatabaseQueue;
-  yield* Effect.addFinalizer(() => dbQueue.shutdown);
-  return dbQueue;
-}).pipe(Effect.map((q) => Context.make(DatabaseQueueService, { ...q, shutdown: () => q.shutdown })));
 
 // ============================================================================
 // Validation Service
@@ -737,6 +644,7 @@ export const appendMessageDelta = (params: {
  */
 export const finalizeAssistantMessage = (params: {
   userId: string;
+  threadId: string;
   messageId: string;
   ok: boolean;
   finalContent?: string;

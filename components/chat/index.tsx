@@ -504,7 +504,10 @@ function ChatInterfaceInternal({
       onError: (message) => triggerError(message),
     });
 
-    Effect.runPromise(program);
+    Effect.runPromise(program).catch((err) => {
+      console.error("Failed to update response style", err);
+      triggerError("Failed to update response style. Please try again.");
+    });
   }, [
     responseStyle,
     isThread,

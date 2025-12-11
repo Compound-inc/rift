@@ -65,15 +65,6 @@ export class QuotaExceededError extends Data.TaggedError("QuotaExceededError")<{
 }> {}
 
 /**
- * Error during AI streaming/generation.
- * Maps to HTTP 500 Internal Server Error.
- */
-export class StreamError extends Data.TaggedError("StreamError")<{
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
-
-/**
  * Error during database operations (Convex).
  */
 export class DatabaseError extends Data.TaggedError("DatabaseError")<{
@@ -148,7 +139,6 @@ export type ChatRouteError =
   | NoSubscriptionError
   | BotDetectionError
   | QuotaExceededError
-  | StreamError
   | DatabaseError
   | AbortError
   | RegenerateError

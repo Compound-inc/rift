@@ -25,8 +25,7 @@ type ErrorCode =
   | "TIMEOUT"
   | "PROVIDER_ERROR"
   | "INTERNAL_ERROR"
-  | "DATABASE_ERROR"
-  | "STREAM_ERROR";
+  | "DATABASE_ERROR";
 
 interface ServerErrorResponse {
   errorCode: ErrorCode;
@@ -123,9 +122,20 @@ export const parseServerError = (
             otherTypeLimit: response.otherQuotaInfo?.limit ?? 0,
           });
 
+        case "TIMEOUT":
+          return new ServerError({
+            message: response.error || response.message || "Request timed out. Please try again.",
+            cause: error,
+          });
+
+        case "NO_ORGANIZATION":
+          return new ServerError({
+            message: response.error || response.message || "No organization found. Please join or create one.",
+            cause: error,
+          });
+
         case "INTERNAL_ERROR":
         case "DATABASE_ERROR":
-        case "STREAM_ERROR":
           return new ServerError({
             message: response.error || response.message || "An internal error occurred",
             cause: error,

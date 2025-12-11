@@ -35,7 +35,6 @@ import {
   NoOrganizationError,
   NoSubscriptionError,
   QuotaExceededError,
-  StreamError,
   DatabaseError,
   AbortError,
   RegenerateError,
@@ -69,6 +68,8 @@ import {
   databaseRetrySchedule,
   classifyProviderError,
   generateIdempotencyKey,
+  checkAborted,
+  fromAbortSignal,
 } from "./services";
 import { buildSystemPrompt } from "./system-prompt";
 import { createDatabaseQueue } from "./database-queue";
@@ -256,10 +257,6 @@ const errorToResponse = (
         "PROVIDER_ERROR"
       );
 
-    case "StreamError":
-      logger.error(`Stream error: ${error.message}`, logContext, { cause: error.cause });
-      return makeResponse({ error: error.message }, 500, "STREAM_ERROR");
-
     case "DatabaseError":
       logger.error(`Database error: ${error.message}`, logContext, { 
         operation: error.operation,
@@ -326,10 +323,8 @@ const handleChatRequest = (
 
     yield* verifyBotProtection(logContext);
 
-    // Early abort check
-    if (req.signal?.aborted) {
-      return yield* Effect.fail(new AbortError({ message: "Request aborted" }));
-    }
+    // Early abort check (Effect-based)
+    yield* checkAborted(req.signal);
 
     // Parse request body
     const rawBody = yield* Effect.tryPromise({
@@ -525,9 +520,6 @@ const handleChatRequest = (
     // Create database queue for background operations
     const dbQueue = yield* createDatabaseQueue(logContext);
 
-    // Ensure cleanup on scope close
-    yield* Effect.addFinalizer(() => dbQueue.shutdown);
-
     // Persist user message or increment quota based on trigger
     if (lastUser && (userText || userFiles.length > 0)) {
       const idempotencyKey = generateIdempotencyKey(
@@ -579,6 +571,7 @@ const handleChatRequest = (
       toolCallCount: 0,
       pendingUpdate: { content: "", reasoning: "" },
     });
+    const queueShutdownRef = yield* Ref.make(false);
 
     // Finalization helper
     const finalize = (args: {
@@ -587,10 +580,13 @@ const handleChatRequest = (
       finalReasoning?: string;
       error?: { type: string; message: string };
     }) =>
-      finalizeAssistantMessage({
-        userId: auth.userId,
-                  messageId: newMessageId,
-        ...args,
+      Effect.gen(function* () {
+        return yield* finalizeAssistantMessage({
+          userId: auth.userId,
+          threadId,
+          messageId: newMessageId,
+          ...args,
+        });
       }).pipe(
         Effect.catchAll((error) =>
           Effect.sync(() => {
@@ -598,6 +594,15 @@ const handleChatRequest = (
           })
         )
       );
+
+    const shutdownQueue = async (reason: string) => {
+      const alreadyShutdown = await Effect.runPromise(Ref.get(queueShutdownRef));
+      if (alreadyShutdown) return;
+      await Effect.runPromise(Ref.set(queueShutdownRef, true));
+      await Effect.runPromise(dbQueue.shutdown).catch((err) =>
+        logger.error("Failed to shutdown dbQueue", logContext, err)
+      );
+    };
 
     // Build system prompt
     const systemPrompt = yield* buildSystemPrompt({
@@ -703,10 +708,16 @@ const handleChatRequest = (
               logger.debug("Incrementing tool quota (abort)", logContext, { 
                 toolCallCount: finalState.toolCallCount 
               });
-              Effect.runPromise(
-                incrementToolCallQuota(auth.userId, finalState.toolCallCount)
-              ).catch((err) => logger.error("Failed to increment tool quota", logContext, err));
+              try {
+                await Effect.runPromise(
+                  incrementToolCallQuota(auth.userId, finalState.toolCallCount)
+                );
+              } catch (err) {
+                logger.error("Failed to increment tool quota", logContext, err);
+              }
             }
+
+            await shutdownQueue("abort");
           });
         };
 
@@ -850,10 +861,16 @@ const handleChatRequest = (
                 logger.debug("Incrementing tool quota", logContext, { 
                   toolCallCount: finalState.toolCallCount 
                 });
-                Effect.runPromise(
-                  incrementToolCallQuota(auth.userId, finalState.toolCallCount)
-                ).catch((err) => logger.error("Failed to increment tool quota", logContext, err));
+                try {
+                  await Effect.runPromise(
+                    incrementToolCallQuota(auth.userId, finalState.toolCallCount)
+                  );
+                } catch (err) {
+                  logger.error("Failed to increment tool quota", logContext, err);
+                }
               }
+
+              await shutdownQueue("finish");
             },
             onError: async (error) => {
               const state = await Effect.runPromise(Ref.get(stateRef));
@@ -880,6 +897,7 @@ const handleChatRequest = (
                 ).catch((err) => logger.error("Failed to finalize on abort", logContext, err));
                 
                 logger.info("Stream aborted", logContext, { contentLength: finalState.content.length });
+                await shutdownQueue("abort-signal");
                 return;
               }
 
@@ -902,6 +920,8 @@ const handleChatRequest = (
                 },
                 })
               ).catch((err) => logger.error("Failed to finalize on error", logContext, err));
+
+              await shutdownQueue("error");
 
               try {
                 // Provide user-friendly error message based on error type
@@ -941,6 +961,7 @@ const handleChatRequest = (
             logger.error("Failed to finalize on error", logContext, finalizeErr)
           );
           
+          await shutdownQueue("execute-catch");
           throw error;
         }
       },
@@ -965,7 +986,9 @@ export async function POST(req: Request): Promise<Response> {
   
   const logContext: LogContext = { requestId };
 
-  const program = handleChatRequest(req, requestId).pipe(
+  const abortEffect = fromAbortSignal(req.signal);
+
+  const program = Effect.race(handleChatRequest(req, requestId), abortEffect).pipe(
     Effect.scoped,
     // Add request timeout
     Effect.timeout(Duration.millis(CONFIG.REQUEST_TIMEOUT_MS)),
@@ -990,7 +1013,6 @@ export async function POST(req: Request): Promise<Response> {
       ModelError: (e: ModelError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
       ToolError: (e: ToolError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
       ProviderError: (e: ProviderError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
-      StreamError: (e: StreamError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
       TimeoutError: (e: TimeoutError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
     }),
     Effect.catchAll((error: unknown) => {
