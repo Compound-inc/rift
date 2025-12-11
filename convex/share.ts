@@ -711,7 +711,7 @@ export const cloneSharedThread = AuthMutation({
               createdAt: now,
               updatedAt: now,
               lastMessageAt: now,
-              generationStatus: "compleated",
+              generationStatus: "completed",
               visibility: "visible",
               userSetTitle: false,
               userId: userId,

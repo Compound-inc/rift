@@ -600,7 +600,6 @@ function ChatInterfaceInternal({
         triggerError,
         setInput,
         setIsSendingMessage,
-        messageContent,
       });
 
       const result = await Effect.runPromise(Effect.either(program));

@@ -23,7 +23,8 @@ export const threadInfoFields = {
   generationStatus: v.union(
     v.literal("pending"),
     v.literal("generation"),
-    v.literal("compleated"),
+    v.literal("compleated"), // legacy, remove after migration
+    v.literal("completed"),
     v.literal("failed"),
   ),
   visibility: v.union(v.literal("visible"), v.literal("archived")),
@@ -428,6 +429,31 @@ export const deleteThread = AuthMutation({
     await ctx.db.delete(thread._id);
 
     return null;
+  },
+});
+
+/**
+ * One-time migration to rename generationStatus from "compleated" to "completed".
+ */
+export const backfillCompletedStatus = internalMutation({
+  args: {
+    secret: v.string(),
+  },
+  returns: v.object({ updated: v.number() }),
+  handler: async (ctx, args) => {
+    ensureServerSecret(args.secret);
+
+    let updated = 0;
+    const threads = ctx.db.query("threads");
+    for await (const thread of threads) {
+      const status = (thread as { generationStatus?: string }).generationStatus;
+      if (status === "compleated") {
+        await ctx.db.patch(thread._id, { generationStatus: "completed" });
+        updated += 1;
+      }
+    }
+
+    return { updated };
   },
 });
 
@@ -882,7 +908,7 @@ export const serverFinalizeAssistantMessage = mutation({
         .unique());
     if (threadForStatus) {
       await ctx.db.patch(threadForStatus._id, {
-        generationStatus: args.ok ? ("compleated" as const) : ("failed" as const),
+        generationStatus: args.ok ? ("completed" as const) : ("failed" as const),
         updatedAt: Date.now(),
         lastMessageAt: Date.now(),
       });

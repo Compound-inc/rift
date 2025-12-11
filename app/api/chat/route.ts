@@ -1,4 +1,4 @@
-import { Effect, Scope, Ref, Duration } from "effect";
+import { Cause, Duration, Effect, Fiber, Ref, Scope } from "effect";
 import { checkBotId } from "botid/server";
 import {
   streamText,
@@ -595,14 +595,19 @@ const handleChatRequest = (
         )
       );
 
-    const shutdownQueue = async (reason: string) => {
-      const alreadyShutdown = await Effect.runPromise(Ref.get(queueShutdownRef));
-      if (alreadyShutdown) return;
-      await Effect.runPromise(Ref.set(queueShutdownRef, true));
-      await Effect.runPromise(dbQueue.shutdown).catch((err) =>
-        logger.error("Failed to shutdown dbQueue", logContext, err)
+    const shutdownQueue = (reason: string) =>
+      Effect.gen(function* () {
+        const alreadyShutdown = yield* Ref.get(queueShutdownRef);
+        if (alreadyShutdown) return;
+        yield* Ref.set(queueShutdownRef, true);
+        yield* dbQueue.shutdown;
+      }).pipe(
+        Effect.catchAll((error) =>
+          Effect.sync(() => {
+            logger.error("Failed to shutdown dbQueue", { ...logContext, reason }, error);
+          })
+        )
       );
-    };
 
     // Build system prompt
     const systemPrompt = yield* buildSystemPrompt({
@@ -717,7 +722,7 @@ const handleChatRequest = (
               }
             }
 
-            await shutdownQueue("abort");
+            await Effect.runPromise(shutdownQueue("abort"));
           });
         };
 
@@ -773,7 +778,7 @@ const handleChatRequest = (
                 );
               } else if (chunk.type === "tool-call") {
                 logger.debug("Tool call detected", logContext, { 
-                  toolName: (chunk as any).toolName 
+                  toolName: chunk.toolName,
                 });
                 Effect.runPromise(
                   Ref.update(stateRef, (s) => ({
@@ -870,7 +875,7 @@ const handleChatRequest = (
                 }
               }
 
-              await shutdownQueue("finish");
+              await Effect.runPromise(shutdownQueue("finish"));
             },
             onError: async (error) => {
               const state = await Effect.runPromise(Ref.get(stateRef));
@@ -897,7 +902,7 @@ const handleChatRequest = (
                 ).catch((err) => logger.error("Failed to finalize on abort", logContext, err));
                 
                 logger.info("Stream aborted", logContext, { contentLength: finalState.content.length });
-                await shutdownQueue("abort-signal");
+                await Effect.runPromise(shutdownQueue("abort-signal"));
                 return;
               }
 
@@ -921,7 +926,7 @@ const handleChatRequest = (
                 })
               ).catch((err) => logger.error("Failed to finalize on error", logContext, err));
 
-              await shutdownQueue("error");
+              await Effect.runPromise(shutdownQueue("error"));
 
               try {
                 // Provide user-friendly error message based on error type
@@ -961,7 +966,7 @@ const handleChatRequest = (
             logger.error("Failed to finalize on error", logContext, finalizeErr)
           );
           
-          await shutdownQueue("execute-catch");
+          await Effect.runPromise(shutdownQueue("execute-catch"));
           throw error;
         }
       },
@@ -988,7 +993,25 @@ export async function POST(req: Request): Promise<Response> {
 
   const abortEffect = fromAbortSignal(req.signal);
 
-  const program = Effect.race(handleChatRequest(req, requestId), abortEffect).pipe(
+  const program = Effect.gen(function* (_) {
+    const mainFiber = yield* _(Effect.forkScoped(handleChatRequest(req, requestId)));
+
+    // Interrupt the main fiber if the request is aborted.
+    yield* _(
+      abortEffect.pipe(
+        Effect.catchAll(() => Fiber.interrupt(mainFiber)),
+        Effect.forkScoped
+      )
+    );
+
+    return yield* Fiber.join(mainFiber).pipe(
+      Effect.catchAllCause((cause) =>
+        Cause.isInterruptedOnly(cause)
+          ? Effect.fail(new AbortError({ message: "Request aborted" }))
+          : Effect.failCause(cause)
+      )
+    );
+  }).pipe(
     Effect.scoped,
     // Add request timeout
     Effect.timeout(Duration.millis(CONFIG.REQUEST_TIMEOUT_MS)),

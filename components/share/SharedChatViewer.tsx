@@ -1,13 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useQuery, useConvexAuth, useMutation, Authenticated, Unauthenticated } from "convex/react";
+import { useCallback, useEffect, useState } from "react";
+import { useQuery, useConvexAuth, useMutation, Unauthenticated } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { UIMessage } from "@ai-sdk-tools/store";
+import { isTextUIPart } from "ai";
 import {
   Conversation,
   ConversationContent,
 } from "@/components/ai/conversation";
+import type { ConvexMessage } from "@/components/chat/types";
 import { MessageRenderer } from "@/components/chat/components/message-renderer";
 import { Loader } from "@/components/ai/loader";
 import { toast } from "sonner";
@@ -41,15 +43,15 @@ type SharedChatViewerProps = {
   initialIsDone: boolean;
 };
 
-const mapPageToUI = (page: any[]): UIMessage[] =>
+const mapPageToUI = (page: ConvexMessage[]): UIMessage[] =>
   page.map((m) => ({
     id: m.messageId,
     role: m.role,
     parts: [
-      ...(m.reasoning ? [{ type: "reasoning", text: m.reasoning }] : []),
-      ...(m.content ? [{ type: "text", text: m.content }] : []),
+      ...(m.reasoning ? [{ type: "reasoning" as const, text: m.reasoning }] : []),
+      ...(m.content ? [{ type: "text" as const, text: m.content }] : []),
       ...(m.attachments
-        ? m.attachments.map((att: any) => ({
+        ? m.attachments.map((att) => ({
             type: "file" as const,
             mediaType: att.mimeType,
             url: att.attachmentUrl,
@@ -58,7 +60,7 @@ const mapPageToUI = (page: any[]): UIMessage[] =>
           }))
         : []),
       ...(m.sources
-        ? m.sources.map((source: any) => ({
+        ? m.sources.map((source) => ({
             type: "source-url" as const,
             sourceId: source.sourceId,
             url: source.url,
@@ -127,8 +129,8 @@ export default function SharedChatViewer({
         .map((m) => {
           const role = m.role === "user" ? "User" : "Assistant";
           const content = m.parts
-            .filter((p) => p.type === "text")
-            .map((p) => (p as any).text)
+            .filter(isTextUIPart)
+            .map((p) => p.text)
             .join("");
           return `${role}:\n${content}`;
         })
@@ -192,7 +194,7 @@ export default function SharedChatViewer({
     handleClone({ triggeredByAuth: true });
   }, [autoClonePending, isAuthenticated, isCloning, handleClone]);
 
-  const renderedMessages = useMemo(() => messages, [messages]);
+  const renderedMessages = messages;
 
   return (
     <ChatStoreProvider initialMessages={initialMessages}>

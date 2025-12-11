@@ -21,6 +21,14 @@ class ShareToggleError extends Data.TaggedError("ShareToggleError")<{
   readonly cause: unknown;
 }> {}
 
+class ShareSettingsError extends Data.TaggedError("ShareSettingsError")<{
+  readonly cause: unknown;
+}> {}
+
+class RegenerateShareLinkError extends Data.TaggedError("RegenerateShareLinkError")<{
+  readonly cause: unknown;
+}> {}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -39,8 +47,8 @@ type ShareOverride = {
 export function useThreadShare() {
   const enableShare = useMutation(api.share.enableShare);
   const disableShare = useMutation(api.share.disableShare);
-  const updateShareSettings = useMutation(api.share.updateShareSettings);
-  const regenerateShareLink = useMutation(api.share.regenerateShareLink);
+  const updateShareSettingsMutation = useMutation(api.share.updateShareSettings);
+  const regenerateShareLinkMutation = useMutation(api.share.regenerateShareLink);
 
   const [shareOverrides, setShareOverrides] = useState<
     Record<string, ShareOverride>
@@ -115,7 +123,6 @@ export function useThreadShare() {
             console.error("toggle share failed", error);
           }),
         ),
-        Effect.catchAll(() => Effect.void),
       );
 
       await Effect.runPromise(program);
@@ -142,11 +149,46 @@ export function useThreadShare() {
           console.error("Failed to copy link", error);
         }),
       ),
-      Effect.catchAll(() => Effect.void),
     );
 
     await Effect.runPromise(program);
   }, []);
+
+  const updateShareSettings = useCallback(
+    async (args: { threadId: string; orgOnly: boolean; shareName: boolean }) => {
+      const program = Effect.tryPromise({
+        try: () => updateShareSettingsMutation(args),
+        catch: (error) => new ShareSettingsError({ cause: error }),
+      }).pipe(
+        Effect.tapError((error) =>
+          Effect.sync(() => {
+            console.error("update share settings failed", error);
+          }),
+        ),
+      );
+
+      return Effect.runPromise(program);
+    },
+    [updateShareSettingsMutation],
+  );
+
+  const regenerateShareLink = useCallback(
+    async (args: { threadId: string }) => {
+      const program = Effect.tryPromise({
+        try: () => regenerateShareLinkMutation(args),
+        catch: (error) => new RegenerateShareLinkError({ cause: error }),
+      }).pipe(
+        Effect.tapError((error) =>
+          Effect.sync(() => {
+            console.error("regenerate share link failed", error);
+          }),
+        ),
+      );
+
+      return Effect.runPromise(program);
+    },
+    [regenerateShareLinkMutation],
+  );
 
   return {
     resolveShareState,

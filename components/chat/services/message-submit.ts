@@ -1,6 +1,6 @@
 import { Cause, Effect, Option } from "effect";
 import type { UIMessage } from "@ai-sdk-tools/store";
-import { AbortError, getErrorMessage, MessageSubmitError, type ChatError } from "../errors";
+import { AbortError, MessageSubmitError, type ChatError } from "../errors";
 
 const isChatError = (error: unknown): error is ChatError =>
   Boolean(
@@ -38,7 +38,6 @@ type SubmitMessageParams = {
   triggerError: (message: string) => void;
   setInput: (value: string) => void;
   setIsSendingMessage: (value: boolean) => void;
-  messageContent: string;
 };
 
 /**

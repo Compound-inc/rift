@@ -68,7 +68,8 @@ export default defineSchema({
     generationStatus: v.union(
       v.literal("pending"),
       v.literal("generation"),
-      v.literal("compleated"),
+      v.literal("compleated"), // legacy, remove after migration
+      v.literal("completed"),
       v.literal("failed"),
     ),
 

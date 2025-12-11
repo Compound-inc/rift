@@ -140,8 +140,8 @@ export function ShareSettingsDialog({
         ? Boolean(shareStatus?.isShared)
         : shareState.isShared;
     setIsSharedLocal(nextIsShared);
-    setOrgOnly(shareStatus?.orgOnly ?? orgOnly ?? false);
-    setShareName(shareStatus?.shareName ?? shareName ?? false);
+    setOrgOnly((prev) => shareStatus?.orgOnly ?? prev);
+    setShareName((prev) => shareStatus?.shareName ?? prev);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shareState, shareStatus, pendingToggle, pendingSettings]);
 
@@ -160,6 +160,8 @@ export function ShareSettingsDialog({
     const prevOrgOnly = orgOnly;
     const prevShareName = shareName;
     setPendingSettings(true);
+    setOrgOnly(nextOrgOnly);
+    setShareName(nextShareName);
     try {
       await updateShareSettings({
         threadId: thread.threadId,
@@ -171,8 +173,9 @@ export function ShareSettingsDialog({
       toast.error("No se pudieron guardar las opciones");
       setOrgOnly(prevOrgOnly);
       setShareName(prevShareName);
+    } finally {
+      setPendingSettings(false);
     }
-    setPendingSettings(false);
   };
 
   const handleShareToggle = async () => {
@@ -195,13 +198,18 @@ export function ShareSettingsDialog({
 
   const onCopy = async () => {
     if (!shareId) return;
-    await handleCopyShareLink(shareId);
-    setCopied(true);
-    if (copyResetTimeoutRef.current) {
-      clearTimeout(copyResetTimeoutRef.current);
+    try {
+      await handleCopyShareLink(shareId);
+      setCopied(true);
+      if (copyResetTimeoutRef.current) {
+        clearTimeout(copyResetTimeoutRef.current);
+      }
+      copyResetTimeoutRef.current = setTimeout(() => setCopied(false), 1500);
+      toast.success("Enlace copiado");
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo copiar el enlace");
     }
-    copyResetTimeoutRef.current = setTimeout(() => setCopied(false), 1500);
-    toast.success("Enlace copiado");
   };
 
   const onRegenerate = async () => {
@@ -302,7 +310,6 @@ export function ShareSettingsDialog({
                 checked={orgOnly}
                 disabled={!isShared}
                 onChange={(checked) => {
-                  setOrgOnly(checked);
                   void persistSettings(checked, shareName);
                 }}
               />
@@ -313,7 +320,6 @@ export function ShareSettingsDialog({
                 checked={shareName}
                 disabled={!isShared}
                 onChange={(checked) => {
-                  setShareName(checked);
                   void persistSettings(orgOnly, checked);
                 }}
               />

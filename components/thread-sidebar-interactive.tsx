@@ -33,7 +33,12 @@ interface Thread {
   pinned: boolean;
   _creationTime: number;
   lastMessageAt: number;
-  generationStatus: "pending" | "generation" | "compleated" | "failed";
+  generationStatus:
+    | "pending"
+    | "generation"
+    | "compleated" // legacy, remove after migration
+    | "completed"
+    | "failed";
   updatedAt?: number;
   shareId?: string;
   shareStatus?: "active" | "revoked";

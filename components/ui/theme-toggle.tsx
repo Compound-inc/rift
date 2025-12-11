@@ -44,7 +44,11 @@ export function ThemeToggle({
   const isDark = mounted ? resolvedTheme === "dark" : false;
   const baseClass =
     styleType === "secondary"
-      ? cn(buttonVariants({ variant: "ghost", size: "icon" }), "cursor-pointer")
+      ? cn(
+          buttonVariants({ variant: "ghost", size: "icon" }),
+          sizeClasses[size],
+          "cursor-pointer",
+        )
       : cn(
           "inline-flex items-center justify-center rounded-md border bg-background/80 backdrop-blur-sm transition-colors shadow-sm dark:bg-popover-main dark:border-border",
           "hover:bg-background hover:shadow-md cursor-pointer outline-none",
