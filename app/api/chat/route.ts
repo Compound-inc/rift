@@ -1,5 +1,5 @@
 import { Cause, Duration, Effect, Fiber, Ref, Scope } from "effect";
-import { checkBotId } from "botid/server";
+// import { checkBotId } from "botid/server";
 import {
   streamText,
   convertToModelMessages,
@@ -42,7 +42,7 @@ import {
   ToolError,
   TimeoutError,
   ProviderError,
-  BotDetectionError,
+  // BotDetectionError,
   type ChatRouteError,
 } from "./errors";
 
@@ -270,9 +270,8 @@ const errorToResponse = (
   }
 };
 
-/**
+/*
  * Runs BotID verification and fails the effect when the request is classified as a bot.
- */
 const verifyBotProtection = (logContext: LogContext) =>
   Effect.tryPromise({
     try: () => checkBotId(),
@@ -296,6 +295,7 @@ const verifyBotProtection = (logContext: LogContext) =>
       return Effect.succeed(verification);
     })
   );
+*/
 
 // ============================================================================
 // Streaming State
@@ -321,7 +321,7 @@ const handleChatRequest = (
   const start = Date.now();
     const logContext: LogContext = { requestId };
 
-    yield* verifyBotProtection(logContext);
+    // yield* verifyBotProtection(logContext);
 
     // Early abort check (Effect-based)
     yield* checkAborted(req.signal);
@@ -1027,7 +1027,7 @@ export async function POST(req: Request): Promise<Response> {
       ValidationError: (e: ValidationError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
       RegenerateError: (e: RegenerateError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
       AuthenticationError: (e: AuthenticationError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
-      BotDetectionError: (e: BotDetectionError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
+      // BotDetectionError: (e: BotDetectionError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
       NoOrganizationError: (e: NoOrganizationError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
       NoSubscriptionError: (e: NoSubscriptionError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
       QuotaExceededError: (e: QuotaExceededError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),

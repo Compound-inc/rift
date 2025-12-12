@@ -3,9 +3,10 @@ import { workos } from '@/app/api/workos';
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { getPermissions, checkPermission, PERMISSIONS } from '@/lib/permissions';
-import { checkBotId } from 'botid/server';
+// import { checkBotId } from 'botid/server';
 
 export const POST = async (req: NextRequest) => {
+  /*
   try {
     const verification = await checkBotId();
     if (verification.isBot) {
@@ -21,6 +22,7 @@ export const POST = async (req: NextRequest) => {
       { status: 403 }
     );
   }
+  */
 
   const productionDomain = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
   const baseUrl = productionDomain ? `https://${productionDomain}` : "http://localhost:3000";

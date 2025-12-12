@@ -3,7 +3,7 @@ import { generateText, type LanguageModel } from "ai";
 import { Effect, Schedule, Duration, Data } from "effect";
 import { fetchMutation } from "convex/nextjs";
 import { withAuth } from "@workos-inc/authkit-nextjs";
-import { checkBotId } from "botid/server";
+// import { checkBotId } from "botid/server";
 import { api } from "@/convex/_generated/api";
 
 
@@ -55,10 +55,12 @@ class TimeoutError extends Data.TaggedError("TimeoutError")<{
   readonly message: string;
 }> {}
 
+/*
 class BotDetectionError extends Data.TaggedError("BotDetectionError")<{
   readonly message: string;
   readonly reason?: string;
 }> {}
+*/
 
 // ============================================================================
 // Request ID Generation
@@ -81,7 +83,7 @@ type RouteError =
   | ModelCallError
   | MutationCallError
   | TimeoutError
-  | BotDetectionError;
+  // | BotDetectionError;
 
 const errorToResponse = (error: RouteError, requestId: string): NextResponse => {
   const headers = { "X-Request-ID": requestId };
@@ -95,11 +97,11 @@ const errorToResponse = (error: RouteError, requestId: string): NextResponse => 
       return NextResponse.json({ error: error.message, requestId }, { status: 400, headers });
     case "TimeoutError":
       return NextResponse.json({ error: error.message, requestId }, { status: 504, headers });
-    case "BotDetectionError":
-      return NextResponse.json(
-        { error: error.message, reason: error.reason, requestId },
-        { status: 403, headers }
-      );
+    // case "BotDetectionError":
+    //   return NextResponse.json(
+    //     { error: error.message, reason: error.reason, requestId },
+    //     { status: 403, headers }
+    //   );
     case "ModelCallError":
     case "MutationCallError":
       return NextResponse.json({ error: "Failed to generate title", requestId }, { status: 500, headers });
@@ -200,6 +202,7 @@ const updateThreadTitle = (accessToken: string, threadId: string, title: string)
       }),
   }).pipe(Effect.retry(MUTATION_RETRY_SCHEDULE));
 
+/*
 const verifyBotProtection = (requestId: string) =>
   Effect.tryPromise({
     try: () => checkBotId(),
@@ -223,6 +226,7 @@ const verifyBotProtection = (requestId: string) =>
       return Effect.succeed(verification);
     })
   );
+*/
 
 // ============================================================================
 // Main Handler
@@ -230,7 +234,7 @@ const verifyBotProtection = (requestId: string) =>
 
 const handleRequest = (request: NextRequest, requestId: string) =>
   Effect.gen(function* () {
-    yield* verifyBotProtection(requestId);
+    // yield* verifyBotProtection(requestId);
     const accessToken = yield* authenticate;
     const rawBody = yield* parseRequestBody(request);
     const { threadId, userMessage } = yield* validateRequestBody(rawBody);
@@ -270,7 +274,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ValidationError: (e: ValidationError) => Effect.succeed(errorToResponse(e, requestId)),
       ParseError: (e: ParseError) => Effect.succeed(errorToResponse(e, requestId)),
       TimeoutError: (e: TimeoutError) => Effect.succeed(errorToResponse(e, requestId)),
-      BotDetectionError: (e: BotDetectionError) => Effect.succeed(errorToResponse(e, requestId)),
+      // BotDetectionError: (e: BotDetectionError) => Effect.succeed(errorToResponse(e, requestId)),
       ModelCallError: (e: ModelCallError) => Effect.succeed(errorToResponse(e, requestId)),
       MutationCallError: (e: MutationCallError) => Effect.succeed(errorToResponse(e, requestId)),
     }),
