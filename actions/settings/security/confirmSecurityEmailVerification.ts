@@ -1,6 +1,7 @@
 "use server";
 
 import { Effect } from "effect";
+import crypto from "crypto";
 
 import {
   clearPendingStepUpMagicAuthCookie,
@@ -54,7 +55,9 @@ export async function confirmSecurityEmailVerification(
         return { success: false as const, error: "Código inválido o expirado. Intenta de nuevo." };
       }
 
-      if (magic.code !== trimmed) {
+      const codeBuffer = Buffer.from(magic.code);
+      const trimmedBuffer = Buffer.from(trimmed);
+      if (codeBuffer.length !== trimmedBuffer.length || !crypto.timingSafeEqual(codeBuffer, trimmedBuffer)) {
         return { success: false as const, error: "Código inválido o expirado. Intenta de nuevo." };
       }
 
