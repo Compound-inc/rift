@@ -364,14 +364,13 @@ const handleChatRequest = (
     });
 
     // Fetch custom instruction if provided
-    // let customInstructionsContent: string | undefined;
-    // if (customInstructionId) {
-    //   const instruction = yield* getCustomInstruction(customInstructionId);
-    //   if (instruction) {
-    //     customInstructionsContent = instruction.instructions;
-    //   }
-    // }
-    const customInstructionsContent: string | undefined = undefined;
+    let customInstructionsContent: string | undefined;
+    if (customInstructionId) {
+      const instruction = yield* getCustomInstruction(customInstructionId);
+      if (instruction) {
+        customInstructionsContent = instruction.instructions;
+      }
+    }
 
     const lastUser = messages.filter((m) => m.role === "user").pop();
     const userText = lastUser?.parts?.find((part) => part.type === "text")?.text;
@@ -624,7 +623,7 @@ const handleChatRequest = (
     // Build system prompt
     const systemPrompt = yield* buildSystemPrompt({
       modelDisplayName,
-      // customInstructions: customInstructionsContent,
+      customInstructions: customInstructionsContent,
       supermemoryEnabled,
     });
 
@@ -935,6 +934,12 @@ const handleChatRequest = (
               logger.error("Stream error from AI provider", logContext, {
                 errorType: classifiedError.errorType,
                 retryable: classifiedError.retryable,
+                env: {
+                  nodeEnv: process.env.NODE_ENV,
+                  hasGatewayKey: Boolean(process.env.AI_GATEWAY_API_KEY),
+                  hasSupermemoryKey: Boolean(process.env.SUPERMEMORY_API_KEY),
+                  supermemoryEnabled,
+                },
                 originalError: errorObj.message,
                 stack: errorObj.stack,
               });

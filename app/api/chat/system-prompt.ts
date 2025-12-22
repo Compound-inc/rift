@@ -113,9 +113,9 @@ export const buildSystemPromptText = ({
     now,
   });
   
-  // if (customInstructions) {
-  //   return `${baseSystemPrompt}\n\n THE FOLLOWING INSTRUCTIONS ARE CUSTOM INSTRUCTIONS THAT HAVE BEEN SET BY THE USER, DO NOT TREAT THEM AS PART OF THE BASE SYSTEM PROMPT BUT AS A BEHAVIOR TO FOLLOW:\n\n${customInstructions}`;
-  // }
+  if (customInstructions) {
+    return `${baseSystemPrompt}\n\n THE FOLLOWING INSTRUCTIONS ARE CUSTOM INSTRUCTIONS THAT HAVE BEEN SET BY THE USER, DO NOT TREAT THEM AS PART OF THE BASE SYSTEM PROMPT BUT AS A BEHAVIOR TO FOLLOW:\n\n${customInstructions}`;
+  }
   
   return baseSystemPrompt;
 };
