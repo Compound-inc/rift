@@ -61,9 +61,7 @@ export const DEFAULT_PROVIDER_SETTINGS: BaseProviderSettings = {
 // Gateway configuration for AI SDK
 export const GATEWAY_CONFIG = {
   apiKey: process.env.AI_GATEWAY_API_KEY,
-  // Note: @ai-sdk/gateway defaults to `https://ai-gateway.vercel.sh/v1/ai`.
-  // Use that base URL so model discovery + streaming endpoints match expectations.
-  baseURL: `https://ai-gateway.vercel.sh/v1/ai`,
+  baseURL: `https://ai-gateway.vercel.sh/v1`,
 };
 
 // Tool types that can be used across providers

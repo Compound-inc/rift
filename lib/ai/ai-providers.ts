@@ -9,7 +9,6 @@ import { MOONSHOT_MODELS } from "./providers/moonshot";
 import { ZAI_MODELS } from "./providers/zai";
 import { PRIME_INTELLECT_MODELS } from "./providers/prime-intellect";
 import { type BaseModelConfig, type ModelCapabilities } from "./config/base";
-import { GATEWAY_CONFIG } from "./config/base";
 
 // All models in one array
 export const MODELS: BaseModelConfig[] = [
@@ -52,25 +51,10 @@ export const getProviderDisplayName = (provider?: string) => {
 };
 
 // Configure gateway provider with app attribution headers
-const gatewayApiKey = process.env.AI_GATEWAY_API_KEY ?? GATEWAY_CONFIG.apiKey;
-const normalizeGatewayBaseURL = (value: string) => {
-  const trimmed = value.replace(/\/+$/, "");
-  // Common misconfig: using `.../v1` instead of `.../v1/ai`
-  if (trimmed.endsWith("/v1")) {
-    return `${trimmed}/ai`;
-  }
-  return trimmed;
-};
-const gatewayBaseURL = normalizeGatewayBaseURL(
-  process.env.AI_GATEWAY_BASE_URL ?? GATEWAY_CONFIG.baseURL
-);
-
 export const gateway = createGateway({
-  apiKey: gatewayApiKey,
-  baseURL: gatewayBaseURL,
   headers: {
-    "http-referer": "https://rift.mx",
-    "x-title": "Rift",
+    'http-referer': 'https://rift.mx',
+    'x-title': 'Rift',
   },
 });
 
@@ -107,15 +91,6 @@ export function getLanguageModel(modelId: string) {
   const resolved = resolveModel(modelId);
 
   console.log(`Model via AI Gateway: ${resolved}`);
-
-  // When using the AI Gateway, a missing API key usually results in confusing
-  // downstream failures (e.g. unexpected empty responses during streaming).
-  // Fail fast with a clear error message in production.
-  if (process.env.NODE_ENV === "production" && !gatewayApiKey) {
-    throw new Error(
-      "AI Gateway is enabled but AI_GATEWAY_API_KEY is not set. Set AI_GATEWAY_API_KEY in your Vercel project env vars (Production/Preview) or disable the gateway provider."
-    );
-  }
 
   try {
     return gateway(resolved);

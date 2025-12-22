@@ -5,19 +5,19 @@ import { ModelError } from "./errors";
 type BuildSystemPromptArgs = {
   modelDisplayName: string;
   customInstructions?: string;
-  supermemoryEnabled?: boolean;
+  // supermemoryEnabled?: boolean;
   now?: Date;
 };
 
 type BasePromptArgs = {
   modelDisplayName: string;
-  supermemoryEnabled: boolean;
+  // supermemoryEnabled: boolean;
   now: Date;
 };
 
 const buildBaseSystemPrompt = ({
   modelDisplayName,
-  supermemoryEnabled,
+  // supermemoryEnabled,
   now,
 }: BasePromptArgs): string => {
   const dateString = now.toLocaleDateString("en-US", {
@@ -88,15 +88,15 @@ CODE FORMATTING:
 
   const baseSystemPromptParts: Array<string> = [baseIdentityPrompt];
 
-  if (supermemoryEnabled) {
-    baseSystemPromptParts.push(`When users share information about themselves,
-              remember it using the addMemory tool. When they ask questions that seem relevant to their memories, search your memories to provide
-              personalized responses. do not over use user memories, only use them if the question seems relevant to their memories.
-                1. Remembering their learning progress and struggles
-                2. Searching for relevant information from their past sessions
-                3. Providing personalized explanations based on their learning style
-                4. Tracking topics they've mastered vs topics they need more help with`);
-  }
+  // if (supermemoryEnabled) {
+  //   baseSystemPromptParts.push(`When users share information about themselves,
+  //             remember it using the addMemory tool. When they ask questions that seem relevant to their memories, search your memories to provide
+  //             personalized responses. do not over use user memories, only use them if the question seems relevant to their memories.
+  //               1. Remembering their learning progress and struggles
+  //               2. Searching for relevant information from their past sessions
+  //               3. Providing personalized explanations based on their learning style
+  //               4. Tracking topics they've mastered vs topics they need more help with`);
+  // }
 
   return baseSystemPromptParts.join("\n\n");
 };
@@ -104,12 +104,12 @@ CODE FORMATTING:
 export const buildSystemPromptText = ({
   modelDisplayName,
   customInstructions,
-  supermemoryEnabled = Boolean(process.env.SUPERMEMORY_API_KEY),
+  // supermemoryEnabled = Boolean(process.env.SUPERMEMORY_API_KEY),
   now = new Date(),
 }: BuildSystemPromptArgs): string => {
   const baseSystemPrompt = buildBaseSystemPrompt({
     modelDisplayName,
-    supermemoryEnabled,
+    // supermemoryEnabled,
     now,
   });
   
