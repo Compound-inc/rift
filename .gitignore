@@ -6,3 +6,6 @@ bun.lock
 lib/local/
 .cursor/rules/effect.mdc
 tsconfig.tsbuildinfo
+
+# Sentry Config File
+.env.sentry-build-plugin
