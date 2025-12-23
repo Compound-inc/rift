@@ -15,6 +15,7 @@ import { fetchMutation } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import { withTracing } from "@posthog/ai";
 import { PostHog } from "posthog-node";
+import * as Sentry from "@sentry/nextjs";
 // import { withSupermemory, supermemoryTools } from "@supermemory/tools/ai-sdk";
 import {
   getLanguageModel,
@@ -72,6 +73,7 @@ import {
   checkAborted,
   fromAbortSignal,
   getCustomInstruction,
+  captureChatError,
 } from "./services";
 import { buildSystemPrompt } from "./system-prompt";
 import { createDatabaseQueue } from "./database-queue";
@@ -136,6 +138,8 @@ const errorToResponse = (
   requestId: string,
   logContext: LogContext
 ): Response => {
+  captureChatError(error, logContext);
+
   const baseHeaders = {
     "Content-Type": "application/json",
     "X-Response-Time": `${Date.now() - start}ms`,
@@ -933,6 +937,8 @@ const handleChatRequest = (
               // Classify the provider error for better debugging
               const classifiedError = classifyProviderError(errorObj);
               
+              captureChatError(classifiedError, logContext);
+              
               logger.error("Stream error from AI provider", logContext, {
                 errorType: classifiedError.errorType,
                 retryable: classifiedError.retryable,
@@ -980,6 +986,20 @@ const handleChatRequest = (
           
           const errorMessage = error instanceof Error ? error.message : "Unknown error";
           logger.error("Stream execution error", logContext, error);
+          
+          // Capture execution error to Sentry
+          try {
+            const errorObj = error instanceof Error ? error : new Error(String(error));
+            Sentry.captureException(errorObj, {
+              tags: {
+                error_type: "stream_execution_error",
+                request_id: requestId,
+              },
+              extra: logContext,
+            });
+          } catch (sentryError) {
+            console.error("Failed to capture stream execution error to Sentry", sentryError);
+          }
           
           await Effect.runPromise(
             finalize({
@@ -1064,6 +1084,21 @@ export async function POST(req: Request): Promise<Response> {
     }),
     Effect.catchAll((error: unknown) => {
       logger.error("Unhandled error in chat route", logContext, error);
+      
+      // Capture unknown errors to Sentry
+      try {
+        const errorObj = error instanceof Error ? error : new Error(String(error));
+        Sentry.captureException(errorObj, {
+          tags: {
+            error_type: "unhandled",
+            request_id: requestId,
+          },
+          extra: logContext,
+        });
+      } catch (sentryError) {
+        console.error("Failed to capture unhandled error to Sentry", sentryError);
+      }
+      
       const errorResponse = new Response(JSON.stringify({ error: "Internal server error", requestId }), {
       status: 500,
       headers: {

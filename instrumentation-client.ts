@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import posthog from 'posthog-js'
 import { initBotId } from 'botid/client/core';
 
@@ -24,3 +25,4 @@ posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
   defaults: '2025-05-24'
 });
 
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;

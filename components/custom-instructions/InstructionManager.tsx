@@ -13,11 +13,16 @@ import { User, Users, Share2, MessageSquarePlus, PlusIcon } from "lucide-react";
 import { InstructionForm } from "./InstructionForm";
 import { InstructionCard } from "./InstructionCard";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
+import { useConvexAuth } from "convex/react";
 import { SettingsSection, SettingsDivider } from "@/components/settings";
 
 export function InstructionManager() {
   const { user } = useAuth();
-  const instructions = useQuery(api.customInstructions.list);
+  const { isAuthenticated } = useConvexAuth();
+  const instructions = useQuery(
+    api.customInstructions.list,
+    isAuthenticated ? {} : "skip"
+  );
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 

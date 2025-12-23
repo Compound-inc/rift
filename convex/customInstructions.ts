@@ -103,22 +103,25 @@ export const remove = AuthMutation({
 
 export const list = AuthQuery({
   args: {},
-  returns: v.array(
-    v.object({
-      _id: v.id("customInstructions"),
-      _creationTime: v.number(),
-      title: v.string(),
-      description: v.string(),
-      icon: v.string(),
-      iconColor: v.optional(v.string()),
-      instructions: v.string(),
-      ownerId: v.string(),
-      orgId: v.optional(v.string()),
-      isSharedWithOrg: v.boolean(),
-      createdAt: v.number(),
-      updatedAt: v.number(),
-      ownerName: v.string(),
-    })
+  returns: v.union(
+    v.null(),
+    v.array(
+      v.object({
+        _id: v.id("customInstructions"),
+        _creationTime: v.number(),
+        title: v.string(),
+        description: v.string(),
+        icon: v.string(),
+        iconColor: v.optional(v.string()),
+        instructions: v.string(),
+        ownerId: v.string(),
+        orgId: v.optional(v.string()),
+        isSharedWithOrg: v.boolean(),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+        ownerName: v.string(),
+      })
+    )
   ),
   handler: async (ctx) => {
     const userId = ctx.identity.subject;

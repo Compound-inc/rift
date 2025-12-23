@@ -21,6 +21,7 @@ import {
   PlusIcon,
 } from "lucide-react";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
+import { useConvexAuth } from "convex/react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
@@ -36,10 +37,14 @@ export function InstructionSelector({
   disabled,
 }: InstructionSelectorProps) {
   const { user } = useAuth();
-  const instructions = useQuery(api.customInstructions.list);
+  const { isAuthenticated } = useConvexAuth();
+  const instructions = useQuery(
+    api.customInstructions.list,
+    isAuthenticated ? {} : "skip"
+  );
   const [open, setOpen] = useState(false);
 
-  const isLoading = instructions === undefined || instructions === null;
+  const isLoading = instructions === undefined;
   const loadedInstructions = instructions ?? [];
 
   const hasInstructions = loadedInstructions.length > 0;

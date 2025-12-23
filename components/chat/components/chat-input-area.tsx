@@ -277,7 +277,7 @@ export const ChatInputArea = React.memo(function ChatInputArea({
               </div>
             </PromptInputTools>
             <PromptInputSubmit
-              disabled={disableInput}
+              disabled={disableInput || uploadingFiles.length > 0}
               status={status}
               onStop={onStop}
             />
