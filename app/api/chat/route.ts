@@ -13,7 +13,7 @@ import {
 } from "ai";
 import { withTracing } from "@posthog/ai";
 import { PostHog } from "posthog-node";
-import { withSupermemory, supermemoryTools } from "@supermemory/tools/ai-sdk";
+// import { withSupermemory, supermemoryTools } from "@supermemory/tools/ai-sdk";
 import {
   getLanguageModel,
   getModel,
@@ -390,22 +390,23 @@ const handleChatRequest = (
         }),
     });
 
-    const supermemoryEnabled = Boolean(process.env.SUPERMEMORY_API_KEY);
-    const modelWithMemory = yield* Effect.try({
-      try: () =>
-        supermemoryEnabled
-      ? withSupermemory(baseModel, auth.userId, {
-          mode: "profile",
-          verbose: process.env.NODE_ENV !== "production",
-        })
-          : baseModel,
-      catch: (error) =>
-        new ModelError({
-          message: "Failed to initialize Supermemory integration",
-          modelId,
-          cause: error,
-        }),
-    });
+    // const supermemoryEnabled = Boolean(process.env.SUPERMEMORY_API_KEY);
+    // const modelWithMemory = yield* Effect.try({
+    //   try: () =>
+    //     supermemoryEnabled
+    //   ? withSupermemory(baseModel, auth.userId, {
+    //       mode: "profile",
+    //       verbose: process.env.NODE_ENV !== "production",
+    //     })
+    //       : baseModel,
+    //   catch: (error) =>
+    //     new ModelError({
+    //       message: "Failed to initialize Supermemory integration",
+    //       modelId,
+    //       cause: error,
+    //     }),
+    // });
+    const modelWithMemory = baseModel;
 
     // PostHog client - handle gracefully
     const phClient = yield* Effect.try({
@@ -483,11 +484,11 @@ const handleChatRequest = (
       try: () => ({
       ...providerTools,
       ...(enabledTools.includes("web_search") ? { webSearch: exaWebSearch } : {}),
-      ...(process.env.SUPERMEMORY_API_KEY
-        ? supermemoryTools(process.env.SUPERMEMORY_API_KEY, {
-            containerTags: auth.orgId ? [auth.userId, auth.orgId] : [auth.userId],
-          })
-        : {}),
+      // ...(process.env.SUPERMEMORY_API_KEY
+      //   ? supermemoryTools(process.env.SUPERMEMORY_API_KEY, {
+      //       containerTags: auth.orgId ? [auth.userId, auth.orgId] : [auth.userId],
+      //     })
+      //   : {}),
       }),
       catch: (error) =>
         new ToolError({
@@ -613,7 +614,8 @@ const handleChatRequest = (
     const systemPrompt = yield* buildSystemPrompt({
       modelDisplayName,
       responseStyle: responseStyle as ResponseStyle,
-      supermemoryEnabled,
+      // supermemoryEnabled,
+      supermemoryEnabled: false,
     });
 
     // Create the streaming response
