@@ -206,6 +206,11 @@ const settingsSections: SettingsSection[] = [
       //   icon: MessageSquare,
       // },
       {
+        title: "Instrucciones",
+        href: "/settings/custom-instructions",
+        icon: MessageSquare,
+      },
+      {
         title: "Modelos",
         href: "/settings/models",
         icon: Bot,
@@ -219,11 +224,6 @@ const settingsSections: SettingsSection[] = [
         title: "Apariencia",
         href: "/settings/appearance",
         icon: Palette,
-      },
-      {
-        title: "Instrucciones",
-        href: "/settings/custom-instructions",
-        icon: MessageSquare,
       },
       // {
       //   title: "Atajos",

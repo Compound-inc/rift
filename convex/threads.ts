@@ -232,6 +232,29 @@ export const updateThreadCustomInstruction = AuthMutation({
       return null;
     }
 
+    // Verify user has access to the instruction if provided
+    if (args.customInstructionId) {
+      const instruction = await ctx.db.get(args.customInstructionId);
+      if (!instruction) {
+        throw new Error("Instruction not found");
+      }
+      
+      const orgId = extractOrganizationIdFromJWT(ctx.identity);
+      const isOwner = instruction.ownerId === userId;
+      const isOrgMember = orgId && instruction.orgId === orgId && instruction.isSharedWithOrg;
+      
+      const shareRecord = await ctx.db
+        .query("customInstructionShares")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .filter((q) => q.eq(q.field("instructionId"), args.customInstructionId!))
+        .first();
+      const isSharedUser = shareRecord !== null;
+
+      if (!isOwner && !isOrgMember && !isSharedUser) {
+        throw new Error("Unauthorized access to instruction");
+      }
+    }
+
     // Update the custom instruction
     await ctx.db.patch(thread._id, {
       customInstructionId: args.customInstructionId,
