@@ -164,7 +164,7 @@ export const CodeBlockCopyButton = ({
       )}
       onClick={copyToClipboard}
       type="button"
-      aria-label="Copy code"
+      aria-label="Copiar código"
       {...props}
     >
       {children ?? <Icon size={14} />}

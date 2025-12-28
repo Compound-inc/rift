@@ -144,6 +144,8 @@ function SubscribePageContent() {
 
             if (!error && url) {
                 router.push(url);
+            } else if (error && url) {
+                router.push(url);
             } else {
                 setError(error || "Error desconocido al iniciar suscripción");
                 setLoading(false);

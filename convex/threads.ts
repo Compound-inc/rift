@@ -512,6 +512,64 @@ export const serverGetThreadInfo = query({
   },
 });
 
+export const serverValidateThreadAndInstruction = query({
+  args: {
+    secret: v.string(),
+    userId: v.string(),
+    orgId: v.optional(v.string()),
+    threadId: v.string(),
+    customInstructionId: v.optional(v.id("customInstructions")),
+  },
+  returns: v.object({
+    thread: v.union(threadInfoValidator, v.null()),
+    customInstruction: v.union(
+      v.object({
+        instructions: v.string(),
+      }),
+      v.null()
+    ),
+  }),
+  handler: async (ctx, args) => {
+    ensureServerSecret(args.secret);
+    
+    // Validate thread ownership
+    const thread = await ctx.db
+      .query("threads")
+      .withIndex("by_user_and_threadId", (q) =>
+        q.eq("userId", args.userId).eq("threadId", args.threadId),
+      )
+      .unique();
+    
+    // Validate custom instruction access if provided
+    let customInstruction: { instructions: string } | null = null;
+    if (args.customInstructionId) {
+      const instruction = await ctx.db.get(args.customInstructionId);
+      if (instruction) {
+        // Check access
+        const isOwner = instruction.ownerId === args.userId;
+        const isOrgMember = args.orgId && instruction.orgId === args.orgId && instruction.isSharedWithOrg;
+        
+        // Check if user has direct share via junction table
+        const shareRecord = await ctx.db
+          .query("customInstructionShares")
+          .withIndex("by_user", (q) => q.eq("userId", args.userId))
+          .filter((q) => q.eq(q.field("instructionId"), args.customInstructionId!))
+          .first();
+        const isSharedUser = shareRecord !== null;
+
+        if (isOwner || isOrgMember || isSharedUser) {
+          customInstruction = { instructions: instruction.instructions };
+        }
+      }
+    }
+    
+    return {
+      thread,
+      customInstruction,
+    };
+  },
+});
+
 export const serverDeleteMessagesAfter = mutation({
   args: {
     secret: v.string(),
@@ -1019,8 +1077,12 @@ export const createAttachment = AuthMutation({
   handler: async (ctx, args) => {
     const userId = ctx.identity.subject;
     
-    // Generate a unique file key
-    const fileKey = `${userId}-${Date.now()}-${args.fileName}`;
+    // Extract fileKey from the R2 public URL
+    const url = new URL(args.dataUrl);
+    const fileKey = url.pathname.startsWith("/") ? url.pathname.slice(1) : url.pathname;
+    if (!fileKey) {
+      throw new Error(`Failed to extract fileKey from dataUrl: ${args.dataUrl}`);
+    }
     
     // Create the attachment record with R2 URL
     const attachmentId = await ctx.db.insert("attachments", {

@@ -72,7 +72,7 @@ import {
   generateIdempotencyKey,
   checkAborted,
   fromAbortSignal,
-  getCustomInstruction,
+  validateThreadAndInstruction,
   captureChatError,
 } from "./services";
 import { buildSystemPrompt } from "./system-prompt";
@@ -367,14 +367,23 @@ const handleChatRequest = (
       timeMs: Date.now() - start 
     });
 
-    // Fetch custom instruction if provided
-    let customInstructionsContent: string | undefined;
-    if (customInstructionId) {
-      const instruction = yield* getCustomInstruction(customInstructionId);
-      if (instruction) {
-        customInstructionsContent = instruction.instructions;
-      }
+    // Validate thread ownership and custom instruction access
+    const { thread, customInstruction } = yield* validateThreadAndInstruction(
+      auth.userId,
+      auth.orgId,
+      threadId,
+      customInstructionId
+    );
+
+    if (!thread) {
+      return yield* new ValidationError({
+        message: "Thread not found or access denied",
+        field: "threadId",
+      });
     }
+
+    const customInstructionsContent = customInstruction?.instructions;
+    const validatedCustomInstructionId = customInstruction ? customInstructionId : undefined;
 
     const lastUser = messages.filter((m) => m.role === "user").pop();
     const userText = lastUser?.parts?.find((part) => part.type === "text")?.text;
@@ -892,10 +901,10 @@ const handleChatRequest = (
                 }
               }
 
-              if (customInstructionId) {
+              if (validatedCustomInstructionId) {
                 try {
                   await fetchMutation(api.customInstructions.serverIncrementUsage, {
-                    id: customInstructionId as Id<"customInstructions">,
+                    id: validatedCustomInstructionId as Id<"customInstructions">,
                     secret: process.env.CONVEX_SECRET_TOKEN!,
                   });
                 } catch (err) {

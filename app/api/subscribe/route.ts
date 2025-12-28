@@ -38,6 +38,7 @@ export const POST = async (req: NextRequest) => {
 
   try {
     let targetOrganizationId = providedOrgId;
+    let isExistingOrg = false;
 
     // If no organization ID provided, try to find one or create one
     if (!targetOrganizationId) {
@@ -50,6 +51,7 @@ export const POST = async (req: NextRequest) => {
          // User has organizations, use the first one (or logic to pick "active" if possible)
          // Ideally frontend sends the active one, but this is a fallback.
          targetOrganizationId = memberships.data[0].organizationId;
+         isExistingOrg = true;
        } else {
          // No existing organizations, create a new one
          if (!orgName) {
@@ -70,6 +72,9 @@ export const POST = async (req: NextRequest) => {
          
          targetOrganizationId = organization.id;
        }
+    } else {
+      // Organization ID was provided, so this is an existing org
+      isExistingOrg = true;
     }
 
     // Map subscription level to Price ID from env
@@ -213,7 +218,19 @@ export const POST = async (req: NextRequest) => {
         });
     }
 
-    // For paid plans, create Checkout Session
+    // For paid plans, check permissions if user already has an organization
+    if (isExistingOrg) {
+      const permissions = await getPermissions();
+      if (!checkPermission(permissions, "MANAGE_BILLING")) {
+        console.log(`User ${userId} attempted to subscribe but lacks billing permission for organization ${targetOrganizationId}`);
+        return NextResponse.json({ 
+          error: "Unauthorized: You do not have permission to manage billing.",
+          url: `${baseUrl}/chat`
+        }, { status: 403 });
+      }
+    }
+
+    // Create Checkout Session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       billing_address_collection: 'auto',

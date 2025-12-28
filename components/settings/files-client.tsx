@@ -191,7 +191,7 @@ export function FilesClient() {
         <Checkbox
           checked={table.getIsAllPageRowsSelected()}
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
+          aria-label="Seleccionar todo"
           className="data-[state=unchecked]:bg-transparent border-border"
         />
       ),
@@ -199,7 +199,7 @@ export function FilesClient() {
         <Checkbox
           checked={row.getIsSelected()}
           onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
+          aria-label="Seleccionar fila"
           className="data-[state=unchecked]:bg-transparent border-border"
         />
       ),

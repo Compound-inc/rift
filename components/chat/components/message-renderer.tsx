@@ -333,13 +333,11 @@ export const MessageRenderer = React.memo(function MessageRenderer({
                       toolName === "url_context" ? (
                         <div className="p-3 text-sm">
                           <div className="text-green-700 font-medium mb-2">
-                            ✓ Successfully retrieved
-                            information
+                            ✓ Información recuperada exitosamente
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            Content has been analyzed and
-                            integrated into the response
-                            above.
+                            El contenido ha sido analizado e
+                            integrado en la respuesta anterior.
                           </div>
                         </div>
                       ) : (
@@ -359,7 +357,7 @@ export const MessageRenderer = React.memo(function MessageRenderer({
                     }
                     errorText={
                       toolResult.isError
-                        ? "Tool execution failed"
+                        ? "Error al ejecutar la herramienta"
                         : undefined
                     }
                   />
@@ -389,7 +387,7 @@ export const MessageRenderer = React.memo(function MessageRenderer({
                   <div key={`${message.id}-file-${i}`} className="rounded-lg overflow-hidden border">
                     <img
                       src={url}
-                      alt="Uploaded image"
+                      alt="Imagen subida"
                       className="max-w-full h-auto max-h-96 object-contain"
                       loading="lazy"
                     />
@@ -405,7 +403,7 @@ export const MessageRenderer = React.memo(function MessageRenderer({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-block w-16 h-16 rounded-lg border-2 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
-                    title="View PDF"
+                    title="Ver PDF"
                   >
                     <div className="w-full h-full flex items-center justify-center bg-red-100 dark:bg-red-900/30 rounded-lg">
                       <span className="text-red-600 dark:text-red-400 font-bold text-lg">PDF</span>
@@ -419,7 +417,7 @@ export const MessageRenderer = React.memo(function MessageRenderer({
                 <div key={`${message.id}-file-${i}`} className="flex items-center gap-2 p-3 border rounded-lg bg-muted">
                   <AttachmentsIcon className="size-4" />
                   <div className="flex-1">
-                    <div className="font-medium">File</div>
+                    <div className="font-medium">Archivo</div>
                     <div className="text-sm text-muted-foreground">
                       {mediaType}
                     </div>
@@ -430,7 +428,7 @@ export const MessageRenderer = React.memo(function MessageRenderer({
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:text-blue-800"
                   >
-                    View
+                    Ver
                   </a>
                 </div>
               );

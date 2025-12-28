@@ -444,21 +444,36 @@ export const isRetryableDatabaseError = (error: DatabaseError): boolean => {
 // ============================================================================
 
 /**
- * Fetches a custom instruction by ID.
+ * Validates thread ownership and custom instruction access in a single batched call.
+ * Returns both thread info and custom instruction content if valid.
  */
-export const getCustomInstruction = (
-  instructionId: string
-): Effect.Effect<{ instructions: string } | null, DatabaseError> =>
+export const validateThreadAndInstruction = (
+  userId: string,
+  orgId: string | undefined,
+  threadId: string,
+  customInstructionId: string | undefined
+): Effect.Effect<
+  {
+    thread: { customInstructionId?: Id<"customInstructions"> } | null;
+    customInstruction: { instructions: string } | null;
+  },
+  DatabaseError
+> =>
   Effect.tryPromise({
     try: () =>
-      fetchQuery(api.customInstructions.serverGet, {
-        id: instructionId as Id<"customInstructions">,
+      fetchQuery(api.threads.serverValidateThreadAndInstruction, {
         secret: process.env.CONVEX_SECRET_TOKEN!,
+        userId,
+        orgId,
+        threadId,
+        customInstructionId: customInstructionId
+          ? (customInstructionId as Id<"customInstructions">)
+          : undefined,
       }),
     catch: (error) =>
       new DatabaseError({
-        message: "Failed to get custom instruction",
-        operation: "getCustomInstruction",
+        message: "Failed to validate thread and instruction",
+        operation: "validateThreadAndInstruction",
         cause: error,
       }),
   });

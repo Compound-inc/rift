@@ -176,7 +176,7 @@ export const ChatInputArea = React.memo(function ChatInputArea({
               <button
                 onClick={() => setQuotaError(null)}
                 className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
-                aria-label="Close"
+                aria-label="Cerrar"
               >
                 <svg
                   className="w-4 h-4"
@@ -280,7 +280,7 @@ export const ChatInputArea = React.memo(function ChatInputArea({
                   <TooltipTrigger asChild>
                     <PromptInputButton
                       onClick={handleSearchToggle}
-                      aria-label="Toggle web search"
+                      aria-label="Activar búsqueda web"
                       disabled={disableInput}
                       variant={isSearchEnabled ? "default" : "ghost"}
                       className={
