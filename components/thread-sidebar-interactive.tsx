@@ -325,7 +325,7 @@ export function ThreadSidebarInteractive({
     event.stopPropagation();
 
     if (pathname === `/chat/${threadId}`) {
-      router.replace("/");
+      router.replace("/chat");
     }
 
     try {
@@ -333,10 +333,10 @@ export function ThreadSidebarInteractive({
       const thread = combinedThreads.find((t) => t.threadId === threadId);
       await deleteThread({ threadId });
       await logThreadRemoved(String(threadId), thread?.title);
-      toast.success("Hilo eliminado");
+      toast.success("Conversación eliminada");
     } catch (error) {
       console.error("Failed to delete thread:", error);
-      toast.error("Error al eliminar el hilo");
+      toast.error("Error al eliminar la conversación");
     }
   };
 
@@ -385,7 +385,7 @@ export function ThreadSidebarInteractive({
         delete newTitles[threadId];
         return newTitles;
       });
-      toast.success("Hilo renombrado");
+      toast.success("Conversación renombrada");
     } catch (error) {
       console.error("Failed to rename thread:", error);
       // Revert optimistic and return to editing with original
@@ -396,7 +396,7 @@ export function ThreadSidebarInteractive({
       });
       setEditingThreadId(threadId);
       setEditingTitle(originalThread.title);
-      toast.error("Error al renombrar el hilo");
+      toast.error("Error al renombrar la conversación");
     }
   };
 
@@ -409,10 +409,10 @@ export function ThreadSidebarInteractive({
     event.stopPropagation();
     try {
       await togglePinThread({ threadId });
-      toast.success("Estado de fijado actualizado");
+      toast.success("Conversación fijada/desfijada");
     } catch (error) {
       console.error("Failed to toggle pin:", error);
-      toast.error("Error al actualizar el estado de fijado");
+      toast.error("Error al fijar/desfijar la conversación");
     }
   };
 

@@ -453,12 +453,73 @@ function ChatInterfaceInternal({
     return renderedMessages;
   }, [renderedMessages, isThread, paginationStatus]);
 
+  // Track if all AI responses are ready to prevent layout shift
+  // Count expected assistant responses with text parts
+  const expectedResponseCount = useMemo(() => {
+    if (!isThread || status === "streaming" || status === "submitted") {
+      return 0; // Don't wait during streaming
+    }
+    return displayMessages.filter(
+      (m) => m.role === "assistant" && m.parts.some((p) => p.type === "text")
+    ).length;
+  }, [displayMessages, isThread, status]);
+
+  const [readyResponseCount, setReadyResponseCount] = useState(0);
+  const readyResponseIdsRef = useRef<Set<string>>(new Set());
+
+  // Reset ready count when thread changes
+  useEffect(() => {
+    setReadyResponseCount(0);
+    readyResponseIdsRef.current.clear();
+  }, [id]);
+
+  // Handler for when a response finishes rendering
+  const handleResponseReady = useCallback((messageId: string) => {
+    if (!readyResponseIdsRef.current.has(messageId)) {
+      readyResponseIdsRef.current.add(messageId);
+      setReadyResponseCount((prev) => prev + 1);
+    }
+  }, []);
+
+  // Check if all responses are ready
+  const allResponsesReady = useMemo(() => {
+    // During streaming, always show
+    if (status === "streaming" || status === "submitted") return true;
+    // No responses expected, show immediately
+    if (expectedResponseCount === 0) return true;
+    // Check if all expected responses are ready
+    return readyResponseCount >= expectedResponseCount;
+  }, [status, expectedResponseCount, readyResponseCount]);
+
+  // Fallback timeout - show content after 300ms even if responses aren't ready
+  const [forceShow, setForceShow] = useState(false);
+  useEffect(() => {
+    if (allResponsesReady || !isThread || displayMessages.length === 0) {
+      setForceShow(false);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setForceShow(true);
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [allResponsesReady, isThread, displayMessages.length, id]);
+
+  // Reset forceShow when thread changes
+  useEffect(() => {
+    setForceShow(false);
+  }, [id]);
+
+  const shouldShowMessages = allResponsesReady || forceShow || status === "streaming" || status === "submitted";
+
   // Initial scroll to bottom when thread loads (instant, no animation)
+  // Wait until messages are ready to show before scrolling
   const hasInitialScrolledRef = useRef(false);
   const initialScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   useLayoutEffect(() => {
-    // Only scroll on initial load for this thread
-    if (displayMessages.length > 0 && !hasInitialScrolledRef.current) {
+    // Only scroll once messages are ready to be shown and we haven't scrolled yet
+    if (shouldShowMessages && displayMessages.length > 0 && !hasInitialScrolledRef.current) {
       scrollToBottom("instant");
       hasInitialScrolledRef.current = true;
       
@@ -473,7 +534,7 @@ function ChatInterfaceInternal({
         markInitialScrollDone();
       }, 150); // Small delay for heavy components to render
     }
-  }, [displayMessages.length, scrollToBottom, markInitialScrollDone]);
+  }, [shouldShowMessages, displayMessages.length, scrollToBottom, markInitialScrollDone]);
 
   // Reset scroll state when thread changes
   useEffect(() => {
@@ -787,7 +848,9 @@ function ChatInterfaceInternal({
                 onSuggestionClick={handleSuggestionClick}
               />
             )}
-            <div>
+            <div
+              className={shouldShowMessages ? "" : "opacity-0"}
+            >
               {displayMessages.map((message, index) => {
               const isLast = index === displayMessages.length - 1;
               const isStreaming = isLast && (status === "streaming");
@@ -799,6 +862,7 @@ function ChatInterfaceInternal({
                   disableRegenerate={status === "streaming"}
                   onRegenerateAssistantMessage={onRegenerateAssistant}
                   onRegenerateAfterUserMessage={onRegenerateAfterUser}
+                  onResponseReady={() => handleResponseReady(message.id)}
                   onEditUserMessage={async (
                     messageId: string,
                     newContent: string
