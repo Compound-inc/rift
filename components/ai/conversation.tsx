@@ -5,11 +5,6 @@ import { forwardRef, type ComponentProps } from 'react';
 
 export type ConversationProps = ComponentProps<'div'>;
 
-/**
- * Scroll container for chat messages.
- * Accepts a ref to enable stick-to-bottom behavior.
- * Uses overflow-anchor to help browser maintain scroll position.
- */
 export const Conversation = forwardRef<HTMLDivElement, ConversationProps>(
   ({ className, style, ...props }, ref) => (
     <div
@@ -20,7 +15,6 @@ export const Conversation = forwardRef<HTMLDivElement, ConversationProps>(
       )}
       style={{
         scrollbarGutter: 'stable both-edges',
-        // Disable overflow anchor on container - we'll use explicit anchor
         overflowAnchor: 'none',
         ...style,
       }}
@@ -32,15 +26,9 @@ export const Conversation = forwardRef<HTMLDivElement, ConversationProps>(
 Conversation.displayName = 'Conversation';
 
 export type ConversationContentProps = ComponentProps<'div'> & {
-  /** Whether to include the scroll anchor at the bottom */
   withScrollAnchor?: boolean;
 };
 
-/**
- * Content container for chat messages.
- * Accepts a ref to enable ResizeObserver for stick-to-bottom.
- * Includes an optional scroll anchor for browser-native scroll position maintenance.
- */
 export const ConversationContent = forwardRef<HTMLDivElement, ConversationContentProps>(
   ({ className, children, withScrollAnchor = true, ...props }, ref) => (
     <div
@@ -52,16 +40,10 @@ export const ConversationContent = forwardRef<HTMLDivElement, ConversationConten
       {...props}
     >
       {children}
-      {/* Scroll anchor - browser uses this to maintain scroll position when content above grows */}
       {withScrollAnchor && (
         <div 
           aria-hidden="true"
-          style={{ 
-            height: 1, 
-            overflowAnchor: 'auto',
-            // Ensure it's always the anchor point
-            contain: 'strict',
-          }} 
+          style={{ height: 1, overflowAnchor: 'auto', contain: 'strict' }} 
         />
       )}
     </div>

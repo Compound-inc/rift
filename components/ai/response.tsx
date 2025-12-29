@@ -11,15 +11,12 @@ type ResponseProps = ComponentProps<typeof Streamdown> & {
 export const Response = memo(
   ({ className, onReady, ...props }: ResponseProps) => {
     const hasNotifiedRef = useRef(false);
-    const containerRef = useRef<HTMLDivElement>(null);
 
-    // Notify when component is mounted and rendered
     useEffect(() => {
       if (onReady && !hasNotifiedRef.current) {
         let timeoutId: NodeJS.Timeout | null = null;
         let rafId2: number | null = null;
         
-        // Use requestAnimationFrame to ensure DOM is ready
         const rafId1 = requestAnimationFrame(() => {
           rafId2 = requestAnimationFrame(() => {
             timeoutId = setTimeout(() => {
@@ -40,16 +37,14 @@ export const Response = memo(
     }, [onReady]);
 
     return (
-      <div ref={containerRef}>
-        <Streamdown
-          controls={false}
-          className={cn(
-            'size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 text-[16px] leading-[28px] [&_h1]:mt-12 [&_h1]:mb-6 [&_h2]:mt-12 [&_h2]:mb-6 [&_h3]:mt-12 [&_h3]:mb-6',
-            className
-          )}
-          {...props}
-        />
-      </div>
+      <Streamdown
+        controls={false}
+        className={cn(
+          'size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 text-[16px] leading-[28px] [&_h1]:mt-12 [&_h1]:mb-6 [&_h2]:mt-12 [&_h2]:mb-6 [&_h3]:mt-12 [&_h3]:mb-6',
+          className
+        )}
+        {...props}
+      />
     );
   },
   (prevProps, nextProps) => prevProps.children === nextProps.children

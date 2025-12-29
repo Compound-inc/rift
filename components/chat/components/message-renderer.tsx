@@ -33,7 +33,6 @@ import type { UIMessage } from "@ai-sdk-tools/store";
 import React, { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 
-// Memoized action buttons component
 const MessageActions = React.memo(function MessageActions({
   message,
   onRegenerateAssistantMessage,
@@ -132,13 +131,10 @@ const MessageActions = React.memo(function MessageActions({
   }
 
   return null;
-}, (prevProps, nextProps) => {
-  // Re-render when message ID or disabled state changes
-  return (
-    prevProps.message.id === nextProps.message.id &&
-    prevProps.disableRegenerate === nextProps.disableRegenerate
-  );
-});
+}, (prevProps, nextProps) => (
+  prevProps.message.id === nextProps.message.id &&
+  prevProps.disableRegenerate === nextProps.disableRegenerate
+));
 
 interface MessageRendererProps {
   message: UIMessage;
@@ -206,14 +202,10 @@ export const MessageRenderer = React.memo(function MessageRenderer({
     if (!isEditing) return;
     const ta = textAreaRef.current;
     if (!ta) return;
-    // Autosize: grow with content up to max height; then scroll
     ta.style.height = "auto";
-    const max = 320; // px
-    const next = Math.min(ta.scrollHeight, max);
-    ta.style.height = `${next}px`;
+    ta.style.height = `${Math.min(ta.scrollHeight, 320)}px`;
   }, [isEditing, draft]);
 
-  // Compute derived values for showing loader
   const hasTextParts = message.parts.some(
     (p) => p.type === "text" && (p as any).text && (p as any).text.length > 0,
   );
@@ -221,7 +213,6 @@ export const MessageRenderer = React.memo(function MessageRenderer({
   const showInlineLoader = isStreaming && message.role === "assistant" && !hasTextParts && !hasReasoningParts;
 
   const renderMessageContent = useCallback(() => {
-    // Group reasoning parts together
     const reasoningParts = message.parts.filter(
       (part) => part.type === "reasoning" && "text" in part,
     );
@@ -231,7 +222,6 @@ export const MessageRenderer = React.memo(function MessageRenderer({
 
     return (
       <>
-        {/* Single reasoning section for all reasoning parts */}
         {reasoningParts.length > 0 && (
           <Reasoning
             key={`${message.id}-reasoning`}
@@ -255,16 +245,12 @@ export const MessageRenderer = React.memo(function MessageRenderer({
           </Reasoning>
         )}
 
-        {/* Render non-reasoning, non-source parts (text content) */}
         {message.parts.map((part, partIdx: number) => {
-          // Skip reasoning, source-url, and file parts (handled separately)
           if (part.type === "reasoning" || part.type === "source-url" || part.type === "file") {
             return null;
           }
 
           if (part.type === "text" && "text" in part) {
-            // Always use Response for assistant messages - consistent rendering prevents
-            // component switching that causes re-mounts and scroll position issues.
             if (message.role === "assistant") {
               return (
                 <Response 
@@ -275,7 +261,6 @@ export const MessageRenderer = React.memo(function MessageRenderer({
                 </Response>
               );
             }
-            // Render user messages as plain text without markdown processing
             return (
               <div 
                 key={`${message.id}-${partIdx}`}
@@ -375,7 +360,6 @@ export const MessageRenderer = React.memo(function MessageRenderer({
           return null;
         })}
 
-        {/* Render file attachments */}
         {fileParts.length > 0 && (
           <div className="space-y-3">
             {fileParts.map((part, i) => {
@@ -418,7 +402,6 @@ export const MessageRenderer = React.memo(function MessageRenderer({
                 );
               }
               
-              // Fallback for other file types
               return (
                 <div key={`${message.id}-file-${i}`} className="flex items-center gap-2 p-3 border rounded-lg bg-muted">
                   <AttachmentsIcon className="size-4" />
@@ -449,7 +432,6 @@ export const MessageRenderer = React.memo(function MessageRenderer({
   return (
     <div className="group">
       {isEditing && message.role === "user" ? (
-        // Break out of Message component constraints for editing
         <div className="w-full max-w-none px-4">
           <div className="w-full max-w-[80%] ml-auto">
             <div className="bg-hover text-secondary rounded-lg py-3 px-4">
@@ -492,7 +474,6 @@ export const MessageRenderer = React.memo(function MessageRenderer({
         </Message>
       )}
       
-      {/* Sources section for assistant messages - only show when sources exist and response is completed */}
       {message.role === "assistant" && 
        message.parts.filter((part) => part.type === "source-url").length > 0 &&
        !isStreaming && (
@@ -520,7 +501,6 @@ export const MessageRenderer = React.memo(function MessageRenderer({
         </Sources>
       )}
       
-      {/* Message Actions - memoized to prevent re-renders during streaming */}
       <MessageActions
         message={message}
         onRegenerateAssistantMessage={onRegenerateAssistantMessage}
@@ -531,11 +511,7 @@ export const MessageRenderer = React.memo(function MessageRenderer({
     </div>
   );
 }, (prevProps, nextProps) => {
-  // While streaming, always allow re-render so tokens appear incrementally
-  if (nextProps.isStreaming) return false;
-  // Also re-render exactly when streaming toggles to update reasoning trigger immediately
-  if (prevProps.isStreaming !== nextProps.isStreaming) return false;
-  // For non-streaming messages, use strict comparison to avoid churn
+  if (nextProps.isStreaming || prevProps.isStreaming !== nextProps.isStreaming) return false;
   return (
     prevProps.disableRegenerate === nextProps.disableRegenerate &&
     prevProps.message.id === nextProps.message.id &&
