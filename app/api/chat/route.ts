@@ -638,9 +638,8 @@ const handleChatRequest = (
     // Build system prompt
     const systemPrompt = yield* buildSystemPrompt({
       modelDisplayName,
-      responseStyle: responseStyle as ResponseStyle,
+      customInstructions: customInstructionsContent,
       // supermemoryEnabled,
-      supermemoryEnabled: false,
     });
 
     // Create the streaming response
