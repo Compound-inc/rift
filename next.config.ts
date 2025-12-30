@@ -2,6 +2,17 @@ import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 import { withBotId } from "botid/next/config";
 
+const isCI = Boolean(process.env.CI);
+const isVercel = Boolean(process.env.VERCEL);
+
+// Work around sentry-cli occasionally failing to write to stdout on Vercel (EAGAIN / os error 11).
+// These env vars are read by sentry-cli and are safe to set at build time.
+if (isCI || isVercel) {
+  process.env.SENTRYCLI_LOG_STREAM ??= "stderr";
+  process.env.SENTRYCLI_LOG_LEVEL ??= "error";
+  process.env.SENTRYCLI_NO_PROGRESS_BAR ??= "1";
+}
+
 const nextConfig: NextConfig = {
   experimental: {
     turbopackFileSystemCacheForDev: true,
@@ -41,8 +52,9 @@ export default withSentryConfig(withBotId(nextConfig), {
 
   project: "rift",
 
-  // Only print logs for uploading source maps in CI
-  silent: !process.env.CI,
+  // Vercel build logs can trigger a sentry-cli stdout EAGAIN (os error 11).
+  // Keep uploads enabled, but avoid noisy CLI/progress output in CI/Vercel.
+  silent: isCI || isVercel,
 
   // For all available options, see:
   // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/

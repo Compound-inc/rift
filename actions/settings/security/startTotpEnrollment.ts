@@ -32,7 +32,7 @@ export async function startTotpEnrollment(): Promise<StartTotpEnrollmentResult> 
 
       // Rate limit MFA enrollment attempts (shared pool with email verification)
       const rateLimitResult = yield* checkRateLimit(user.id, {
-        limit: 5, // 5 attempts per window (shared with email verification)
+        limit: 6, // 6 attempts per window (shared with email verification)
         windowSeconds: 600, // 10 minute window
         keyPrefix: "rate_limit:security_verification:",
       });
