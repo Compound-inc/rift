@@ -11,7 +11,7 @@ import { useRegeneration } from "./hooks/use-regeneration";
 import { ToolType, getDefaultTools } from "@/lib/ai/model-tools";
 import { resolveModel } from "@/lib/ai/ai-providers";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
-import { useConvexAuth, usePaginatedQuery, useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Loader } from "@/components/ai/loader";
 import { AttachmentsIcon } from "@/components/ui/icons/svg-icons";
@@ -46,6 +46,7 @@ import { getErrorMessage } from "./errors";
 function ChatInterfaceInternal({
   id,
   initialMessages,
+  serverMessages,
   hasMoreMessages = false,
   disableInput = false,
   onInitialMessage,
@@ -70,6 +71,7 @@ function ChatInterfaceInternal({
   const { user } = useAuth();
   const prevIdRef = useRef(id);
   const autoStartTriggeredRef = useRef(false);
+  const hadActiveSessionRef = useRef(false);
 
   const chatKey = useChatUIStore((s) => s.chatKey);
   const setInput = useChatUIStore((s) => s.setInput);
@@ -109,6 +111,9 @@ function ChatInterfaceInternal({
   const prevModelRef = useRef(selectedModel);
   const currentModelRef = useRef(selectedModel);
   
+  // Ref to track latest server messages for use in closures (avoids stale closure issue)
+  const historicalMessagesRef = useRef<UIMessage[]>([]);
+  
   useEffect(() => {
     currentModelRef.current = selectedModel;
     if (prevModelRef.current !== selectedModel) {
@@ -128,57 +133,25 @@ function ChatInterfaceInternal({
 
   const isThread = id !== "welcome";
 
-  const [enableClientPagination, setEnableClientPagination] = useState(false);
-  const shouldFetchHistoryFromConvex = isThread;
+  // Server messages come from CachedChatWrapper's one-off fetch (no subscription needed)
+  const historicalMessagesFromServer = serverMessages ?? [];
 
-  const { 
-    results: paginatedMessages, 
-    status: paginationStatus, 
-    loadMore 
-  } = usePaginatedQuery(
-    api.threads.getThreadMessagesPaginatedSafe,
-    // If initialMessages is undefined OR an empty array, fetch from client.
-    shouldFetchHistoryFromConvex ? { threadId: id } : "skip",
-    { initialNumItems: 20 }
-  );
-
-  const historicalMessagesFromServer: UIMessage[] = useMemo(() => {
-    if (!paginatedMessages || !isThread) return [];
-    
-    return paginatedMessages.reverse().map((m: any) => ({
-      id: m.messageId,
-      role: m.role,
-      parts: [
-        ...(m.reasoning ? [{ type: "reasoning", text: m.reasoning }] : []),
-        ...(m.content ? [{ type: "text", text: m.content }] : []),
-        ...(m.attachments ? m.attachments.map((att: any) => ({
-          type: "file" as const,
-          mediaType: att.mimeType,
-          url: att.attachmentUrl,
-          attachmentId: att.attachmentId,
-          attachmentType: att.attachmentType,
-        })) : []),
-        ...(m.sources ? m.sources.map((source: any) => ({
-          type: "source-url" as const,
-          sourceId: source.sourceId,
-          url: source.url,
-          title: source.title,
-        })) : []),
-      ],
-    }));
-  }, [paginatedMessages, isThread]);
-
-  // Prefer cache until server has at least as many messages
+  // Prefer cache until server has loaded
   const historicalMessages: UIMessage[] = useMemo(() => {
     if (!isThread) return [];
-    const cacheCount = initialMessages?.length ?? 0;
-    const serverCount = historicalMessagesFromServer.length;
-
-    if (cacheCount > 0 && serverCount < cacheCount) {
-      return initialMessages!;
+    if (historicalMessagesFromServer.length > 0) {
+      return historicalMessagesFromServer;
     }
-    return serverCount > 0 ? historicalMessagesFromServer : [];
+    return initialMessages ?? [];
   }, [isThread, historicalMessagesFromServer, initialMessages]);
+
+  // Keep ref in sync for use in closures (prepareSendMessagesRequest)
+  useEffect(() => {
+    // Prefer server data, fall back to cache
+    historicalMessagesRef.current = historicalMessagesFromServer.length > 0 
+      ? historicalMessagesFromServer 
+      : (initialMessages ?? []);
+  }, [historicalMessagesFromServer, initialMessages]);
 
   const chatStateInstance = useChatStateInstance();
 
@@ -260,34 +233,17 @@ function ChatInterfaceInternal({
             ? [...currentDefaultTools, "web_search" as ToolType]
             : currentDefaultTools;
 
-          const baseBeforePrune =
-            initialMessages && initialMessages.length > 0
-              ? initialMessages
-              : historicalMessages;
+          // Use ref to get latest server data (avoids stale closure issue)
+          const serverData = historicalMessagesRef.current;
 
           const anchor = trigger === "regenerate-message" ? regenerateAnchorRef.current : null;
-          const base = anchor ? pruneAt(baseBeforePrune, anchor.id, anchor.role) : baseBeforePrune;
+          const base = anchor ? pruneAt(serverData, anchor.id, anchor.role) : serverData;
           const hookMessages = anchor ? pruneAt(messages, anchor.id, anchor.role) : messages;
 
-          let requestMessages: UIMessage[] = [];
-          const pivotIndexInLocal = hookMessages.findIndex((localMsg: UIMessage) =>
-            base.some((baseMsg: UIMessage) => baseMsg.id === localMsg.id)
-          );
-
-          if (pivotIndexInLocal !== -1) {
-            const pivotId = hookMessages[pivotIndexInLocal].id;
-            const pivotIndexInBase = base.findIndex((baseMsg: UIMessage) => baseMsg.id === pivotId);
-
-            if (pivotIndexInBase !== -1) {
-              requestMessages = [...base.slice(0, pivotIndexInBase), ...hookMessages];
-            } else {
-               const usedIds = new Set(hookMessages.map((m: UIMessage) => m.id));
-               requestMessages = [...base.filter((m: UIMessage) => !usedIds.has(m.id)), ...hookMessages];
-            }
-          } else {
-            const usedIds = new Set(hookMessages.map((m: UIMessage) => m.id));
-            requestMessages = [...base.filter((m: UIMessage) => !usedIds.has(m.id)), ...hookMessages];
-          }
+          // Use server versions for existing messages, hook only for new messages
+          const serverIds = new Set(base.map((m: UIMessage) => m.id));
+          const newMessagesFromHook = hookMessages.filter((m: UIMessage) => !serverIds.has(m.id));
+          const requestMessages = [...base, ...newMessagesFromHook];
 
           const currentCustomInstructionId = useChatUIStore.getState().customInstructionId;
 
@@ -349,6 +305,13 @@ function ChatInterfaceInternal({
 
   const updateUserMessageContent = useMutation(api.threads.updateUserMessageContent);
 
+  // Track if user has had active interaction (streaming/sending) in this session
+  // This helps distinguish between stale cached messages vs live session messages
+  const isActivelyGenerating = status === "streaming" || status === "submitted";
+  if (isActivelyGenerating) {
+    hadActiveSessionRef.current = true;
+  }
+
   const renderedMessages: UIMessage[] = useMemo(() => {
     if (!isThread) {
       if (messages.length > 0) return messages;
@@ -356,27 +319,42 @@ function ChatInterfaceInternal({
       return [];
     }
 
-    const base =
-      initialMessages && initialMessages.length > 0
-        ? initialMessages
-        : historicalMessages;
-
-    const pivotIndexInLocal = messages.findIndex((localMsg: UIMessage) =>
-      base.some((baseMsg: UIMessage) => baseMsg.id === localMsg.id)
-    );
-
-    if (pivotIndexInLocal !== -1) {
-      const pivotId = messages[pivotIndexInLocal].id;
-      const pivotIndexInBase = base.findIndex((baseMsg: UIMessage) => baseMsg.id === pivotId);
-
-      if (pivotIndexInBase !== -1) {
-        return [...base.slice(0, pivotIndexInBase), ...messages];
+    // During active generation, use server for history + hook for new/streaming messages
+    if (isActivelyGenerating && messages.length > 0) {
+      if (historicalMessagesFromServer.length > 0) {
+        // Use server versions for existing messages, hook only for new messages (includes streaming)
+        const serverIds = new Set(historicalMessagesFromServer.map((m: UIMessage) => m.id));
+        const newMessagesFromHook = messages.filter((m: UIMessage) => !serverIds.has(m.id));
+        return [...historicalMessagesFromServer, ...newMessagesFromHook];
       }
+      return messages;
     }
 
-    const usedIds = new Set(messages.map((m: UIMessage) => m.id));
-    return [...base.filter((m: any) => !usedIds.has(m.id)), ...messages];
-  }, [isThread, historicalMessages, messages, initialMessages]);
+    // After active session (user sent message/received stream), merge server + new hook messages
+    if (hadActiveSessionRef.current && messages.length > 0) {
+      if (historicalMessagesFromServer.length > 0) {
+        // Use server versions for existing messages (source of truth)
+        // Only use hook for NEW messages not in server (user's new message, AI response)
+        const serverIds = new Set(historicalMessagesFromServer.map((m: UIMessage) => m.id));
+        const newMessagesFromHook = messages.filter((m: UIMessage) => !serverIds.has(m.id));
+        return [...historicalMessagesFromServer, ...newMessagesFromHook];
+      }
+      // No server data but we have hook messages - use them (preserves AI response)
+      return messages;
+    }
+
+    // Fresh navigation (no active session) - prefer server data for fresh content
+    if (historicalMessagesFromServer.length > 0) {
+      return historicalMessagesFromServer;
+    }
+
+    // Server not loaded yet - use cache for instant loading
+    if (initialMessages && initialMessages.length > 0) {
+      return initialMessages;
+    }
+
+    return historicalMessages;
+  }, [isThread, historicalMessages, historicalMessagesFromServer, messages, initialMessages, isActivelyGenerating]);
 
   const lastNonEmptyRenderRef = useRef<UIMessage[]>([]);
   useEffect(() => {
@@ -386,12 +364,12 @@ function ChatInterfaceInternal({
   }, [renderedMessages]);
 
   const displayMessages: UIMessage[] = useMemo(() => {
-    const loadingHistory = paginationStatus === "LoadingFirstPage" || paginationStatus === "LoadingMore";
-    if (renderedMessages.length === 0 && isThread && loadingHistory) {
+    // Use last non-empty render if current is empty (prevents flicker during transitions)
+    if (renderedMessages.length === 0 && isThread && lastNonEmptyRenderRef.current.length > 0) {
       return lastNonEmptyRenderRef.current;
     }
     return renderedMessages;
-  }, [renderedMessages, isThread, paginationStatus]);
+  }, [renderedMessages, isThread]);
 
   // Track expected AI responses for layout shift prevention
   const expectedResponseCount = useMemo(() => {
@@ -537,6 +515,7 @@ function ChatInterfaceInternal({
   useEffect(() => {
     if (prevIdRef.current !== id) {
       autoStartTriggeredRef.current = false;
+      hadActiveSessionRef.current = false;
       setMessages([]);
       prevIdRef.current = id;
     }
@@ -655,25 +634,6 @@ function ChatInterfaceInternal({
     setInput(prompt);
   }, [setInput]);
 
-  const handleLoadMore = useCallback(() => {
-    if (initialMessages && !enableClientPagination) {
-      setEnableClientPagination(true);
-      return;
-    }
-    
-    if (paginationStatus === "CanLoadMore") {
-      const scrollContainer = document.querySelector('[role="log"]');
-      const oldScrollHeight = scrollContainer?.scrollHeight || 0;
-      loadMore(5);
-
-      setTimeout(() => {
-        if (scrollContainer) {
-          const newScrollHeight = scrollContainer.scrollHeight;
-          scrollContainer.scrollTop += (newScrollHeight - oldScrollHeight);
-        }
-      }, 100);
-    }
-  }, [paginationStatus, loadMore, initialMessages, enableClientPagination]);
 
   const handleScrollToBottom = useCallback(() => {
     scrollToBottom("smooth");
@@ -721,16 +681,6 @@ function ChatInterfaceInternal({
       <div className="flex-1 min-h-0">
         <Conversation ref={scrollRef as React.RefObject<HTMLDivElement>}>
           <ConversationContent ref={contentRef as React.RefObject<HTMLDivElement>} className="mx-auto w-full max-w-full md:max-w-3xl p-4 pb-[140px] md:pb-35">
-            {isThread && (paginationStatus === "CanLoadMore" || (initialMessages && hasMoreMessages && !enableClientPagination)) && (
-              <div className="flex justify-center mb-4">
-                <button
-                  onClick={handleLoadMore}
-                  className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-accent transition-colors"
-                >
-                  Load older messages
-                </button>
-              </div>
-            )}
             
             {!isThread && renderedMessages.length === 0 && (
               <WelcomeScreen 

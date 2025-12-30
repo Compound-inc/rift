@@ -67,4 +67,14 @@ export async function saveCachedThreadMessages(
   await db.put(STORE, record);
 }
 
-
+/**
+ * Reconciles the cache with server data.
+ * Server is the source of truth - replaces cached messages with server messages.
+ */
+export async function reconcileCacheWithServer(
+  threadId: string,
+  serverMessages: UIMessage[],
+): Promise<void> {
+  if (!serverMessages || serverMessages.length === 0) return;
+  await saveCachedThreadMessages(threadId, serverMessages);
+}
