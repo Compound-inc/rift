@@ -14,6 +14,8 @@ import {
   callWorkosApiEffect,
 } from "./security-effect";
 
+import { validatePassword } from "@/lib/password-validation";
+
 type ChangeCurrentUserPasswordArgs = {
   currentPassword: string;
   newPassword: string;
@@ -32,10 +34,11 @@ export async function changeCurrentUserPassword(
   const currentPassword = args.currentPassword ?? "";
   const newPassword = args.newPassword ?? "";
 
-  if (newPassword.length < 12) {
+  const validation = validatePassword(newPassword);
+  if (!validation.isValid) {
     return {
       success: false,
-      error: "La nueva contraseña debe tener al menos 12 caracteres.",
+      error: validation.error || "Contraseña inválida.",
     };
   }
 

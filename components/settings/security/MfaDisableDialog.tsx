@@ -99,7 +99,12 @@ export function MfaDisableDialog({
         open={isPreDialogOpen}
         onOpenChange={onPreDialogOpenChange}
       >
-        <DialogContent className="max-w-md rounded-2xl border border-border/50 bg-white/95 dark:bg-popover-main shadow-2xl">
+        <DialogContent 
+          className="max-w-md rounded-2xl border border-border/50 bg-white/95 dark:bg-popover-main shadow-2xl !data-[state=closed]:animate-none !data-[state=closed]:fade-out-0 !data-[state=closed]:zoom-out-100 !duration-0"
+          showCloseButton={false}
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <div className="space-y-6 p-2">
             <DialogHeader className="space-y-2">
               <DialogTitle className="text-2xl font-bold text-foreground dark:text-popover-text">
@@ -140,7 +145,12 @@ export function MfaDisableDialog({
         open={isDialogOpen} 
         onOpenChange={handleDialogOpenChange}
       >
-        <DialogContent className="max-w-md rounded-2xl border border-border/50 bg-white/95 dark:bg-popover-main shadow-2xl">
+        <DialogContent 
+          className="max-w-md rounded-2xl border border-border/50 bg-white/95 dark:bg-popover-main shadow-2xl !data-[state=closed]:animate-none !data-[state=closed]:fade-out-0 !data-[state=closed]:zoom-out-100 !duration-0"
+          showCloseButton={false}
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <div className="space-y-6 p-2">
             <DialogHeader className="space-y-2">
               <DialogTitle className="text-2xl font-bold text-foreground dark:text-popover-text">
@@ -157,11 +167,12 @@ export function MfaDisableDialog({
                   <SettingsInput
                     type="text"
                     value={deleteMfaStepUpCode}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setDeleteMfaStepUpCode(
                         e.target.value.replace(/\D/g, "").slice(0, 6),
-                      )
-                    }
+                      );
+                      setDeleteMfaStepUpError(null);
+                    }}
                     width="w-full"
                     placeholder="123456"
                     error={!!deleteMfaStepUpError}

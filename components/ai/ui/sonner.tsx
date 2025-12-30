@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
+import { cn } from "@/lib/utils"
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme()
@@ -16,7 +17,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
-      className="toaster group"
+      className={cn(
+        "toaster group [&_.sonner-toast]:bg-popover-main [&_.sonner-toast]:backdrop-blur-sm [&_.sonner-toast]:text-popover-text [&_.sonner-toast]:border-border/30 [&_.sonner-toast]:rounded-xl [&_.sonner-toast]:border"
+      )}
       icons={{
         success: <CircleCheckIcon className="size-4" />,
         info: <InfoIcon className="size-4" />,
@@ -26,10 +29,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }}
       style={
         {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
+          "--normal-bg": "var(--popover-main)",
+          "--normal-text": "var(--popover-text)",
           "--normal-border": "var(--border)",
-          "--border-radius": "var(--radius)",
+          "--border-radius": "calc(var(--radius) + 4px)",
         } as React.CSSProperties
       }
       {...props}

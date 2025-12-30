@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ai/ui/button";
 import { 
   Dialog, 
@@ -9,12 +10,28 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from "../ai/ui/dialog";
-import { User, Users, Share2, MessageSquarePlus, PlusIcon } from "lucide-react";
+import { MessageSquarePlus, PlusIcon } from "lucide-react";
 import { InstructionForm } from "./InstructionForm";
 import { InstructionCard } from "./InstructionCard";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
 import { useConvexAuth } from "convex/react";
 import { SettingsSection, SettingsDivider } from "@/components/settings";
+
+type InstructionItem = {
+  _id: Id<"customInstructions">;
+  _creationTime: number;
+  title: string;
+  description: string;
+  icon: string;
+  iconColor?: string;
+  instructions: string;
+  ownerId: string;
+  orgId?: string;
+  isSharedWithOrg: boolean;
+  createdAt: number;
+  updatedAt: number;
+  ownerName: string;
+};
 
 export function InstructionManager() {
   const { user } = useAuth();
@@ -45,7 +62,7 @@ export function InstructionManager() {
   };
 
   const InstructionGrid = ({ items, emptyMessage }: { 
-    items: any[], 
+    items: InstructionItem[], 
     emptyMessage: string 
   }) => (
     <div className="grid gap-3 md:grid-cols-1 lg:grid-cols-2 items-stretch">

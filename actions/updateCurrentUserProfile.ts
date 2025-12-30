@@ -196,7 +196,7 @@ export async function updateCurrentUserProfile(
 
         return yield* Effect.fail(
           new RateLimitError({
-            message: errorMessage!,
+            message: errorMessage ?? "No se pudo actualizar el perfil. Por favor intenta de nuevo más tarde.",
             retryAfter: rateLimitResult.retryAfter,
           })
         );

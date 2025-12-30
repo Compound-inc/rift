@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import { Button } from "@/components/ai/ui/button";
 import { SettingRow, SettingsInput } from "@/components/settings";
 import {
@@ -11,15 +11,30 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ai/ui/dialog";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Check, X, Shield, ShieldCheck, ShieldAlert } from "lucide-react";
 import { changeCurrentUserPassword } from "@/actions/settings/security/changeCurrentUserPassword";
 import { setCurrentUserPassword } from "@/actions/settings/security/setCurrentUserPassword";
 import { sendSecurityEmailVerification } from "@/actions/settings/security/sendSecurityEmailVerification";
 import { confirmSecurityEmailVerification } from "@/actions/settings/security/confirmSecurityEmailVerification";
+import { validatePassword, PASSWORD_REQUIREMENTS } from "@/lib/password-validation";
+import { cn } from "@/lib/utils";
 
 interface PasswordChangeDialogProps {
   hasPassword: boolean;
   isPending: boolean;
+}
+
+function PasswordRequirement({ label, met, show }: { label: string; met: boolean; show: boolean }) {
+  if (!show) return null;
+  return (
+    <div className={cn(
+      "flex items-center gap-2 text-xs transition-colors duration-200",
+      met ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+    )}>
+      {met ? <Check className="h-3 w-3" /> : <div className="h-3 w-3 rounded-full border border-current opacity-50" />}
+      <span>{label}</span>
+    </div>
+  );
 }
 
 export function PasswordChangeDialog({ hasPassword, isPending: parentIsPending }: PasswordChangeDialogProps) {
@@ -37,18 +52,26 @@ export function PasswordChangeDialog({ hasPassword, isPending: parentIsPending }
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [hasTriedSubmit, setHasTriedSubmit] = useState(false);
+
+  const validation = useMemo(() => validatePassword(newPassword), [newPassword]);
+  const isPasswordValid = validation.isValid;
+  const isConfirmValid = newPassword === confirmPassword && newPassword !== "";
 
   const onChangePassword = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    setHasTriedSubmit(true);
     startTransition(async () => {
       setPasswordError(null);
       setPasswordSuccess(false);
-      if (newPassword !== confirmPassword) {
-        setPasswordError("Las contraseñas no coinciden.");
+      
+      if (!isPasswordValid) {
+        setPasswordError(validation.error || "La contraseña no cumple con los requisitos.");
         return;
       }
-      if (newPassword.length < 12) {
-        setPasswordError("La nueva contraseña debe tener al menos 12 caracteres.");
+
+      if (newPassword !== confirmPassword) {
+        setPasswordError("Las contraseñas no coinciden.");
         return;
       }
 
@@ -80,6 +103,30 @@ export function PasswordChangeDialog({ hasPassword, isPending: parentIsPending }
     });
   };
 
+  const strengthColor = useMemo(() => {
+    if (newPassword === "") return "bg-gray-200 dark:bg-gray-800";
+    switch (validation.score) {
+      case 0: return "bg-destructive";
+      case 1: return "bg-orange-500";
+      case 2: return "bg-yellow-500";
+      case 3: return "bg-lime-500";
+      case 4: return "bg-green-500";
+      default: return "bg-gray-200 dark:bg-gray-800";
+    }
+  }, [newPassword, validation.score]);
+
+  const strengthText = useMemo(() => {
+    if (newPassword === "") return "";
+    switch (validation.score) {
+      case 0: return "Muy débil";
+      case 1: return "Débil";
+      case 2: return "Regular";
+      case 3: return "Fuerte";
+      case 4: return "Muy fuerte";
+      default: return "";
+    }
+  }, [newPassword, validation.score]);
+
   const beginPasswordStepUp = () =>
     startTransition(async () => {
       setPasswordStepUpError(null);
@@ -110,6 +157,26 @@ export function PasswordChangeDialog({ hasPassword, isPending: parentIsPending }
     beginPasswordStepUp();
   };
 
+  const clearPasswordDialogState = () => {
+    setPasswordStepUpCode("");
+    setPasswordStepUpError(null);
+    setPasswordStepUpVerified(false);
+    setPasswordError(null);
+    setPasswordSuccess(false);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setShowCurrentPassword(false);
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+    setHasTriedSubmit(false);
+  };
+
+  const handleClosePasswordDialog = () => {
+    clearPasswordDialogState();
+    setIsPasswordDialogOpen(false);
+  };
+
   const isLoading = isPending || parentIsPending;
 
   return (
@@ -124,7 +191,12 @@ export function PasswordChangeDialog({ hasPassword, isPending: parentIsPending }
             {hasPassword ? "Cambiar contraseña" : "Crear contraseña"}
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-w-md rounded-2xl border border-border/50 bg-white/95 dark:bg-popover-main shadow-2xl">
+        <DialogContent 
+          className="max-w-md rounded-2xl border border-border/50 bg-white/95 dark:bg-popover-main shadow-2xl !data-[state=closed]:animate-none !data-[state=closed]:fade-out-0 !data-[state=closed]:zoom-out-100 !duration-0"
+          showCloseButton={false}
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <div className="space-y-6 p-2">
             <DialogHeader className="space-y-2">
               <DialogTitle className="text-2xl font-bold text-foreground dark:text-popover-text">
@@ -168,23 +240,19 @@ export function PasswordChangeDialog({ hasPassword, isPending: parentIsPending }
         onOpenChange={(open) => {
           setIsPasswordDialogOpen(open);
           if (!open) {
-            setPasswordStepUpCode("");
-            setPasswordStepUpError(null);
-            setPasswordStepUpVerified(false);
-            setPasswordError(null);
-            setPasswordSuccess(false);
-            setCurrentPassword("");
-            setNewPassword("");
-            setConfirmPassword("");
-            setShowCurrentPassword(false);
-            setShowNewPassword(false);
-            setShowConfirmPassword(false);
+            clearPasswordDialogState();
           }
         }}
       >
-        <DialogContent className="max-w-md rounded-2xl border border-border/50 bg-white/95 dark:bg-popover-main shadow-2xl" style={{ boxSizing: 'content-box' }}>
+        <DialogContent 
+          className="max-w-md rounded-2xl border border-border/50 bg-white/95 dark:bg-popover-main shadow-2xl !data-[state=closed]:animate-none !data-[state=closed]:fade-out-0 !data-[state=closed]:zoom-out-100 !duration-0" 
+          style={{ boxSizing: 'content-box' }}
+          showCloseButton={false}
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           {passwordSuccess ? (
-            <div className="flex flex-col items-center justify-center py-10 px-4 space-y-6 text-center animate-in fade-in zoom-in-95 duration-300">
+            <div className="flex flex-col items-center justify-center py-10 px-4 space-y-6 text-center">
               <div className="rounded-full bg-green-100 p-3 dark:bg-green-900/30">
                 <svg
                   className="size-12 text-green-600 dark:text-green-400"
@@ -210,17 +278,7 @@ export function PasswordChangeDialog({ hasPassword, isPending: parentIsPending }
               </div>
               <div className="flex items-center gap-4 pt-4">
                 <Button
-                  onClick={() => {
-                    setIsPasswordDialogOpen(false);
-                    setPasswordSuccess(false);
-                    setCurrentPassword("");
-                    setNewPassword("");
-                    setConfirmPassword("");
-                    setShowCurrentPassword(false);
-                    setShowNewPassword(false);
-                    setShowConfirmPassword(false);
-                    setPasswordError(null);
-                  }}
+                  onClick={handleClosePasswordDialog}
                   className="cursor-pointer rounded-lg font-medium min-w-[100px]"
                   variant="accent"
                 >
@@ -253,11 +311,12 @@ export function PasswordChangeDialog({ hasPassword, isPending: parentIsPending }
                     <SettingsInput
                       type="text"
                       value={passwordStepUpCode}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setPasswordStepUpCode(
                           e.target.value.replace(/\D/g, "").slice(0, 6),
-                        )
-                      }
+                        );
+                        setPasswordStepUpError(null);
+                      }}
                       width="w-full"
                       placeholder="123456"
                       error={!!passwordStepUpError}
@@ -275,7 +334,7 @@ export function PasswordChangeDialog({ hasPassword, isPending: parentIsPending }
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => setIsPasswordDialogOpen(false)}
+                        onClick={handleClosePasswordDialog}
                         disabled={isLoading}
                         className="cursor-pointer rounded-lg font-medium mr-2"
                       >
@@ -309,7 +368,10 @@ export function PasswordChangeDialog({ hasPassword, isPending: parentIsPending }
                         <SettingsInput
                           type={showCurrentPassword ? "text" : "password"}
                           value={currentPassword}
-                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          onChange={(e) => {
+                            setCurrentPassword(e.target.value);
+                            setPasswordError(null);
+                          }}
                           autoComplete="current-password"
                           width="w-full"
                           className="pr-10"
@@ -330,40 +392,90 @@ export function PasswordChangeDialog({ hasPassword, isPending: parentIsPending }
                     </SettingRow>
                   )}
 
-                  <SettingRow label="Nueva contraseña">
-                    <div className="relative w-full">
-                      <SettingsInput
-                        type={showNewPassword ? "text" : "password"}
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        autoComplete="new-password"
-                        width="w-full"
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowNewPassword(!showNewPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-text-muted dark:hover:text-white transition-colors"
-                        aria-label={showNewPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                      >
-                        {showNewPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
+                  <div className="space-y-2">
+                    <SettingRow label="Nueva contraseña">
+                      <div className="relative w-full">
+                        <SettingsInput
+                          type={showNewPassword ? "text" : "password"}
+                          value={newPassword}
+                          onChange={(e) => {
+                            setNewPassword(e.target.value);
+                            setPasswordError(null);
+                          }}
+                          autoComplete="new-password"
+                          width="w-full"
+                          className="pr-10"
+                          error={hasTriedSubmit && !isPasswordValid}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-text-muted dark:hover:text-white transition-colors"
+                          aria-label={showNewPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        >
+                          {showNewPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                    </SettingRow>
+
+                    <div className="space-y-3 px-1">
+                      <div className="flex items-center justify-between gap-3 min-h-[14px]">
+                        <div className="flex flex-1 h-1.5 gap-1">
+                          {[0, 1, 2, 3].map((i) => (
+                            <div
+                              key={i}
+                              className={cn(
+                                "h-full flex-1 rounded-full transition-all duration-300",
+                                newPassword !== "" && i < validation.score + 1 ? strengthColor : "bg-gray-200 dark:bg-gray-800"
+                              )}
+                            />
+                          ))}
+                        </div>
+                        <span className={cn(
+                          "text-[10px] font-bold uppercase w-[85px] text-right shrink-0 h-[14px] flex items-center justify-end",
+                          newPassword !== "" ? strengthColor.replace('bg-', 'text-') : "text-muted-foreground"
+                        )}>
+                          {strengthText || "\u00A0"}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 gap-1.5">
+                        <PasswordRequirement 
+                          label={`Mínimo ${PASSWORD_REQUIREMENTS.minLength} caracteres`} 
+                          met={validation.requirements.length} 
+                          show={true} 
+                        />
+                        <PasswordRequirement 
+                          label="Al menos un carácter especial" 
+                          met={validation.requirements.specialChar} 
+                          show={true} 
+                        />
+                        <PasswordRequirement 
+                          label="Contraseña segura" 
+                          met={validation.requirements.strength} 
+                          show={true} 
+                        />
+                      </div>
                     </div>
-                  </SettingRow>
+                  </div>
 
                   <SettingRow label="Confirmar nueva contraseña">
                     <div className="relative w-full">
                       <SettingsInput
                         type={showConfirmPassword ? "text" : "password"}
                         value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        onChange={(e) => {
+                          setConfirmPassword(e.target.value);
+                          setPasswordError(null);
+                        }}
                         autoComplete="new-password"
                         width="w-full"
                         className="pr-10"
+                        error={hasTriedSubmit && !isConfirmValid}
                       />
                       <button
                         type="button"
@@ -381,20 +493,8 @@ export function PasswordChangeDialog({ hasPassword, isPending: parentIsPending }
                   </SettingRow>
 
                 {passwordError && (
-                  <div className="flex items-center gap-2 text-sm text-destructive">
-                    <svg
-                      className="size-4 shrink-0"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                      />
-                    </svg>
+                  <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/5 p-2.5 rounded-lg border border-destructive/20 animate-in fade-in slide-in-from-top-1">
+                    <ShieldAlert className="size-4 shrink-0" />
                     <span>{passwordError}</span>
                   </div>
                 )}
@@ -404,9 +504,7 @@ export function PasswordChangeDialog({ hasPassword, isPending: parentIsPending }
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => {
-                        setIsPasswordDialogOpen(false);
-                      }}
+                      onClick={handleClosePasswordDialog}
                       disabled={isLoading}
                       className="cursor-pointer rounded-lg font-medium mr-2"
                     >
@@ -414,7 +512,7 @@ export function PasswordChangeDialog({ hasPassword, isPending: parentIsPending }
                     </Button>
                     <Button
                       type="submit"
-                      disabled={isLoading}
+                      disabled={isLoading || !isPasswordValid || !isConfirmValid}
                       className="cursor-pointer rounded-lg font-medium gap-2 min-w-[150px]"
                       variant="accent"
                     >
