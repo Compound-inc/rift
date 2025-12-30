@@ -3,9 +3,11 @@ import { Effect, Data, Schedule, Duration } from "effect";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { fetchMutation } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
-import { S3Client } from "bun";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { logAttachmentUploaded } from "@/actions/audit";
 import { checkRateLimit, getRateLimitErrorMessage } from "@/lib/rate-limit";
+
+export const runtime = "nodejs";
 export const maxDuration = 30;
 
 // ============================================================================
@@ -75,15 +77,24 @@ type UploadError =
   | RateLimitError;
 
 // ============================================================================
-// R2 Client
+// R2 Client (lazy initialization)
 // ============================================================================
 
-const r2Client = new S3Client({
-  accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-  secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-  bucket: process.env.R2_BUCKET_NAME!,
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-});
+let _r2Client: S3Client | null = null;
+
+const getR2Client = (): S3Client => {
+  if (!_r2Client) {
+    _r2Client = new S3Client({
+      region: "auto",
+      endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+      },
+    });
+  }
+  return _r2Client;
+};
 
 // ============================================================================
 // Retry Schedules
@@ -217,19 +228,28 @@ const uploadToR2 = (
   logContext: LogContext
 ): Effect.Effect<string, StorageError> =>
   Effect.gen(function* () {
-    const s3file = r2Client.file(fileKey);
+    const arrayBuffer = yield* Effect.tryPromise({
+      try: () => file.arrayBuffer(),
+      catch: (error) =>
+        new StorageError({ message: "Failed to read file data", cause: error }),
+    });
+
+    const uploadCommand = new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME!,
+      Key: fileKey,
+      Body: Buffer.from(arrayBuffer),
+      ContentType: file.type,
+      ContentDisposition: `inline; filename="${file.name}"`,
+    });
 
     yield* Effect.tryPromise({
-      try: () =>
-        s3file.write(file, {
-          type: file.type,
-        }),
+      try: () => getR2Client().send(uploadCommand),
       catch: (error) =>
         new StorageError({ message: "No se pudo guardar el archivo. Por favor intenta de nuevo. Si el problema persiste, contacta con soporte.", cause: error }),
     }).pipe(
       Effect.retry(storageRetrySchedule),
       Effect.tapError((error) =>
-        Effect.sync(() => logger.error("R2 upload failed", logContext, error))
+        Effect.sync(() => logger.error("DB upload failed", logContext, error))
       )
     );
 
