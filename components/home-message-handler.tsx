@@ -26,31 +26,6 @@ export function HomeMessageHandler({ action }: HomeMessageHandlerProps) {
   const { isAuthenticated } = useConvexAuth();
   const customInstructionId = useChatUIStore((s) => s.customInstructionId);
 
-  // Retry helper with exponential backoff for transient auth failures
-  const retryWithBackoff = async <T,>(
-    fn: () => Promise<T>,
-    maxRetries = 3
-  ): Promise<T> => {
-    for (let i = 0; i < maxRetries; i++) {
-      try {
-        return await fn();
-      } catch (error: any) {
-        const isAuthError = error?.message?.includes("Unauthenticated") || 
-                           error?.message?.includes("user must be logged in");
-        
-        // Only retry on auth errors, and not on the last attempt
-        if (!isAuthError || i === maxRetries - 1) {
-          throw error;
-        }
-        
-        // Exponential backoff: 100ms, 300ms, 900ms
-        const delay = Math.pow(3, i) * 100;
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-    throw new Error("Max retries exceeded");
-  };
-
   const handleInitialMessage = async (message: UIMessage) => {
     const newThreadId = generateUUID();
 
@@ -63,17 +38,15 @@ export function HomeMessageHandler({ action }: HomeMessageHandlerProps) {
       if (!isAuthenticated) {
         toast.error("Por favor inicia sesión para crear un chat.");
         console.error("User not authenticated when creating thread");
-        return;
+        throw new Error("User not authenticated when creating thread");
       }
 
-      // Create the thread with retry logic for transient auth failures during token refresh
-      await retryWithBackoff(() =>
-        createThread({
-          threadId: newThreadId,
-          model: selectedModel,
-          customInstructionId: customInstructionId,
-        })
-      );
+      // Create the thread
+      await createThread({
+        threadId: newThreadId,
+        model: selectedModel,
+        customInstructionId: customInstructionId,
+      });
 
       try {
         const hasAttachment = Boolean(
@@ -113,8 +86,8 @@ export function HomeMessageHandler({ action }: HomeMessageHandlerProps) {
       } else {
         toast.error("Error al crear el chat. Por favor intenta nuevamente.");
       }
-      
-      return;
+
+      throw error instanceof Error ? error : new Error(String(error));
     }
   };
 

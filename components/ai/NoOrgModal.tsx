@@ -102,8 +102,24 @@ export function NoOrgModal() {
 
         if (data.success && data.organizationId) {
             await switchToOrganization(data.organizationId);
-            // Wait a moment for state to propagate or refresh
-            router.refresh();
+            // Force an AuthKit refresh so cookies/JWT include the new org context,
+            try {
+                await fetch("/api/auth/refresh", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    credentials: "include",
+                    body: JSON.stringify({ organizationId: data.organizationId }),
+                });
+            } catch {
+            }
+
+            if (typeof window !== "undefined") {
+                window.location.reload();
+            } else {
+                router.refresh();
+            }
         } else {
             setError(data.error || "Error desconocido al crear la organización");
             setLoading(false);
