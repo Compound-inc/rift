@@ -117,7 +117,7 @@ export function CachedChatWrapper({ threadId, customInstructionId }: CachedChatW
       try {
         const result = await convex.query(api.threads.getThreadMessagesPaginatedSafe, {
           threadId,
-          paginationOpts: { numItems: 50, cursor: null },
+          paginationOpts: { numItems: 5, cursor: null },
         });
         
         if (cancelled) return;

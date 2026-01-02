@@ -136,6 +136,37 @@ function ChatInterfaceInternal({
   // Server messages come from CachedChatWrapper's one-off fetch (no subscription needed)
   const historicalMessagesFromServer = serverMessages ?? [];
 
+  /**
+   * If Convex only returns the most recent N messages (e.g. 5),
+   * the local hook store may still contain older cached messages.
+   *
+   * Those older messages must NOT be treated as "new" relative to the server base,
+   * otherwise they get appended after the server messages and scramble the history.
+   *
+   * We only consider hook messages AFTER the last server/base message as new.
+   */
+  const sliceHookMessagesAfterBaseTail = useCallback(
+    (base: UIMessage[], hookMessages: UIMessage[]) => {
+      if (!base || base.length === 0) return hookMessages;
+      if (!hookMessages || hookMessages.length === 0) return [];
+
+      const lastBaseId = base[base.length - 1]?.id;
+      if (!lastBaseId) return hookMessages;
+
+      // Find the last occurrence of the base tail in the hook list
+      let lastIdx = -1;
+      for (let i = hookMessages.length - 1; i >= 0; i--) {
+        if (hookMessages[i]?.id === lastBaseId) {
+          lastIdx = i;
+          break;
+        }
+      }
+      if (lastIdx === -1) return hookMessages;
+      return hookMessages.slice(lastIdx + 1);
+    },
+    [],
+  );
+
   // Prefer cache until server has loaded
   const historicalMessages: UIMessage[] = useMemo(() => {
     if (!isThread) return [];
@@ -242,7 +273,8 @@ function ChatInterfaceInternal({
 
           // Use server versions for existing messages, hook only for new messages
           const serverIds = new Set(base.map((m: UIMessage) => m.id));
-          const newMessagesFromHook = hookMessages.filter((m: UIMessage) => !serverIds.has(m.id));
+          const hookAfterBase = sliceHookMessagesAfterBaseTail(base, hookMessages);
+          const newMessagesFromHook = hookAfterBase.filter((m: UIMessage) => !serverIds.has(m.id));
           const requestMessages = [...base, ...newMessagesFromHook];
 
           const currentCustomInstructionId = useChatUIStore.getState().customInstructionId;
@@ -324,7 +356,8 @@ function ChatInterfaceInternal({
       if (historicalMessagesFromServer.length > 0) {
         // Use server versions for existing messages, hook only for new messages (includes streaming)
         const serverIds = new Set(historicalMessagesFromServer.map((m: UIMessage) => m.id));
-        const newMessagesFromHook = messages.filter((m: UIMessage) => !serverIds.has(m.id));
+        const hookAfterServer = sliceHookMessagesAfterBaseTail(historicalMessagesFromServer, messages);
+        const newMessagesFromHook = hookAfterServer.filter((m: UIMessage) => !serverIds.has(m.id));
         return [...historicalMessagesFromServer, ...newMessagesFromHook];
       }
       return messages;
@@ -336,7 +369,8 @@ function ChatInterfaceInternal({
         // Use server versions for existing messages (source of truth)
         // Only use hook for NEW messages not in server (user's new message, AI response)
         const serverIds = new Set(historicalMessagesFromServer.map((m: UIMessage) => m.id));
-        const newMessagesFromHook = messages.filter((m: UIMessage) => !serverIds.has(m.id));
+        const hookAfterServer = sliceHookMessagesAfterBaseTail(historicalMessagesFromServer, messages);
+        const newMessagesFromHook = hookAfterServer.filter((m: UIMessage) => !serverIds.has(m.id));
         return [...historicalMessagesFromServer, ...newMessagesFromHook];
       }
       // No server data but we have hook messages - use them (preserves AI response)
@@ -354,7 +388,15 @@ function ChatInterfaceInternal({
     }
 
     return historicalMessages;
-  }, [isThread, historicalMessages, historicalMessagesFromServer, messages, initialMessages, isActivelyGenerating]);
+  }, [
+    isThread,
+    historicalMessages,
+    historicalMessagesFromServer,
+    messages,
+    initialMessages,
+    isActivelyGenerating,
+    sliceHookMessagesAfterBaseTail,
+  ]);
 
   const lastNonEmptyRenderRef = useRef<UIMessage[]>([]);
   useEffect(() => {
