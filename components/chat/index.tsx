@@ -11,7 +11,7 @@ import { useRegeneration } from "./hooks/use-regeneration";
 import { ToolType, getDefaultTools } from "@/lib/ai/model-tools";
 import { resolveModel } from "@/lib/ai/ai-providers";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
-import { useConvexAuth, useMutation } from "convex/react";
+import { useConvex, useConvexAuth, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Loader } from "@/components/ai/loader";
 import { AttachmentsIcon } from "@/components/ui/icons/svg-icons";
@@ -42,18 +42,26 @@ import {
 } from "./services";
 import { uploadWithStateEffect } from "./services/upload-service";
 import { getErrorMessage } from "./errors";
+import { transformConvexMessages } from "./utils/transformConvexMessages";
+
+const HISTORY_PAGE_SIZE = 20;
+const HISTORY_ROOT_MARGIN = "200px 0px 0px 0px";
+const AUTOFILL_VIEWPORT_THRESHOLD_PX = 32;
+const AUTOFILL_MAX_PAGES_PER_THREAD = 10;
 
 function ChatInterfaceInternal({
   id,
   initialMessages,
   serverMessages,
-  hasMoreMessages = false,
+  initialHistoryCursor,
+  initialHistoryIsDone,
   disableInput = false,
   onInitialMessage,
   customInstructionId: initialCustomInstructionId,
 }: ChatInterfaceProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const convex = useConvex();
 
   const {
     scrollRef,
@@ -132,9 +140,29 @@ function ChatInterfaceInternal({
   }, [selectedModel, setIsSearchEnabled]);
 
   const isThread = id !== "welcome";
+  const activeThreadIdRef = useRef(id);
+  useEffect(() => {
+    activeThreadIdRef.current = id;
+  }, [id]);
 
   // Server messages come from CachedChatWrapper's one-off fetch (no subscription needed)
   const historicalMessagesFromServer = serverMessages ?? [];
+
+  const topSentinelRef = useRef<HTMLDivElement | null>(null);
+  const requestInFlightRef = useRef(false);
+  const autoFillAttemptsRef = useRef(0);
+
+  const [olderEphemeralMessages, setOlderEphemeralMessages] = useState<UIMessage[]>([]);
+  const [historyCursor, setHistoryCursor] = useState<string | null>(
+    initialHistoryCursor ?? null,
+  );
+  const [historyIsDone, setHistoryIsDone] = useState<boolean>(
+    initialHistoryIsDone ?? true,
+  );
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+  const pendingPrependScrollRef = useRef<null | { scrollTop: number; scrollHeight: number }>(
+    null,
+  );
 
   /**
    * If Convex only returns the most recent N messages (e.g. 5),
@@ -176,13 +204,178 @@ function ChatInterfaceInternal({
     return initialMessages ?? [];
   }, [isThread, historicalMessagesFromServer, initialMessages]);
 
+  // Combine ephemeral older pages (never cached) + base persisted history for UI + AI context.
+  const baseHistory: UIMessage[] = useMemo(() => {
+    if (!isThread) return [];
+    if (!olderEphemeralMessages || olderEphemeralMessages.length === 0) {
+      return historicalMessages;
+    }
+    return [...olderEphemeralMessages, ...historicalMessages];
+  }, [isThread, olderEphemeralMessages, historicalMessages]);
+
   // Keep ref in sync for use in closures (prepareSendMessagesRequest)
   useEffect(() => {
-    // Prefer server data, fall back to cache
-    historicalMessagesRef.current = historicalMessagesFromServer.length > 0 
-      ? historicalMessagesFromServer 
-      : (initialMessages ?? []);
-  }, [historicalMessagesFromServer, initialMessages]);
+    historicalMessagesRef.current = baseHistory;
+  }, [baseHistory]);
+
+  // Reset per-thread ephemeral pagination state; also keep cursor/isDone in sync with late-arriving server props.
+  useEffect(() => {
+    autoFillAttemptsRef.current = 0;
+    setOlderEphemeralMessages([]);
+    setHistoryCursor(initialHistoryCursor ?? null);
+    setHistoryIsDone(initialHistoryIsDone ?? true);
+  }, [id]);
+
+  useEffect(() => {
+    if (!isThread) return;
+    if (olderEphemeralMessages.length > 0) return;
+    setHistoryCursor(initialHistoryCursor ?? null);
+    setHistoryIsDone(initialHistoryIsDone ?? true);
+  }, [isThread, initialHistoryCursor, initialHistoryIsDone, olderEphemeralMessages.length]);
+
+  const loadOlderPage = useCallback(
+    async ({ preserveScroll }: { preserveScroll: boolean }) => {
+      if (!isThread) return;
+      if (historyIsDone) return;
+      if (requestInFlightRef.current) return;
+
+      const cursor = historyCursor && historyCursor.length > 0 ? historyCursor : null;
+      if (!cursor) {
+        setHistoryIsDone(true);
+        return;
+      }
+
+      const requestThreadId = id;
+      requestInFlightRef.current = true;
+      setIsLoadingOlder(true);
+
+      try {
+        if (preserveScroll) {
+          const el = scrollRef.current;
+          if (el) {
+            pendingPrependScrollRef.current = {
+              scrollTop: el.scrollTop,
+              scrollHeight: el.scrollHeight,
+            };
+          }
+        } else {
+          pendingPrependScrollRef.current = null;
+        }
+
+        const result = await convex.query(api.threads.getThreadMessagesPaginatedSafe, {
+          threadId: id,
+          paginationOpts: { numItems: HISTORY_PAGE_SIZE, cursor },
+        });
+
+        // Ignore late results if user navigated to a different thread mid-request.
+        if (activeThreadIdRef.current !== requestThreadId) {
+          pendingPrependScrollRef.current = null;
+          return;
+        }
+
+        const nextCursor =
+          typeof result.continueCursor === "string" && result.continueCursor.length > 0
+            ? result.continueCursor
+            : null;
+        const done = !!result.isDone || nextCursor === null;
+        setHistoryCursor(nextCursor);
+        setHistoryIsDone(done);
+
+        const page = result.page ?? [];
+        if (!page || page.length === 0) {
+          pendingPrependScrollRef.current = null;
+          return;
+        }
+
+        const transformed = transformConvexMessages(page);
+
+        // Dedupe against existing ephemeral + current persisted base history.
+        const baseIds = new Set(historicalMessages.map((m) => m.id));
+
+        setOlderEphemeralMessages((prev) => {
+          const seen = new Set<string>([...baseIds, ...prev.map((m) => m.id)]);
+          const newUnique = transformed.filter((m) => !seen.has(m.id));
+          if (newUnique.length === 0) {
+            pendingPrependScrollRef.current = null;
+            return prev;
+          }
+          return [...newUnique, ...prev];
+        });
+      } catch (error) {
+        console.error("Failed to load older messages:", error);
+      } finally {
+        requestInFlightRef.current = false;
+        setIsLoadingOlder(false);
+      }
+    },
+    [convex, historyCursor, historyIsDone, historicalMessages, id, isThread, scrollRef],
+  );
+
+  useEffect(() => {
+    const container = scrollRef.current;
+    const sentinel = topSentinelRef.current;
+    if (!container || !sentinel) return;
+    if (!isThread) return;
+    if (historyIsDone) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          void loadOlderPage({ preserveScroll: !isAtBottom });
+        }
+      },
+      {
+        root: container,
+        rootMargin: HISTORY_ROOT_MARGIN,
+        threshold: 0,
+      },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [historyIsDone, isAtBottom, isThread, loadOlderPage, scrollRef]);
+
+  // Auto-fill: if content doesn't overflow, keep loading older pages (bounded) so users can scroll.
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    if (!isThread) return;
+    if (historyIsDone) return;
+    if (requestInFlightRef.current || isLoadingOlder) return;
+    if (autoFillAttemptsRef.current >= AUTOFILL_MAX_PAGES_PER_THREAD) return;
+
+    if (container.scrollHeight <= container.clientHeight + AUTOFILL_VIEWPORT_THRESHOLD_PX) {
+      autoFillAttemptsRef.current += 1;
+      void loadOlderPage({ preserveScroll: false });
+    }
+  }, [
+    baseHistory.length,
+    historyIsDone,
+    isLoadingOlder,
+    isThread,
+    loadOlderPage,
+    scrollRef,
+  ]);
+
+  useLayoutEffect(() => {
+    const pending = pendingPrependScrollRef.current;
+    if (!pending) return;
+
+    const el = scrollRef.current;
+    if (!el) {
+      pendingPrependScrollRef.current = null;
+      return;
+    }
+
+    const nextScrollHeight = el.scrollHeight;
+    const delta = nextScrollHeight - pending.scrollHeight;
+    if (delta !== 0) {
+      el.scrollTop = pending.scrollTop + delta;
+    }
+
+    pendingPrependScrollRef.current = null;
+  }, [olderEphemeralMessages.length, scrollRef]);
 
   const chatStateInstance = useChatStateInstance();
 
@@ -353,45 +546,38 @@ function ChatInterfaceInternal({
 
     // During active generation, use server for history + hook for new/streaming messages
     if (isActivelyGenerating && messages.length > 0) {
-      if (historicalMessagesFromServer.length > 0) {
-        // Use server versions for existing messages, hook only for new messages (includes streaming)
-        const serverIds = new Set(historicalMessagesFromServer.map((m: UIMessage) => m.id));
-        const hookAfterServer = sliceHookMessagesAfterBaseTail(historicalMessagesFromServer, messages);
-        const newMessagesFromHook = hookAfterServer.filter((m: UIMessage) => !serverIds.has(m.id));
-        return [...historicalMessagesFromServer, ...newMessagesFromHook];
+      if (baseHistory.length > 0) {
+        // Use base history (ephemeral older + server/cache) for existing messages,
+        // hook only for new messages (includes streaming).
+        const baseIds = new Set(baseHistory.map((m: UIMessage) => m.id));
+        const hookAfterBase = sliceHookMessagesAfterBaseTail(baseHistory, messages);
+        const newMessagesFromHook = hookAfterBase.filter((m: UIMessage) => !baseIds.has(m.id));
+        return [...baseHistory, ...newMessagesFromHook];
       }
       return messages;
     }
 
     // After active session (user sent message/received stream), merge server + new hook messages
     if (hadActiveSessionRef.current && messages.length > 0) {
-      if (historicalMessagesFromServer.length > 0) {
-        // Use server versions for existing messages (source of truth)
-        // Only use hook for NEW messages not in server (user's new message, AI response)
-        const serverIds = new Set(historicalMessagesFromServer.map((m: UIMessage) => m.id));
-        const hookAfterServer = sliceHookMessagesAfterBaseTail(historicalMessagesFromServer, messages);
-        const newMessagesFromHook = hookAfterServer.filter((m: UIMessage) => !serverIds.has(m.id));
-        return [...historicalMessagesFromServer, ...newMessagesFromHook];
+      if (baseHistory.length > 0) {
+        // Use base versions for existing messages (source of truth),
+        // only use hook for NEW messages (user's new message, AI response).
+        const baseIds = new Set(baseHistory.map((m: UIMessage) => m.id));
+        const hookAfterBase = sliceHookMessagesAfterBaseTail(baseHistory, messages);
+        const newMessagesFromHook = hookAfterBase.filter((m: UIMessage) => !baseIds.has(m.id));
+        return [...baseHistory, ...newMessagesFromHook];
       }
       // No server data but we have hook messages - use them (preserves AI response)
       return messages;
     }
 
-    // Fresh navigation (no active session) - prefer server data for fresh content
-    if (historicalMessagesFromServer.length > 0) {
-      return historicalMessagesFromServer;
-    }
-
-    // Server not loaded yet - use cache for instant loading
-    if (initialMessages && initialMessages.length > 0) {
-      return initialMessages;
-    }
-
+    // Fresh navigation (no active session) - use base history (includes ephemeral older when present).
+    if (baseHistory.length > 0) return baseHistory;
     return historicalMessages;
   }, [
     isThread,
+    baseHistory,
     historicalMessages,
-    historicalMessagesFromServer,
     messages,
     initialMessages,
     isActivelyGenerating,
@@ -412,6 +598,10 @@ function ChatInterfaceInternal({
     }
     return renderedMessages;
   }, [renderedMessages, isThread]);
+
+  const olderEphemeralIdSet = useMemo(() => {
+    return new Set(olderEphemeralMessages.map((m) => m.id));
+  }, [olderEphemeralMessages]);
 
   // Track expected AI responses for layout shift prevention
   const expectedResponseCount = useMemo(() => {
@@ -492,11 +682,14 @@ function ChatInterfaceInternal({
     if (status === "streaming") return;
 
     const handle = setTimeout(() => {
-      void saveCachedThreadMessages(id, displayMessages);
+      // Do not persist older pages loaded via infinite scroll (ephemeral by design).
+      const persistable = displayMessages.filter((m) => !olderEphemeralIdSet.has(m.id));
+      if (persistable.length === 0) return;
+      void saveCachedThreadMessages(id, persistable);
     }, 750);
 
     return () => clearTimeout(handle);
-  }, [id, isThread, displayMessages, status]);
+  }, [id, isThread, displayMessages, status, olderEphemeralIdSet]);
 
   useEffect(() => {
     if (prevIdRef.current !== id) {
@@ -729,6 +922,16 @@ function ChatInterfaceInternal({
                 user={user} 
                 onSuggestionClick={handleSuggestionClick}
               />
+            )}
+            {isThread && (
+              <div className="-mt-2 pb-2">
+                <div ref={topSentinelRef} className="h-[1px] w-full" />
+                {isLoadingOlder && (
+                  <div className="flex items-center justify-center py-2">
+                    <span className="text-xs text-muted-foreground">Cargando mensajes anteriores…</span>
+                  </div>
+                )}
+              </div>
             )}
             <div
               className={shouldShowMessages ? "" : "opacity-0"}

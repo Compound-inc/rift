@@ -6,6 +6,7 @@ import * as Sentry from "@sentry/nextjs";
 import { useConvex } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import ChatInterface from "@/components/chat";
+import { transformConvexMessages } from "@/components/chat/utils/transformConvexMessages";
 import {
   loadCachedThreadMessages,
   getMemoryCachedThreadMessages,
@@ -15,33 +16,6 @@ import {
 interface CachedChatWrapperProps {
   threadId: string;
   customInstructionId?: string;
-}
-
-/**
- * Transform Convex messages to UIMessage format
- */
-function transformConvexMessages(messages: any[]): UIMessage[] {
-  return messages.slice().reverse().map((m: any) => ({
-    id: m.messageId,
-    role: m.role,
-    parts: [
-      ...(m.reasoning ? [{ type: "reasoning", text: m.reasoning }] : []),
-      ...(m.content ? [{ type: "text", text: m.content }] : []),
-      ...(m.attachments ? m.attachments.map((att: any) => ({
-        type: "file" as const,
-        mediaType: att.mimeType,
-        url: att.attachmentUrl,
-        attachmentId: att.attachmentId,
-        attachmentType: att.attachmentType,
-      })) : []),
-      ...(m.sources ? m.sources.map((source: any) => ({
-        type: "source-url" as const,
-        sourceId: source.sourceId,
-        url: source.url,
-        title: source.title,
-      })) : []),
-    ],
-  }));
 }
 
 /**
@@ -68,6 +42,8 @@ export function CachedChatWrapper({ threadId, customInstructionId }: CachedChatW
   // Server messages from one-off fetch
   const [serverMessages, setServerMessages] = useState<UIMessage[] | undefined>(undefined);
   const [serverFetchedThreadId, setServerFetchedThreadId] = useState<string | null>(null);
+  const [serverContinueCursor, setServerContinueCursor] = useState<string | null>(null);
+  const [serverIsDone, setServerIsDone] = useState<boolean>(true);
 
   // Load from IndexedDB if memory cache is empty
   useEffect(() => {
@@ -109,6 +85,8 @@ export function CachedChatWrapper({ threadId, customInstructionId }: CachedChatW
     // Reset server messages when thread changes
     if (serverFetchedThreadId !== null && serverFetchedThreadId !== threadId) {
       setServerMessages(undefined);
+      setServerContinueCursor(null);
+      setServerIsDone(true);
     }
     
     let cancelled = false;
@@ -117,11 +95,18 @@ export function CachedChatWrapper({ threadId, customInstructionId }: CachedChatW
       try {
         const result = await convex.query(api.threads.getThreadMessagesPaginatedSafe, {
           threadId,
-          paginationOpts: { numItems: 5, cursor: null },
+          paginationOpts: { numItems: 20, cursor: null },
         });
         
         if (cancelled) return;
         
+        const normalizedCursor =
+          typeof result.continueCursor === "string" && result.continueCursor.length > 0
+            ? result.continueCursor
+            : null;
+        setServerContinueCursor(normalizedCursor);
+        setServerIsDone(!!result.isDone || normalizedCursor === null);
+
         if (result.page && result.page.length > 0) {
           const messages = transformConvexMessages(result.page);
           setServerMessages(messages);
@@ -145,6 +130,8 @@ export function CachedChatWrapper({ threadId, customInstructionId }: CachedChatW
 
   // Only pass serverMessages if it's for the current thread
   const currentServerMessages = serverFetchedThreadId === threadId ? serverMessages : undefined;
+  const currentContinueCursor = serverFetchedThreadId === threadId ? serverContinueCursor : null;
+  const currentIsDone = serverFetchedThreadId === threadId ? serverIsDone : true;
 
   return (
     <ChatInterface
@@ -152,6 +139,8 @@ export function CachedChatWrapper({ threadId, customInstructionId }: CachedChatW
       id={threadId}
       initialMessages={initialMessages}
       serverMessages={currentServerMessages}
+      initialHistoryCursor={currentContinueCursor}
+      initialHistoryIsDone={currentIsDone}
       customInstructionId={customInstructionId}
     />
   );
