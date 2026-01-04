@@ -33,6 +33,37 @@ type InstructionItem = {
   ownerName: string;
 };
 
+function InstructionGrid({
+  items,
+  emptyMessage,
+  currentUserId,
+  onEdit,
+}: {
+  items: InstructionItem[];
+  emptyMessage: string;
+  currentUserId: string;
+  onEdit: (id: string) => void;
+}) {
+  return (
+    <div className="grid gap-3 md:grid-cols-1 lg:grid-cols-2 items-stretch">
+      {items.map((instruction) => (
+        <InstructionCard
+          key={instruction._id}
+          instruction={instruction}
+          currentUserId={currentUserId}
+          onEdit={() => onEdit(instruction._id)}
+        />
+      ))}
+      {items.length === 0 && (
+        <div className="col-span-full text-center py-10 px-4 text-sm text-muted-foreground border border-dashed rounded-3xl bg-muted/20">
+          <MessageSquarePlus className="h-8 w-8 mx-auto mb-3 opacity-20" />
+          {emptyMessage}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function InstructionManager() {
   const { user } = useAuth();
   const { isAuthenticated } = useConvexAuth();
@@ -60,28 +91,6 @@ export function InstructionManager() {
     setEditingId(id);
     setIsDialogOpen(true);
   };
-
-  const InstructionGrid = ({ items, emptyMessage }: { 
-    items: InstructionItem[], 
-    emptyMessage: string 
-  }) => (
-    <div className="grid gap-3 md:grid-cols-1 lg:grid-cols-2 items-stretch">
-      {items.map((instruction) => (
-        <InstructionCard
-          key={instruction._id}
-          instruction={instruction}
-          currentUserId={user.id}
-          onEdit={() => handleEdit(instruction._id)}
-        />
-      ))}
-      {items.length === 0 && (
-        <div className="col-span-full text-center py-10 px-4 text-sm text-muted-foreground border border-dashed rounded-3xl bg-muted/20">
-          <MessageSquarePlus className="h-8 w-8 mx-auto mb-3 opacity-20" />
-          {emptyMessage}
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <div className="space-y-6">
@@ -124,6 +133,8 @@ export function InstructionManager() {
           <InstructionGrid 
             items={myInstructions}
             emptyMessage="No has creado instrucciones todavía. Crea una para personalizar tus respuestas."
+            currentUserId={user.id}
+            onEdit={handleEdit}
           />
         </div>
       </SettingsSection>
@@ -137,6 +148,8 @@ export function InstructionManager() {
         <InstructionGrid 
           items={sharedWithMe}
           emptyMessage="Nadie ha compartido instrucciones directamente contigo aún."
+          currentUserId={user.id}
+          onEdit={handleEdit}
         />
       </SettingsSection>
 
@@ -149,6 +162,8 @@ export function InstructionManager() {
         <InstructionGrid 
           items={orgInstructions}
           emptyMessage="No hay instrucciones globales en tu organización actualmente."
+          currentUserId={user.id}
+          onEdit={handleEdit}
         />
       </SettingsSection>
     </div>

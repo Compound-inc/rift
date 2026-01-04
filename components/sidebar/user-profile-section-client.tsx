@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
+import { useIsClient } from "@/lib/hooks/useIsClient";
 import {
   getLastUserKey,
   loadSidebarProfile,
@@ -45,28 +46,25 @@ export function UserProfileSectionClient({ serverSkeleton }: UserProfileSectionC
     isAuthenticated ? {} : "skip",
   );
 
-  const [userKey, setUserKey] = useState<string | null>(() => getLastUserKey());
+  const isClient = useIsClient();
+  const [initialUserKey] = useState<string | null>(() => getLastUserKey());
+  const userKey = user?.workos_id ?? initialUserKey;
   const [cachedProfile, setCachedProfile] = useState<SidebarProfile | null>(null);
   const [cacheLoaded, setCacheLoaded] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     if (user?.workos_id) {
-      // If the real user differs from the optimistic cache key, drop optimistic data.
-      if (userKey && userKey !== user.workos_id) {
-        setCachedProfile(null);
-        setCacheLoaded(false);
-      }
-      setUserKey(user.workos_id);
       setLastUserKey(user.workos_id);
     }
-  }, [user?.workos_id, userKey]);
+  }, [user?.workos_id]);
 
   useEffect(() => {
     if (!userKey) return;
     let cancelled = false;
-    setCacheLoaded(false);
     void (async () => {
+      // Move state updates into the async task (avoids setState directly in effect body).
+      setCacheLoaded(false);
+      setCachedProfile(null);
       const cached = await loadSidebarProfile(userKey);
       if (cancelled) return;
       setCachedProfile(cached);
@@ -91,10 +89,6 @@ export function UserProfileSectionClient({ serverSkeleton }: UserProfileSectionC
     });
   }, [userKey, user, orgInfo?.plan]);
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
   const optimisticDisplayName = cachedProfile?.displayName;
   const optimisticAvatarUrl = cachedProfile?.profilePictureUrl;
   const optimisticPlan = cachedProfile?.plan;
@@ -104,7 +98,7 @@ export function UserProfileSectionClient({ serverSkeleton }: UserProfileSectionC
 
   // Show skeleton during SSR and initial load
   // On server and initial client render, show skeleton to match SSR
-  if (!isMounted) {
+  if (!isClient) {
     return <>{serverSkeleton || <ProfileSkeleton />}</>;
   }
   

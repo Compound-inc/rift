@@ -145,9 +145,6 @@ function ChatInterfaceInternal({
     activeThreadIdRef.current = id;
   }, [id]);
 
-  // Server messages come from CachedChatWrapper's one-off fetch (no subscription needed)
-  const historicalMessagesFromServer = serverMessages ?? [];
-
   const topSentinelRef = useRef<HTMLDivElement | null>(null);
   const requestInFlightRef = useRef(false);
   const autoFillAttemptsRef = useRef(0);
@@ -198,11 +195,12 @@ function ChatInterfaceInternal({
   // Prefer cache until server has loaded
   const historicalMessages: UIMessage[] = useMemo(() => {
     if (!isThread) return [];
-    if (historicalMessagesFromServer.length > 0) {
-      return historicalMessagesFromServer;
+    const serverHistory = serverMessages ?? [];
+    if (serverHistory.length > 0) {
+      return serverHistory;
     }
     return initialMessages ?? [];
-  }, [isThread, historicalMessagesFromServer, initialMessages]);
+  }, [isThread, serverMessages, initialMessages]);
 
   // Combine ephemeral older pages (never cached) + base persisted history for UI + AI context.
   const baseHistory: UIMessage[] = useMemo(() => {
@@ -219,11 +217,22 @@ function ChatInterfaceInternal({
   }, [baseHistory]);
 
   // Reset per-thread ephemeral pagination state; also keep cursor/isDone in sync with late-arriving server props.
+  const initialHistoryRef = useRef<{ cursor: string | null; isDone: boolean }>({
+    cursor: initialHistoryCursor ?? null,
+    isDone: initialHistoryIsDone ?? true,
+  });
+  useEffect(() => {
+    initialHistoryRef.current = {
+      cursor: initialHistoryCursor ?? null,
+      isDone: initialHistoryIsDone ?? true,
+    };
+  }, [initialHistoryCursor, initialHistoryIsDone]);
+
   useEffect(() => {
     autoFillAttemptsRef.current = 0;
     setOlderEphemeralMessages([]);
-    setHistoryCursor(initialHistoryCursor ?? null);
-    setHistoryIsDone(initialHistoryIsDone ?? true);
+    setHistoryCursor(initialHistoryRef.current.cursor);
+    setHistoryIsDone(initialHistoryRef.current.isDone);
   }, [id]);
 
   useEffect(() => {
@@ -616,6 +625,7 @@ function ChatInterfaceInternal({
     messages,
     initialMessages,
     isActivelyGenerating,
+    regenerateAnchorRef,
     sliceHookMessagesAfterBaseTail,
     pruneAt,
   ]);
@@ -893,7 +903,6 @@ function ChatInterfaceInternal({
       setUploadingFiles,
       setIsUploading,
       triggerError,
-      regenerateAnchorRef,
     ]
   );
 

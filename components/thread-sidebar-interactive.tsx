@@ -484,7 +484,7 @@ export function ThreadSidebarInteractive({
       event.preventDefault();
       handleThreadNavigation(threadId);
     },
-    [editingThreadId, handleThreadNavigation],
+    [editingThreadId, handleThreadNavigation, handleContainerClick],
   );
 
   // Idle prefetch: warm local-first cache (IndexedDB -> memory).
@@ -713,7 +713,7 @@ export function ThreadSidebarInteractive({
         <div className="flex h-full items-center justify-center px-5">
           <div className="text-center">
             <p className="text-sm text-muted-foreground">
-              No se encontraron chats que coincidan con "{searchQuery}"
+              No se encontraron chats que coincidan con &quot;{searchQuery}&quot;
             </p>
           </div>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 
 import { updateCurrentUserProfile } from "@/actions/updateCurrentUserProfile";
@@ -26,6 +26,17 @@ export function ProfileForm({ initialUser }: { initialUser: ProfileFormUser }) {
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const lastSubmitTimeRef = useRef<number>(0);
+  const [isSubmitCoolingDown, setIsSubmitCoolingDown] = useState(false);
+  const cooldownTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (cooldownTimeoutRef.current !== null) {
+        window.clearTimeout(cooldownTimeoutRef.current);
+        cooldownTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const displayName = useMemo(() => {
     const name = `${firstName} ${lastName}`.trim();
@@ -49,6 +60,14 @@ export function ProfileForm({ initialUser }: { initialUser: ProfileFormUser }) {
     }
     
     lastSubmitTimeRef.current = now;
+    setIsSubmitCoolingDown(true);
+    if (cooldownTimeoutRef.current !== null) {
+      window.clearTimeout(cooldownTimeoutRef.current);
+    }
+    cooldownTimeoutRef.current = window.setTimeout(() => {
+      setIsSubmitCoolingDown(false);
+      cooldownTimeoutRef.current = null;
+    }, THROTTLE_MS);
     
     startTransition(async () => {
       setError(null);
@@ -177,7 +196,7 @@ export function ProfileForm({ initialUser }: { initialUser: ProfileFormUser }) {
         <div className="flex justify-start items-start gap-2 pt-0">
           <Button 
             type="submit" 
-            disabled={!isDirty || isPending || (Date.now() - lastSubmitTimeRef.current < 2000 && lastSubmitTimeRef.current > 0)} 
+            disabled={!isDirty || isPending || isSubmitCoolingDown} 
             variant="accent"
           >
             {isPending ? "Guardando..." : "Guardar cambios"}

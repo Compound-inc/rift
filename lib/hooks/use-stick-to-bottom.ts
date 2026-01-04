@@ -44,8 +44,10 @@ export function useStickToBottom(
   // Refs to avoid recreating ResizeObserver on state changes
   const isAtBottomRef = useRef(true);
   const escapedFromLockRef = useRef(false);
-  isAtBottomRef.current = isAtBottom;
-  escapedFromLockRef.current = escapedFromLock;
+  useEffect(() => {
+    isAtBottomRef.current = isAtBottom;
+    escapedFromLockRef.current = escapedFromLock;
+  }, [isAtBottom, escapedFromLock]);
 
   const lastScrollTopRef = useRef<number>(0);
   const isProgrammaticScrollRef = useRef(false);
