@@ -1,6 +1,41 @@
 import { useEffect, useRef, useState } from "react";
 import { useSelectedThreadStore } from "@/lib/stores/selected-thread-store";
 
+declare global {
+  interface Window {
+    __riftSelectedThreadHistoryPatched?: boolean;
+  }
+}
+
+const RIFT_NAV_EVENT = "rift:navigation";
+
+function ensureHistoryPatched() {
+  if (typeof window === "undefined") return;
+  if (window.__riftSelectedThreadHistoryPatched) return;
+  window.__riftSelectedThreadHistoryPatched = true;
+
+  const originalPushState = window.history.pushState.bind(window.history);
+  const originalReplaceState = window.history.replaceState.bind(window.history);
+
+  const dispatch = () => {
+    try {
+      window.dispatchEvent(new Event(RIFT_NAV_EVENT));
+    } catch {
+      // ignore
+    }
+  };
+
+  window.history.pushState = ((data: any, unused: string, url?: string | URL | null) => {
+    originalPushState(data, unused, url as any);
+    dispatch();
+  }) as any;
+
+  window.history.replaceState = ((data: any, unused: string, url?: string | URL | null) => {
+    originalReplaceState(data, unused, url as any);
+    dispatch();
+  }) as any;
+}
+
 function parseThreadIdFromPathname(pathname: string): string | null {
   // Supported:
   // - /chat
@@ -27,6 +62,8 @@ export function useSelectedThreadUrlSync() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    ensureHistoryPatched();
+
     if (!hasInitializedRef.current) {
       hasInitializedRef.current = true;
       // Store initializes from window.location in the zustand initializer.
@@ -41,27 +78,16 @@ export function useSelectedThreadUrlSync() {
     };
 
     const onPopState = () => syncFromLocation();
-
-    // Also capture URL changes done via pushState/replaceState (Next <Link> does this without popstate).
-    const originalPushState = window.history.pushState.bind(window.history);
-    const originalReplaceState = window.history.replaceState.bind(window.history);
-    window.history.pushState = ((data: any, unused: string, url?: string | URL | null) => {
-      originalPushState(data, unused, url as any);
-      syncFromLocation();
-    }) as any;
-    window.history.replaceState = ((data: any, unused: string, url?: string | URL | null) => {
-      originalReplaceState(data, unused, url as any);
-      syncFromLocation();
-    }) as any;
+    const onNavEvent = () => syncFromLocation();
 
     // Mark hydrated once effects are running (prevents `welcome` component flash).
     setIsHydrated(true);
 
     window.addEventListener("popstate", onPopState);
+    window.addEventListener(RIFT_NAV_EVENT, onNavEvent);
     return () => {
       window.removeEventListener("popstate", onPopState);
-      window.history.pushState = originalPushState as any;
-      window.history.replaceState = originalReplaceState as any;
+      window.removeEventListener(RIFT_NAV_EVENT, onNavEvent);
     };
   }, [setSelectedThreadId]);
 

@@ -34,7 +34,6 @@ import {
 import { useThreadShare } from "@/lib/hooks/useThreadShare";
 import { ShareSettingsDialog } from "@/components/share/ShareSettingsDialog";
 import { prefetchCachedThreadMessages } from "@/lib/local-first/thread-messages-cache";
-import { useThreadOpenPerfStore } from "@/lib/stores/thread-open-perf-store";
 import { useSelectedThreadStore } from "@/lib/stores/selected-thread-store";
 import {
   getLastUserKey,
@@ -87,9 +86,6 @@ export function ThreadSidebarInteractive({
 }: {}) {
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const { closeSidebar, isMobile: isMobileViewport } = useChatSidebarControls();
-  const startThreadOpenFromSidebar = useThreadOpenPerfStore((s) => s.startFromSidebar);
-  const markPushCalled = useThreadOpenPerfStore((s) => s.markPushCalled);
-  const noteCachePrefetch = useThreadOpenPerfStore((s) => s.noteCachePrefetch);
   const selectedThreadId = useSelectedThreadStore((s) => s.selectedThreadId);
   const setSelectedThreadId = useSelectedThreadStore((s) => s.setSelectedThreadId);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -451,10 +447,6 @@ export function ThreadSidebarInteractive({
 
   const handleThreadNavigation = useCallback(
     (threadId: string) => {
-      // Perf metric: sidebar press -> first text rendered in conversation.
-      startThreadOpenFromSidebar(threadId);
-      markPushCalled(threadId);
-
       // Prefetch cached messages in parallel with route navigation (warms in-memory cache).
       prefetchCachedThreadMessages(threadId);
 
@@ -464,11 +456,38 @@ export function ThreadSidebarInteractive({
         closeSidebar();
       }
     },
-    [closeSidebar, isMobileViewport, startThreadOpenFromSidebar, markPushCalled, setSelectedThreadId],
+    [closeSidebar, isMobileViewport, setSelectedThreadId],
   );
 
-  // Idle prefetch: warm Next.js route (RSC) + local-first cache for the most visible threads.
-  // This targets the breakdown's slow segment: click -> routeSeen.
+  const handleThreadLinkClick = useCallback(
+    (threadId: string, event: React.MouseEvent<HTMLAnchorElement>) => {
+      if (editingThreadId === threadId) {
+        // While editing, clicking the row should focus the input (and never navigate).
+        event.preventDefault();
+        handleContainerClick(event as unknown as React.MouseEvent);
+        return;
+      }
+
+      // Allow normal link behavior for:
+      // - middle click / right click
+      // - cmd/ctrl/shift/alt modified clicks (open in new tab/window, etc.)
+      if (
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      handleThreadNavigation(threadId);
+    },
+    [editingThreadId, handleThreadNavigation],
+  );
+
+  // Idle prefetch: warm local-first cache (IndexedDB -> memory).
   useEffect(() => {
     if (!hasHydrated || authLoading) return;
 
@@ -490,7 +509,6 @@ export function ThreadSidebarInteractive({
       for (const threadId of toPrefetch) {
         if (prefetchedThreadIdsRef.current.has(threadId)) continue;
         prefetchedThreadIdsRef.current.add(threadId);
-        noteCachePrefetch(threadId);
         prefetchCachedThreadMessages(threadId);
       }
     };
@@ -511,7 +529,7 @@ export function ThreadSidebarInteractive({
 
     const timeout = window.setTimeout(run, 0);
     return () => window.clearTimeout(timeout);
-  }, [groupedThreads, hasHydrated, authLoading, noteCachePrefetch, selectedThreadId]);
+  }, [groupedThreads, hasHydrated, authLoading, selectedThreadId]);
 
 
   const renderThreadItem = (thread: Thread) => {
@@ -521,13 +539,13 @@ export function ThreadSidebarInteractive({
     return (
       <ContextMenu key={thread.threadId}>
         <ContextMenuTrigger>
-          <div
-            onClick={isEditing ? handleContainerClick : () => handleThreadNavigation(thread.threadId)}
+          <a
+            href={`/chat/${thread.threadId}`}
+            onClick={(event) => handleThreadLinkClick(thread.threadId, event)}
             onPointerEnter={() => {
               // Warm both the route and local-first cache on hover (mouse/pen).
               if (!prefetchedThreadIdsRef.current.has(thread.threadId)) {
                 prefetchedThreadIdsRef.current.add(thread.threadId);
-                noteCachePrefetch(thread.threadId);
                 prefetchCachedThreadMessages(thread.threadId);
               }
             }}
@@ -535,7 +553,6 @@ export function ThreadSidebarInteractive({
               // Touch/mobile doesn't hover; start warming as early as possible.
               if (!prefetchedThreadIdsRef.current.has(thread.threadId)) {
                 prefetchedThreadIdsRef.current.add(thread.threadId);
-                noteCachePrefetch(thread.threadId);
                 prefetchCachedThreadMessages(thread.threadId);
               }
             }}
@@ -617,7 +634,7 @@ export function ThreadSidebarInteractive({
                 )}
               </div>
             </div>
-          </div>
+          </a>
         </ContextMenuTrigger>
         <ContextMenuContent className="border border-zinc-200 bg-white shadow-md dark:border-zinc-800/70 dark:bg-zinc-950 dark:shadow-2xl">
           <ContextMenuItem

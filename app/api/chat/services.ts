@@ -924,11 +924,6 @@ export const incrementToolCallQuota = (
       }),
   }).pipe(
     Effect.retry({ schedule: databaseRetrySchedule, while: isRetryableDatabaseError }),
-    Effect.tap(() =>
-      Effect.sync(() =>
-        console.log(`Incremented tool call quota by ${toolCallCount} for user`)
-      )
-    )
   );
 
 // ============================================================================

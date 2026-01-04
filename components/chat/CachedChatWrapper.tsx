@@ -12,7 +12,6 @@ import {
   getMemoryCachedThreadMessages,
   reconcileCacheWithServer,
 } from "@/lib/local-first/thread-messages-cache";
-import { useThreadOpenPerfStore } from "@/lib/stores/thread-open-perf-store";
 
 interface CachedChatWrapperProps {
   threadId: string;
@@ -26,10 +25,6 @@ interface CachedChatWrapperProps {
  */
 export function CachedChatWrapper({ threadId, customInstructionId }: CachedChatWrapperProps) {
   const convex = useConvex();
-  const noteMemoryCache = useThreadOpenPerfStore((s) => s.noteMemoryCache);
-  const noteIndexedDbLoad = useThreadOpenPerfStore((s) => s.noteIndexedDbLoad);
-  const markServerFetchStarted = useThreadOpenPerfStore((s) => s.markServerFetchStarted);
-  const noteServerFetch = useThreadOpenPerfStore((s) => s.noteServerFetch);
 
   // Sync read from memory cache (instant)
   let memoryCachedMessages: UIMessage[] | undefined;
@@ -50,14 +45,6 @@ export function CachedChatWrapper({ threadId, customInstructionId }: CachedChatW
   const [serverContinueCursor, setServerContinueCursor] = useState<string | null>(null);
   const [serverIsDone, setServerIsDone] = useState<boolean>(true);
 
-  useEffect(() => {
-    if (hadMemoryCache) {
-      noteMemoryCache(threadId, memoryCachedMessages?.length ?? 0);
-    } else {
-      noteMemoryCache(threadId, 0);
-    }
-  }, [threadId, hadMemoryCache, memoryCachedMessages?.length, noteMemoryCache]);
-
   // Load from IndexedDB if memory cache is empty
   useEffect(() => {
     if (hadMemoryCache || asyncLoadedThreadId === threadId) return;
@@ -67,13 +54,10 @@ export function CachedChatWrapper({ threadId, customInstructionId }: CachedChatW
     
     void (async () => {
       try {
-        const start = typeof performance !== "undefined" ? performance.now() : Date.now();
         const record = await loadCachedThreadMessages(threadId);
-        const end = typeof performance !== "undefined" ? performance.now() : Date.now();
         if (cancelled) return;
         setAsyncLoadedMessages(record?.messages);
         setAsyncLoadedThreadId(threadId);
-        noteIndexedDbLoad(threadId, Math.max(0, Math.round(end - start)), record?.messages?.length ?? 0);
       } catch (error) {
         if (!cancelled) {
           Sentry.captureException(error, {
@@ -87,13 +71,12 @@ export function CachedChatWrapper({ threadId, customInstructionId }: CachedChatW
           });
           setAsyncLoadedMessages(undefined);
           setAsyncLoadedThreadId(threadId);
-          noteIndexedDbLoad(threadId, 0, 0);
         }
       }
     })();
 
     return () => { cancelled = true; };
-  }, [threadId, hadMemoryCache, asyncLoadedThreadId, noteIndexedDbLoad]);
+  }, [threadId, hadMemoryCache, asyncLoadedThreadId]);
 
   // One-off fetch from Convex - provides fresh data and reconciles cache
   useEffect(() => {
@@ -110,13 +93,10 @@ export function CachedChatWrapper({ threadId, customInstructionId }: CachedChatW
     
     void (async () => {
       try {
-        markServerFetchStarted(threadId);
-        const start = typeof performance !== "undefined" ? performance.now() : Date.now();
         const result = await convex.query(api.threads.getThreadMessagesPaginatedSafe, {
           threadId,
           paginationOpts: { numItems: 20, cursor: null },
         });
-        const end = typeof performance !== "undefined" ? performance.now() : Date.now();
         
         if (cancelled) return;
         
@@ -131,23 +111,20 @@ export function CachedChatWrapper({ threadId, customInstructionId }: CachedChatW
           const messages = transformConvexMessages(result.page);
           setServerMessages(messages);
           await reconcileCacheWithServer(threadId, messages);
-          noteServerFetch(threadId, Math.max(0, Math.round(end - start)), messages.length, true);
         } else {
           setServerMessages([]);
           await reconcileCacheWithServer(threadId, []);
-          noteServerFetch(threadId, Math.max(0, Math.round(end - start)), 0, true);
         }
         
         setServerFetchedThreadId(threadId);
       } catch {
         // Silently fail - will use cache
         setServerFetchedThreadId(threadId);
-        noteServerFetch(threadId, 0, 0, false);
       }
     })();
 
     return () => { cancelled = true; };
-  }, [threadId, convex, serverFetchedThreadId, noteServerFetch, markServerFetchStarted]);
+  }, [threadId, convex, serverFetchedThreadId]);
 
   const initialMessages = memoryCachedMessages ?? 
     (asyncLoadedThreadId === threadId ? asyncLoadedMessages : undefined);

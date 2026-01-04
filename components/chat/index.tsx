@@ -30,7 +30,6 @@ import { ChatStoreProvider, useChatStateInstance } from "@/lib/stores/hooks";
 import { Effect } from "effect";
 import { saveCachedThreadMessages } from "@/lib/local-first/thread-messages-cache";
 import { useStickToBottom } from "@/lib/hooks/use-stick-to-bottom";
-import { useThreadOpenPerfStore } from "@/lib/stores/thread-open-perf-store";
 
 import {
   updateMessageContentEffect,
@@ -79,9 +78,6 @@ function ChatInterfaceInternal({
   const promptDisabled = disableInput;
   const { user } = useAuth();
   const prevIdRef = useRef(id);
-  const markThreadFirstTextRendered = useThreadOpenPerfStore(
-    (s) => s.markFirstTextRendered,
-  );
   const autoStartTriggeredRef = useRef(false);
   const hadActiveSessionRef = useRef(false);
 
@@ -693,39 +689,6 @@ function ChatInterfaceInternal({
   }, [id]);
 
   const shouldShowMessages = allResponsesReady || forceShow || status === "streaming" || status === "submitted";
-
-  // Perf metric: stop timing when the first visible text has actually painted.
-  const hasMarkedFirstTextRef = useRef(false);
-  useEffect(() => {
-    hasMarkedFirstTextRef.current = false;
-  }, [id]);
-
-  useEffect(() => {
-    if (!isThread) return;
-    if (hasMarkedFirstTextRef.current) return;
-    if (!shouldShowMessages) return;
-    if (!displayMessages || displayMessages.length === 0) return;
-
-    const hasAnyText = displayMessages.some((m) =>
-      (m.parts || []).some((p: any) => p?.type === "text" && typeof p?.text === "string" && p.text.trim() !== ""),
-    );
-    if (!hasAnyText) return;
-
-    let raf1: number | null = null;
-    let raf2: number | null = null;
-    raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => {
-        if (hasMarkedFirstTextRef.current) return;
-        hasMarkedFirstTextRef.current = true;
-        markThreadFirstTextRendered(id);
-      });
-    });
-
-    return () => {
-      if (raf1 !== null) cancelAnimationFrame(raf1);
-      if (raf2 !== null) cancelAnimationFrame(raf2);
-    };
-  }, [id, isThread, shouldShowMessages, displayMessages, markThreadFirstTextRendered]);
 
   // Initial scroll to bottom (instant, then switch to smooth after 150ms)
   const hasInitialScrolledRef = useRef(false);
