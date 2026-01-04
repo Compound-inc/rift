@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import type { UIMessage } from "@ai-sdk-tools/store";
 import * as Sentry from "@sentry/nextjs";
 import { useConvex } from "convex/react";
@@ -37,20 +37,19 @@ export function CachedChatWrapper({ threadId, customInstructionId }: CachedChatW
 
   // Async IndexedDB fallback (only when memory cache is empty)
   const [asyncLoadedMessages, setAsyncLoadedMessages] = useState<UIMessage[] | undefined>(undefined);
-  const didLoadIndexedDbRef = useRef(false);
+  const [asyncLoadedThreadId, setAsyncLoadedThreadId] = useState<string | null>(null);
 
   // Server messages from one-off fetch
   const [serverMessages, setServerMessages] = useState<UIMessage[] | undefined>(undefined);
-  const didFetchServerRef = useRef(false);
+  const [serverFetchedThreadId, setServerFetchedThreadId] = useState<string | null>(null);
   const [serverContinueCursor, setServerContinueCursor] = useState<string | null>(null);
   const [serverIsDone, setServerIsDone] = useState<boolean>(true);
 
   // Load from IndexedDB if memory cache is empty
   useEffect(() => {
-    if (hadMemoryCache) return;
-    if (didLoadIndexedDbRef.current) return;
-    didLoadIndexedDbRef.current = true;
+    if (hadMemoryCache || asyncLoadedThreadId === threadId) return;
 
+    setAsyncLoadedMessages(undefined);
     let cancelled = false;
     
     void (async () => {
@@ -58,6 +57,7 @@ export function CachedChatWrapper({ threadId, customInstructionId }: CachedChatW
         const record = await loadCachedThreadMessages(threadId);
         if (cancelled) return;
         setAsyncLoadedMessages(record?.messages);
+        setAsyncLoadedThreadId(threadId);
       } catch (error) {
         if (!cancelled) {
           Sentry.captureException(error, {
@@ -70,17 +70,24 @@ export function CachedChatWrapper({ threadId, customInstructionId }: CachedChatW
             },
           });
           setAsyncLoadedMessages(undefined);
+          setAsyncLoadedThreadId(threadId);
         }
       }
     })();
 
     return () => { cancelled = true; };
-  }, [threadId, hadMemoryCache]);
+  }, [threadId, hadMemoryCache, asyncLoadedThreadId]);
 
   // One-off fetch from Convex - provides fresh data and reconciles cache
   useEffect(() => {
-    if (didFetchServerRef.current) return;
-    didFetchServerRef.current = true;
+    if (serverFetchedThreadId === threadId) return;
+    
+    // Reset server messages when thread changes
+    if (serverFetchedThreadId !== null && serverFetchedThreadId !== threadId) {
+      setServerMessages(undefined);
+      setServerContinueCursor(null);
+      setServerIsDone(true);
+    }
     
     let cancelled = false;
     
@@ -109,20 +116,23 @@ export function CachedChatWrapper({ threadId, customInstructionId }: CachedChatW
           await reconcileCacheWithServer(threadId, []);
         }
         
+        setServerFetchedThreadId(threadId);
       } catch {
         // Silently fail - will use cache
+        setServerFetchedThreadId(threadId);
       }
     })();
 
     return () => { cancelled = true; };
-  }, [threadId, convex]);
+  }, [threadId, convex, serverFetchedThreadId]);
 
   const initialMessages = memoryCachedMessages ?? 
-    asyncLoadedMessages;
+    (asyncLoadedThreadId === threadId ? asyncLoadedMessages : undefined);
 
-  const currentServerMessages = serverMessages;
-  const currentContinueCursor = serverContinueCursor;
-  const currentIsDone = serverIsDone;
+  // Only pass serverMessages if it's for the current thread
+  const currentServerMessages = serverFetchedThreadId === threadId ? serverMessages : undefined;
+  const currentContinueCursor = serverFetchedThreadId === threadId ? serverContinueCursor : null;
+  const currentIsDone = serverFetchedThreadId === threadId ? serverIsDone : true;
 
   return (
     <ChatInterface
