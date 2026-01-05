@@ -128,7 +128,7 @@ export function ThreadSidebarInteractive({
     setHasHydrated(true);
   }, []);
 
-  const shouldUsePaginated = hasHydrated && !authLoading;
+  const shouldUsePaginated = hasHydrated && isAuthenticated && !authLoading;
   const paginatedArgs = useMemo(
     () => ({
       paginationOpts: {
@@ -151,7 +151,7 @@ export function ThreadSidebarInteractive({
   );
 
   useEffect(() => {
-    if (!hasHydrated || authLoading) return;
+    if (!hasHydrated) return;
     if (!userKey) return;
     let cancelled = false;
     setCacheLoaded(false);
@@ -720,9 +720,11 @@ export function ThreadSidebarInteractive({
       );
     }
     
-    // No threads and no search query
     return (
       <div className="flex h-full items-center justify-center px-5">
+        <div className="text-center text-muted-foreground">
+          <p className="text-sm">Aún no hay chats</p>
+        </div>
       </div>
     );
   };
@@ -760,7 +762,7 @@ export function ThreadSidebarInteractive({
           )}
         </Authenticated>
         <Unauthenticated>
-          {null}
+          {renderCachedOnlyList() || renderEmptyState()}
         </Unauthenticated>
       </div>
 
