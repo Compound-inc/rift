@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "bun run --bun next dev",
-    "build": "bun run --bun next build",
+    "build": "bun run next build",
     "start": "bun run --bun next start",
     "lint": "eslint ."
   },
