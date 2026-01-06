@@ -148,7 +148,14 @@ export function useRegeneration({
       const role = "user"; // We are effectively regenerating from the user's perspective
 
       // Force re-render with pruning at the user message (keeping the user message)
-      setMessages((curr) => pruneAt(curr, userMessageId, role));
+      // Important: `regenerate()` (from the AI SDK store) can throw "message <id> not found"
+      // if the anchor message doesn't exist in its internal `messages` array yet.
+      // This can happen in our app because `renderedMessages` can include server history
+      // that isn't currently in the hook store. If so, sync from `renderedMessages`.
+      setMessages((curr) => {
+        const source = curr.some((m) => m.id === userMessageId) ? curr : renderedMessages;
+        return pruneAt(source, userMessageId, role);
+      });
       regenerateAnchorRef.current = { id: userMessageId, role };
 
       if (status === "streaming") stop();
@@ -168,7 +175,11 @@ export function useRegeneration({
       if (status === "streaming") stop();
 
       // Optimistic prune
-      setMessages((curr) => pruneAt(curr, messageId, role));
+      // ensure the anchor exists in the hook store before we call `regenerate()`.
+      setMessages((curr) => {
+        const source = curr.some((m) => m.id === messageId) ? curr : renderedMessages;
+        return pruneAt(source, messageId, role);
+      });
 
       runRegenerationWithCancellation(messageId);
     },
@@ -200,7 +211,11 @@ export function useRegeneration({
         regenerateAnchorRef.current = { id: messageId, role };
 
         if (status === "streaming") stop();
-        setMessages((curr) => pruneAt(curr, messageId, role));
+        // Ensure anchor exists in the hook store; otherwise `regenerate()` may throw.
+        setMessages((curr) => {
+          const source = curr.some((m) => m.id === messageId) ? curr : renderedMessages;
+          return pruneAt(source, messageId, role);
+        });
 
         // Regenerate with retry
         yield* Effect.tryPromise({
