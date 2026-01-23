@@ -32,7 +32,6 @@ import { Loader } from "@/components/ai/loader";
 import type { UIMessage } from "@ai-sdk-tools/store";
 import React, { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import Image from "next/image";
-import { TooltipProvider } from "@/components/ai/ui/tooltip";
 
 // Stable callback wrapper using refs (8.2 useLatest pattern)
 function useLatest<T>(value: T) {
@@ -41,7 +40,7 @@ function useLatest<T>(value: T) {
   return ref;
 }
 
-function MessageActions({
+const MessageActions = React.memo(function MessageActions({
   messageId,
   messageRole,
   messageParts,
@@ -60,16 +59,22 @@ function MessageActions({
 }) {
   const [isCopied, setIsCopied] = useState(false);
 
-  // Use refs to avoid callback recreation (5.5 Functional setState)
   const messagePartsRef = useLatest(messageParts);
+  const onRegenerateAssistantRef = useLatest(onRegenerateAssistantMessage);
+  const onRegenerateAfterUserRef = useLatest(onRegenerateAfterUserMessage);
+  const onStartEditRef = useLatest(onStartEdit);
 
   const handleRegenerateAssistant = useCallback(() => {
-    onRegenerateAssistantMessage(messageId);
-  }, [onRegenerateAssistantMessage, messageId]);
+    onRegenerateAssistantRef.current(messageId);
+  }, [messageId, onRegenerateAssistantRef]);
 
   const handleRegenerateAfterUser = useCallback(() => {
-    onRegenerateAfterUserMessage(messageId);
-  }, [onRegenerateAfterUserMessage, messageId]);
+    onRegenerateAfterUserRef.current(messageId);
+  }, [messageId, onRegenerateAfterUserRef]);
+
+  const handleStartEdit = useCallback(() => {
+    onStartEditRef.current?.();
+  }, [onStartEditRef]);
 
   const handleCopy = useCallback(async () => {
     const textContent = messagePartsRef.current
@@ -124,7 +129,7 @@ function MessageActions({
           </Action>
           {onStartEdit && (
             <Action
-              onClick={onStartEdit}
+              onClick={handleStartEdit}
               label="Editar"
               tooltip="Editar"
             >
@@ -144,7 +149,7 @@ function MessageActions({
   }
 
   return null;
-}
+});
 
 interface MessageRendererProps {
   message: UIMessage;
@@ -156,7 +161,7 @@ interface MessageRendererProps {
   onResponseReady?: (messageId: string) => void;
 }
 
-export function MessageRenderer({
+export const MessageRenderer = React.memo(function MessageRenderer({
   message,
   isStreaming,
   onRegenerateAssistantMessage,
@@ -455,8 +460,7 @@ export function MessageRenderer({
   const handleStartEdit = useCallback(() => setIsEditing(true), []);
 
   return (
-    <TooltipProvider>
-      <div className="group message-item">
+    <div className="group message-item">
         {isEditing && message.role === "user" ? (
           <div className="w-full max-w-none px-4">
             <div className="w-full max-w-[80%] ml-auto">
@@ -537,6 +541,20 @@ export function MessageRenderer({
           onStartEdit={message.role === "user" && !!onEditUserMessage ? handleStartEdit : undefined}
         />
       </div>
-    </TooltipProvider>
   );
-}
+}, (prevProps, nextProps) => {
+  // For non-streaming messages, only re-render if message content changes
+  if (!prevProps.isStreaming && !nextProps.isStreaming) {
+    return (
+      prevProps.message.id === nextProps.message.id &&
+      prevProps.message.parts === nextProps.message.parts &&
+      prevProps.disableRegenerate === nextProps.disableRegenerate
+    );
+  }
+  // For streaming messages, compare all relevant props
+  return (
+    prevProps.message === nextProps.message &&
+    prevProps.isStreaming === nextProps.isStreaming &&
+    prevProps.disableRegenerate === nextProps.disableRegenerate
+  );
+});

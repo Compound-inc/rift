@@ -20,6 +20,7 @@ import {
   ConversationContent,
 } from "@/components/ai/conversation";
 import { Message, MessageContent } from "@/components/ai/message";
+import { TooltipProvider } from "@/components/ai/ui/tooltip";
 
 import { useChatUIStore } from "./ui-store";
 import { WelcomeScreen } from "./components/welcome-screen";
@@ -501,6 +502,10 @@ function ChatInterfaceInternal({
   const { messages, status, setMessages, sendMessage, stop } = chatHelpers as any;
   const regenerateRef = useRef<null | ((opts?: { messageId?: string }) => Promise<void>)>(null);
   regenerateRef.current = (chatHelpers as any).regenerate ?? null;
+  
+  // Use ref for status to avoid recreating callbacks on every status change (5.1 Defer State Reads)
+  const statusRef = useRef(status);
+  statusRef.current = status;
 
   useEffect(() => {
     chatStateInstance.syncFromAISDK(messages, status === 'streaming' ? 'streaming' : 'ready');
@@ -867,8 +872,10 @@ function ChatInterfaceInternal({
         uploadingFiles,
         isSendingMessage,
       } = state;
+      // Use ref to avoid recreating callback on every status change
+      const currentStatus = statusRef.current;
       const isGenerating =
-        status === "streaming" || status === "submitted" || isSendingMessage;
+        currentStatus === "streaming" || currentStatus === "submitted" || isSendingMessage;
 
       // Prevent sending when input is disabled, unauthenticated, or while auth is (re)loading
       if (
@@ -944,7 +951,6 @@ function ChatInterfaceInternal({
     },
     [
       promptDisabled,
-      status,
       id,
       onInitialMessage,
       setMessages,
@@ -976,44 +982,53 @@ function ChatInterfaceInternal({
     scrollToBottom("smooth");
   }, [scrollToBottom]);
 
+  // Memoize drag handlers to prevent re-renders
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    const dt = e.dataTransfer;
+    const hasFiles = !!dt && Array.from(dt.types || []).includes("Files");
+    if (!hasFiles) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current += 1;
+    setIsDragActive(true);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    const dt = e.dataTransfer;
+    const hasFiles = !!dt && Array.from(dt.types || []).includes("Files");
+    if (!hasFiles) return;
+    e.preventDefault();
+    dt.dropEffect = "copy";
+    setIsDragActive(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    if (dragCounterRef.current > 0) {
+      dragCounterRef.current -= 1;
+    }
+    if (dragCounterRef.current <= 0) {
+      setIsDragActive(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDragActive(false);
+    const files = Array.from(e.dataTransfer?.files || []);
+    if (!files || files.length === 0) return;
+    void handleProcessFiles(files);
+  }, [handleProcessFiles]);
+
   return (
     <div
       className="flex h-screen w-full min-h-0 flex-col relative"
-      onDragEnter={(e) => {
-        const dt = e.dataTransfer;
-        const hasFiles = !!dt && Array.from(dt.types || []).includes("Files");
-        if (!hasFiles) return;
-        e.preventDefault();
-        e.stopPropagation();
-        dragCounterRef.current += 1;
-        setIsDragActive(true);
-      }}
-      onDragOver={(e) => {
-        const dt = e.dataTransfer;
-        const hasFiles = !!dt && Array.from(dt.types || []).includes("Files");
-        if (!hasFiles) return;
-        e.preventDefault();
-        dt.dropEffect = "copy";
-        setIsDragActive(true);
-      }}
-      onDragLeave={(e) => {
-        e.preventDefault();
-        if (dragCounterRef.current > 0) {
-          dragCounterRef.current -= 1;
-        }
-        if (dragCounterRef.current <= 0) {
-          setIsDragActive(false);
-        }
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dragCounterRef.current = 0;
-        setIsDragActive(false);
-        const files = Array.from(e.dataTransfer?.files || []);
-        if (!files || files.length === 0) return;
-        void handleProcessFiles(files);
-      }}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       <div className="flex-1 min-h-0">
         <Conversation ref={scrollRef as React.RefObject<HTMLDivElement>}>
@@ -1079,6 +1094,7 @@ function ChatInterfaceInternal({
         isAtBottom={isAtBottom}
         onScrollToBottom={handleScrollToBottom}
         showScrollToBottom={!isAtBottom && displayMessages.length > 0}
+        status={status}
       />
 
       {isDragActive && (
@@ -1099,8 +1115,10 @@ function ChatInterfaceInternal({
 
 export default function ChatInterface(props: ChatInterfaceProps) {
   return (
-    <ChatStoreProvider initialMessages={props.initialMessages || []}>
-      <ChatInterfaceInternal {...props} />
-    </ChatStoreProvider>
+    <TooltipProvider>
+      <ChatStoreProvider initialMessages={props.initialMessages || []}>
+        <ChatInterfaceInternal {...props} />
+      </ChatStoreProvider>
+    </TooltipProvider>
   );
 }

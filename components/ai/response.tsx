@@ -7,7 +7,10 @@ import { code } from '@streamdown/code';
 import { mermaid } from '@streamdown/mermaid';
 import { math } from '@streamdown/math';
 
+// Hoist static objects to module level to prevent new references on each render
+// See: https://streamdown.ai/docs/memoization
 const plugins = { code, mermaid, math } as PluginConfig;
+const shikiTheme: ['github-light', 'github-dark'] = ['github-light', 'github-dark'];
 
 type ResponseProps = ComponentProps<typeof Streamdown> & {
   onReady?: () => void;
@@ -44,7 +47,7 @@ export function Response({ className, onReady, ...props }: ResponseProps) {
   return (
     <Streamdown
       plugins={plugins}
-      shikiTheme={['github-light', 'github-dark']}
+      shikiTheme={shikiTheme}
       controls={false}
       className={cn(
         'size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 text-[16px] leading-[28px] [&_h1]:mt-12 [&_h1]:mb-6 [&_h2]:mt-12 [&_h2]:mb-6 [&_h3]:mt-12 [&_h3]:mb-6',

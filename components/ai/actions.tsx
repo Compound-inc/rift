@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { Button } from '@/components/ai/ui/button';
 import {
   Tooltip,
@@ -24,9 +25,9 @@ export type ActionProps = ComponentProps<typeof Button> & {
   label?: string;
 };
 
-// Note: TooltipProvider should be wrapped at a higher level (e.g., MessageRenderer)
-// to avoid creating new provider instances on each render
-export function Action({
+// Memoize Action to prevent unnecessary re-renders of Tooltip components
+// TooltipProvider should be wrapped at a higher level (e.g., ChatInterface)
+export const Action = React.memo(function Action({
   tooltip,
   children,
   label,
@@ -63,4 +64,4 @@ export function Action({
   }
 
   return button;
-}
+});
