@@ -27,7 +27,7 @@ import {
 import { createToolsForModel } from "@/lib/ai/model-tools";
 import { ToolType } from "@/lib/ai/config/base";
 import { Id } from "@/convex/_generated/dataModel";
-import { exaWebSearch } from "@/lib/ai/tools/exa-search";
+import { valyuSearchTools } from "@/lib/ai/tools/valyu-search";
 
 export const maxDuration = 500;
 
@@ -507,7 +507,7 @@ const handleChatRequest = (
     const tools = yield* Effect.try({
       try: () => ({
       ...providerTools,
-      ...(enabledTools.includes("web_search") ? { webSearch: exaWebSearch } : {}),
+      ...(enabledTools.includes("web_search") ? valyuSearchTools : {}),
       // ...(process.env.SUPERMEMORY_API_KEY
       //   ? supermemoryTools(process.env.SUPERMEMORY_API_KEY, {
       //       containerTags: auth.orgId ? [auth.userId, auth.orgId] : [auth.userId],
@@ -770,7 +770,7 @@ const handleChatRequest = (
             tools: toolSet,
             system: systemPrompt,
             headers: getAttributionHeaders(),
-            stopWhen: stepCountIs(50),
+            stopWhen: stepCountIs(20),
             experimental_transform: smoothStream({
               delayInMs: 5,
               chunking: "word",

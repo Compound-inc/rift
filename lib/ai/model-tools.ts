@@ -24,7 +24,7 @@ export const TOOL_CONFIGS: Record<
 
 // Tool utility functions
 export function getSupportedTools(modelId: string): ToolType[] {
-  // All models support web_search via EXA
+  // All models support web_search via Valyu
   return ["web_search"];
 }
 
@@ -46,6 +46,6 @@ export function isToolSupportedByModel(
   modelId: string,
   toolType: ToolType,
 ): boolean {
-  // Only web_search is supported via EXA
+  // Only web_search is supported via Valyu
   return toolType === "web_search";
 }

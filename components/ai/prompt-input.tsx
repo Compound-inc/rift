@@ -489,7 +489,7 @@ export const PromptInputError = ({
   return (
     <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/50">
       <AlertTriangle className="size-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-      <div className="flex-1 text-sm text-red-800 dark:text-red-200">
+      <div className="flex-1 text-sm text-red-800 dark:text-red-200 max-h-[200px] overflow-y-auto">
         {error}
       </div>
       {onDismiss && (
