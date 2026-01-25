@@ -102,13 +102,6 @@ function SettingItem({
       href={href}
       className={baseClasses}
       prefetch={true}
-      onClick={() => {
-        // #region agent log
-        const navStartTime = performance.now();
-        (window as any).__navStartTime = navStartTime;
-        fetch('http://127.0.0.1:7242/ingest/047d796f-87bb-4f09-adbd-1a615912b381',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'settings-sidebar.tsx:100',message:'Link click - navigation started',data:{href,fromPath:typeof window!=='undefined'?window.location.pathname:'unknown',navStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
-      }}
     >
       <Icon className={iconClasses} />
       <span className="flex-1 text-left truncate">{title}</span>

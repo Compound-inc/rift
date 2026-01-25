@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, Suspense } from "react";
-import { usePathname } from "next/navigation";
+import { Suspense } from "react";
 import { SettingsSidebar } from "@/components/settings/settings-sidebar";
 import Link from 'next/link';
 import { SettingsShell } from "@/components/settings/settings-shell";
@@ -52,16 +51,6 @@ export default function SettingsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
-  
-  // #region agent log
-  useEffect(() => {
-    const navStartTime = typeof window !== 'undefined' ? (window as any).__navStartTime : null;
-    const timeSinceNav = navStartTime ? performance.now() - navStartTime : null;
-    fetch('http://127.0.0.1:7242/ingest/047d796f-87bb-4f09-adbd-1a615912b381',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'settings/layout.tsx:55',message:'Layout render/mount',data:{pathname,timeSinceNav,navStartTime,currentTime:performance.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-  }, [pathname]);
-  // #endregion
-  
   // Layout is non-blocking - permissions are parsed client-side instantly
   // No server-side loading needed - client-side JWT parsing gives same result immediately
   return (
