@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, startTransition } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import { useConvexAuth } from "convex/react";
+import { useEffect, Suspense } from "react";
+import { usePathname } from "next/navigation";
 import { SettingsSidebar } from "@/components/settings/settings-sidebar";
 import Link from 'next/link';
 import { SettingsShell } from "@/components/settings/settings-shell";
@@ -53,20 +52,16 @@ export default function SettingsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, isLoading } = useConvexAuth();
-
-  // Redirect to sign-in if not authenticated (non-urgent update)
+  
+  // #region agent log
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      const returnTo = encodeURIComponent(pathname);
-      startTransition(() => {
-        router.replace(`/sign-in?return_to=${returnTo}`);
-      });
-    }
-  }, [isAuthenticated, isLoading, router, pathname]);
-
+    const navStartTime = typeof window !== 'undefined' ? (window as any).__navStartTime : null;
+    const timeSinceNav = navStartTime ? performance.now() - navStartTime : null;
+    fetch('http://127.0.0.1:7242/ingest/047d796f-87bb-4f09-adbd-1a615912b381',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'settings/layout.tsx:55',message:'Layout render/mount',data:{pathname,timeSinceNav,navStartTime,currentTime:performance.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  }, [pathname]);
+  // #endregion
+  
   // Layout is non-blocking - permissions are parsed client-side instantly
   // No server-side loading needed - client-side JWT parsing gives same result immediately
   return (
@@ -98,7 +93,9 @@ export default function SettingsLayout({
               </svg>
             </Link>
           </div>
-          {children}
+          <Suspense fallback={null}>
+            {children}
+          </Suspense>
         </SettingsShell>
       </PermissionsProvider>
     </>

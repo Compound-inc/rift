@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useQuery, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { AlertTriangle, CreditCard } from "lucide-react";
@@ -62,11 +63,29 @@ function formatPrice(amount: number): string {
 export function BillingContent() {
   const { isAuthenticated } = useConvexAuth();
   
+  // #region agent log
+  useEffect(() => {
+    const navStartTime = typeof window !== 'undefined' ? (window as any).__navStartTime : null;
+    const timeSinceNav = navStartTime ? performance.now() - navStartTime : null;
+    fetch('http://127.0.0.1:7242/ingest/047d796f-87bb-4f09-adbd-1a615912b381',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'settings/billing/BillingContent.tsx:65',message:'BillingContent mounted - starting data fetch',data:{isAuthenticated,timeSinceNav,navStartTime,currentTime:performance.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+  }, [isAuthenticated]);
+  // #endregion
+  
   // Fetch billing info using useQuery
   const billingInfo = useQuery(
     api.organizations.getOrganizationBillingInfo,
     isAuthenticated ? {} : "skip"
   );
+
+  // #region agent log
+  useEffect(() => {
+    if (billingInfo !== undefined) {
+      const navStartTime = typeof window !== 'undefined' ? (window as any).__navStartTime : null;
+      const timeSinceNav = navStartTime ? performance.now() - navStartTime : null;
+      fetch('http://127.0.0.1:7242/ingest/047d796f-87bb-4f09-adbd-1a615912b381',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'settings/billing/BillingContent.tsx:75',message:'BillingContent data fetch completed',data:{hasData:billingInfo!==null,isLoading:billingInfo===undefined,timeSinceNav,navStartTime,currentTime:performance.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    }
+  }, [billingInfo]);
+  // #endregion
 
   // Show skeleton while loading
   if (billingInfo === undefined) {

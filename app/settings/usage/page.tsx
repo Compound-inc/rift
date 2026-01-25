@@ -1,9 +1,21 @@
 "use client";
 
+import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { SettingsSection } from "@/components/settings";
 import { UsageDataClient } from "./UsageDataClient";
 
 export default function UsagePage() {
+  const pathname = usePathname();
+  
+  // #region agent log
+  useEffect(() => {
+    const navStartTime = typeof window !== 'undefined' ? (window as any).__navStartTime : null;
+    const timeSinceNav = navStartTime ? performance.now() - navStartTime : null;
+    fetch('http://127.0.0.1:7242/ingest/047d796f-87bb-4f09-adbd-1a615912b381',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'settings/usage/page.tsx:10',message:'UsagePage component mounted',data:{pathname,timeSinceNav,navStartTime,currentTime:performance.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  }, [pathname]);
+  // #endregion
+  
   return (
     <div className="py-6 px-4 md:py-12 md:px-12 flex flex-col max-w-4xl min-w-0 md:min-w-[520px] w-full min-h-full box-border">
       <SettingsSection
