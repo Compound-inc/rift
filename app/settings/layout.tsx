@@ -1,9 +1,8 @@
-import { Suspense } from "react";
 import { SettingsSidebar } from "@/components/settings/settings-sidebar";
-import { SettingsSidebarSkeleton } from "@/components/settings/settings-sidebar-skeleton";
 import Link from 'next/link';
-import { hasPermissions } from "@/lib/permissions";
+import { getPermissionSet } from "@/lib/permissions";
 import { SettingsShell } from "@/components/settings/settings-shell";
+import { PermissionsProvider } from "@/contexts/permissions-context";
 
 // Custom scrollbar styles matching the chat interface
 const scrollbarStyles = `
@@ -45,70 +44,46 @@ const scrollbarStyles = `
   }
 `;
 
-async function SettingsSidebarLoader() {
-  // Batch permission checks to avoid duplicate JWT parsing within this request
-  const batch = await hasPermissions([
-    "WIDGETS_USERS_TABLE_MANAGE",
-    "WIDGETS_DOMAIN_VERIFICATION_MANAGE",
-    "VIEW_ORG_ANALYTICS",
-    "MANAGE_BILLING",
-  ]);
-  const canManageMembers = batch.WIDGETS_USERS_TABLE_MANAGE;
-  const canManageDomainSso = batch.WIDGETS_DOMAIN_VERIFICATION_MANAGE;
-  // Hide analytics in production environment
-  const isProduction = process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production';
-  const canViewAnalytics = isProduction ? false : batch.VIEW_ORG_ANALYTICS;
-  const canManageBilling = batch.MANAGE_BILLING;
-  
-  return (
-    <SettingsSidebar 
-      canManageMembers={canManageMembers}
-      canManageDomainSso={canManageDomainSso}
-      canViewAnalytics={canViewAnalytics}
-      canManageBilling={canManageBilling}
-    />
-  );
-}
-
 export default async function SettingsLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+
+  const permissions = await getPermissionSet();
+
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: scrollbarStyles }} />
-      <SettingsShell
-        sidebar={
-          <Suspense fallback={<SettingsSidebarSkeleton />}>
-            <SettingsSidebarLoader />
-          </Suspense>
-        }
-      >
-        {/* Close button - positioned fixed in top right to stay visible when scrolling */}
-        <div className="fixed top-4 right-4 z-30">
-          <Link 
-            href="/chat"
-            className="flex items-center justify-center w-10 h-10 rounded-full bg-background-settings dark:bg-popover-main border dark:border-border shadow-container-small-n hover:bg-hover dark:hover:bg-hover/60 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-border"
-            title="Cerrar Ajustes"
-          >
-            <svg 
-              className="w-5 h-5 text-gray-500 dark:text-text-muted group-hover:text-gray-700 dark:group-hover:text-white" 
-              fill="none" 
-              stroke="currentColor" 
-              viewBox="0 0 24 24"
+      <PermissionsProvider initialPermissions={permissions}>
+        <SettingsShell
+          sidebar={<SettingsSidebar />}
+        >
+          {/* Close button - positioned fixed in top right to stay visible when scrolling */}
+          <div className="fixed top-4 right-4 z-30">
+            <Link 
+              href="/chat"
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-background-settings dark:bg-popover-main border dark:border-border shadow-container-small-n hover:bg-hover dark:hover:bg-hover/60 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-border"
+              title="Cerrar Ajustes"
             >
-              <path 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                strokeWidth={2} 
-                d="M6 18L18 6M6 6l12 12" 
-              />
-            </svg>
-          </Link>
-        </div>
-        {children}
-      </SettingsShell>
+              <svg 
+                className="w-5 h-5 text-gray-500 dark:text-text-muted group-hover:text-gray-700 dark:group-hover:text-white" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2} 
+                  d="M6 18L18 6M6 6l12 12" 
+                />
+              </svg>
+            </Link>
+          </div>
+          {children}
+        </SettingsShell>
+      </PermissionsProvider>
     </>
   );
 }
