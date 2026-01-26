@@ -43,7 +43,11 @@ function getPlanFromLookupKey(lookupKey: string | null): PlanType | null {
 }
 
 export const createOrganization = internalMutation({
-  args: { workos_id: v.string(), name: v.string() },
+  args: { 
+    workos_id: v.string(), 
+    name: v.string(),
+    stripeCustomerId: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const existing = await ctx.db
       .query("organizations")
@@ -51,11 +55,19 @@ export const createOrganization = internalMutation({
       .first();
 
     if (existing) {
-      await ctx.db.patch(existing._id, { name: args.name });
+      const patch: { name: string; stripeCustomerId?: string } = { name: args.name };
+      if (args.stripeCustomerId !== undefined) {
+        patch.stripeCustomerId = args.stripeCustomerId;
+      }
+      await ctx.db.patch(existing._id, patch);
       return existing._id;
     }
 
-    return await ctx.db.insert("organizations", args);
+    return await ctx.db.insert("organizations", {
+      workos_id: args.workos_id,
+      name: args.name,
+      ...(args.stripeCustomerId !== undefined && { stripeCustomerId: args.stripeCustomerId }),
+    });
   },
 });
 
@@ -337,6 +349,81 @@ export const syncStripeDataWithPeriod = internalAction({
       typeof value === "number" ? value * 1000 : undefined;
 
     try {
+      // Check if organization exists by stripeCustomerId, if not, fetch customer metadata
+      let organization = await ctx.runQuery(
+        internal.organizations.getOrganizationByStripeCustomerId,
+        {
+          stripeCustomerId: args.stripeCustomerId,
+        },
+      );
+
+      // If organization not found, try to find/create it using Stripe customer metadata
+      if (!organization) {
+        console.warn(
+          `[Stripe Sync Fallback] Organization not found by stripeCustomerId: ${args.stripeCustomerId}. Attempting fallback lookup via Stripe customer metadata.`,
+        );
+        try {
+          const customer = await stripe.customers.retrieve(args.stripeCustomerId);
+          if (customer && typeof customer === "object" && !customer.deleted) {
+            const workOSOrganizationId =
+              customer.metadata?.workOSOrganizationId;
+            if (workOSOrganizationId) {
+              // Find or create organization by workos_id
+              let org = await ctx.runQuery(
+                internal.organizations.getByWorkOSId,
+                {
+                  workos_id: workOSOrganizationId,
+                },
+              );
+
+              if (!org) {
+                // Organization doesn't exist yet, create it
+                // We'll need to fetch the org name from WorkOS or use a placeholder
+                // For now, create with empty name - it will be updated by WorkOS webhook
+                console.warn(
+                  `[Stripe Sync Fallback] Creating organization for workos_id: ${workOSOrganizationId} (stripeCustomerId: ${args.stripeCustomerId})`,
+                );
+                await ctx.runMutation(
+                  internal.organizations.setStripeCustomerIdByWorkOSId,
+                  {
+                    workos_id: workOSOrganizationId,
+                    stripeCustomerId: args.stripeCustomerId,
+                  },
+                );
+                org = await ctx.runQuery(
+                  internal.organizations.getByWorkOSId,
+                  {
+                    workos_id: workOSOrganizationId,
+                  },
+                );
+              } else if (!org.stripeCustomerId) {
+                // Organization exists but missing stripeCustomerId, update it
+                console.warn(
+                  `[Stripe Sync Fallback] Updating existing organization ${org._id} with stripeCustomerId: ${args.stripeCustomerId}`,
+                );
+                await ctx.runMutation(internal.organizations.updateOrganization, {
+                  id: org._id,
+                  patch: { stripeCustomerId: args.stripeCustomerId },
+                });
+              }
+              organization = org;
+            }
+          }
+        } catch (error) {
+          console.error(
+            `Failed to fetch Stripe customer ${args.stripeCustomerId} for fallback lookup:`,
+            error,
+          );
+        }
+      }
+
+      // If still no organization found, throw error
+      if (!organization) {
+        throw new Error(
+          `Organization not found for Stripe customer ID: ${args.stripeCustomerId}. Could not find or create organization.`,
+        );
+      }
+
       // Fetch latest subscription data from Stripe
       const subscriptions = await stripe.subscriptions.list({
         customer: args.stripeCustomerId,

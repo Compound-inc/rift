@@ -158,6 +158,7 @@ http.route({
           await ctx.runMutation(internal.organizations.createOrganization, {
             name: data.name,
             workos_id: data.id,
+            stripeCustomerId: data.stripe_customer_id || undefined,
           });
           break;
         }
@@ -197,9 +198,16 @@ http.route({
             );
           }
 
+          const patch: { name: string; stripeCustomerId?: string } = {
+            name: data.name,
+          };
+          if (data.stripe_customer_id) {
+            patch.stripeCustomerId = data.stripe_customer_id;
+          }
+
           await ctx.runMutation(internal.organizations.updateOrganization, {
             id: organization._id,
-            patch: { name: data.name },
+            patch,
           });
 
           break;
