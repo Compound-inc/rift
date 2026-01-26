@@ -9,7 +9,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@ai-sdk/react": "2.0.125",
+    "@ai-sdk/react": "^3.0.51",
     "@aws-sdk/client-s3": "^3.957.0",
     "@convex-dev/rate-limiter": "^0.2.14",
     "@convex-dev/workos": "^0.0.1",
@@ -18,7 +18,7 @@
     "@opentelemetry/exporter-trace-otlp-http": "^0.208.0",
     "@opentelemetry/resources": "^2.2.0",
     "@opentelemetry/sdk-trace-node": "^2.2.0",
-    "@posthog/ai": "^6.6.0",
+    "@posthog/ai": "^7.5.4",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-avatar": "^1.1.11",
@@ -62,7 +62,7 @@
     "@zxcvbn-ts/core": "^3.0.4",
     "@zxcvbn-ts/language-common": "^3.0.4",
     "@zxcvbn-ts/language-en": "^3.0.2",
-    "ai": "5.0.123",
+    "ai": "^6.0.49",
     "axiom": "^0.35.0",
     "botid": "^1.5.10",
     "class-variance-authority": "^0.7.1",

@@ -220,7 +220,7 @@ export default function SharedChatViewer({
                 </p>
                 <h1 className="truncate text-lg font-semibold">{thread.title}</h1>
               </div>
-              <ThemeToggle size="md" styleType="secondary" />
+              <ThemeToggle size="md" styleType="ghost" />
 
               <div className="flex items-center gap-2">
                 <Button
@@ -247,7 +247,7 @@ export default function SharedChatViewer({
                   {...NAV_CTA_BUTTON_PROPS}
                   onClick={() => handleClone()}
                   disabled={isCloning}
-                  className="gap-2 cursor-pointer"
+                  className="gap-2 cursor-pointer text-white dark:text-white"
                 >
                   <GitFork className="h-4 w-4" />
                   {isCloning ? "Clonando..." : "Clonar chat"}
@@ -285,7 +285,7 @@ export default function SharedChatViewer({
 
               {/* Right: Theme Toggle + More Options */}
               <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                <ThemeToggle size="md" styleType="secondary" />
+                <ThemeToggle size="md" styleType="ghost" />
                 <Button
                   {...NAV_ICON_BUTTON_PROPS}
                   onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}

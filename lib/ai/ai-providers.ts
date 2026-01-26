@@ -114,14 +114,18 @@ export const getProviderOptions = (modelId: string, hasTools: boolean = false) =
   const isOpenAIModel = modelId.startsWith("openai/");
   const isGoogleModel = modelId.startsWith("google/");
 
+  const openaiBaseOptions = {
+    store: true,
+    ...(hasTools ? { parallelToolCalls: true } : {}),
+  };
+
   return {
     openai: isOpenAIModel && supportsReasoning(modelId)
       ? {
-          ...baseOptions,
-          reasoningEffort: "low" as const,
+          ...openaiBaseOptions,
           reasoningSummary: "detailed" as const,
         }
-      : baseOptions,
+      : openaiBaseOptions,
     anthropic: isAnthropicModel && supportsReasoning(modelId)
       ? {
           ...baseOptions,

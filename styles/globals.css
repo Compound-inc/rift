@@ -430,3 +430,165 @@
   content-visibility: auto;
   contain-intrinsic-size: 0 120px;
 }
+
+/* Print styles for shared chat pages - Light mode with transparent backgrounds */
+@media print {
+  /* Force light mode - override dark mode */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Main container - white background */
+  body,
+  html {
+    background: white !important;
+    color: #000 !important;
+  }
+
+  /* User messages - light gray background matching chat UI hover color */
+  /* Target the MessageContent div with bg-hover or bg-popover-main */
+  .is-user > div[class*="bg-hover"],
+  .is-user > div[class*="bg-popover-main"],
+  .is-user > div[class*="dark:bg-popover-main"],
+  .is-user [class*="bg-hover"],
+  .is-user [class*="bg-popover-main"] {
+    background: #EBEBEB !important; /* Light gray matching hover: oklch(0.9219 0 0) ≈ #EBEBEB */
+    color: #343434 !important; /* Dark text matching text-secondary: oklch(0.2046 0 0) ≈ #343434 */
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Assistant messages - transparent background */
+  .is-assistant > div,
+  .is-assistant [class*="bg-transparent"] {
+    background: transparent !important;
+    color: #000 !important;
+  }
+
+  /* Override all text colors to ensure readability */
+  [class*="text-foreground"] {
+    color: #000 !important;
+  }
+
+  /* User message text - dark gray */
+  .is-user [class*="text-secondary"],
+  .is-user [class*="text-popover-text"] {
+    color: #343434 !important;
+  }
+
+  /* Muted text - medium gray for print */
+  [class*="text-muted"],
+  [class*="text-muted-foreground"] {
+    color: #666 !important;
+  }
+
+  /* Hide interactive elements */
+  button:not([class*="print:block"]),
+  [role="button"]:not([class*="print:block"]),
+  [class*="Actions"],
+  [class*="Action"],
+  [class*="opacity-0"],
+  [class*="group-hover"] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Hide avatars */
+  [class*="Avatar"],
+  [class*="size-8"][class*="ring"] {
+    display: none !important;
+  }
+
+  /* Hide most icons except in print:block elements */
+  svg:not([class*="print:block"]) {
+    display: none !important;
+  }
+
+  /* Subtle borders for print */
+  [class*="border"]:not([class*="print:block"]) {
+    border-color: #E5E5E5 !important;
+  }
+
+  /* Code blocks - light background */
+  pre,
+  code,
+  [class*="code"] {
+    background: #F5F5F5 !important;
+    color: #000 !important;
+    border: 1px solid #E5E5E5 !important;
+  }
+
+  /* Links */
+  a {
+    color: #000 !important;
+    text-decoration: underline !important;
+  }
+
+  /* Prevent page breaks inside messages */
+  .is-user,
+  .is-assistant {
+    page-break-inside: avoid;
+    margin-bottom: 1rem;
+  }
+
+  /* Footer for print */
+  [class*="print:block"] {
+    display: block !important;
+  }
+
+  /* Override dark mode completely */
+  .dark,
+  .dark * {
+    background: transparent !important;
+    color: #000 !important;
+  }
+
+  /* User messages in dark mode should still have light gray background */
+  .dark .is-user > div[class*="bg-popover-main"],
+  .dark .is-user [class*="bg-popover-main"] {
+    background: #EBEBEB !important;
+    color: #343434 !important;
+  }
+
+  /* Reasoning sections - very light background */
+  [class*="reasoning"],
+  [class*="Reasoning"],
+  [class*="ReasoningContent"] {
+    background: #F9F9F9 !important;
+    border: 1px solid #E5E5E5 !important;
+    color: #000 !important;
+  }
+
+  /* Tool outputs - very light background */
+  [class*="Tool"],
+  [class*="ToolContent"],
+  [class*="ToolOutput"] {
+    background: #F9F9F9 !important;
+    border: 1px solid #E5E5E5 !important;
+    color: #000 !important;
+  }
+
+  /* Sources - transparent with subtle styling */
+  [class*="Source"],
+  [class*="Sources"] {
+    background: transparent !important;
+    color: #000 !important;
+  }
+
+  /* Tables - light styling */
+  table {
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    border: 1px solid #E5E5E5 !important;
+    background: transparent !important;
+    color: #000 !important;
+  }
+
+  th {
+    background: #F5F5F5 !important;
+  }
+}

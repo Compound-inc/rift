@@ -142,7 +142,7 @@ function ShareAccessMessage({ status }: { status: SharedThreadAccessDenied["stat
             <h1 className="truncate text-lg font-semibold">Enlace compartido</h1>
           </div>
           <div className="flex items-center gap-2">
-            <ThemeToggle size="md" />
+            <ThemeToggle size="md" styleType="ghost" />
           </div>
         </div>
       </div>

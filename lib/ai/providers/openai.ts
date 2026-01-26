@@ -31,7 +31,6 @@ export interface OpenAISettings {
   include?: string[];
   promptCacheKey?: string;
   safetyIdentifier?: string;
-  structuredOutputs?: boolean;
   maxCompletionTokens?: number;
   prediction?: Record<string, any>;
   logitBias?: Record<number, number>;
@@ -47,7 +46,6 @@ export const DEFAULT_OPENAI_SETTINGS: OpenAISettings = {
   strictJsonSchema: false,
   serviceTier: "auto",
   textVerbosity: "medium",
-  structuredOutputs: true,
   maxRetries: 3,
 };
 

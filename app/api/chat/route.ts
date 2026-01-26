@@ -304,6 +304,23 @@ const verifyBotProtection = (logContext: LogContext) =>
 */
 
 // ============================================================================
+// Tool Name Constants
+// ============================================================================
+
+// Only these search tools from Valyu should increment quota
+// All other tools are automatically excluded
+const SEARCH_TOOLS = new Set([
+  'webSearch',
+  'financeSearch',
+  'paperSearch',
+  'bioSearch',
+  'patentSearch',
+  'secSearch',
+  'economicsSearch',
+  'companyResearch',
+]);
+
+// ============================================================================
 // Streaming State
 // ============================================================================
 
@@ -311,7 +328,7 @@ interface StreamingState {
   content: string;
   reasoning: string;
   isComplete: boolean;
-  toolCallCount: number;
+  searchToolCallCount: number;
   pendingUpdate: { content: string; reasoning: string };
 }
 
@@ -631,7 +648,7 @@ const handleChatRequest = (
       content: "",
       reasoning: "",
       isComplete: false,
-      toolCallCount: 0,
+      searchToolCallCount: 0,
       pendingUpdate: { content: "", reasoning: "" },
     });
     const queueShutdownRef = yield* Ref.make(false);
@@ -768,17 +785,17 @@ const handleChatRequest = (
 
             logger.info("Request aborted by client", logContext, {
               contentLength: finalState.content.length,
-              toolCallCount: finalState.toolCallCount,
+              searchToolCallCount: finalState.searchToolCallCount,
             });
 
-            // Increment tool call quota if any tools were used
-            if (finalState.toolCallCount > 0) {
+            // Increment tool call quota if any search tools were used
+            if (finalState.searchToolCallCount > 0) {
               logger.debug("Incrementing tool quota (abort)", logContext, { 
-                toolCallCount: finalState.toolCallCount 
+                searchToolCallCount: finalState.searchToolCallCount 
               });
               try {
                 await Effect.runPromise(
-                  incrementToolCallQuota(auth.userId, finalState.toolCallCount)
+                  incrementToolCallQuota(auth.userId, finalState.searchToolCallCount)
                 );
               } catch (err) {
                 logger.error("Failed to increment tool quota", logContext, err);
@@ -801,7 +818,7 @@ const handleChatRequest = (
         try {
           const result = streamText({
             model,
-            messages: convertToModelMessages(
+            messages: await convertToModelMessages(
               filterMessagesForModel(messages as UIMessage[], modelId)
             ),
             tools: toolSet,
@@ -843,12 +860,20 @@ const handleChatRequest = (
                 logger.debug("Tool call detected", logContext, { 
                   toolName: chunk.toolName,
                 });
-                Effect.runPromise(
-                  Ref.update(stateRef, (s) => ({
-                    ...s,
-                    toolCallCount: s.toolCallCount + 1,
-                  }))
-                );
+                // Only increment quota for search tools; all other tools are automatically excluded
+                if (SEARCH_TOOLS.has(chunk.toolName)) {
+                  Effect.runPromise(
+                    Ref.update(stateRef, (s) => ({
+                      ...s,
+                      searchToolCallCount: s.searchToolCallCount + 1,
+                    }))
+                  );
+                } else {
+                  // Log non-search tool calls but don't increment quota
+                  logger.debug("Non-search tool call (not counted for quota)", logContext, {
+                    toolName: chunk.toolName,
+                  });
+                }
               } else if (
                 chunk.type === "tool-result" &&
                 chunk.toolName === "webSearch"
@@ -921,17 +946,17 @@ const handleChatRequest = (
                 totalTimeMs: totalTime,
                 contentLength: finalState.content.length,
                 reasoningLength: finalState.reasoning.length,
-                toolCallCount: finalState.toolCallCount,
+                searchToolCallCount: finalState.searchToolCallCount,
                 success,
               });
 
-              if (finalState.toolCallCount > 0) {
+              if (finalState.searchToolCallCount > 0) {
                 logger.debug("Incrementing tool quota", logContext, { 
-                  toolCallCount: finalState.toolCallCount 
+                  searchToolCallCount: finalState.searchToolCallCount 
                 });
                 try {
                   await Effect.runPromise(
-                    incrementToolCallQuota(auth.userId, finalState.toolCallCount)
+                    incrementToolCallQuota(auth.userId, finalState.searchToolCallCount)
                   );
                 } catch (err) {
                   logger.error("Failed to increment tool quota", logContext, err);
