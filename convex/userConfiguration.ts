@@ -1,5 +1,5 @@
 import { AuthQuery, AuthMutation } from "./helpers/authenticated";
-import { query } from "./_generated/server";
+import { query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { ensureServerSecret } from "./helpers/auth";
 
@@ -70,5 +70,36 @@ export const updateSupermemoryPreference = AuthMutation({
     }
 
     return null;
+  },
+});
+
+export const createUserConfiguration = internalMutation({
+  args: {
+    userId: v.string(),
+    supermemoryEnabled: v.optional(v.boolean()),
+  },
+  returns: v.id("userConfiguration"),
+  handler: async (ctx, args) => {
+    // Check if configuration already exists
+    const existing = await ctx.db
+      .query("userConfiguration")
+      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .unique();
+
+    if (existing) {
+      // Update existing configuration if supermemoryEnabled is provided
+      if (args.supermemoryEnabled !== undefined) {
+        await ctx.db.patch(existing._id, {
+          supermemoryEnabled: args.supermemoryEnabled,
+        });
+      }
+      return existing._id;
+    } else {
+      // Create new configuration with supermemory enabled by default
+      return await ctx.db.insert("userConfiguration", {
+        userId: args.userId,
+        supermemoryEnabled: args.supermemoryEnabled ?? true,
+      });
+    }
   },
 });

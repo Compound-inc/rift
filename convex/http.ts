@@ -106,6 +106,11 @@ http.route({
             lastName: data.last_name ?? undefined,
             profilePictureUrl: data.profile_picture_url ?? undefined,
           });
+          // Create user configuration with supermemory enabled
+          await ctx.runMutation(internal.userConfiguration.createUserConfiguration, {
+            userId: data.id,
+            supermemoryEnabled: true,
+          });
           break;
         }
         case "user.deleted": {
