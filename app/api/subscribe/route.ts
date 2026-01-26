@@ -241,6 +241,7 @@ export const POST = async (req: NextRequest) => {
         },
       ],
       mode: 'subscription',
+      allow_promotion_codes: true,
       success_url: `${baseUrl}/chat`,
       cancel_url: `${baseUrl}/`,
     });
