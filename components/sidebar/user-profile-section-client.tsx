@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ai/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useRouter } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
@@ -39,6 +40,7 @@ function getPlanBadgeStyles(plan: string) {
 }
 
 export function UserProfileSectionClient({ serverSkeleton }: UserProfileSectionClientProps) {
+  const router = useRouter();
   const { isAuthenticated, isLoading } = useConvexAuth();
   const user = useQuery(api.users.getCurrentUser, isAuthenticated ? {} : "skip");
   const orgInfo = useQuery(
@@ -159,8 +161,12 @@ export function UserProfileSectionClient({ serverSkeleton }: UserProfileSectionC
   }
 
   // Unauthenticated state
+  const handleSignInHover = () => {
+    router.prefetch("/sign-in");
+  };
+
   return (
-    <Link href="/sign-in" className="w-full">
+    <Link href="/sign-in" onMouseEnter={handleSignInHover} className="w-full">
       <Button
         className="w-full bg-accent hover:bg-accent/90 text-white rounded-lg font-medium"
       >

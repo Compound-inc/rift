@@ -178,9 +178,11 @@ function ShareAccessMessage({ status }: { status: SharedThreadAccessDenied["stat
               <h2 className="text-xl font-semibold">{current.title}</h2>
               <p className="text-sm text-muted-foreground">{current.description}</p>
               {current.action && (
-                <Button asChild className="w-fit">
-                  <a href={current.action.href}>{current.action.label}</a>
-                </Button>
+                <div className="flex justify-end">
+                  <Button asChild className="w-fit">
+                    <a href={current.action.href}>{current.action.label}</a>
+                  </Button>
+                </div>
               )}
             </div>
           </div>

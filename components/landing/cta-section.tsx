@@ -1,7 +1,16 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ai/ui/button";
 
 export default function CTASection() {
+  const router = useRouter();
+
+  const handleSignUpHover = () => {
+    router.prefetch("/sign-up");
+  };
+
   return (
     <div className="pt-24 md:pt-0">
     <section
@@ -31,7 +40,7 @@ export default function CTASection() {
             asChild
             className="hover:bg-white hover:text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/1)] hover:shadow-[rgba(0,0,0,0.1)_0px_0px_0px_1px] relative flex w-full sm:w-auto cursor-pointer select-none items-center justify-center whitespace-nowrap bg-white text-base leading-6 tracking-normal duration-[0.17s] text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/1)] dark:bg-zinc-900 dark:text-white dark:hover:bg-zinc-800 shadow-[rgba(0,0,0,0.05)_0px_0px_0px_1px] rounded-[50px] h-14 px-8 border-none"
           >
-            <Link href="/sign-up" aria-label="Conocer los precios">
+            <Link href="/sign-up" onMouseEnter={handleSignUpHover} aria-label="Conocer los precios">
               Registrarse
             </Link>
           </Button>
