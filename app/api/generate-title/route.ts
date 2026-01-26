@@ -183,6 +183,7 @@ const generateTitle = (trimmedMessage: string) =>
         - do not write anything other than the title
         - do not use quotes or colons
         - do not use any other text other than the title
+        - the title should be in same language as the user message
         User message: ${trimmedMessage}`,
         temperature: 0.5,
         maxOutputTokens: 50,
