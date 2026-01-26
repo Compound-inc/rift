@@ -6,6 +6,11 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const returnTo = searchParams.get('return_to');
   const plan = searchParams.get('plan');
+
+  // Validate returnTo is a safe relative URL
+  if (returnTo && (!returnTo.startsWith('/') || returnTo.startsWith('//') || returnTo.includes(':'))) {
+    throw new Error('Invalid return_to parameter');
+  }
   
   let stateObj: Record<string, string> = {};
   if (returnTo) stateObj.returnTo = returnTo;

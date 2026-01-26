@@ -11,7 +11,11 @@ export async function GET(request: NextRequest) {
     try {
       const state = JSON.parse(stateParam);
       if (state.returnTo) {
-        returnPathname = state.returnTo;
+        // Validate returnTo is a safe relative URL
+        const returnTo = state.returnTo;
+        if (returnTo.startsWith('/') && !returnTo.startsWith('//') && !returnTo.includes(':')) {
+          returnPathname = returnTo;
+        }
       }
       // Preserve plan parameter if present, so it can be handled by the router or subsequent page
       if (state.plan) {

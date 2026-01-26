@@ -5,7 +5,6 @@ import { PaginatedOrganizationData } from "@/actions/getOrganizationMembers";
 
 interface MembersContentProps {
   initialData: PaginatedOrganizationData;
-  organizationId: string;
   currentUserId: string;
   totalMemberCount: number;
   seatQuantity: number | null;
@@ -14,7 +13,6 @@ interface MembersContentProps {
 
 export function MembersContent({
   initialData,
-  organizationId,
   currentUserId,
   totalMemberCount,
   seatQuantity,
@@ -23,7 +21,6 @@ export function MembersContent({
   return (
     <MembersListWithShell
       initialData={initialData}
-      organizationId={organizationId}
       currentUserId={currentUserId}
       seatQuantity={seatQuantity}
       totalMemberCount={totalMemberCount}

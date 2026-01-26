@@ -98,8 +98,6 @@ function DomainVerificationContent() {
   useEffect(() => {
     if (isEnterprise && user && organizationId && !authTokenPromise) {
       const promise = getWorkOSWidgetToken(
-        organizationId,
-        user.id,
         ["widgets:domain-verification:manage"] as const
       ).then((result) => {
         if (result.success) {
@@ -170,8 +168,6 @@ function SsoConnectionsContent() {
   useEffect(() => {
     if (isEnterprise && user && organizationId && !authTokenPromise) {
       const promise = getWorkOSWidgetToken(
-        organizationId,
-        user.id,
         ["widgets:sso:manage"] as const
       ).then((result) => {
         if (result.success) {

@@ -18,7 +18,6 @@ interface MembersHeaderClientProps {
   seatQuantity?: number | null;
   totalMemberCount: number;
   plan?: "free" | "plus" | "pro" | "enterprise" | null;
-  organizationId: string;
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onRefresh: () => void;
@@ -28,7 +27,6 @@ export function MembersHeaderClient({
   seatQuantity,
   totalMemberCount,
   plan,
-  organizationId,
   searchQuery,
   onSearchChange,
   onRefresh,
@@ -66,7 +64,7 @@ export function MembersHeaderClient({
       const results = await Promise.all(
         invitationForms
           .filter(inv => inv.email.trim())
-          .map(inv => inviteUser(inv.email, inv.role, organizationId))
+          .map(inv => inviteUser(inv.email, inv.role))
       );
 
       const hasErrors = results.some(r => !r.success);

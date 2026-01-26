@@ -1,12 +1,19 @@
 "use server";
 
+import { withAuth } from "@workos-inc/authkit-nextjs";
 import { workos } from "@/app/api/workos";
 import { getOrganizationMemberCount } from "./getOrganizationMembers";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 
-export async function inviteUser(organizationId: string, email: string, roleSlug?: string) {
+export async function inviteUser(email: string, roleSlug?: string) {
   try {
+    const { organizationId } = await withAuth({ ensureSignedIn: true });
+    
+    if (!organizationId) {
+      return { success: false, error: "No organization found in session" };
+    }
+
     // Verify plan
     const plan = await fetchQuery(api.organizations.getOrganizationPlan, {
       workos_id: organizationId,
@@ -24,7 +31,7 @@ export async function inviteUser(organizationId: string, email: string, roleSlug
     });
     
     if (seatQuantity !== null && seatQuantity !== undefined) {
-        const currentCount = await getOrganizationMemberCount(organizationId);
+        const currentCount = await getOrganizationMemberCount();
         // Check if adding 1 more would exceed limit (currentCount includes active + pending)
         // So if currentCount >= seatQuantity, we cannot add more.
         if (currentCount >= seatQuantity) {

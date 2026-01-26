@@ -5,11 +5,7 @@ import { api } from "@/convex/_generated/api";
 import { getAuditLogPortalLink } from "@/actions/getAuditLogPortalLink";
 import { useState } from "react";
 
-interface AuditLogsButtonProps {
-  organizationId: string;
-}
-
-export function AuditLogsButton({ organizationId }: AuditLogsButtonProps) {
+export function AuditLogsButton() {
   const { isAuthenticated } = useConvexAuth();
   const [auditLogsLink, setAuditLogsLink] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -28,7 +24,7 @@ export function AuditLogsButton({ organizationId }: AuditLogsButtonProps) {
 
     setIsLoading(true);
     try {
-      const link = await getAuditLogPortalLink(organizationId);
+      const link = await getAuditLogPortalLink();
       setAuditLogsLink(link);
       if (link) {
         window.open(link, "_blank", "noopener,noreferrer");

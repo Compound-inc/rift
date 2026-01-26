@@ -1,6 +1,6 @@
 "use server";
 
-import { requireAuth } from "@/lib/auth-server";
+import { withAuth } from "@workos-inc/authkit-nextjs";
 import { workos } from "@/app/api/workos";
 type WidgetScope = 'widgets:users-table:manage' | 'widgets:sso:manage' | 'widgets:domain-verification:manage' | 'widgets:api-keys:manage';
 
@@ -9,16 +9,28 @@ export type GetWorkOSWidgetTokenResult =
   | { success: false; error: string };
 
 export async function getWorkOSWidgetToken(
-  organizationId: string,
-  userId: string,
   scopes: WidgetScope[]
 ): Promise<GetWorkOSWidgetTokenResult> {
   try {
-    await requireAuth();
+    const { user, organizationId } = await withAuth({ ensureSignedIn: true });
+    
+    if (!user?.id) {
+      return {
+        success: false,
+        error: "User not authenticated",
+      };
+    }
+
+    if (!organizationId) {
+      return {
+        success: false,
+        error: "No organization found in session",
+      };
+    }
     
     const token = await workos.widgets.getToken({
       organizationId,
-      userId,
+      userId: user.id,
       scopes,
     });
     

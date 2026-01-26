@@ -89,7 +89,6 @@ function MembersContent() {
 
   return (
     <MembersData
-      organizationId={organizationId}
       currentUserId={user.id}
     />
   );
@@ -120,5 +119,5 @@ function AuditLogsContent() {
     );
   }
 
-  return <AuditLogsButton organizationId={organizationId} />;
+  return <AuditLogsButton />;
 }

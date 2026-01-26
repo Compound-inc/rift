@@ -59,7 +59,6 @@ function getRoleLabel(role: string): string {
 
 interface MembersListWithShellProps {
   initialData: PaginatedOrganizationData;
-  organizationId: string;
   currentUserId: string;
   seatQuantity?: number | null;
   totalMemberCount: number;
@@ -69,7 +68,6 @@ interface MembersListWithShellProps {
 
 export function MembersListWithShell({ 
   initialData, 
-  organizationId, 
   currentUserId, 
   seatQuantity, 
   totalMemberCount, 
@@ -99,14 +97,14 @@ export function MembersListWithShell({
   const fetchMembers = useCallback(async (after?: string, before?: string) => {
     setLoading(true);
     try {
-      const newData = await getPaginatedOrganizationMembers(organizationId, 50, after, before);
+      const newData = await getPaginatedOrganizationMembers(50, after, before);
       setData(newData);
     } catch (e) {
       console.error("Failed to fetch members", e);
     } finally {
       setLoading(false);
     }
-  }, [organizationId]);
+  }, []);
 
   const handleNextPage = useCallback(() => {
     if (data.nextCursor) {
@@ -426,7 +424,6 @@ export function MembersListWithShell({
             seatQuantity={seatQuantity}
             totalMemberCount={totalMemberCount}
             plan={plan}
-            organizationId={organizationId}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             onRefresh={refreshData}

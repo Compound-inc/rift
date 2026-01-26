@@ -42,7 +42,6 @@ import { cn } from "@/lib/utils"
 
 interface MembersListProps {
   initialData: PaginatedOrganizationData
-  organizationId: string
   currentUserId: string
   seatQuantity?: number | null
   totalMemberCount: number
@@ -54,7 +53,7 @@ interface InvitationFormData {
   role: string
 }
 
-export function MembersList({ initialData, organizationId, currentUserId, seatQuantity, totalMemberCount, plan }: MembersListProps) {
+export function MembersList({ initialData, currentUserId, seatQuantity, totalMemberCount, plan }: MembersListProps) {
   const router = useRouter()
   const [data, setData] = useState<PaginatedOrganizationData>(initialData)
   const [loading, setLoading] = useState(false)
@@ -94,14 +93,14 @@ export function MembersList({ initialData, organizationId, currentUserId, seatQu
   const fetchMembers = useCallback(async (after?: string, before?: string) => {
     setLoading(true)
     try {
-        const newData = await getPaginatedOrganizationMembers(organizationId, 50, after, before)
+        const newData = await getPaginatedOrganizationMembers(50, after, before)
         setData(newData)
     } catch (e) {
         console.error("Failed to fetch members", e)
     } finally {
         setLoading(false)
     }
-  }, [organizationId])
+  }, [])
 
   const handleNextPage = () => {
     if (data.nextCursor) {
@@ -159,7 +158,7 @@ export function MembersList({ initialData, organizationId, currentUserId, seatQu
 
       const results = await Promise.all(
         validInvitations
-          .map(inv => inviteUser(organizationId, inv.email, inv.role))
+          .map(inv => inviteUser(inv.email, inv.role))
       )
 
       const failures = results.filter(r => !r.success)

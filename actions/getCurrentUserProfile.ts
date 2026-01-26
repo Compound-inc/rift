@@ -36,9 +36,9 @@ export async function getCurrentUserProfile(): Promise<GetCurrentUserProfileResu
       user: {
         id: workosUser.id,
         email: workosUser.email,
-        firstName: (workosUser as any).firstName ?? null,
-        lastName: (workosUser as any).lastName ?? null,
-        profilePictureUrl: (workosUser as any).profilePictureUrl ?? null,
+        firstName: workosUser.firstName ?? null,
+        lastName: workosUser.lastName ?? null,
+        profilePictureUrl: workosUser.profilePictureUrl ?? null,
       },
     } satisfies GetCurrentUserProfileResult;
   }).pipe(
@@ -51,6 +51,15 @@ export async function getCurrentUserProfile(): Promise<GetCurrentUserProfileResu
             error instanceof Error
               ? error.message
               : "No se pudo cargar el perfil",
+        } satisfies GetCurrentUserProfileResult;
+      }),
+    ),
+    Effect.catchAllDefect((defect) =>
+      Effect.sync(() => {
+        console.error("[profile] getCurrentUserProfile failed (defect)", { defect });
+        return {
+          success: false as const,
+          error: "No se pudo cargar el perfil",
         } satisfies GetCurrentUserProfileResult;
       }),
     ),
