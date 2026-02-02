@@ -42,7 +42,6 @@ export const config = {
     // Always run for API routes (no prefetch for API routes)
     '/api/chat',
     '/api/generate-title',
-    '/api/subscribe',
     '/api/upload',
     // Catch-all for any other API routes
     '/api/:path*',

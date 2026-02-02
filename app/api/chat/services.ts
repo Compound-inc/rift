@@ -4,6 +4,7 @@ import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { UIMessage } from "ai";
+import { Autumn } from "autumn-js";
 import { isCapable, isPremium } from "@/lib/ai/ai-providers";
 import { ToolType } from "@/lib/ai/config/base";
 import * as Sentry from "@sentry/nextjs";
@@ -627,80 +628,80 @@ export const getAuthContext = (): Effect.Effect<
 // Quota Service
 // ============================================================================
 
-/**
- * Checks user quota and returns whether the request is allowed.
- */
-export const checkUserQuota = (
-  userId: string,
-  orgId: string,
-  modelId: string
-): Effect.Effect<
-  { allowed: true; quotaType: "standard" | "premium" },
-  NoSubscriptionError | QuotaExceededError | DatabaseError
-> =>
-  Effect.gen(function* () {
-    const quotaType = isPremium(modelId) ? "premium" : "standard";
+export const UserQuota = {
+  check: (args: {
+    customer_id: string;
+    feature_id: string;
+    entity_id: string;
+    quotaType: "standard" | "premium";
+  }): Effect.Effect<void, QuotaExceededError | DatabaseError> =>
+    Effect.gen(function* () {
+      const data = yield* Effect.tryPromise({
+        try: async () => {
+          const secretKey = process.env.AUTUMN_SECRET_KEY;
+          if (!secretKey) {
+            throw new Error("AUTUMN_SECRET_KEY is not set");
+          }
 
-    const quotaCheck = yield* Effect.tryPromise({
-      try: () =>
-        fetchQuery(api.users.serverCheckUserQuota, {
-          secret: process.env.CONVEX_SECRET_TOKEN!,
-          userId,
-          orgId,
-          quotaType,
-        }),
-      catch: (error) =>
-        new DatabaseError({
-          message: "Failed to check user quota",
-          operation: "serverCheckUserQuota",
-          cause: error,
-        }),
-    });
-
-    if (!quotaCheck.allowed) {
-      if (!quotaCheck.quotaConfigured) {
-        return yield* new NoSubscriptionError({
-          message: "Organization has no active subscription configured",
-          quotaType,
-        });
-      }
-
-      // Fetch both quotas for detailed error
-      const bothQuotas = yield* Effect.tryPromise({
-        try: () =>
-          fetchQuery(api.users.serverGetUserBothQuotas, {
-            secret: process.env.CONVEX_SECRET_TOKEN!,
-            userId,
-            orgId,
-          }),
+          const autumn = new Autumn({ secretKey });
+          const { data } = await autumn.check({
+            customer_id: args.customer_id,
+            feature_id: args.feature_id,
+            entity_id: args.entity_id,
+            entity_data: {
+              feature_id: "seats",
+            },
+          });
+          return data as unknown as {
+            allowed: boolean;
+            usage?: number;
+            included_usage?: number;
+            balance?: number;
+            unlimited?: boolean;
+          };
+        },
         catch: (error) =>
           new DatabaseError({
-            message: "Failed to get user quotas",
-            operation: "serverGetUserBothQuotas",
+            message: "Failed to check quota (Autumn)",
+            operation: "autumn.check",
             cause: error,
           }),
       });
 
-      return yield* new QuotaExceededError({
-        message: `Message quota exceeded. Usage: ${quotaCheck.currentUsage}/${quotaCheck.limit} messages`,
-        quotaType,
-        currentUsage: quotaCheck.currentUsage,
-        limit: quotaCheck.limit,
-        otherQuotaInfo: {
-          currentUsage:
-            quotaType === "standard"
-              ? bothQuotas.premium.currentUsage
-              : bothQuotas.standard.currentUsage,
-          limit:
-            quotaType === "standard"
-              ? bothQuotas.premium.limit
-              : bothQuotas.standard.limit,
-        },
-      });
-    }
+      if (!data.allowed) {
+        return yield* new QuotaExceededError({
+          message: `Message quota exceeded (Autumn). Feature: ${args.feature_id}`,
+          quotaType: args.quotaType,
+          currentUsage: data.usage ?? 0,
+          limit: data.included_usage ?? 0,
+        });
+      }
+    }),
 
-    return { allowed: true as const, quotaType };
-  });
+  track: (args: {
+    customer_id: string;
+    feature_id: string;
+    entity_id: string;
+    value: number;
+  }): Effect.Effect<void, DatabaseError> =>
+    Effect.tryPromise({
+      try: async () => {
+        const secretKey = process.env.AUTUMN_SECRET_KEY;
+        if (!secretKey) {
+          throw new Error("AUTUMN_SECRET_KEY is not set");
+        }
+
+        const autumn = new Autumn({ secretKey });
+        await autumn.track(args);
+      },
+      catch: (error) =>
+        new DatabaseError({
+          message: "Failed to track quota usage (Autumn)",
+          operation: "autumn.track",
+          cause: error,
+        }),
+    }),
+} as const;
 
 // ============================================================================
 // Database Operations
@@ -778,30 +779,6 @@ export const sendUserMessage = (params: {
       new DatabaseError({
         message: "Failed to send user message",
         operation: "serverSendMessage",
-        cause: error,
-      }),
-  }).pipe(Effect.retry({ schedule: databaseRetrySchedule, while: isRetryableDatabaseError }));
-
-/**
- * Increments user quota (for regenerations).
- */
-export const incrementUserQuota = (
-  userId: string,
-  orgId: string,
-  quotaType: "standard" | "premium"
-): Effect.Effect<void, DatabaseError> =>
-  Effect.tryPromise({
-    try: () =>
-      fetchMutation(api.users.serverIncrementUserQuota, {
-        secret: process.env.CONVEX_SECRET_TOKEN!,
-        userId,
-        orgId,
-        quotaType,
-      }),
-    catch: (error) =>
-      new DatabaseError({
-        message: "Failed to increment user quota",
-        operation: "serverIncrementUserQuota",
         cause: error,
       }),
   }).pipe(Effect.retry({ schedule: databaseRetrySchedule, while: isRetryableDatabaseError }));
@@ -901,30 +878,6 @@ export const addSourcesToMessage = (params: {
         cause: error,
       }),
   }).pipe(Effect.retry({ schedule: databaseRetrySchedule, while: isRetryableDatabaseError }));
-
-/**
- * Increments tool call quota.
- */
-export const incrementToolCallQuota = (
-  userId: string,
-  toolCallCount: number
-): Effect.Effect<void, DatabaseError> =>
-  Effect.tryPromise({
-    try: () =>
-      fetchMutation(api.threads.serverIncrementToolCallQuota, {
-        secret: process.env.CONVEX_SECRET_TOKEN!,
-        userId,
-        toolCallCount,
-      }),
-    catch: (error) =>
-      new DatabaseError({
-        message: `Failed to increment tool call quota: ${error instanceof Error ? error.message : String(error)}`,
-        operation: "serverIncrementToolCallQuota",
-        cause: error,
-      }),
-  }).pipe(
-    Effect.retry({ schedule: databaseRetrySchedule, while: isRetryableDatabaseError }),
-  );
 
 // ============================================================================
 // Abort Handling

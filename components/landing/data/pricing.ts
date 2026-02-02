@@ -25,7 +25,7 @@ export const landingPlans: LandingPlan[] = [
   },
   {
     name: "Pro",
-    priceAmount: 490,
+    priceAmount: 480,
     currency: "MXN",
     billingPeriodLabel: "mes",
     description: "Para profesionales que necesitan más capacidad.",

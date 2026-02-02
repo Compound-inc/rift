@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { ShieldAlert } from "lucide-react";
 import {
   Dialog,
@@ -10,17 +10,13 @@ import {
 } from "@/components/ai/ui/dialog";
 import { Button } from "@/components/ai/ui/button";
 import Link from "next/link";
-// "Renovar Plan" used to open Stripe portal via createStripePortalSession. Stripe removed.
-import { createStripePortalSession } from "@/actions/createStripePortalSession";
 import { useConvexAuth, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { generateUUID } from "@/lib/utils";
 
 interface NoSubscriptionDialogProps {
   isOpen: boolean;
   onClose: () => void;
   orgName?: string | null;
-  stripeCustomerId?: string | null;
   canManageBilling?: boolean;
   subscriptionStatus?: string | null;
 }
@@ -92,12 +88,9 @@ export function NoSubscriptionDialog({
   isOpen,
   onClose,
   orgName,
-  stripeCustomerId,
   canManageBilling,
   subscriptionStatus,
 }: NoSubscriptionDialogProps) {
-  const [isRenewing, setIsRenewing] = useState(false);
-  const [portalError, setPortalError] = useState<string | null>(null);
   const { isAuthenticated } = useConvexAuth();
 
   const organizationInfo = useQuery(
@@ -110,11 +103,8 @@ export function NoSubscriptionDialog({
     isAuthenticated ? {} : "skip",
   );
 
-  const idempotencyKey = useMemo(() => generateUUID(), []);
-
   const resolved = useMemo(() => {
     const defaultOrgName = orgName ?? organizationInfo?.name ?? billingInfo?.name ?? null;
-    const defaultStripeCustomerId = stripeCustomerId ?? billingInfo?.stripeCustomerId ?? null;
     const defaultSubscriptionStatus =
       subscriptionStatus ??
       billingInfo?.subscriptionStatus ??
@@ -129,7 +119,6 @@ export function NoSubscriptionDialog({
 
     return {
       orgName: defaultOrgName,
-      stripeCustomerId: defaultStripeCustomerId,
       subscriptionStatus: defaultSubscriptionStatus,
       canManageBilling: defaultCanManageBilling,
       plan: defaultPlan,
@@ -139,40 +128,12 @@ export function NoSubscriptionDialog({
     canManageBilling,
     orgName,
     organizationInfo,
-    stripeCustomerId,
     subscriptionStatus,
   ]);
 
   const orgLabel = resolved.orgName ?? "Tu organización";
   const isCanceled = resolved.subscriptionStatus === "canceled";
   const isEnterprise = resolved.plan === "enterprise";
-
-  const handleRenewPlan = async () => {
-    if (isRenewing) return;
-
-    if (!resolved.stripeCustomerId) {
-      window.location.href = "/settings/billing";
-      return;
-    }
-
-    setPortalError(null);
-    setIsRenewing(true);
-    try {
-      const { url } = await createStripePortalSession(resolved.stripeCustomerId);
-      if (url) {
-        window.location.href = url;
-      } else {
-        throw new Error("No portal URL returned");
-      }
-    } catch (error) {
-      console.error("Failed to open Stripe portal:", error);
-      setPortalError(
-        "No pudimos abrir el portal de Stripe. Inténtalo de nuevo o visita Ajustes > Facturación.",
-      );
-    } finally {
-      setIsRenewing(false);
-    }
-  };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -205,12 +166,6 @@ export function NoSubscriptionDialog({
               </div>
             </div>
 
-            {portalError && (
-              <div className="rounded-2xl border border-red-200/80 bg-red-50/80 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
-                {portalError}
-              </div>
-            )}
-
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
               <Button
                 onClick={onClose}
@@ -235,32 +190,15 @@ export function NoSubscriptionDialog({
                     variant="outline"
                     className="w-full justify-center rounded-2xl border-zinc-200 bg-white/80 text-zinc-900 hover:bg-white dark:border-zinc-800 dark:bg-transparent dark:text-white dark:hover:bg-zinc-900/60 sm:w-auto"
                   >
-                    <Link href={`/subscribe?plan=free&cancel_existing_subscription=true&idempotency_key=${idempotencyKey}`}>Cambiar a plan gratuito</Link>
+                    <Link href="/subscribe?plan=free">Cambiar a plan gratuito</Link>
                   </Button>
-                  {isCanceled ? (
-                    <Button
-                      asChild
-                      variant="outline"
-                      className="w-full justify-center rounded-2xl border-zinc-200 bg-white/80 text-zinc-900 hover:bg-white dark:border-zinc-800 dark:bg-transparent dark:text-white dark:hover:bg-zinc-900/60 sm:w-auto"
-                    >
-                      <Link href="/#pricing">Ver planes</Link>
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={handleRenewPlan}
-                      disabled={isRenewing}
-                      variant="outline"
-                      className="w-full justify-center rounded-2xl border-zinc-200 bg-white/80 text-zinc-900 hover:bg-white dark:border-zinc-800 dark:bg-transparent dark:text-white dark:hover:bg-zinc-900/60 sm:w-auto cursor-pointer"
-                    >
-                      {isRenewing ? (
-                        <>
-                          Renovar Plan
-                        </>
-                      ) : (
-                        "Renovar Plan"
-                      )}
-                    </Button>
-                  )}
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="w-full justify-center rounded-2xl border-zinc-200 bg-white/80 text-zinc-900 hover:bg-white dark:border-zinc-800 dark:bg-transparent dark:text-white dark:hover:bg-zinc-900/60 sm:w-auto"
+                  >
+                    <Link href="/#pricing">{isCanceled ? "Ver planes" : "Cambiar plan"}</Link>
+                  </Button>
                 </>
               ) : (
                 <Button

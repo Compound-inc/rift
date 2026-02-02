@@ -5,7 +5,6 @@ import { paginationOptsValidator } from "convex/server";
 import {
   extractOrganizationIdFromJWT,
   checkQuotaLimit,
-  incrementQuotaUsage,
   incrementToolCallQuota,
   getOrganizationBillingCycle,
 } from "./helpers/quota";
@@ -684,13 +683,6 @@ export const serverSendMessage = mutation({
     if (!thread) {
       throw new Error("Thread not found or access denied");
     }
-
-    await incrementQuotaUsage(
-      ctx,
-      args.userId,
-      args.quotaType,
-      billingCycle?.billingCycleStart,
-    );
 
     const messageDocId = await ctx.db.insert("messages", {
       messageId: args.messageId,

@@ -13,10 +13,14 @@ export const GET = async (request: NextRequest) => {
 
     const searchParams = request.nextUrl.searchParams;
     const plan = searchParams.get("plan");
+    const seats = searchParams.get("seats");
 
     if (plan) {
       const subscribeUrl = new URL("/subscribe", request.url);
       subscribeUrl.searchParams.set("plan", plan);
+      if (seats) {
+        subscribeUrl.searchParams.set("seats", seats);
+      }
       return NextResponse.redirect(subscribeUrl);
     }
 

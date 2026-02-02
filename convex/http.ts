@@ -4,37 +4,6 @@ import { internal } from "./_generated/api";
 
 const http = httpRouter();
 
-// Protected endpoint to sync Stripe customer ID to an organization by WorkOS ID
-// STRIPE: Received { workos_id, stripeCustomerId }. Called setStripeCustomerIdByWorkOSId(workos_id, stripeCustomerId) to store payment-provider customer ID in Convex. Replace with new-provider sync when migrating.
-http.route({
-  path: "/sync-stripe-customer",
-  method: "POST",
-  handler: httpAction(async (ctx, request) => {
-    const authHeader = request.headers.get("authorization") || "";
-    const expected = `Bearer ${process.env.CONVEX_SYNC_SECRET ?? ""}`;
-    if (!process.env.CONVEX_SYNC_SECRET || authHeader !== expected) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    const body = await request.json();
-    const { workos_id, stripeCustomerId } = body ?? {};
-    if (!workos_id || !stripeCustomerId) {
-      return new Response(JSON.stringify({ error: "Missing fields" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    return new Response(JSON.stringify({ status: "ok" }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  }),
-});
-
 // Protected endpoint to get organization by WorkOS ID
 http.route({
   path: "/get-organization-by-workos-id",
@@ -243,97 +212,6 @@ http.route({
           headers: { "Content-Type": "application/json" },
         },
       );
-    }
-  }),
-});
-
-// Stripe webhook endpoint
-// STRIPE: 1) Verify: stripe.webhooks.constructEvent(payload, stripe-signature, STRIPE_WEBHOOK_SECRET)
-// STRIPE: 2) Process: switch on event.type (checkout.session.completed, customer.subscription.*, invoice.*, payment_intent.*). For checkout.session.completed / customer.subscription.created: if paid sub, list and cancel free subs. For all: extract billing period from event, run syncStripeDataWithPeriod(stripeCustomerId, billingPeriod). Return 200.
-http.route({
-  path: "/stripe-webhook",
-  method: "POST",
-  handler: httpAction(async (ctx, request) => {
-    const sigHeader = request.headers.get("stripe-signature");
-
-    if (!sigHeader) {
-      return new Response(
-        JSON.stringify({ error: "Missing stripe-signature header" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    return new Response(
-      JSON.stringify({ status: "ok", message: "Stripe removed; webhook not processed" }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
-  }),
-});
-
-// Stripe success endpoint
-// STRIPE: After Stripe Checkout success, eagerly ran syncStripeDataWithPeriod(organization.stripeCustomerId) to sync subscription into Convex before webhooks. Replace with new provider's post-checkout sync when migrating.
-http.route({
-  path: "/stripe-success",
-  method: "POST",
-  handler: httpAction(async (ctx, request) => {
-    try {
-      const authHeader = request.headers.get("authorization") || "";
-      const expected = `Bearer ${process.env.CONVEX_SYNC_SECRET ?? ""}`;
-      if (!process.env.CONVEX_SYNC_SECRET || authHeader !== expected) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-
-      const body = await request.json();
-      const { workosOrganizationId } = body;
-
-      if (!workosOrganizationId) {
-        return new Response(
-          JSON.stringify({ error: "Missing workosOrganizationId" }),
-          {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          },
-        );
-      }
-
-      const organization = await ctx.runQuery(
-        internal.organizations.getByWorkOSId,
-        { workos_id: workosOrganizationId },
-      );
-
-      if (!organization) {
-        return new Response(
-          JSON.stringify({ error: "Organization not found" }),
-          {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          },
-        );
-      }
-
-      return new Response(
-        JSON.stringify({ status: "ok", message: "Stripe removed" }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    } catch (error) {
-      console.error("Stripe success endpoint error:", error);
-
-      return new Response(JSON.stringify({ error: "Request failed" }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      });
     }
   }),
 });

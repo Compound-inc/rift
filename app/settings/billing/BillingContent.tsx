@@ -8,10 +8,10 @@ import { BillingSkeleton } from "./BillingSkeleton";
 
 // Precios estimados en MXN (Hardcoded para visualización)
 // Plus: ~$10 USD -> $200 MXN
-// Pro: ~$27 USD -> $540 MXN
+// Pro: (autumn.config.ts) $480 MXN base
 const PLAN_PRICES_MXN = {
   plus: 190,
-  pro: 540,
+  pro: 480,
   enterprise: 0,
 } as const;
 
@@ -127,8 +127,7 @@ export function BillingContent() {
             </div>
             {billingInfo.plan !== "enterprise" && (
               <div className="mt-4">
-                {/* BillingButton opened Stripe Billing Portal; Stripe removed. */}
-                <BillingButton stripeCustomerId={billingInfo.stripeCustomerId} />
+                <BillingButton />
               </div>
             )}
           </div>

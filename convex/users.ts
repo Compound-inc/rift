@@ -326,7 +326,7 @@ export const serverCheckUserQuota = query({
         "Organization ID is required. User must be part of an organization to send messages."
       );
     }
-    
+
     const billingCycle = await getOrganizationBillingCycle(ctx, args.orgId);
     const quotaCheck = await checkQuotaLimit(
       ctx,
@@ -368,7 +368,7 @@ export const serverGetUserBothQuotas = query({
         "Organization ID is required. User must be part of an organization to send messages."
       );
     }
-    
+
     const billingCycle = await getOrganizationBillingCycle(ctx, args.orgId);
     const standardQuota = await checkQuotaLimit(
       ctx,

@@ -58,15 +58,13 @@ import {
   validateRegenerateRequest,
   filterMessagesForModel,
   getAuthContext,
-  checkUserQuota,
   handleRegeneration,
   sendUserMessage,
-  incrementUserQuota,
   startAssistantMessage,
   appendMessageDelta,
   finalizeAssistantMessage,
   addSourcesToMessage,
-  incrementToolCallQuota,
+  UserQuota,
   databaseRetrySchedule,
   classifyProviderError,
   generateIdempotencyKey,
@@ -553,7 +551,18 @@ const handleChatRequest = (
       }),
       // Quota check
       lastUser && (userText || userFiles.length > 0)
-        ? checkUserQuota(auth.userId, auth.orgId, modelId)
+        ? Effect.gen(function* () {
+            const quotaType = isPremium(modelId) ? "premium" : "standard";
+          const featureId = quotaType;
+            yield* UserQuota.check({
+              customer_id: auth.orgId,
+              feature_id: featureId,
+              entity_id: auth.userId,
+              quotaType,
+            });
+
+            return { allowed: true as const, quotaType };
+          })
         : Effect.succeed({ allowed: true as const, quotaType }),
     ], { concurrency: 2 });
 
@@ -632,14 +641,6 @@ const handleChatRequest = (
           )
         );
       } else {
-        // Run synchronously for regeneration quota increment
-        yield* incrementUserQuota(auth.userId, auth.orgId, quotaType).pipe(
-          Effect.tapError((error) =>
-            Effect.sync(() => {
-              logger.error(`Failed to increment quota: ${idempotencyKey}`, logContext, error);
-            })
-          )
-        );
       }
     }
 
@@ -795,10 +796,15 @@ const handleChatRequest = (
               });
               try {
                 await Effect.runPromise(
-                  incrementToolCallQuota(auth.userId, finalState.searchToolCallCount)
+                  UserQuota.track({
+                    customer_id: auth.orgId,
+                    feature_id: quotaType,
+                    entity_id: auth.userId,
+                    value: finalState.searchToolCallCount,
+                  })
                 );
               } catch (err) {
-                logger.error("Failed to increment tool quota", logContext, err);
+                logger.error("Failed to track tool quota (Autumn)", logContext, err);
               }
             }
 
@@ -816,6 +822,16 @@ const handleChatRequest = (
         logger.debug("Starting AI stream", logContext, { timeMs: Date.now() - start });
 
         try {
+          // Track message usage (+1) whenever generation starts.
+          await Effect.runPromise(
+            UserQuota.track({
+              customer_id: auth.orgId,
+              feature_id: quotaType,
+              entity_id: auth.userId,
+              value: 1,
+            })
+          );
+
           const result = streamText({
             model,
             messages: await convertToModelMessages(
@@ -956,10 +972,15 @@ const handleChatRequest = (
                 });
                 try {
                   await Effect.runPromise(
-                    incrementToolCallQuota(auth.userId, finalState.searchToolCallCount)
+                    UserQuota.track({
+                      customer_id: auth.orgId,
+                      feature_id: quotaType,
+                      entity_id: auth.userId,
+                      value: finalState.searchToolCallCount,
+                    })
                   );
                 } catch (err) {
-                  logger.error("Failed to increment tool quota", logContext, err);
+                  logger.error("Failed to track tool quota (Autumn)", logContext, err);
                 }
               }
 

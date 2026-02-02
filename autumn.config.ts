@@ -7,15 +7,15 @@ import {
 } from "atmn";
 
 // Features
-export const standardMessages = feature({
-	id: "standard_messages",
-	name: "Standard Messages",
+export const premium = feature({
+	id: "premium",
+	name: "Premium Messages",
 	type: "single_use",
 });
 
-export const premiumMessages = feature({
-	id: "premium_messages",
-	name: "Premium Messages",
+export const standard = feature({
+	id: "standard",
+	name: "Standard Messages",
 	type: "single_use",
 });
 
@@ -32,12 +32,18 @@ export const free = product({
 	is_default: true,
 	items: [
 		featureItem({
+			feature_id: premium.id,
+			included_usage: 5,
+			interval: "month",
+		}),
+
+		featureItem({
 			feature_id: seats.id,
 			included_usage: 1,
 		}),
 
 		featureItem({
-			feature_id: standardMessages.id,
+			feature_id: standard.id,
 			included_usage: 20,
 			interval: "month",
 		}),
@@ -48,28 +54,23 @@ export const plus = product({
 	id: "plus",
 	name: "plus",
 	items: [
-		priceItem({
-			price: 190, // $10 USD
-			interval: "month",
-		}),
-
 		pricedFeatureItem({
 			feature_id: seats.id,
-			price: 190, // $10 USD
+			price: 190,
 			interval: "month",
 			included_usage: 1,
 			billing_units: 1,
-			usage_model: "pay_per_use",
+			usage_model: "prepaid",
 		}),
 
 		featureItem({
-			feature_id: premiumMessages.id,
+			feature_id: premium.id,
 			included_usage: 100,
 			interval: "month",
 		}),
 
 		featureItem({
-			feature_id: standardMessages.id,
+			feature_id: standard.id,
 			included_usage: 1000,
 			interval: "month",
 		}),
@@ -80,28 +81,23 @@ export const pro = product({
 	id: "pro",
 	name: "pro",
 	items: [
-		priceItem({
-			price: 480, // $24 USD
-			interval: "month",
-		}),
-
 		pricedFeatureItem({
 			feature_id: seats.id,
-			price: 480, // $24 USD
+			price: 480,
 			interval: "month",
 			included_usage: 1,
 			billing_units: 1,
-			usage_model: "pay_per_use",
+			usage_model: "prepaid",
 		}),
 
 		featureItem({
-			feature_id: premiumMessages.id,
+			feature_id: premium.id,
 			included_usage: 270,
 			interval: "month",
 		}),
 
 		featureItem({
-			feature_id: standardMessages.id,
+			feature_id: standard.id,
 			included_usage: 2700,
 			interval: "month",
 		}),

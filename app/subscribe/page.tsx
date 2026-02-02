@@ -1,6 +1,6 @@
 "use client";
 
-import { useCustomer, CheckoutDialog } from "autumn-js/react";
+import { useCustomer } from "autumn-js/react";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -9,6 +9,15 @@ import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { LoadingIcon } from "@/components/ui/icons/svg-icons";
 import { Button } from "@/components/ai/ui/button";
 import { landingPlans } from "@/components/landing/data/pricing";
+import { ensureWorkosOrganization } from "@/actions/ensureWorkosOrganization";
+
+const MIN_SEATS = 1;
+const MAX_SEATS = 100;
+
+function clampSeats(value: number): number {
+  if (!Number.isFinite(value)) return MIN_SEATS;
+  return Math.min(MAX_SEATS, Math.max(MIN_SEATS, Math.trunc(value)));
+}
 
 function GradientBackground({ id }: { id: string }) {
   const gradients = {
@@ -103,19 +112,26 @@ function GradientBackground({ id }: { id: string }) {
 }
 
 const PAID_PLANS = ["plus", "pro"] as const;
+type PaidPlan = (typeof PAID_PLANS)[number];
+
+function getSuccessUrl(): string {
+  return new URL("/chat", window.location.origin).toString();
+}
 
 function SubscribePageContent() {
   const { user, organizationId, switchToOrganization } = useAuth();
-  const { checkout } = useCustomer();
+  const { attach } = useCustomer();
+  console.log("Autumn customer:", useCustomer())
   const searchParams = useSearchParams();
   const planParam = searchParams.get("plan")?.toLowerCase() ?? null;
+  const seatsParam = searchParams.get("seats");
+  const seats = clampSeats(Number(seatsParam ?? MIN_SEATS));
   const router = useRouter();
-  const checkoutStartedRef = useRef(false);
+  const startedRef = useRef(false);
 
   const [orgName, setOrgName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
 
   const selectedPlan = landingPlans.find(
     (p) => p.name.toLowerCase() === planParam?.toLowerCase()
@@ -124,62 +140,49 @@ function SubscribePageContent() {
   const gradientId = selectedPlan?.gradientId || "1";
   const planName = selectedPlan?.name || planParam;
 
-  // When user has org: free → POST and redirect to url; plus/pro → Autumn checkout and redirect
+  const isPaidPlan = (value: string | null): value is PaidPlan =>
+    value === "plus" || value === "pro";
+
+  // When user has org: free → /chat ; plus/pro → Autumn checkout (per docs)
   useEffect(() => {
     if (!user || !organizationId || !planParam) return;
-    if (checkoutStartedRef.current) return;
+    if (startedRef.current) return;
 
-    const runFlow = async () => {
-      setLoading(true);
+    startedRef.current = true;
+    setLoading(true);
+    setError("");
+
+    (async () => {
       try {
         if (planParam === "free") {
-          const res = await fetch("/api/subscribe", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              userId: user.id,
-              organizationId,
-              subscriptionLevel: "free",
-            }),
-          });
-          const data = await res.json();
-          if (data.url) {
-            router.push(data.url);
-            return;
-          }
-          if (data.error) {
-            setError(data.error);
-          }
-          setLoading(false);
+          router.replace("/chat");
           return;
         }
 
-        if (PAID_PLANS.includes(planParam as (typeof PAID_PLANS)[number])) {
-          checkoutStartedRef.current = true;
-          const successUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/chat`;
-          const result = await checkout({
+        if (isPaidPlan(planParam)) {
+          // Skip intermediate dialog UX: attach directly (redirects to Stripe when needed).
+          await attach({
             productId: planParam,
-            dialog: CheckoutDialog,
-            successUrl,
+            options: [{ featureId: "seats", quantity: seats }],
+            successUrl: getSuccessUrl(),
           });
-          const redirectUrlFromCheckout = result?.url ?? result?.checkout_url;
-          if (redirectUrlFromCheckout) {
-            window.location.href = redirectUrlFromCheckout;
-            return;
-          }
+          router.replace("/chat");
+          return;
         }
-        setLoading(false);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Error de conexión al iniciar suscripción"
-        );
-        checkoutStartedRef.current = false;
-      }
-      setLoading(false);
-    };
 
-    runFlow();
-  }, [user, organizationId, planParam, router, checkout]);
+        throw new Error("Invalid plan selected");
+      } catch (err) {
+        startedRef.current = false;
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Error de conexión al iniciar suscripción",
+        );
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [user, organizationId, planParam, router, attach, seats]);
 
   if (!planParam) {
      return <div>Error: No plan selected.</div>;
@@ -194,20 +197,18 @@ function SubscribePageContent() {
       return (
         <div className="flex items-center justify-center min-h-screen">
             <div className="flex flex-col items-center space-y-4">
-                {!error && <LoadingIcon className="size-8 animate-spin" />}
-                {/* Previously: "Redirigiendo a Stripe...". Replace with new provider when migrating. */}
-                {!error && <p className="text-sm text-muted-foreground">Redirigiendo a checkout…</p>}
+                {loading && !error && <LoadingIcon className="size-8 animate-spin" />}
+                {!error && (
+                  <p className="text-sm text-muted-foreground">
+                    {planParam === "free" ? "Entrando al chat…" : "Abriendo checkout…"}
+                  </p>
+                )}
                 {error && (
                     <>
                         <p className="text-red-500 text-sm text-center max-w-md">{error}</p>
-                        {redirectUrl && (
-                            <Button
-                                onClick={() => router.push(redirectUrl)}
-                                className="mt-4"
-                            >
-                                {redirectUrl.includes("/settings/billing") ? "Ver configuración de facturación" : "Volver al chat"}
-                            </Button>
-                        )}
+                        <Button onClick={() => router.replace("/")} className="mt-4">
+                          Volver
+                        </Button>
                     </>
                 )}
             </div>
@@ -216,7 +217,7 @@ function SubscribePageContent() {
   }
 
   // Handle manual subscription for users without organization
-  const handleCreateOrgAndSubscribe = async () => {
+  const handleCreateOrgAndContinue = async () => {
     setLoading(true);
     setError("");
     
@@ -225,45 +226,38 @@ function SubscribePageContent() {
         setLoading(false);
         return;
     }
+    if (orgName.length > 50) {
+      setError("El nombre de la organización no puede exceder los 50 caracteres.");
+      setLoading(false);
+      return;
+    }
 
     try {
-        const res = await fetch("/api/subscribe", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                userId: user.id,
-                orgName, 
-                organizationId: undefined, // Explicitly undefined for new org
-                subscriptionLevel: planParam.toLowerCase(),
-            }),
-        });
+        const { organizationId: newOrgId } = await ensureWorkosOrganization({ orgName });
+        await switchToOrganization(newOrgId);
 
-        const data = await res.json();
-        const { error: errMsg, url: redirectUrlFromApi, organizationId: newOrgId } = data;
-
-        if (errMsg) {
-          setError(errMsg);
+        // Continue flow immediately (avoid extra routing state).
+        startedRef.current = true;
+        if (planParam === "free") {
+          router.replace("/chat");
+          return;
+        }
+        if (isPaidPlan(planParam)) {
+          await attach({
+            productId: planParam,
+            options: [{ featureId: "seats", quantity: seats }],
+            successUrl: getSuccessUrl(),
+          });
+          router.replace("/chat");
           setLoading(false);
           return;
         }
 
-        if (newOrgId) {
-          await switchToOrganization(newOrgId);
-        }
-        if (redirectUrlFromApi) {
-          router.push(redirectUrlFromApi);
-        } else if (newOrgId && planParam) {
-          router.push(`/subscribe?plan=${planParam}`);
-        } else {
-          setError("Error desconocido");
-          setLoading(false);
-        }
+        setError("Invalid plan selected");
     } catch (err) {
-        setError("Error de conexión");
-        setLoading(false);
+        setError(err instanceof Error ? err.message : "Error de conexión");
     }
+    setLoading(false);
   };
 
   return (
@@ -305,7 +299,7 @@ function SubscribePageContent() {
                 )}
 
                 <Button
-                    onClick={handleCreateOrgAndSubscribe}
+                    onClick={handleCreateOrgAndContinue}
                     disabled={loading}
                     className="hover:bg-white hover:text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/1)] hover:shadow-[rgba(0,0,0,0.1)_0px_0px_0px_1px] relative flex w-full cursor-pointer select-none items-center justify-center bg-white text-sm leading-4 tracking-normal duration-[0.17s] text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/1)] dark:bg-zinc-900 dark:text-white dark:hover:bg-zinc-800 shadow-[rgba(0,0,0,0.05)_0px_0px_0px_1px] rounded-[50px] h-10 border border-zinc-200 dark:border-zinc-800"
                 >

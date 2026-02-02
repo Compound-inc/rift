@@ -8,6 +8,7 @@ import { LogOut, Info } from "lucide-react";
 import authkitSignOut from "@/actions/signout";
 import { useRouter } from "next/navigation";
 import { LoadingIcon } from "@/components/ui/icons/svg-icons";
+import { ensureWorkosOrganization } from "@/actions/ensureWorkosOrganization";
 
 function GradientBackground() {
   return (
@@ -86,47 +87,17 @@ export function NoOrgModal() {
     }
 
     try {
-        const res = await fetch("/api/subscribe", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                userId: auth.user!.id,
-                orgName, 
-                subscriptionLevel: "free",
-            }),
-        });
+        const { organizationId: newOrgId } = await ensureWorkosOrganization({ orgName });
+        await switchToOrganization(newOrgId);
 
-        const data = await res.json();
-
-        if (data.success && data.organizationId) {
-            await switchToOrganization(data.organizationId);
-            // Force an AuthKit refresh so cookies/JWT include the new org context,
-            try {
-                await fetch("/api/auth/refresh", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    credentials: "include",
-                    body: JSON.stringify({ organizationId: data.organizationId }),
-                });
-            } catch {
-            }
-
-            if (typeof window !== "undefined") {
-                window.location.reload();
-            } else {
-                router.refresh();
-            }
+        if (typeof window !== "undefined") {
+            window.location.reload();
         } else {
-            setError(data.error || "Error desconocido al crear la organización");
-            setLoading(false);
+            router.refresh();
         }
     } catch (err) {
         console.error(err);
-        setError("Error de conexión");
+        setError(err instanceof Error ? err.message : "Error de conexión");
         setLoading(false);
     }
   };

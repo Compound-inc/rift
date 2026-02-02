@@ -6,6 +6,7 @@ import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
 import { SettingsInput } from "@/components/settings";
+import { ensureWorkosOrganization } from "@/actions/ensureWorkosOrganization";
 
 export function ModalDialog({
   subscriptionLevel,
@@ -40,37 +41,23 @@ export function ModalDialog({
       return;
     }
 
-    // Call API to create a new organization and subscribe to plan
-    const res = await fetch("/api/subscribe", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        userId,
-        orgName: organizationId ? undefined : orgName,
-        organizationId: organizationId || undefined,
-        subscriptionLevel: subscriptionLevel.toLowerCase(),
-      }),
-    });
+    try {
+      if (organizationId) {
+        router.push(`/subscribe?plan=${subscriptionLevel.toLowerCase()}`);
+        return;
+      }
 
-    const data = await res.json();
-    const { error: errMsg, url: redirectUrl, organizationId: newOrgId } = data;
-
-    if (errMsg) {
-      setLoading(false);
-      setError(`Error al suscribirse al plan: ${errMsg}`);
-      return;
-    }
-
-    if (redirectUrl) {
-      router.push(redirectUrl);
-      return;
-    }
-
-    if (newOrgId) {
+      const { organizationId: newOrgId } = await ensureWorkosOrganization({ orgName });
       await switchToOrganization(newOrgId);
       router.push(`/subscribe?plan=${subscriptionLevel.toLowerCase()}`);
+      return;
+    } catch (err) {
+      setLoading(false);
+      setError(
+        `Error al suscribirse al plan: ${
+          err instanceof Error ? err.message : "Error desconocido"
+        }`,
+      );
       return;
     }
 
