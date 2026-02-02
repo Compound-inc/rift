@@ -13,7 +13,7 @@ import {
   ValidationError,
   AuthenticationError,
   NoOrganizationError,
-  NoSubscriptionError,
+  SeatLimitError,
   QuotaExceededError,
   DatabaseError,
   RegenerateError,
@@ -108,6 +108,7 @@ export const captureChatError = (error: ChatRouteError, logContext: LogContext):
       "AbortError",           // Client cancelled request
       "QuotaExceededError",   // Expected business logic
       "NoSubscriptionError",  // Expected business logic
+      "SeatLimitError",       // Expected business logic
     ].includes(error._tag);
 
     if (skipCapture) {
@@ -385,6 +386,7 @@ export interface AuthContext {
   token: string;
   userId: string;
   orgId: string;
+  userName: string;
 }
 
 export interface QuotaCheckResult {
@@ -617,10 +619,16 @@ export const getAuthContext = (): Effect.Effect<
       });
     }
 
+    const userName =
+      [auth.user.firstName, auth.user.lastName].filter(Boolean).join(" ").trim() ||
+      auth.user.email ||
+      auth.user.id;
+
     return {
       token: auth.accessToken,
       userId: auth.user.id,
       orgId: auth.organizationId,
+      userName,
     };
   });
 
@@ -628,15 +636,22 @@ export const getAuthContext = (): Effect.Effect<
 // Quota Service
 // ============================================================================
 
+const AUTUMN_ENTITY_NOT_FOUND_ERROR_SNIPPET =
+  "not found. To automatically create this entity, please pass in 'feature_id' into the 'entity_data' field of the request body.";
+
+const isAutumnEntityNotFoundError = (message?: string): boolean =>
+  Boolean(message?.includes(AUTUMN_ENTITY_NOT_FOUND_ERROR_SNIPPET));
+
 export const UserQuota = {
   check: (args: {
     customer_id: string;
     feature_id: string;
     entity_id: string;
+    entity_name: string;
     quotaType: "standard" | "premium";
-  }): Effect.Effect<void, QuotaExceededError | DatabaseError> =>
+  }): Effect.Effect<void, QuotaExceededError | SeatLimitError | DatabaseError> =>
     Effect.gen(function* () {
-      const data = yield* Effect.tryPromise({
+      const result = yield* Effect.tryPromise({
         try: async () => {
           const secretKey = process.env.AUTUMN_SECRET_KEY;
           if (!secretKey) {
@@ -644,20 +659,81 @@ export const UserQuota = {
           }
 
           const autumn = new Autumn({ secretKey });
-          const { data } = await autumn.check({
-            customer_id: args.customer_id,
-            feature_id: args.feature_id,
-            entity_id: args.entity_id,
-            entity_data: {
+          const runCheck = () =>
+            autumn.check({
+              customer_id: args.customer_id,
+              feature_id: args.feature_id,
+              entity_id: args.entity_id,
+            });
+
+          let createdSeatsEntity = false;
+          const ensureSeatsEntity = async () => {
+            if (createdSeatsEntity) return;
+
+            const seatsResponse = await autumn.check({
+              customer_id: args.customer_id,
               feature_id: "seats",
+            });
+
+            const seatsData = (seatsResponse as any)?.data as unknown;
+            if (!seatsData || typeof (seatsData as any).allowed !== "boolean") {
+              const message = (seatsResponse as any)?.error?.message as string | undefined;
+              throw new Error(message ?? "Autumn seats check failed");
+            }
+
+            const seatsAllowed =
+              (seatsData as any).unlimited === true || (seatsData as any).allowed === true;
+
+            if (!seatsAllowed) {
+              return "no_seats" as const;
+            }
+
+            createdSeatsEntity = true;
+            await autumn.entities.create(args.customer_id, {
+              id: args.entity_id,
+              name: args.entity_name,
+              feature_id: "seats",
+            });
+
+            return "ok" as const;
+          };
+
+          let response: Awaited<ReturnType<typeof runCheck>>;
+
+          try {
+            response = await runCheck();
+          } catch (error) {
+            const message = error instanceof Error ? error.message : undefined;
+            if (!isAutumnEntityNotFoundError(message)) throw error;
+            const ensured = await ensureSeatsEntity();
+            if (ensured === "no_seats") return { kind: "no_seats" as const };
+            response = await runCheck();
+          }
+
+          if ((response as any)?.data == null) {
+            const message = (response as any)?.error?.message as string | undefined;
+            if (isAutumnEntityNotFoundError(message)) {
+              const ensured = await ensureSeatsEntity();
+              if (ensured === "no_seats") return { kind: "no_seats" as const };
+              response = await runCheck();
+            }
+          }
+
+          const responseData = (response as any)?.data as unknown;
+          if (!responseData || typeof (responseData as any).allowed !== "boolean") {
+            const message = (response as any)?.error?.message as string | undefined;
+            throw new Error(message ?? "Autumn check failed");
+          }
+
+          return {
+            kind: "ok" as const,
+            data: responseData as {
+              allowed: boolean;
+              usage?: number;
+              included_usage?: number;
+              balance?: number;
+              unlimited?: boolean;
             },
-          });
-          return data as unknown as {
-            allowed: boolean;
-            usage?: number;
-            included_usage?: number;
-            balance?: number;
-            unlimited?: boolean;
           };
         },
         catch: (error) =>
@@ -667,6 +743,14 @@ export const UserQuota = {
             cause: error,
           }),
       });
+
+      if (result.kind === "no_seats") {
+        return yield* new SeatLimitError({
+          message: "Your organization has reached its user limit.",
+        });
+      }
+
+      const data = result.data;
 
       if (!data.allowed) {
         return yield* new QuotaExceededError({

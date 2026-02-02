@@ -174,6 +174,16 @@ const errorToResponse = (
         "NO_SUBSCRIPTION"
       );
 
+    case "SeatLimitError":
+      return makeResponse(
+        {
+          error: "Seat limit reached",
+          message: error.message,
+        },
+        403,
+        "SEAT_LIMIT"
+      );
+
     case "QuotaExceededError":
       return makeResponse(
         {
@@ -558,6 +568,7 @@ const handleChatRequest = (
               customer_id: auth.orgId,
               feature_id: featureId,
               entity_id: auth.userId,
+              entity_name: auth.userName,
               quotaType,
             });
 
