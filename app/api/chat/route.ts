@@ -388,8 +388,26 @@ const handleChatRequest = (
     const auth = yield* getAuthContext();
     logContext.userId = auth.userId;
 
+    // Fetch org plan to branch quota: Enterprise = entity-level; Plus/Pro/Free = customer-level
+    const plan = yield* Effect.tryPromise({
+      try: () =>
+        fetchQuery(api.organizations.getOrganizationPlan, {
+          workos_id: auth.orgId,
+          secret: process.env.CONVEX_SECRET_TOKEN!,
+        }),
+      catch: (error) =>
+        new DatabaseError({
+          message: "Failed to fetch organization plan",
+          operation: "getOrganizationPlan",
+          cause: error,
+        }),
+    }).pipe(Effect.catchAll(() => Effect.succeed(null)));
+    const isEnterprise = plan === "enterprise";
+
     logger.debug("Authentication complete", logContext, { 
-      timeMs: Date.now() - start 
+      timeMs: Date.now() - start,
+      plan: plan ?? null,
+      isEnterprise,
     });
 
     // Validate thread ownership and custom instruction access
@@ -563,12 +581,13 @@ const handleChatRequest = (
       lastUser && (userText || userFiles.length > 0)
         ? Effect.gen(function* () {
             const quotaType = isPremium(modelId) ? "premium" : "standard";
-          const featureId = quotaType;
+            const featureId = quotaType;
             yield* UserQuota.check({
               customer_id: auth.orgId,
               feature_id: featureId,
-              entity_id: auth.userId,
-              entity_name: auth.userName,
+              ...(isEnterprise
+                ? { entity_id: auth.userId, entity_name: auth.userName }
+                : {}),
               quotaType,
             });
 
@@ -810,7 +829,7 @@ const handleChatRequest = (
                   UserQuota.track({
                     customer_id: auth.orgId,
                     feature_id: quotaType,
-                    entity_id: auth.userId,
+                    ...(isEnterprise ? { entity_id: auth.userId } : {}),
                     value: finalState.searchToolCallCount,
                   })
                 );
@@ -838,7 +857,7 @@ const handleChatRequest = (
             UserQuota.track({
               customer_id: auth.orgId,
               feature_id: quotaType,
-              entity_id: auth.userId,
+              ...(isEnterprise ? { entity_id: auth.userId } : {}),
               value: 1,
             })
           );
@@ -986,7 +1005,7 @@ const handleChatRequest = (
                     UserQuota.track({
                       customer_id: auth.orgId,
                       feature_id: quotaType,
-                      entity_id: auth.userId,
+                      ...(isEnterprise ? { entity_id: auth.userId } : {}),
                       value: finalState.searchToolCallCount,
                     })
                   );

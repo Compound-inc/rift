@@ -1,10 +1,12 @@
 import {
     internalQuery,
     internalMutation,
+    mutation,
   } from "../_generated/server";
   import { v } from "convex/values";
   import { internal } from "../_generated/api";
   import { productStatusValidator } from "../schema";
+  import { serverSecretArg, ensureServerSecret } from "../helpers/auth";
   
   // Plan configurations for admin dashboard
   const ADMIN_PLAN_CONFIGS = {
@@ -95,6 +97,33 @@ import {
   });
   
   
+  /**
+   * Clear legacy organization fields so they can be removed from the schema.
+   * Run via: bun run scripts/clear-org-legacy-fields.ts
+   */
+  export const clearOrganizationsLegacyFields = mutation({
+    args: { ...serverSecretArg },
+    returns: v.object({ updated: v.number() }),
+    handler: async (ctx, args) => {
+      ensureServerSecret(args.secret);
+      const orgs = await ctx.db.query("organizations").collect();
+      const legacyPatch = {
+        billingCycleStart: undefined,
+        billingCycleEnd: undefined,
+        stripeCustomerId: undefined,
+        subscriptionId: undefined,
+        subscriptionStatus: undefined,
+        priceId: undefined,
+        paymentMethodBrand: undefined,
+        paymentMethodLast4: undefined,
+      };
+      for (const org of orgs) {
+        await ctx.db.patch(org._id, legacyPatch);
+      }
+      return { updated: orgs.length };
+    },
+  });
+
   /**
    * Get organization by ID for admin operations
    */

@@ -11,14 +11,6 @@ import { Button } from "@/components/ai/ui/button";
 import { landingPlans } from "@/components/landing/data/pricing";
 import { ensureWorkosOrganization } from "@/actions/ensureWorkosOrganization";
 
-const MIN_SEATS = 1;
-const MAX_SEATS = 100;
-
-function clampSeats(value: number): number {
-  if (!Number.isFinite(value)) return MIN_SEATS;
-  return Math.min(MAX_SEATS, Math.max(MIN_SEATS, Math.trunc(value)));
-}
-
 function GradientBackground({ id }: { id: string }) {
   const gradients = {
     "1": (
@@ -124,8 +116,6 @@ function SubscribePageContent() {
   console.log("Autumn customer:", useCustomer())
   const searchParams = useSearchParams();
   const planParam = searchParams.get("plan")?.toLowerCase() ?? null;
-  const seatsParam = searchParams.get("seats");
-  const seats = clampSeats(Number(seatsParam ?? MIN_SEATS));
   const router = useRouter();
   const startedRef = useRef(false);
 
@@ -160,10 +150,8 @@ function SubscribePageContent() {
         }
 
         if (isPaidPlan(planParam)) {
-          // Skip intermediate dialog UX: attach directly (redirects to Stripe when needed).
           await attach({
             productId: planParam,
-            options: [{ featureId: "seats", quantity: seats }],
             successUrl: getSuccessUrl(),
           });
           router.replace("/chat");
@@ -182,7 +170,7 @@ function SubscribePageContent() {
         setLoading(false);
       }
     })();
-  }, [user, organizationId, planParam, router, attach, seats]);
+  }, [user, organizationId, planParam, router, attach]);
 
   if (!planParam) {
      return <div>Error: No plan selected.</div>;
@@ -245,7 +233,6 @@ function SubscribePageContent() {
         if (isPaidPlan(planParam)) {
           await attach({
             productId: planParam,
-            options: [{ featureId: "seats", quantity: seats }],
             successUrl: getSuccessUrl(),
           });
           router.replace("/chat");

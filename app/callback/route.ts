@@ -22,10 +22,6 @@ export async function GET(request: NextRequest) {
           const separator = returnPathname.includes('?') ? '&' : '?';
           returnPathname = `${returnPathname}${separator}plan=${state.plan}`;
       }
-      if (state.seats) {
-          const separator = returnPathname.includes('?') ? '&' : '?';
-          returnPathname = `${returnPathname}${separator}seats=${state.seats}`;
-      }
     } catch (e) {
     }
   }

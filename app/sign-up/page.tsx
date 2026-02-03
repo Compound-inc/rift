@@ -9,7 +9,6 @@ export default function SignUpPage() {
     const searchParams = new URLSearchParams(window.location.search);
     const returnTo = searchParams.get("return_to");
     const plan = searchParams.get("plan");
-    const seats = searchParams.get("seats");
     
     // Build the API route URL with any query parameters
     const params = new URLSearchParams();
@@ -18,9 +17,6 @@ export default function SignUpPage() {
     }
     if (plan) {
       params.set("plan", plan);
-    }
-    if (seats) {
-      params.set("seats", seats);
     }
 
     const apiUrl = `/api/sign-up${params.toString() ? `?${params.toString()}` : ""}`;

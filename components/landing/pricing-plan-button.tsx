@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ai/ui/button";
 import type { LandingPlan } from "@/components/landing/data/pricing";
@@ -26,50 +26,9 @@ type PricingPlanButtonProps = {
   slug: PlanSlug;
 };
 
-const MIN_SEATS = 1;
-const MAX_SEATS = 100;
-
-function clampSeats(value: number): number {
-  if (!Number.isFinite(value)) return MIN_SEATS;
-  return Math.min(MAX_SEATS, Math.max(MIN_SEATS, Math.trunc(value)));
-}
-
-function upsertQueryParam(href: string, key: string, value: string): string {
-  // Preserve hash if present
-  const [withoutHash, hash = ""] = href.split("#");
-  const hashSuffix = hash ? `#${hash}` : "";
-
-  const [pathname, search = ""] = withoutHash.split("?");
-  const params = new URLSearchParams(search);
-  params.set(key, value);
-  const query = params.toString();
-  return query ? `${pathname}?${query}${hashSuffix}` : `${pathname}${hashSuffix}`;
-}
-
-// Shared landing-page seat selection across all plan buttons.
-let seatsValue = 1;
-const seatListeners = new Set<() => void>();
-
-function setSeats(next: number) {
-  const clamped = clampSeats(next);
-  if (clamped === seatsValue) return;
-  seatsValue = clamped;
-  seatListeners.forEach((listener) => listener());
-}
-
-function subscribeToSeats(listener: () => void) {
-  seatListeners.add(listener);
-  return () => seatListeners.delete(listener);
-}
-
-function getSeatsSnapshot() {
-  return seatsValue;
-}
-
 export function PricingPlanButton({ plan, slug }: PricingPlanButtonProps) {
   const [context, setContext] = useState<PricingContext | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const seats = useSyncExternalStore(subscribeToSeats, getSeatsSnapshot, getSeatsSnapshot);
 
   useEffect(() => {
     let cancelled = false;
@@ -103,32 +62,28 @@ export function PricingPlanButton({ plan, slug }: PricingPlanButtonProps) {
 
   const resolvedContext = context ?? DEFAULT_PRICING_CONTEXT;
   const cta = buildPlanCta(slug, plan, resolvedContext);
-  const isSeatPlan = slug === "plus" || slug === "pro";
 
   let linkHref: string | null =
     !cta.disabled && typeof cta.href === "string" ? cta.href : null;
 
-  if (linkHref && isSeatPlan) {
-    linkHref = upsertQueryParam(linkHref, "seats", String(seats));
-  }
-
+  // Plus/Pro: fixed single-seat price (1 user per org). Enterprise is manually activated, not from this flow.
   let priceEstimate: string | null = null;
-  if (isSeatPlan) {
+  if (slug === "plus" || slug === "pro") {
     const base = slug === "plus" ? 190 : 480;
-    const perExtraSeat = slug === "plus" ? 190 : 480;
-    const total = base + perExtraSeat * Math.max(0, seats - 1);
     priceEstimate = new Intl.NumberFormat("es-MX", {
       style: "currency",
       currency: "MXN",
       maximumFractionDigits: 0,
-    }).format(total);
+    }).format(base);
   }
 
   if (isLoading) {
     return (
       <div className="flex w-full flex-col gap-3">
-        {isSeatPlan ? (
-          <SeatSelector seats={seats} onChange={setSeats} estimate={priceEstimate} />
+        {priceEstimate ? (
+          <p className="text-xs text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/0.6)] dark:text-zinc-400">
+            {priceEstimate} / mes
+          </p>
         ) : null}
         <Button className={CTA_BUTTON_CLASS} disabled aria-busy="true" aria-live="polite">
           Suscribirse
@@ -140,8 +95,10 @@ export function PricingPlanButton({ plan, slug }: PricingPlanButtonProps) {
   if (!linkHref) {
     return (
       <div className="flex w-full flex-col gap-3">
-        {isSeatPlan ? (
-          <SeatSelector seats={seats} onChange={setSeats} estimate={priceEstimate} />
+        {priceEstimate ? (
+          <p className="text-xs text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/0.6)] dark:text-zinc-400">
+            {priceEstimate} / mes
+          </p>
         ) : null}
         <Button className={CTA_BUTTON_CLASS} disabled>
           {cta.label}
@@ -152,8 +109,10 @@ export function PricingPlanButton({ plan, slug }: PricingPlanButtonProps) {
 
   return (
     <div className="flex w-full flex-col gap-3">
-      {isSeatPlan ? (
-        <SeatSelector seats={seats} onChange={setSeats} estimate={priceEstimate} />
+      {priceEstimate ? (
+        <p className="text-xs text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/0.6)] dark:text-zinc-400">
+          {priceEstimate} / mes
+        </p>
       ) : null}
       <Button className={CTA_BUTTON_CLASS} asChild>
         {cta.external ? (
@@ -162,38 +121,6 @@ export function PricingPlanButton({ plan, slug }: PricingPlanButtonProps) {
           <Link href={linkHref}>{cta.label}</Link>
         )}
       </Button>
-    </div>
-  );
-}
-
-function SeatSelector({
-  seats,
-  onChange,
-  estimate,
-}: {
-  seats: number;
-  onChange: (value: number) => void;
-  estimate: string | null;
-}) {
-  return (
-    <div className="flex w-full flex-col gap-2">
-      <label className="flex items-center justify-between gap-3 text-sm text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/0.75)] dark:text-zinc-300">
-        <span className="font-medium">Asientos</span>
-        <input
-          type="number"
-          inputMode="numeric"
-          min={MIN_SEATS}
-          max={MAX_SEATS}
-          value={seats}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="w-20 rounded-full border border-zinc-200 bg-white px-3 py-1 text-right text-sm text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/1)] shadow-[rgba(0,0,0,0.05)_0px_0px_0px_1px] focus:outline-none focus:ring-2 focus:ring-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/0.1)] dark:border-zinc-800 dark:bg-zinc-900 dark:text-white"
-        />
-      </label>
-      {estimate ? (
-        <p className="text-xs text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/0.6)] dark:text-zinc-400">
-          Total estimado: <span className="font-medium">{estimate}</span> / mes
-        </p>
-      ) : null}
     </div>
   );
 }

@@ -646,11 +646,13 @@ export const UserQuota = {
   check: (args: {
     customer_id: string;
     feature_id: string;
-    entity_id: string;
-    entity_name: string;
+    entity_id?: string;
+    entity_name?: string;
     quotaType: "standard" | "premium";
   }): Effect.Effect<void, QuotaExceededError | SeatLimitError | DatabaseError> =>
     Effect.gen(function* () {
+      const useEntityLogic = Boolean(args.entity_id && args.entity_name);
+
       const result = yield* Effect.tryPromise({
         try: async () => {
           const secretKey = process.env.AUTUMN_SECRET_KEY;
@@ -659,16 +661,22 @@ export const UserQuota = {
           }
 
           const autumn = new Autumn({ secretKey });
+
           const runCheck = () =>
-            autumn.check({
-              customer_id: args.customer_id,
-              feature_id: args.feature_id,
-              entity_id: args.entity_id,
-            });
+            useEntityLogic
+              ? autumn.check({
+                  customer_id: args.customer_id,
+                  feature_id: args.feature_id,
+                  entity_id: args.entity_id!,
+                })
+              : autumn.check({
+                  customer_id: args.customer_id,
+                  feature_id: args.feature_id,
+                });
 
           let createdSeatsEntity = false;
           const ensureSeatsEntity = async () => {
-            if (createdSeatsEntity) return;
+            if (createdSeatsEntity || !useEntityLogic) return;
 
             const seatsResponse = await autumn.check({
               customer_id: args.customer_id,
@@ -690,8 +698,8 @@ export const UserQuota = {
 
             createdSeatsEntity = true;
             await autumn.entities.create(args.customer_id, {
-              id: args.entity_id,
-              name: args.entity_name,
+              id: args.entity_id!,
+              name: args.entity_name!,
               feature_id: "seats",
             });
 
@@ -700,23 +708,27 @@ export const UserQuota = {
 
           let response: Awaited<ReturnType<typeof runCheck>>;
 
-          try {
-            response = await runCheck();
-          } catch (error) {
-            const message = error instanceof Error ? error.message : undefined;
-            if (!isAutumnEntityNotFoundError(message)) throw error;
-            const ensured = await ensureSeatsEntity();
-            if (ensured === "no_seats") return { kind: "no_seats" as const };
-            response = await runCheck();
-          }
-
-          if ((response as any)?.data == null) {
-            const message = (response as any)?.error?.message as string | undefined;
-            if (isAutumnEntityNotFoundError(message)) {
+          if (useEntityLogic) {
+            try {
+              response = await runCheck();
+            } catch (error) {
+              const message = error instanceof Error ? error.message : undefined;
+              if (!isAutumnEntityNotFoundError(message)) throw error;
               const ensured = await ensureSeatsEntity();
               if (ensured === "no_seats") return { kind: "no_seats" as const };
               response = await runCheck();
             }
+
+            if ((response as any)?.data == null) {
+              const message = (response as any)?.error?.message as string | undefined;
+              if (isAutumnEntityNotFoundError(message)) {
+                const ensured = await ensureSeatsEntity();
+                if (ensured === "no_seats") return { kind: "no_seats" as const };
+                response = await runCheck();
+              }
+            }
+          } else {
+            response = await runCheck();
           }
 
           const responseData = (response as any)?.data as unknown;
@@ -765,7 +777,7 @@ export const UserQuota = {
   track: (args: {
     customer_id: string;
     feature_id: string;
-    entity_id: string;
+    entity_id?: string;
     value: number;
   }): Effect.Effect<void, DatabaseError> =>
     Effect.tryPromise({
@@ -776,7 +788,20 @@ export const UserQuota = {
         }
 
         const autumn = new Autumn({ secretKey });
-        await autumn.track(args);
+        if (args.entity_id != null) {
+          await autumn.track({
+            customer_id: args.customer_id,
+            feature_id: args.feature_id,
+            entity_id: args.entity_id,
+            value: args.value,
+          });
+        } else {
+          await autumn.track({
+            customer_id: args.customer_id,
+            feature_id: args.feature_id,
+            value: args.value,
+          });
+        }
       },
       catch: (error) =>
         new DatabaseError({
