@@ -4,10 +4,6 @@ import {
   internalMutation,
 } from "./_generated/server";
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
-import { Id } from "./_generated/dataModel";
-import { getAuthUserIdentity } from "./helpers/getUser";
-import { extractOrganizationIdFromJWT } from "./helpers/quota";
 import { PermissionQuery, AuthOrgQuery } from "./helpers/authenticated";
 import { serverSecretArg, ensureServerSecret } from "./helpers/auth";
 import { productStatusValidator } from "./schema";

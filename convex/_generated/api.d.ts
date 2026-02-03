@@ -15,7 +15,7 @@ import type * as customInstructions from "../customInstructions.js";
 import type * as helpers_auth from "../helpers/auth.js";
 import type * as helpers_authenticated from "../helpers/authenticated.js";
 import type * as helpers_getUser from "../helpers/getUser.js";
-import type * as helpers_quota from "../helpers/quota.js";
+import type * as helpers_identity from "../helpers/identity.js";
 import type * as http from "../http.js";
 import type * as organizations from "../organizations.js";
 import type * as share from "../share.js";
@@ -39,7 +39,7 @@ declare const fullApi: ApiFromModules<{
   "helpers/auth": typeof helpers_auth;
   "helpers/authenticated": typeof helpers_authenticated;
   "helpers/getUser": typeof helpers_getUser;
-  "helpers/quota": typeof helpers_quota;
+  "helpers/identity": typeof helpers_identity;
   http: typeof http;
   organizations: typeof organizations;
   share: typeof share;

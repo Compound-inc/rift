@@ -1,6 +1,6 @@
 import { query, mutation, QueryCtx, MutationCtx } from "../_generated/server";
 import { getAuthUserIdentity } from "./getUser";
-import { extractOrganizationIdFromJWT } from "./quota";
+import { extractOrganizationIdFromJWT } from "./identity";
 import { UserIdentity } from "convex/server";
 import { ObjectType, PropertyValidators } from "convex/values";
 

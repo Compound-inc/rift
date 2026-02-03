@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { AuthMutation } from "./helpers/authenticated";
-import { extractOrganizationIdFromJWT } from "./helpers/quota";
+import { extractOrganizationIdFromJWT } from "./helpers/identity";
 
 export const report = AuthMutation({
   args: {

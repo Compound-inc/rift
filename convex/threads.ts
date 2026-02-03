@@ -2,12 +2,7 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId, getAuthUserIdentity } from "./helpers/getUser";
 import { paginationOptsValidator } from "convex/server";
-import {
-  extractOrganizationIdFromJWT,
-  checkQuotaLimit,
-  incrementToolCallQuota,
-  getOrganizationBillingCycle,
-} from "./helpers/quota";
+import { extractOrganizationIdFromJWT } from "./helpers/identity";
 import { ensureServerSecret } from "./helpers/auth";
 import { AuthMutation, AuthOrgMutation, AuthQuery } from "./helpers/authenticated";
 
@@ -658,7 +653,6 @@ export const serverSendMessage = mutation({
       );
     }
 
-    const billingCycle = await getOrganizationBillingCycle(ctx, args.orgId);
     const now = Date.now();
 
     // Idempotency: if a message with this messageId already exists for this user, return it
@@ -1033,24 +1027,6 @@ export const updateUserMessageContent = AuthMutation({
       });
     }
 
-    return null;
-  },
-});
-
-/**
- * Increment tool call quota for a user (server-side only)
- * This mutation is secured with a secret token to prevent client-side abuse
- */
-export const serverIncrementToolCallQuota = mutation({
-  args: {
-    secret: v.string(),
-    userId: v.string(),
-    toolCallCount: v.number(),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    ensureServerSecret(args.secret);
-    await incrementToolCallQuota(ctx, args.userId, args.toolCallCount);
     return null;
   },
 });
