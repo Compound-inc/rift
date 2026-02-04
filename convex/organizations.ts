@@ -170,11 +170,10 @@ export const syncAutumnSubscriptionData = internalMutation({
     }
 
     const newPlan = getPlanFromLookupKey(args.product.productId ?? null);
-    const shouldUpdatePlan = !organization.plan || organization.plan !== newPlan;
 
     await ctx.db.patch(organization._id, {
       productStatus: args.product.status ?? undefined,
-      ...(shouldUpdatePlan && newPlan ? { plan: newPlan } : {}),
+      plan: newPlan,
     });
     return organization._id;
   },

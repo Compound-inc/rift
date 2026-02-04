@@ -44,7 +44,7 @@ export default defineSchema({
   organizations: defineTable({
     workos_id: v.string(),
     name: v.string(),
-    plan: v.optional(v.union(v.literal("free"), v.literal("plus"), v.literal("pro"), v.literal("enterprise"))),
+    plan: v.optional(v.union(v.literal("free"), v.literal("plus"), v.literal("pro"), v.literal("enterprise"), v.null())),
     productStatus: v.optional(productStatusValidator),
     // Legacy fields (allow existing docs to validate; remove after migration)
     seatQuantity: v.optional(v.number()),

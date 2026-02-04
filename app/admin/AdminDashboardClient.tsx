@@ -105,6 +105,7 @@ export default function AdminDashboardClient() {
     const result = await cancelOrganizationSubscriptionAction({
       organizationId: selectedOrg._id,
       workos_id: selectedOrg.workos_id,
+      productId: selectedOrg.plan,
       cancelType,
       subscriptionStatus: cancelStatus,
     });

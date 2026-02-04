@@ -73,7 +73,7 @@ function getActiveProduct(products: WebhookProduct[]): WebhookProduct | undefine
   if (active) return active;
   const withPeriod = products.find((p) => p.current_period_end != null);
   if (withPeriod) return withPeriod;
-  return products[0];
+  return undefined;
 }
 
 /** Resolve the product to sync: prefer updated_product from event, then active product from customer.products. */

@@ -642,6 +642,10 @@ const AUTUMN_ENTITY_NOT_FOUND_ERROR_SNIPPET =
 const isAutumnEntityNotFoundError = (message?: string): boolean =>
   Boolean(message?.includes(AUTUMN_ENTITY_NOT_FOUND_ERROR_SNIPPET));
 
+/** Treats seat/quota/limit errors from entities.create (e.g. race when seat limit reached) as no_seats. */
+const isAutumnSeatLimitError = (message?: string): boolean =>
+  Boolean(message && /seat|quota|limit/i.test(message));
+
 export const UserQuota = {
   check: (args: {
     customer_id: string;
@@ -696,12 +700,18 @@ export const UserQuota = {
               return "no_seats" as const;
             }
 
-            createdSeatsEntity = true;
-            await autumn.entities.create(args.customer_id, {
-              id: args.entity_id!,
-              name: args.entity_name!,
-              feature_id: "seats",
-            });
+            try {
+              createdSeatsEntity = true;
+              await autumn.entities.create(args.customer_id, {
+                id: args.entity_id!,
+                name: args.entity_name!,
+                feature_id: "seats",
+              });
+            } catch (error) {
+              const message = error instanceof Error ? error.message : undefined;
+              if (isAutumnSeatLimitError(message)) return "no_seats" as const;
+              throw error;
+            }
 
             return "ok" as const;
           };
