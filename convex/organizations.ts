@@ -8,16 +8,13 @@ import { PermissionQuery, AuthOrgQuery } from "./helpers/authenticated";
 import { serverSecretArg, ensureServerSecret } from "./helpers/auth";
 import { productStatusValidator } from "./schema";
 
-// Map Autumn product id (or lookup key) to plan name.
-function getPlanFromLookupKey(
-  lookupKey: string | null,
+const VALID_PLANS = new Set(["free", "plus", "pro", "enterprise"]);
+
+function planFromProductId(
+  productId: string | null,
 ): "free" | "plus" | "pro" | "enterprise" | null {
-  if (!lookupKey) return null;
-  if (lookupKey === "free") return "free";
-  if (lookupKey === "plus") return "plus";
-  if (lookupKey === "pro") return "pro";
-  if (lookupKey === "enterprise") return "enterprise";
-  return null;
+  if (!productId || !VALID_PLANS.has(productId)) return null;
+  return productId as "free" | "plus" | "pro" | "enterprise";
 }
 
 export const createOrganization = internalMutation({
@@ -65,18 +62,6 @@ export const deleteOrganization = internalMutation({
   },
 });
 
-export const getOrganizationSeats = query({
-  args: { workos_id: v.string(), ...serverSecretArg },
-  handler: async (ctx, args) => {
-    ensureServerSecret(args.secret);
-    const organization = await ctx.db
-      .query("organizations")
-      .withIndex("by_workos_id", (q) => q.eq("workos_id", args.workos_id))
-      .first();
-    return null;
-  },
-});
-
 export const getOrganizationPlan = query({
   args: { workos_id: v.string(), ...serverSecretArg },
   handler: async (ctx, args) => {
@@ -86,21 +71,6 @@ export const getOrganizationPlan = query({
       .withIndex("by_workos_id", (q) => q.eq("workos_id", args.workos_id))
       .first();
     return organization?.plan ?? null;
-  },
-});
-
-export const getOrganizationSeatsAndPlan = query({
-  args: { workos_id: v.string(), ...serverSecretArg },
-  handler: async (ctx, args) => {
-    ensureServerSecret(args.secret);
-    const organization = await ctx.db
-      .query("organizations")
-      .withIndex("by_workos_id", (q) => q.eq("workos_id", args.workos_id))
-      .first();
-    return {
-      seatQuantity: null,
-      plan: organization?.plan ?? null,
-    };
   },
 });
 
@@ -169,11 +139,12 @@ export const syncAutumnSubscriptionData = internalMutation({
       throw new Error(`Organization not found for workos_id: ${args.workos_id}`);
     }
 
-    const newPlan = getPlanFromLookupKey(args.product.productId ?? null);
+    // Always set plan from webhook: valid productId → that plan; no/invalid product → null (no subscription).
+    const newPlan = planFromProductId(args.product.productId ?? null);
 
     await ctx.db.patch(organization._id, {
       productStatus: args.product.status ?? undefined,
-      plan: newPlan,
+      plan: newPlan ?? null,
     });
     return organization._id;
   },

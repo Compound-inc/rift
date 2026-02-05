@@ -216,7 +216,7 @@ export const ChatInputArea = React.memo(function ChatInputArea({
           isOpen={showNoSubscriptionDialog}
           onClose={() => setShowNoSubscriptionDialog(false)}
         />
-        
+
         {/* Quota Error Message */}
         {quotaError && (
           <div className="mb-2 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/50 rounded-lg text-red-800 dark:text-red-200 text-sm shadow-sm">

@@ -36,6 +36,7 @@ import {
   AuthenticationError,
   NoOrganizationError,
   NoSubscriptionError,
+  SeatLimitError,
   QuotaExceededError,
   DatabaseError,
   AbortError,
@@ -65,6 +66,7 @@ import {
   finalizeAssistantMessage,
   addSourcesToMessage,
   UserQuota,
+  setThreadFailedToFailed,
   databaseRetrySchedule,
   classifyProviderError,
   generateIdempotencyKey,
@@ -425,6 +427,7 @@ const handleChatRequest = (
       });
     }
 
+    const rest: Effect.Effect<Response, ChatRouteError, Scope.Scope> = Effect.gen(function* () {
     const customInstructionsContent = customInstruction?.instructions;
     const validatedCustomInstructionId = customInstruction ? customInstructionId : undefined;
 
@@ -1145,6 +1148,15 @@ const handleChatRequest = (
         "X-Request-ID": requestId,
       },
     });
+    });
+    return yield* rest.pipe(
+      Effect.catchAll((err: ChatRouteError) =>
+        setThreadFailedToFailed({ userId: auth.userId, threadId }).pipe(
+          Effect.catchAll(() => Effect.succeed(undefined)),
+          Effect.flatMap(() => Effect.fail(err))
+        )
+      )
+    );
   });
 
 // ============================================================================
@@ -1196,6 +1208,7 @@ export async function POST(req: Request): Promise<Response> {
       // BotDetectionError: (e: BotDetectionError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
       NoOrganizationError: (e: NoOrganizationError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
       NoSubscriptionError: (e: NoSubscriptionError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
+      SeatLimitError: (e: SeatLimitError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
       QuotaExceededError: (e: QuotaExceededError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
       AbortError: (e: AbortError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
       DatabaseError: (e: DatabaseError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),

@@ -1,18 +1,13 @@
 'use client';
 
 import { useCustomer } from "autumn-js/react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ai/ui/button";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
 import type { LandingPlan } from "@/components/landing/data/pricing";
-import {
-  DEFAULT_PRICING_CONTEXT,
-  PlanSlug,
-  PricingContext,
-  SubscriptionPlan,
-} from "@/lib/pricing-context";
-import { useHasPermission } from "@/lib/permissions-client";
+import { PlanSlug, PricingContext, SubscriptionPlan } from "@/lib/pricing-context";
+import { usePricingContext } from "@/lib/use-pricing-context";
 import { getAutumnBillingPortalUrl } from "@/actions/getAutumnBillingPortalUrl";
 
 const CTA_BUTTON_CLASS =
@@ -31,47 +26,15 @@ type PricingPlanButtonProps = {
   slug: PlanSlug;
 };
 
-const PAID_PLAN_SLUGS: PlanSlug[] = ["plus", "pro"];
+const PAID_PLAN_SLUGS = new Set<PlanSlug>(["plus", "pro"]);
 
 export function PricingPlanButton({ plan, slug }: PricingPlanButtonProps) {
-  const [context, setContext] = useState<PricingContext | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [isPortalLoading, setIsPortalLoading] = useState(false);
   const { checkout } = useCustomer();
-  const canManageBilling = useHasPermission("MANAGE_BILLING");
+  const resolvedContext = usePricingContext();
+  const canManageBilling = resolvedContext.canManageBilling;
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadContext() {
-      try {
-        const response = await fetch("/api/pricing-context", { cache: "no-store" });
-        if (!response.ok) {
-          throw new Error("Failed to load pricing context");
-        }
-        const data = (await response.json()) as PricingContext;
-        if (!cancelled) {
-          setContext(data);
-        }
-      } catch {
-        if (!cancelled) {
-          setContext(DEFAULT_PRICING_CONTEXT);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    loadContext();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const resolvedContext = context ?? DEFAULT_PRICING_CONTEXT;
   const cta = buildPlanCta(slug, plan, resolvedContext);
 
   let linkHref: string | null =
@@ -86,10 +49,10 @@ export function PricingPlanButton({ plan, slug }: PricingPlanButtonProps) {
     !cta.external &&
     resolvedContext.hasActiveSubscription &&
     resolvedContext.canManageBilling &&
-    PAID_PLAN_SLUGS.includes(slug) &&
+    PAID_PLAN_SLUGS.has(slug) &&
     slug !== resolvedContext.activePlan;
 
-  if (isLoading) {
+  if (resolvedContext.isLoading) {
     return (
       <div className="flex w-full flex-col gap-3">
         <Button className={CTA_BUTTON_CLASS} disabled aria-busy="true" aria-live="polite">

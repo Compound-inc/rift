@@ -133,7 +133,10 @@ export async function setOrganizationPlanAction(
           after(() => {
             console.error("Admin set plan: Autumn attach retry failed", retryResult.error);
           });
-          return { error: message || "Failed to attach plan in Autumn" };
+          const retryMessage =
+            (retryResult.error as { message?: string }).message ??
+            "Failed to attach plan in Autumn";
+          return { error: retryMessage };
         }
       } catch (createErr) {
         after(() => {

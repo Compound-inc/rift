@@ -88,6 +88,19 @@ function getProductToSync(
   return getActiveProduct(products);
 }
 
+type AutumnWebhookResult =
+  | { status: "ignored" }
+  | {
+      status: "ok";
+      scenario: string;
+      organization?: {
+        id: string;
+        workos_id: string;
+        name: string;
+        plan: string | null;
+      };
+    };
+
 export const handleAutumnWebhook = internalAction({
   args: {
     payload: v.string(),
@@ -98,9 +111,16 @@ export const handleAutumnWebhook = internalAction({
   returns: v.object({
     status: v.union(v.literal("ok"), v.literal("ignored")),
     scenario: v.optional(v.string()),
-    orgId: v.optional(v.string()),
+    organization: v.optional(
+      v.object({
+        id: v.string(),
+        workos_id: v.string(),
+        name: v.string(),
+        plan: v.union(v.string(), v.null()),
+      }),
+    ),
   }),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<AutumnWebhookResult> => {
     const webhookSecret = process.env.AUTUMN_WEBHOOK_SECRET;
     if (!webhookSecret) {
       console.error("[Autumn webhook] AUTUMN_WEBHOOK_SECRET is not set");
@@ -150,6 +170,21 @@ export const handleAutumnWebhook = internalAction({
       product,
     });
 
-    return { status: "ok" as const, scenario, orgId: workos_id };
+    const org = await ctx.runQuery(
+      internal.organizations.getOrganizationInfo,
+      { workos_id },
+    );
+    return {
+      status: "ok" as const,
+      scenario,
+      organization: org
+        ? {
+            id: org.id,
+            workos_id: org.workos_id,
+            name: org.name,
+            plan: org.plan ?? null,
+          }
+        : undefined,
+    };
   },
 });

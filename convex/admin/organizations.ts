@@ -29,30 +29,6 @@ import {
   });
   
   /**
-   * Set organization plan
-   */
-  export const setOrganizationPlan = internalMutation({
-    args: {
-      organizationId: v.id("organizations"),
-      plan: v.union(v.literal("free"), v.literal("plus"), v.literal("pro"), v.literal("enterprise")),
-    },
-    returns: v.null(),
-    handler: async (ctx, args) => {
-      const organization = await ctx.db.get(args.organizationId);
-      
-      if (!organization) {
-        throw new Error(`Organization not found: ${args.organizationId}`);
-      }
-
-      await ctx.db.patch(args.organizationId, {
-        plan: args.plan,
-        productStatus: "active",
-      });
-    },
-  });
-  
-  
-  /**
    * Clear legacy organization fields so they can be removed from the schema.
    * Run via: bun run scripts/clear-legacy-fields.ts
    */

@@ -642,8 +642,24 @@ const AUTUMN_ENTITY_NOT_FOUND_ERROR_SNIPPET =
 const isAutumnEntityNotFoundError = (message?: string): boolean =>
   Boolean(message?.includes(AUTUMN_ENTITY_NOT_FOUND_ERROR_SNIPPET));
 
-const isAutumnSeatLimitError = (message?: string): boolean =>
-  Boolean(message && /seat|quota|limit/i.test(message));
+/** Known Autumn API error codes for seat/entity balance limit (prefer over message matching). */
+const AUTUMN_SEAT_LIMIT_CODES = new Set([
+  "balance_exceeded",
+  "limit_exceeded",
+  "entity_limit",
+  "seat_limit",
+  "quota_exceeded",
+  "insufficient_balance",
+]);
+
+const isAutumnSeatLimitError = (error: unknown): boolean =>
+  Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      typeof (error as { code: unknown }).code === "string" &&
+      AUTUMN_SEAT_LIMIT_CODES.has((error as { code: string }).code),
+  );
 
 export const UserQuota = {
   check: (args: {
@@ -665,6 +681,9 @@ export const UserQuota = {
 
           const autumn = new Autumn({ secretKey });
 
+          // Entity flow (Enterprise): we check plan quota (args.feature_id = "standard"|"premium")
+          // per entity. The entity is created with feature_id "seats" so Autumn can bill seat count;
+          // quota checks correctly use args.feature_id for that entity's message limit.
           const runCheck = () =>
             useEntityLogic
               ? autumn.check({
@@ -681,6 +700,7 @@ export const UserQuota = {
           const ensureSeatsEntity = async () => {
             if (createdSeatsEntity || !useEntityLogic) return;
 
+            // Customer-level seats capacity; then create entity under "seats" to record this user as one seat.
             const seatsResponse = await autumn.check({
               customer_id: args.customer_id,
               feature_id: "seats",
@@ -707,8 +727,7 @@ export const UserQuota = {
                 feature_id: "seats",
               });
             } catch (error) {
-              const message = error instanceof Error ? error.message : undefined;
-              if (isAutumnSeatLimitError(message)) return "no_seats" as const;
+              if (isAutumnSeatLimitError(error)) return "no_seats" as const;
               throw error;
             }
 
@@ -718,6 +737,8 @@ export const UserQuota = {
           let response: Awaited<ReturnType<typeof runCheck>>;
 
           if (useEntityLogic) {
+            // First runCheck may throw or return entity-not-found if this seat has no entity yet.
+            // ensureSeatsEntity creates the entity under "seats"; second runCheck uses args.feature_id (plan quota).
             try {
               response = await runCheck();
             } catch (error) {
@@ -767,7 +788,7 @@ export const UserQuota = {
 
       if (result.kind === "no_seats") {
         return yield* new SeatLimitError({
-          message: "Your organization has reached its user limit.",
+          message: "Su organización ha alcanzado el número máximo de usuarios. Pueden contactar a los administradores de la organización para aumentar el límite.",
         });
       }
 
@@ -900,6 +921,31 @@ export const sendUserMessage = (params: {
         cause: error,
       }),
   }).pipe(Effect.retry({ schedule: databaseRetrySchedule, while: isRetryableDatabaseError }));
+
+/**
+ * Sets thread generation status to "failed" when the chat route returns an error
+ * before or without finalizing (e.g. seat limit, quota, auth errors). Idempotent:
+ * Convex only updates if status is "pending" or "generation".
+ */
+export const setThreadFailedToFailed = (params: {
+  userId: string;
+  threadId: string;
+}): Effect.Effect<void, DatabaseError> =>
+  Effect.tryPromise({
+    try: () =>
+      fetchMutation(api.threads.serverSetThreadGenerationStatus, {
+        secret: process.env.CONVEX_SECRET_TOKEN!,
+        userId: params.userId,
+        threadId: params.threadId,
+        status: "failed",
+      }),
+    catch: (error) =>
+      new DatabaseError({
+        message: "Failed to set thread status to failed",
+        operation: "serverSetThreadGenerationStatus",
+        cause: error,
+      }),
+  });
 
 /**
  * Saves an assistant message in the database.

@@ -957,6 +957,41 @@ export const serverFinalizeAssistantMessage = mutation({
 });
 
 /**
+ * Set thread generation status (e.g. to "failed" when the chat route returns an error
+ * before or without calling serverFinalizeAssistantMessage). Called from the Next.js chat API.
+ * Only updates if current status is "pending" or "generation" so we do not overwrite "completed".
+ */
+export const serverSetThreadGenerationStatus = mutation({
+  args: {
+    secret: v.string(),
+    userId: v.string(),
+    threadId: v.string(),
+    status: v.union(v.literal("failed"), v.literal("completed")),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    ensureServerSecret(args.secret);
+    const thread = await ctx.db
+      .query("threads")
+      .withIndex("by_user_and_threadId", (q) =>
+        q.eq("userId", args.userId).eq("threadId", args.threadId),
+      )
+      .unique();
+    if (!thread) return null;
+    if (thread.generationStatus !== "pending" && thread.generationStatus !== "generation") {
+      return null;
+    }
+    const now = Date.now();
+    await ctx.db.patch(thread._id, {
+      generationStatus: args.status,
+      updatedAt: now,
+      lastMessageAt: now,
+    });
+    return null;
+  },
+});
+
+/**
  * Delete a specific message by messageId
  */
 export const deleteMessage = AuthMutation({
