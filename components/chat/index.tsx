@@ -648,10 +648,17 @@ function ChatInterfaceInternal({
     return new Set(olderEphemeralMessages.map((m) => m.id));
   }, [olderEphemeralMessages]);
 
-  // Track expected AI responses for layout shift prevention
+  // Track expected AI responses for layout shift prevention.
+  // Once the initial display is done, freeze the count so that server data
+  // prepending new messages doesn't flip allResponsesReady back to false
+  // (which would trigger unnecessary state cascades and re-renders).
+  const frozenExpectedCountRef = useRef<number | null>(null);
   const expectedResponseCount = useMemo(() => {
     if (!isThread || status === "streaming" || status === "submitted") {
       return 0; // Don't wait during streaming
+    }
+    if (frozenExpectedCountRef.current !== null) {
+      return frozenExpectedCountRef.current;
     }
     return displayMessages.filter(
       (m) => m.role === "assistant" && m.parts.some((p) => p.type === "text")
@@ -666,10 +673,18 @@ function ChatInterfaceInternal({
     readyResponseIdsRef.current.clear();
   }, [id]);
 
+  // Track whether initial display is done (ref avoids re-creating callbacks)
+  const initialDisplayDoneRef = useRef(false);
+
   const handleResponseReady = useCallback((messageId: string) => {
     if (!readyResponseIdsRef.current.has(messageId)) {
       readyResponseIdsRef.current.add(messageId);
-      setReadyResponseCount((prev) => prev + 1);
+      // Only update state before initial display is done.
+      // After that, skip state updates to avoid cascading re-renders
+      // when server data replaces cache data and new MemoResponses mount.
+      if (!initialDisplayDoneRef.current) {
+        setReadyResponseCount((prev) => prev + 1);
+      }
     }
   }, []);
 
@@ -698,6 +713,8 @@ function ChatInterfaceInternal({
   useEffect(() => {
     setForceShow(false);
     setHasEverShownMessages(false);
+    initialDisplayDoneRef.current = false;
+    frozenExpectedCountRef.current = null;
   }, [id]);
 
   const shouldShowMessages = allResponsesReady || forceShow || status === "streaming" || status === "submitted";
@@ -708,7 +725,13 @@ function ChatInterfaceInternal({
     if (!shouldShowMessages) return;
     if (displayMessages.length === 0) return;
     setHasEverShownMessages(true);
-  }, [displayMessages.length, hasEverShownMessages, isThread, shouldShowMessages]);
+    // Mark initial display as done so handleResponseReady stops triggering
+    // state updates (avoids re-render cascades on server data arrival)
+    initialDisplayDoneRef.current = true;
+    // Freeze the expected response count so server data prepending new messages
+    // doesn't flip allResponsesReady back to false
+    frozenExpectedCountRef.current = expectedResponseCount;
+  }, [displayMessages.length, hasEverShownMessages, isThread, shouldShowMessages, expectedResponseCount]);
 
   // Initial scroll to bottom (instant, then switch to smooth after 150ms)
   const hasInitialScrolledRef = useRef(false);
@@ -721,6 +744,25 @@ function ChatInterfaceInternal({
       initialScrollTimeoutRef.current = setTimeout(() => markInitialScrollDone(), 150);
     }
   }, [shouldShowMessages, displayMessages.length, scrollToBottom, markInitialScrollDone]);
+
+  // Synchronous scroll correction when displayMessages changes AFTER initial display.
+  // When server data prepends messages to the list, the content height grows but scrollTop
+  // stays the same. Without this, the scroll correction only happens in the ResizeObserver
+  // callback (~55ms later), which can fire AFTER the browser paints — causing a visible
+  // flicker/shift. This useLayoutEffect runs synchronously before paint.
+  const prevDisplayLenRef = useRef(0);
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !hasInitialScrolledRef.current || !isThread) {
+      prevDisplayLenRef.current = displayMessages.length;
+      return;
+    }
+    if (displayMessages.length !== prevDisplayLenRef.current && prevDisplayLenRef.current > 0) {
+      // Messages changed after initial render — snap to bottom before paint
+      el.scrollTop = el.scrollHeight - el.clientHeight;
+    }
+    prevDisplayLenRef.current = displayMessages.length;
+  }, [displayMessages, isThread]);
 
   useEffect(() => {
     hasInitialScrolledRef.current = false;

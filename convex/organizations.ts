@@ -6,15 +6,33 @@ import {
 import { v } from "convex/values";
 import { PermissionQuery, AuthOrgQuery } from "./helpers/authenticated";
 import { serverSecretArg, ensureServerSecret } from "./helpers/auth";
-import { productStatusValidator } from "./schema";
+import { productStatusValidator, planValidator } from "./schema";
 
-const VALID_PLANS = new Set(["free", "plus", "pro", "enterprise"]);
+// Keep in sync with lib/plan-ids.ts PLAN_IDS
+const VALID_PLANS = new Set([
+  "free",
+  "plus",
+  "pro",
+  "enterprise",
+  "vip",
+  "startup",
+  "pro_api",
+  "plus_api",
+]);
 
-function planFromProductId(
-  productId: string | null,
-): "free" | "plus" | "pro" | "enterprise" | null {
+type Plan =
+  | "free"
+  | "plus"
+  | "pro"
+  | "enterprise"
+  | "vip"
+  | "startup"
+  | "pro_api"
+  | "plus_api";
+
+function planFromProductId(productId: string | null): Plan | null {
   if (!productId || !VALID_PLANS.has(productId)) return null;
-  return productId as "free" | "plus" | "pro" | "enterprise";
+  return productId as Plan;
 }
 
 export const createOrganization = internalMutation({
@@ -46,7 +64,7 @@ export const updateOrganization = internalMutation({
     patch: v.object({
       workos_id: v.optional(v.string()),
       name: v.optional(v.string()),
-      plan: v.optional(v.union(v.literal("free"), v.literal("plus"), v.literal("pro"), v.literal("enterprise"))),
+      plan: v.optional(planValidator),
       productStatus: v.optional(productStatusValidator),
     }),
   },

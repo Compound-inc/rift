@@ -1,10 +1,12 @@
-export type PlanSlug = "plus" | "pro" | "enterprise";
-export type SubscriptionPlan = "free" | PlanSlug;
+import { PLAN_IDS, type PlanId } from "@/lib/plan-ids";
+
+export type PlanSlug = PlanId;
+export type SubscriptionPlan = PlanId;
 
 export type PricingContext = {
   isAuthenticated: boolean;
   hasActiveSubscription: boolean;
-  activePlan: PlanSlug | null;
+  activePlan: PlanId | null;
   canManageBilling: boolean;
   currentPlan: SubscriptionPlan | null;
 };
@@ -17,12 +19,7 @@ export const DEFAULT_PRICING_CONTEXT: PricingContext = {
   currentPlan: null,
 };
 
-const SUBSCRIPTION_PLANS = new Set<SubscriptionPlan>([
-  "free",
-  "plus",
-  "pro",
-  "enterprise",
-]);
+const SUBSCRIPTION_PLANS = new Set<PlanId>(PLAN_IDS);
 
 function isSubscriptionPlan(
   plan: string | null | undefined,

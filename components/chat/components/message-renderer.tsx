@@ -149,6 +149,16 @@ const MessageActions = React.memo(function MessageActions({
   }
 
   return null;
+}, (prevProps, nextProps) => {
+  // Uses ref pattern internally for callbacks, so only compare stable props.
+  // messageParts uses ref internally (useLatest), so skip reference comparison
+  // to avoid re-renders when server data replaces cache with same content.
+  return (
+    prevProps.messageId === nextProps.messageId &&
+    prevProps.messageRole === nextProps.messageRole &&
+    prevProps.disableRegenerate === nextProps.disableRegenerate &&
+    !!prevProps.onStartEdit === !!nextProps.onStartEdit
+  );
 });
 
 interface MessageRendererProps {
@@ -271,18 +281,23 @@ export const MessageRenderer = React.memo(function MessageRenderer({
         </Reasoning>
       )}
 
-      {message.parts.map((part, partIdx: number) => {
+      {(() => {
+        let textIdx = 0;
+        let toolCallIdx = 0;
+        let toolResultIdx = 0;
+        return message.parts.map((part) => {
         if (part.type === "reasoning" || part.type === "source-url" || part.type === "file") {
           return null;
         }
 
         if (part.type === "text" && "text" in part) {
+          const idx = textIdx++;
           if (message.role === "assistant") {
             return (
               <MemoResponse
-                key={`${message.id}-${partIdx}`}
+                key={`${message.id}-text-${idx}`}
                 messageId={message.id}
-                partIdx={partIdx}
+                partIdx={idx}
                 onReady={handleResponseReady}
                 text={part.text}
                 isStreaming={isStreaming}
@@ -291,7 +306,7 @@ export const MessageRenderer = React.memo(function MessageRenderer({
           }
           return (
             <div
-              key={`${message.id}-${partIdx}`}
+              key={`${message.id}-text-${idx}`}
               className="whitespace-pre-wrap break-words"
             >
               {part.text}
@@ -299,6 +314,7 @@ export const MessageRenderer = React.memo(function MessageRenderer({
           );
         }
         if (part.type === "tool-call") {
+          const idx = toolCallIdx++;
           const toolCall = part as {
             toolName?: string;
             args?: unknown;
@@ -307,7 +323,7 @@ export const MessageRenderer = React.memo(function MessageRenderer({
 
           return (
             <Tool
-              key={`${message.id}-${partIdx}`}
+              key={`${message.id}-tool-call-${idx}`}
               className="my-2 border-blue-200 bg-blue-50/50"
             >
               <ToolHeader
@@ -323,6 +339,7 @@ export const MessageRenderer = React.memo(function MessageRenderer({
           );
         }
         if (part.type === "tool-result") {
+          const idx = toolResultIdx++;
           const toolResult = part as {
             toolName?: string;
             result?: unknown;
@@ -332,7 +349,7 @@ export const MessageRenderer = React.memo(function MessageRenderer({
 
           return (
             <Tool
-              key={`${message.id}-${partIdx}`}
+              key={`${message.id}-tool-result-${idx}`}
               className="my-2 border-green-200 bg-green-50/50"
             >
               <ToolHeader
@@ -386,7 +403,8 @@ export const MessageRenderer = React.memo(function MessageRenderer({
         }
 
         return null;
-      })}
+      });
+      })()}
 
       {fileParts.length > 0 && (
         <div className="space-y-3">
@@ -543,18 +561,42 @@ export const MessageRenderer = React.memo(function MessageRenderer({
       </div>
   );
 }, (prevProps, nextProps) => {
-  // For non-streaming messages, only re-render if message content changes
-  if (!prevProps.isStreaming && !nextProps.isStreaming) {
+  // For streaming messages, compare all relevant props by reference
+  if (prevProps.isStreaming || nextProps.isStreaming) {
     return (
-      prevProps.message.id === nextProps.message.id &&
-      prevProps.message.parts === nextProps.message.parts &&
+      prevProps.message === nextProps.message &&
+      prevProps.isStreaming === nextProps.isStreaming &&
       prevProps.disableRegenerate === nextProps.disableRegenerate
     );
   }
-  // For streaming messages, compare all relevant props
-  return (
-    prevProps.message === nextProps.message &&
-    prevProps.isStreaming === nextProps.isStreaming &&
-    prevProps.disableRegenerate === nextProps.disableRegenerate
-  );
+  // For non-streaming messages, deep-compare parts content to avoid
+  // unnecessary re-renders when server data replaces cache data with
+  // the same content but different object references. Prevents layout
+  // micro-shifts caused by browser style recalculation during re-renders.
+  if (prevProps.message.id !== nextProps.message.id) return false;
+  if (prevProps.disableRegenerate !== nextProps.disableRegenerate) return false;
+  // Fast path: same reference means same content
+  if (prevProps.message.parts === nextProps.message.parts) return true;
+  // Deep compare parts by content
+  const prevParts = prevProps.message.parts;
+  const nextParts = nextProps.message.parts;
+  if (prevParts.length !== nextParts.length) return false;
+  for (let i = 0; i < prevParts.length; i++) {
+    const prev = prevParts[i]!;
+    const next = nextParts[i]!;
+    if (prev === next) continue;
+    if (prev.type !== next.type) return false;
+    if (prev.type === 'text' && 'text' in prev && 'text' in next) {
+      if ((prev as { text: string }).text !== (next as { text: string }).text) return false;
+      continue;
+    }
+    if (prev.type === 'reasoning' && 'text' in prev && 'text' in next) {
+      if ((prev as { text: string }).text !== (next as { text: string }).text) return false;
+      continue;
+    }
+    // For other part types (tool-call, tool-result, file, source-url),
+    // fall back to reference equality
+    return false;
+  }
+  return true;
 });

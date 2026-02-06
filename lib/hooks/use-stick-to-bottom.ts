@@ -153,6 +153,14 @@ export function useStickToBottom(
 
       // Keep pinned to bottom when content changes size, as long as the user hasn't escaped the lock.
       if ((grew || shrank) && isAtBottomRef.current && !escapedFromLockRef.current) {
+        // Skip redundant scroll adjustments when already close to the bottom.
+        // Prevents 1-2px layout jitter caused by sub-pixel rounding differences
+        // between content height changes and scroll position recalculation.
+        const el = scrollRef.current;
+        if (el) {
+          const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+          if (distFromBottom <= 1) return;
+        }
         const now = Date.now();
         const canSmooth =
           grew &&

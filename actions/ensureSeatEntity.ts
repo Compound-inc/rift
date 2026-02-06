@@ -4,6 +4,7 @@ import { withAuth } from "@workos-inc/authkit-nextjs";
 import { Autumn } from "autumn-js";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
+import { PLANS_WITH_SEATS } from "@/lib/plan-ids";
 
 const AUTUMN_ENTITY_NOT_FOUND_SNIPPET =
   "not found. To automatically create this entity, please pass in 'feature_id' into the 'entity_data' field of the request body.";
@@ -34,18 +35,18 @@ function isAutumnSeatLimitError(error: unknown): boolean {
   );
 }
 
-export type EnsureEnterpriseEntityResult =
+export type EnsureSeatEntityResult =
   | { ok: true }
-  | { ok: false; reason: "not_enterprise" }
+  | { ok: false; reason: "not_seats_plan" }
   | { ok: false; reason: "seat_limit"; message: string }
   | { ok: false; reason: "error"; message?: string };
 
 /**
- * Validates the current user's org is enterprise and ensures their Autumn
+ * Validates the current user's org has a plan with seats and ensures their Autumn
  * entity exists (creates under "seats" if missing). Call when the usage page
  * hits "entity not found" so the client can refetch useEntity after success.
  */
-export async function ensureEnterpriseEntity(): Promise<EnsureEnterpriseEntityResult> {
+export async function ensureSeatEntity(): Promise<EnsureSeatEntityResult> {
   try {
     const { user, organizationId } = await withAuth({ ensureSignedIn: true });
 
@@ -63,8 +64,8 @@ export async function ensureEnterpriseEntity(): Promise<EnsureEnterpriseEntityRe
       secret: convexSecret,
     });
 
-    if (plan !== "enterprise") {
-      return { ok: false, reason: "not_enterprise" };
+    if (!plan || !PLANS_WITH_SEATS.has(plan)) {
+      return { ok: false, reason: "not_seats_plan" };
     }
 
     const secretKey = process.env.AUTUMN_SECRET_KEY;
@@ -156,7 +157,7 @@ export async function ensureEnterpriseEntity(): Promise<EnsureEnterpriseEntityRe
 
     return { ok: true };
   } catch (error) {
-    console.error("ensureEnterpriseEntity:", error);
+    console.error("ensureSeatEntity:", error);
     return {
       ok: false,
       reason: "error",

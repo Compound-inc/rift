@@ -28,9 +28,6 @@ export const updateUser = internalMutation({
       firstName: v.optional(v.string()),
       lastName: v.optional(v.string()),
       profilePictureUrl: v.optional(v.string()),
-      standardQuotaUsage: v.optional(v.number()),
-      premiumQuotaUsage: v.optional(v.number()),
-      lastQuotaResetAt: v.optional(v.number()),
     }),
   },
   handler: async (ctx, args) => {
@@ -65,45 +62,6 @@ export const getCurrentUser = AuthQuery({
       .unique();
 
     return user;
-  },
-});
-
-export const resetQuota = internalMutation({
-  args: {
-    userWorkosId: v.string(),
-    quotaType: v.optional(
-      v.union(v.literal("standard"), v.literal("premium"), v.literal("both")),
-    ),
-  },
-  handler: async (ctx, args) => {
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_workos_id", (q) => q.eq("workos_id", args.userWorkosId))
-      .unique();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    const quotaType = args.quotaType || "both";
-    const updateData: {
-      lastQuotaResetAt: number;
-      standardQuotaUsage?: number;
-      premiumQuotaUsage?: number;
-    } = {
-      lastQuotaResetAt: Date.now(),
-    };
-
-    if (quotaType === "standard" || quotaType === "both") {
-      updateData.standardQuotaUsage = 0;
-    }
-    if (quotaType === "premium" || quotaType === "both") {
-      updateData.premiumQuotaUsage = 0;
-    }
-
-    await ctx.db.patch(user._id, updateData);
-
-    return { success: true, resetAt: Date.now() };
   },
 });
 

@@ -1,14 +1,17 @@
 "use client";
 
 import { MembersListWithShell } from "./MembersListWithShell";
-import { PaginatedOrganizationData } from "@/actions/getOrganizationMembers";
+import {
+  PaginatedOrganizationData,
+  type OrganizationPlan,
+} from "@/actions/getOrganizationMembers";
 
 interface MembersContentProps {
   initialData: PaginatedOrganizationData;
   currentUserId: string;
   totalMemberCount: number;
   seatQuantity: number | null;
-  plan: "free" | "plus" | "pro" | "enterprise" | null;
+  plan: OrganizationPlan | null;
 }
 
 export function MembersContent({

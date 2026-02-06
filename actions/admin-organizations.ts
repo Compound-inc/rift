@@ -3,10 +3,15 @@
 import { after } from "next/server";
 import { Autumn } from "autumn-js";
 import { isAdmin } from "@/lib/admin-auth";
+import {
+  type AdminSettablePlan,
+  type PlanId,
+  isAdminSettablePlan,
+  PLANS_WITH_SEATS,
+} from "@/lib/plan-ids";
 
 const CONVEX_SITE_URL = process.env.CONVEX_SITE_URL ?? "";
 const CONVEX_ADMIN_TOKEN = process.env.CONVEX_ADMIN_TOKEN ?? "";
-const VALID_PLANS = ["plus", "pro", "enterprise"] as const;
 const VALID_SUBSCRIPTION_STATUSES = new Set([
   "active",
   "canceled",
@@ -18,12 +23,14 @@ const VALID_SUBSCRIPTION_STATUSES = new Set([
   "none",
 ]);
 
+export type AdminPlan = AdminSettablePlan;
+
 export type OrganizationRow = {
   _id: string;
   _creationTime: number;
   workos_id: string;
   name: string;
-  plan?: "free" | "plus" | "pro" | "enterprise";
+  plan?: PlanId;
   productStatus?: string;
 };
 
@@ -67,11 +74,11 @@ export async function listOrganizationsAction(): Promise<
 export type SetPlanParams = {
   organizationId: string;
   workos_id: string;
-  plan: "plus" | "pro" | "enterprise";
+  plan: AdminSettablePlan;
   /** Organization name to set on the Autumn customer. */
   organizationName?: string;
-  /** Only used when plan === "enterprise". Sets the seats balance in Autumn. */
-  enterpriseSeats?: number;
+  /** For plans with seats: sets the seats balance in Autumn. */
+  seats?: number;
 };
 
 export async function setOrganizationPlanAction(
@@ -82,14 +89,17 @@ export async function setOrganizationPlanAction(
     return { error: "Forbidden" };
   }
 
-  const { organizationId, workos_id, plan, organizationName, enterpriseSeats } = params;
+  const { organizationId, workos_id, plan, organizationName, seats } = params;
 
   if (!organizationId || !plan || !workos_id) {
     return { error: "Missing organizationId, plan, or workos_id" };
   }
 
-  if (!VALID_PLANS.includes(plan)) {
-    return { error: "Invalid plan. Must be 'plus', 'pro' or 'enterprise'" };
+  if (!isAdminSettablePlan(plan)) {
+    return {
+      error:
+        "Invalid plan. Admin can only set: enterprise, vip, startup, pro_api, plus_api (plus/pro require payment).",
+    };
   }
 
   const secretKey = process.env.AUTUMN_SECRET_KEY;
@@ -190,21 +200,15 @@ export async function setOrganizationPlanAction(
     }
   }
 
-  // Set enterprise seats balance when plan is enterprise and seats were specified.
-  // SDK expects the balance list (or single object) as second arg, not { balances: [...] }.
-  if (
-    plan === "enterprise" &&
-    enterpriseSeats != null &&
-    Number(enterpriseSeats) > 0
-  ) {
-    const seatsBalance = Number(enterpriseSeats);
+  // Set seats at creation/set-plan time for plans that have a seats feature.
+  if (PLANS_WITH_SEATS.has(plan) && seats != null && Number(seats) > 0) {
     const balanceResult = await autumn.customers.updateBalances(workos_id, [
-      { feature_id: "seats", balance: seatsBalance },
+      { feature_id: "seats", balance: Math.max(1, Math.floor(Number(seats))) },
     ]);
     if (balanceResult.error) {
       after(() => {
         console.warn(
-          "Admin set plan: Autumn updateBalances (seats) failed",
+          "Admin set plan: Autumn updateBalances failed",
           balanceResult.error
         );
       });

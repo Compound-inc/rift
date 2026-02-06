@@ -5,6 +5,7 @@ import { workos } from "@/app/api/workos";
 import { getOrganizationMemberCount } from "./getOrganizationMembers";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
+import { PLANS_WITH_SEATS } from "@/lib/plan-ids";
 import { getAutumnSeatLimitForOrg } from "./getAutumnSeatLimit";
 
 export async function inviteUser(email: string, roleSlug?: string) {
@@ -19,8 +20,8 @@ export async function inviteUser(email: string, roleSlug?: string) {
       workos_id: organizationId,
       secret: process.env.CONVEX_SECRET_TOKEN!,
     });
-    if (plan !== "enterprise") {
-      return { success: false, error: "Solo las organizaciones con el plan Enterprise pueden invitar miembros." };
+    if (!plan || !PLANS_WITH_SEATS.has(plan)) {
+      return { success: false, error: "Solo las organizaciones con planes que incluyen asientos pueden invitar miembros." };
     }
 
     // Verify seat limits

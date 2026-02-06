@@ -5,7 +5,7 @@ import {
   } from "../_generated/server";
   import { v } from "convex/values";
   import { internal } from "../_generated/api";
-  import { productStatusValidator } from "../schema";
+  import { productStatusValidator, planValidator } from "../schema";
   import { serverSecretArg, ensureServerSecret } from "../helpers/auth";
   
   /**
@@ -19,7 +19,7 @@ import {
         _creationTime: v.number(),
         workos_id: v.string(),
         name: v.string(),
-        plan: v.optional(v.union(v.literal("free"), v.literal("plus"), v.literal("pro"), v.literal("enterprise"), v.null())),
+        plan: v.optional(v.union(planValidator, v.null())),
         productStatus: v.optional(productStatusValidator),
       }),
     ),
@@ -28,40 +28,6 @@ import {
     },
   });
   
-  /**
-   * Clear legacy organization fields so they can be removed from the schema.
-   * Run via: bun run scripts/clear-legacy-fields.ts
-   */
-  export const clearOrganizationsLegacyFields = mutation({
-    args: { ...serverSecretArg },
-    returns: v.object({ updated: v.number() }),
-    handler: async (ctx, args) => {
-      ensureServerSecret(args.secret);
-      const orgs = await ctx.db.query("organizations").collect();
-      const legacyPatch = {
-        seatQuantity: undefined,
-        productId: undefined,
-        billingCycleStart: undefined,
-        billingCycleEnd: undefined,
-        stripeCustomerId: undefined,
-        subscriptionId: undefined,
-        subscriptionStatus: undefined,
-        priceId: undefined,
-        paymentMethodBrand: undefined,
-        paymentMethodLast4: undefined,
-        currentPeriodStart: undefined,
-        currentPeriodEnd: undefined,
-        subscriptionIds: undefined,
-        cancelAtPeriodEnd: undefined,
-        standardQuotaLimit: undefined,
-        premiumQuotaLimit: undefined,
-      };
-      for (const org of orgs) {
-        await ctx.db.patch(org._id, legacyPatch);
-      }
-      return { updated: orgs.length };
-    },
-  });
 
   /**
    * Get organization by ID for admin operations
@@ -76,7 +42,7 @@ import {
         _creationTime: v.number(),
         workos_id: v.string(),
         name: v.string(),
-        plan: v.optional(v.union(v.literal("free"), v.literal("plus"), v.literal("pro"), v.literal("enterprise"), v.null())),
+        plan: v.optional(v.union(planValidator, v.null())),
         productStatus: v.optional(productStatusValidator),
       }),
       v.null(),

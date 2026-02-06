@@ -16,7 +16,7 @@ export type SidebarThread = {
 export type SidebarProfile = {
   displayName: string;
   profilePictureUrl?: string;
-  plan?: "free" | "plus" | "pro" | "enterprise";
+  plan?: import("@/lib/plan-ids").PlanId;
 };
 
 type Cached<T> = { userKey: string; value: T; savedAt: number };

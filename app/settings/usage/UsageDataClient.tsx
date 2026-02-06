@@ -8,7 +8,8 @@ import {
   type AutumnFeature,
   mapAutumnToQuotaInfo,
 } from "@/lib/autumn-quota";
-import { ensureEnterpriseEntity } from "@/actions/ensureEnterpriseEntity";
+import { PLANS_WITH_SEATS } from "@/lib/plan-ids";
+import { ensureSeatEntity } from "@/actions/ensureSeatEntity";
 import { QuotaCard } from "./QuotaCard";
 import { UsageSkeleton } from "./UsageSkeleton";
 
@@ -38,10 +39,10 @@ export function UsageDataClient() {
   const { orgInfo, isLoading: orgLoading } = useOrgContext();
   const { user } = useAuth();
   const plan = orgInfo?.plan ?? null;
-  const isEnterprise = plan === "enterprise";
+  const usePerSeatEntity = plan != null && PLANS_WITH_SEATS.has(plan);
 
   const { customer, isLoading: customerLoading } = useCustomer();
-  const entityId = isEnterprise && user?.id ? user.id : null;
+  const entityId = usePerSeatEntity && user?.id ? user.id : null;
   const { entity: entityData, isLoading: entityLoading, error: entityError, refetch: entityRefetch } = useEntity(entityId);
 
   const [ensureInProgress, setEnsureInProgress] = useState(false);
@@ -55,7 +56,7 @@ export function UsageDataClient() {
     setEnsureInProgress(true);
     setSeatLimitReached(false);
     setEnsureFailed(false);
-    const result = await ensureEnterpriseEntity();
+    const result = await ensureSeatEntity();
     setEnsureInProgress(false);
     if (result.ok) {
       entityRefetch();
@@ -73,23 +74,23 @@ export function UsageDataClient() {
   const shouldEnsureEntity = hasEntityNotFoundError || noEntityDataAfterLoad;
 
   useEffect(() => {
-    if (!isEnterprise || !entityId) return;
+    if (!usePerSeatEntity || !entityId) return;
     if (ensureInProgress || seatLimitReached || ensureFailed) return;
     if (shouldEnsureEntity) {
       runEnsure();
     }
-  }, [isEnterprise, entityId, ensureInProgress, seatLimitReached, ensureFailed, shouldEnsureEntity, runEnsure]);
+  }, [usePerSeatEntity, entityId, ensureInProgress, seatLimitReached, ensureFailed, shouldEnsureEntity, runEnsure]);
 
   const loading =
     orgLoading ||
-    (isEnterprise && !user?.id) ||
-    (isEnterprise ? entityLoading || ensureInProgress : customerLoading);
+    (usePerSeatEntity && !user?.id) ||
+    (usePerSeatEntity ? entityLoading || ensureInProgress : customerLoading);
 
   if (loading) {
     return <UsageSkeleton />;
   }
 
-  if (isEnterprise) {
+  if (usePerSeatEntity) {
     if (seatLimitReached) {
       return seatLimitError;
     }

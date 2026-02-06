@@ -34,13 +34,31 @@ export const seats = feature({
 // Products
 export const enterprise = product({
 	id: "enterprise",
-	name: "enterprise",
+	name: "Enterprise",
 	items: [
 		featureItem({
-			feature_id: preUserUsage.id,
+			feature_id: premium.id,
 			included_usage: 0,
+			interval: "month",
 		}),
 
+		featureItem({
+			feature_id: seats.id,
+			included_usage: 1,
+		}),
+
+		featureItem({
+			feature_id: standard.id,
+			included_usage: 0,
+			interval: "month",
+		}),
+	],
+});
+
+export const plusApi = product({
+	id: "plus_api",
+	name: "Plus",
+	items: [
 		featureItem({
 			feature_id: premium.id,
 			included_usage: 100,
@@ -55,6 +73,75 @@ export const enterprise = product({
 		featureItem({
 			feature_id: standard.id,
 			included_usage: 1000,
+			interval: "month",
+		}),
+	],
+});
+
+export const proApi = product({
+	id: "pro_api",
+	name: "Pro",
+	items: [
+		featureItem({
+			feature_id: premium.id,
+			included_usage: 270,
+			interval: "month",
+		}),
+
+		featureItem({
+			feature_id: seats.id,
+			included_usage: 1,
+		}),
+
+		featureItem({
+			feature_id: standard.id,
+			included_usage: 2700,
+			interval: "month",
+		}),
+	],
+});
+
+export const startup = product({
+	id: "startup",
+	name: "Startup",
+	items: [
+		featureItem({
+			feature_id: premium.id,
+			included_usage: 0,
+			interval: "month",
+		}),
+
+		featureItem({
+			feature_id: seats.id,
+			included_usage: 1,
+		}),
+
+		featureItem({
+			feature_id: standard.id,
+			included_usage: 0,
+			interval: "month",
+		}),
+	],
+});
+
+export const vip = product({
+	id: "vip",
+	name: "VIP",
+	items: [
+		featureItem({
+			feature_id: premium.id,
+			included_usage: 0,
+			interval: "month",
+		}),
+
+		featureItem({
+			feature_id: seats.id,
+			included_usage: 1,
+		}),
+
+		featureItem({
+			feature_id: standard.id,
+			included_usage: 0,
 			interval: "month",
 		}),
 	],
@@ -82,7 +169,7 @@ export const free = product({
 
 export const plus = product({
 	id: "plus",
-	name: "plus",
+	name: "Plus",
 	group: "Sub",
 	items: [
 		priceItem({
@@ -106,7 +193,7 @@ export const plus = product({
 
 export const pro = product({
 	id: "pro",
-	name: "pro",
+	name: "Pro",
 	group: "Sub",
 	items: [
 		priceItem({

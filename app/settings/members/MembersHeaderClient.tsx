@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState } from "react";
 import { PlusIcon, CheckCircledIcon, ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import { inviteUser } from "@/actions/inviteUser";
+import { PLANS_WITH_SEATS } from "@/lib/plan-ids";
 
 interface InvitationFormData {
   email: string;
@@ -17,7 +18,7 @@ interface InvitationFormData {
 interface MembersHeaderClientProps {
   seatQuantity?: number | null;
   totalMemberCount: number;
-  plan?: "free" | "plus" | "pro" | "enterprise" | null;
+  plan?: import("@/lib/plan-ids").PlanId | null;
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onRefresh: () => void;
@@ -133,7 +134,7 @@ export function MembersHeaderClient({
           <DialogTrigger asChild>
             <Button 
               variant="ghost"
-              disabled={isLimitReached || plan !== "enterprise"}
+              disabled={isLimitReached || !plan || !PLANS_WITH_SEATS.has(plan)}
               className="gap-2 border border-border/60 bg-white/90 dark:bg-popover-secondary/75 dark:shadow-black/30 hover:bg-black/[0.04] dark:hover:bg-hover/30 hover:text-foreground dark:hover:text-popover-text disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="hidden sm:inline">Invitar Miembros</span>

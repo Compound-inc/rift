@@ -9,6 +9,7 @@ import {
   mapAutumnToQuotaInfo,
   UNCONFIGURED_QUOTA_INFO,
 } from "@/lib/autumn-quota";
+import { PLANS_WITH_SEATS } from "@/lib/plan-ids";
 import { Progress } from "@/components/ai/ui/progress";
 import { Skeleton } from "@/components/ai/ui/skeleton";
 
@@ -18,22 +19,22 @@ function useAutumnQuotaInfo(): { quotaInfo: QuotaInfo | undefined; isLoading: bo
   const { orgInfo, isLoading: orgLoading } = useOrgContext();
   const { user } = useAuth();
   const plan = orgInfo?.plan ?? null;
-  const isEnterprise = plan === "enterprise";
+  const usePerSeatEntity = plan != null && PLANS_WITH_SEATS.has(plan);
 
   const { customer, isLoading: customerLoading } = useCustomer();
-  const entityId = isEnterprise && user?.id ? user.id : null;
+  const entityId = usePerSeatEntity && user?.id ? user.id : null;
   const { entity: entityData, isLoading: entityLoading } = useEntity(entityId);
 
   const loading =
     orgLoading ||
-    (isEnterprise && !user?.id) ||
-    (isEnterprise ? entityLoading : customerLoading);
+    (usePerSeatEntity && !user?.id) ||
+    (usePerSeatEntity ? entityLoading : customerLoading);
 
   if (loading) {
     return { quotaInfo: undefined, isLoading: true };
   }
 
-  if (isEnterprise && entityData) {
+  if (usePerSeatEntity && entityData) {
     const features = entityData.features as Record<string, AutumnFeature> | undefined;
     return { quotaInfo: mapAutumnToQuotaInfo(features), isLoading: false };
   }
