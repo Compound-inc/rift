@@ -54,13 +54,19 @@ export default function AdminDashboardClient() {
   const fetchOrganizations = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const result = await listOrganizationsAction();
-    setLoading(false);
-    if ("error" in result) {
-      setError(result.error);
-      return;
+    try {
+      const result = await listOrganizationsAction();
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
+      setOrganizations(result.data);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to load organizations";
+      setError(message);
+    } finally {
+      setLoading(false);
     }
-    setOrganizations(result.data);
   }, []);
 
   useEffect(() => {
@@ -71,58 +77,72 @@ export default function AdminDashboardClient() {
     if (!selectedOrg || !selectedPlan) return;
 
     setIsSettingPlan(true);
-    const result = await setOrganizationPlanAction({
-      organizationId: selectedOrg._id,
-      workos_id: selectedOrg.workos_id,
-      plan: selectedPlan as "plus" | "pro" | "enterprise",
-      organizationName: selectedOrg.name ?? undefined,
-      ...(selectedPlan === "enterprise"
-        ? { enterpriseSeats: Math.max(1, enterpriseSeats) }
-        : {}),
-    });
-    setIsSettingPlan(false);
+    try {
+      const result = await setOrganizationPlanAction({
+        organizationId: selectedOrg._id,
+        workos_id: selectedOrg.workos_id,
+        plan: selectedPlan as "plus" | "pro" | "enterprise",
+        organizationName: selectedOrg.name ?? undefined,
+        ...(selectedPlan === "enterprise"
+          ? { enterpriseSeats: Math.max(1, enterpriseSeats) }
+          : {}),
+      });
 
-    if ("error" in result) {
-      setError(result.error);
-      return;
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
+
+      setError(null);
+      toast.success("Plan attached in Autumn; quota will apply on next chat request.");
+      setIsSetPlanDialogOpen(false);
+      setSelectedOrg(null);
+      setSelectedPlan("");
+      setEnterpriseSeats(1);
+      startTransition(() => {
+        void fetchOrganizations();
+      });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to set plan";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setIsSettingPlan(false);
     }
-
-    setError(null);
-    toast.success("Plan attached in Autumn; quota will apply on next chat request.");
-    setIsSetPlanDialogOpen(false);
-    setSelectedOrg(null);
-    setSelectedPlan("");
-    setEnterpriseSeats(1);
-    startTransition(() => {
-      void fetchOrganizations();
-    });
   };
 
   const handleCancelSubscription = async () => {
     if (!selectedOrg || !cancelStatus) return;
 
     setIsCanceling(true);
-    const result = await cancelOrganizationSubscriptionAction({
-      organizationId: selectedOrg._id,
-      workos_id: selectedOrg.workos_id,
-      productId: selectedOrg.plan,
-      cancelType,
-      subscriptionStatus: cancelStatus,
-    });
-    setIsCanceling(false);
+    try {
+      const result = await cancelOrganizationSubscriptionAction({
+        organizationId: selectedOrg._id,
+        workos_id: selectedOrg.workos_id,
+        productId: selectedOrg.plan,
+        cancelType,
+        subscriptionStatus: cancelStatus,
+      });
 
-    if ("error" in result) {
-      setError(result.error);
-      return;
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
+
+      setIsCancelDialogOpen(false);
+      setSelectedOrg(null);
+      setCancelType("now");
+      setCancelStatus("canceled");
+      startTransition(() => {
+        void fetchOrganizations();
+      });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to cancel subscription";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setIsCanceling(false);
     }
-
-    setIsCancelDialogOpen(false);
-    setSelectedOrg(null);
-    setCancelType("now");
-    setCancelStatus("canceled");
-    startTransition(() => {
-      void fetchOrganizations();
-    });
   };
 
 

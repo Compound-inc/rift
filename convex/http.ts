@@ -35,9 +35,13 @@ http.route({
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : "Invalid webhook signature";
-      const isOrgNotFound =
-        typeof message === "string" && message.includes("Organization not found");
-      const status = isOrgNotFound ? 503 : 400;
+      const msg = typeof message === "string" ? message : "";
+      const status =
+        msg === "Invalid webhook signature"
+          ? 401
+          : msg.includes("Organization not found")
+            ? 503
+            : 500;
       console.error("[Autumn webhook] Failed:", message, "status:", status);
       return new Response(
         JSON.stringify({ error: message }),

@@ -7,8 +7,13 @@ const { GET, POST } = autumnHandler({
     if (!session?.user?.id) {
       return null;
     }
+    // Billing and quota are keyed by WorkOS org everywhere (chat, checkout, billing portal).
+    // Require org here so we don't create a separate customer identity by user id.
+    if (!session.organizationId) {
+      return null;
+    }
     return {
-      customerId: session.organizationId ?? session.user.id,
+      customerId: session.organizationId,
       customerData: {
         email: session.user.email ?? undefined,
         name: session.user.firstName

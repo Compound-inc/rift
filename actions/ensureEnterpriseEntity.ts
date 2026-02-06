@@ -53,9 +53,14 @@ export async function ensureEnterpriseEntity(): Promise<EnsureEnterpriseEntityRe
       return { ok: false, reason: "error", message: "Not authenticated or no organization" };
     }
 
+    const convexSecret = process.env.CONVEX_SECRET_TOKEN;
+    if (!convexSecret) {
+      return { ok: false, reason: "error", message: "Server configuration error: CONVEX_SECRET_TOKEN is not set" };
+    }
+
     const plan = await fetchQuery(api.organizations.getOrganizationPlan, {
       workos_id: organizationId,
-      secret: process.env.CONVEX_SECRET_TOKEN!,
+      secret: convexSecret,
     });
 
     if (plan !== "enterprise") {

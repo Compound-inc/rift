@@ -9,7 +9,7 @@ const dictionaries = {
 export type { Dictionary, Locale };
 
 export const hasLocale = (locale: string): locale is Locale =>
-  locale in dictionaries;
+  Object.hasOwn(dictionaries, locale);
 
 export const getDictionary = async (locale: Locale): Promise<Dictionary> =>
   dictionaries[locale]() as Promise<Dictionary>;

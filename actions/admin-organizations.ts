@@ -4,9 +4,7 @@ import { after } from "next/server";
 import { Autumn } from "autumn-js";
 import { isAdmin } from "@/lib/admin-auth";
 
-const CONVEX_SITE_URL =
-  process.env.CONVEX_SITE_URL ||
-  (process.env.NEXT_PUBLIC_CONVEX_URL ?? "").replace(".convex.cloud", ".convex.site");
+const CONVEX_SITE_URL = process.env.CONVEX_SITE_URL ?? "";
 const CONVEX_ADMIN_TOKEN = process.env.CONVEX_ADMIN_TOKEN ?? "";
 const VALID_PLANS = ["plus", "pro", "enterprise"] as const;
 const VALID_SUBSCRIPTION_STATUSES = new Set([

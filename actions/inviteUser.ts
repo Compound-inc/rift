@@ -25,11 +25,15 @@ export async function inviteUser(email: string, roleSlug?: string) {
 
     // Verify seat limits
     const seatQuantity = await getAutumnSeatLimitForOrg(organizationId);
-    if (seatQuantity !== null && seatQuantity !== undefined) {
-      const currentCount = await getOrganizationMemberCount();
-      if (currentCount >= seatQuantity) {
-        return { success: false, error: `Has alcanzado el límite de ${seatQuantity} asientos de tu organización.` };
-      }
+    if (seatQuantity == null) {
+      return {
+        success: false,
+        error: "No se pudo verificar el límite de asientos. Intenta más tarde o contacta a soporte.",
+      };
+    }
+    const currentCount = await getOrganizationMemberCount();
+    if (currentCount >= seatQuantity) {
+      return { success: false, error: `Has alcanzado el límite de ${seatQuantity} asientos de tu organización.` };
     }
 
     await workos.userManagement.sendInvitation({

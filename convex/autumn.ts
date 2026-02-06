@@ -17,8 +17,8 @@ const PRODUCT_UPDATE_SCENARIOS = new Set([
   "scheduled",
 ]);
 
-// Product status values we store
-const VALID_PRODUCT_STATUSES = new Set([
+// Product status values we store 
+const VALID_PRODUCT_STATUSES_LIST = [
   "active",
   "expired",
   "scheduled",
@@ -29,11 +29,19 @@ const VALID_PRODUCT_STATUSES = new Set([
   "incomplete",
   "incomplete_expired",
   "unpaid",
-]);
+] as const;
 
-function normalizeProductStatus(status: string | undefined): "active" | "expired" | "scheduled" | "trialing" | "past_due" | "canceled" | "none" | "incomplete" | "incomplete_expired" | "unpaid" {
-  if (status && VALID_PRODUCT_STATUSES.has(status)) {
-    return status as "active" | "expired" | "scheduled" | "trialing" | "past_due" | "canceled" | "none" | "incomplete" | "incomplete_expired" | "unpaid";
+type ProductStatus = (typeof VALID_PRODUCT_STATUSES_LIST)[number];
+
+const VALID_PRODUCT_STATUSES = new Set<string>(VALID_PRODUCT_STATUSES_LIST);
+
+function isValidProductStatus(s: string): s is ProductStatus {
+  return VALID_PRODUCT_STATUSES.has(s);
+}
+
+function normalizeProductStatus(status: string | undefined): ProductStatus {
+  if (status != null && isValidProductStatus(status)) {
+    return status;
   }
   return "none";
 }
