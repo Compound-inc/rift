@@ -81,6 +81,7 @@ import {
 import { buildSystemPrompt } from "./system-prompt";
 import { createDatabaseQueue } from "./database-queue";
 import { generateR2FileKey, uploadObjectToR2 } from "@/lib/r2-upload";
+import { PLANS_WITH_SEATS } from "@/lib/plan-ids";
 
 // ============================================================================
 // Request ID Generation
@@ -423,12 +424,12 @@ const handleChatRequest = (
           cause: error,
         }),
     }).pipe(Effect.catchAll(() => Effect.succeed(null)));
-    const isEnterprise = plan === "enterprise";
+    const usePerSeatEntity = plan != null && PLANS_WITH_SEATS.has(plan);
 
     logger.debug("Authentication complete", logContext, { 
       timeMs: Date.now() - start,
       plan: plan ?? null,
-      isEnterprise,
+      usePerSeatEntity,
     });
 
     // Validate thread ownership and custom instruction access
@@ -628,7 +629,7 @@ const handleChatRequest = (
             yield* UserQuota.check({
               customer_id: auth.orgId,
               feature_id: featureId,
-              ...(isEnterprise
+              ...(usePerSeatEntity
                 ? { entity_id: auth.userId, entity_name: auth.userName }
                 : {}),
               quotaType,
@@ -872,7 +873,7 @@ const handleChatRequest = (
                   UserQuota.track({
                     customer_id: auth.orgId,
                     feature_id: quotaType,
-                    ...(isEnterprise ? { entity_id: auth.userId } : {}),
+                    ...(usePerSeatEntity ? { entity_id: auth.userId } : {}),
                     value: finalState.searchToolCallCount,
                   })
                 );
@@ -900,7 +901,7 @@ const handleChatRequest = (
               UserQuota.track({
                 customer_id: auth.orgId,
                 feature_id: quotaType,
-                ...(isEnterprise ? { entity_id: auth.userId } : {}),
+                ...(usePerSeatEntity ? { entity_id: auth.userId } : {}),
                 value: getMessageCost(modelId),
               })
             );
@@ -1049,7 +1050,7 @@ const handleChatRequest = (
             UserQuota.track({
               customer_id: auth.orgId,
               feature_id: quotaType,
-              ...(isEnterprise ? { entity_id: auth.userId } : {}),
+              ...(usePerSeatEntity ? { entity_id: auth.userId } : {}),
               value: getMessageCost(modelId),
             })
           );
@@ -1197,7 +1198,7 @@ const handleChatRequest = (
                     UserQuota.track({
                       customer_id: auth.orgId,
                       feature_id: quotaType,
-                      ...(isEnterprise ? { entity_id: auth.userId } : {}),
+                      ...(usePerSeatEntity ? { entity_id: auth.userId } : {}),
                       value: finalState.searchToolCallCount,
                     })
                   );

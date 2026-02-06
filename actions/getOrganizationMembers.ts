@@ -6,6 +6,9 @@ import { OrganizationMembership, User, Invitation } from "@workos-inc/node";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import { getAutumnSeatLimitForOrg } from "./getAutumnSeatLimit";
+import { PLANS_WITH_SEATS, type PlanId } from "@/lib/plan-ids";
+
+export type OrganizationPlan = PlanId;
 
 export interface OrganizationMembershipWithUser extends OrganizationMembership {
   user: User | null;
@@ -86,10 +89,10 @@ export async function getOrganizationMemberCount(): Promise<number> {
   return membershipCount + invitationCount;
 }
 
-/** Returns plan from Convex and seat limit from Autumn (only when plan is Enterprise). */
+/** Returns plan from Convex and seat limit from Autumn */
 export async function getOrganizationPlanAndSeatLimit(): Promise<{
   seatQuantity: number | null;
-  plan: "free" | "plus" | "pro" | "enterprise" | null;
+  plan: PlanId | null;
 }> {
   try {
     const { organizationId } = await withAuth({ ensureSignedIn: true });
@@ -103,7 +106,9 @@ export async function getOrganizationPlanAndSeatLimit(): Promise<{
     });
 
     const seatQuantity =
-      plan === "enterprise" ? await getAutumnSeatLimitForOrg(organizationId) : null;
+      plan != null && PLANS_WITH_SEATS.has(plan)
+        ? await getAutumnSeatLimitForOrg(organizationId)
+        : null;
 
     return { seatQuantity, plan };
   } catch (error) {

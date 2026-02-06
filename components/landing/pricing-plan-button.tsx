@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ai/ui/button";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
 import type { LandingPlan } from "@/components/landing/data/pricing";
+import { CUSTOM_PLANS } from "@/lib/plan-ids";
 import { PlanSlug, PricingContext, SubscriptionPlan } from "@/lib/pricing-context";
 import { usePricingContext } from "@/lib/use-pricing-context";
 import { getAutumnBillingPortalUrl } from "@/actions/getAutumnBillingPortalUrl";
@@ -173,6 +174,13 @@ function buildPlanCta(
   context: PricingContext,
   labels: PricingButtonLabels,
 ): PlanButtonConfig {
+  if (context.currentPlan && CUSTOM_PLANS.has(context.currentPlan)) {
+    return {
+      label: context.activePlan === slug ? labels.active : labels.subscribe,
+      disabled: true,
+    };
+  }
+
   const defaultHref = getDefaultPlanHref(slug, context.isAuthenticated, plan);
   const isEnterprisePlan = slug === "enterprise";
 

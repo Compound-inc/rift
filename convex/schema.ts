@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { planValidator } from "./validators";
 
 export const providerMetadataValidor = v.optional(
   v.record(v.string(), v.any()),
@@ -29,6 +30,8 @@ export const productStatusValidator = v.union(
   v.literal("unpaid"),
 );
 
+export { planValidator } from "./validators";
+
 export default defineSchema({
   users: defineTable({
     email: v.string(),
@@ -36,33 +39,12 @@ export default defineSchema({
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     profilePictureUrl: v.optional(v.string()),
-    //Legacy fields (allow existing docs to validate; remove after migration)
-    standardQuotaUsage: v.optional(v.number()),
-    premiumQuotaUsage: v.optional(v.number()),
-    lastQuotaResetAt: v.optional(v.number()),
   }).index("by_workos_id", ["workos_id"]),
   organizations: defineTable({
     workos_id: v.string(),
     name: v.string(),
-    plan: v.optional(v.union(v.literal("free"), v.literal("plus"), v.literal("pro"), v.literal("enterprise"), v.null())),
+    plan: v.optional(v.union(planValidator, v.null())),
     productStatus: v.optional(productStatusValidator),
-    // Legacy fields (allow existing docs to validate; remove after migration)
-    seatQuantity: v.optional(v.number()),
-    productId: v.optional(v.string()),
-    billingCycleStart: v.optional(v.number()),
-    billingCycleEnd: v.optional(v.number()),
-    stripeCustomerId: v.optional(v.string()),
-    subscriptionId: v.optional(v.string()),
-    subscriptionStatus: v.optional(v.string()),
-    priceId: v.optional(v.string()),
-    paymentMethodBrand: v.optional(v.string()),
-    paymentMethodLast4: v.optional(v.string()),
-    standardQuotaLimit: v.optional(v.number()),
-    premiumQuotaLimit: v.optional(v.number()),
-    currentPeriodStart: v.optional(v.number()),
-    currentPeriodEnd: v.optional(v.number()),
-    subscriptionIds: v.optional(v.array(v.string())),
-    cancelAtPeriodEnd: v.optional(v.boolean()),
   }).index("by_workos_id", ["workos_id"]),
   threads: defineTable({
     threadId: v.string(), // User client Defined

@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getPaginatedOrganizationMembers, getOrganizationMemberCount, getOrganizationPlanAndSeatLimit } from "@/actions/getOrganizationMembers";
+import {
+  getPaginatedOrganizationMembers,
+  getOrganizationMemberCount,
+  getOrganizationPlanAndSeatLimit,
+  type OrganizationPlan,
+} from "@/actions/getOrganizationMembers";
 import { MembersContent } from "./MembersContent";
 import { MembersSkeleton } from "./MembersSkeleton";
 
@@ -13,7 +18,7 @@ export function MembersData({ currentUserId }: MembersDataProps) {
   const [initialData, setInitialData] = useState<Awaited<ReturnType<typeof getPaginatedOrganizationMembers>> | null>(null);
   const [totalMemberCount, setTotalMemberCount] = useState<number | null>(null);
   const [seatQuantity, setSeatQuantity] = useState<number | null>(null);
-  const [plan, setPlan] = useState<"free" | "plus" | "pro" | "enterprise" | null>(null);
+  const [plan, setPlan] = useState<OrganizationPlan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {

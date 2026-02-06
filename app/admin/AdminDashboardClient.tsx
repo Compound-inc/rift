@@ -6,7 +6,9 @@ import {
   setOrganizationPlanAction,
   cancelOrganizationSubscriptionAction,
   type OrganizationRow,
+  type AdminPlan,
 } from "@/actions/admin-organizations";
+import { type PlanId, PLANS_WITH_SEATS } from "@/lib/plan-ids";
 import { Button } from "@/components/ai/ui/button";
 import {
   Dialog,
@@ -43,7 +45,7 @@ export default function AdminDashboardClient() {
   const [error, setError] = useState<string | null>(null);
   const [selectedOrg, setSelectedOrg] = useState<OrganizationRow | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<string>("");
-  const [enterpriseSeats, setEnterpriseSeats] = useState<number>(1);
+  const [seats, setSeats] = useState<number>(1);
   const [isSetPlanDialogOpen, setIsSetPlanDialogOpen] = useState(false);
   const [isSettingPlan, setIsSettingPlan] = useState(false);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
@@ -73,20 +75,24 @@ export default function AdminDashboardClient() {
     fetchOrganizations();
   }, [fetchOrganizations]);
 
+  const isSeatsPlan =
+    selectedPlan !== "" && PLANS_WITH_SEATS.has(selectedPlan as PlanId);
+
   const handleSetPlan = async () => {
     if (!selectedOrg || !selectedPlan) return;
 
     setIsSettingPlan(true);
     try {
-      const result = await setOrganizationPlanAction({
+      const payload: Parameters<typeof setOrganizationPlanAction>[0] = {
         organizationId: selectedOrg._id,
         workos_id: selectedOrg.workos_id,
-        plan: selectedPlan as "plus" | "pro" | "enterprise",
+        plan: selectedPlan as AdminPlan,
         organizationName: selectedOrg.name ?? undefined,
-        ...(selectedPlan === "enterprise"
-          ? { enterpriseSeats: Math.max(1, enterpriseSeats) }
-          : {}),
-      });
+      };
+      if (isSeatsPlan) {
+        payload.seats = Math.max(1, seats);
+      }
+      const result = await setOrganizationPlanAction(payload);
 
       if ("error" in result) {
         setError(result.error);
@@ -98,7 +104,7 @@ export default function AdminDashboardClient() {
       setIsSetPlanDialogOpen(false);
       setSelectedOrg(null);
       setSelectedPlan("");
-      setEnterpriseSeats(1);
+      setSeats(1);
       startTransition(() => {
         void fetchOrganizations();
       });
@@ -153,9 +159,19 @@ export default function AdminDashboardClient() {
 
   // Removed badge variants; using plain text instead
 
-  const capitalizeFirstLetter = (str: string) => {
-    return str.charAt(0).toUpperCase() + str.slice(1);
+  const planDisplayLabel: Record<string, string> = {
+    free: "Free",
+    plus: "Plus",
+    pro: "Pro",
+    enterprise: "Enterprise",
+    vip: "VIP",
+    startup: "Startup",
+    pro_api: "Pro API",
+    plus_api: "Plus API",
   };
+  const getPlanLabel = (plan: string) => planDisplayLabel[plan] ?? plan;
+  const capitalizeFirstLetter = (str: string) =>
+    str.charAt(0).toUpperCase() + str.slice(1);
 
   const columns: ColumnDef<OrganizationRow>[] = [
     {
@@ -179,7 +195,7 @@ export default function AdminDashboardClient() {
       header: "Plan",
       cell: ({ row }) => {
         const plan = row.getValue("plan") as string;
-        return <span className="text-sm">{plan ? capitalizeFirstLetter(plan) : "No Plan"}</span>;
+        return <span className="text-sm">{plan ? getPlanLabel(plan) : "No Plan"}</span>;
       },
     },
     {
@@ -291,7 +307,7 @@ export default function AdminDashboardClient() {
         if (!open) {
           setSelectedOrg(null);
           setSelectedPlan("");
-          setEnterpriseSeats(1);
+          setSeats(1);
         }
       }}>
         <DialogContent className="dark:bg-popover-main dark:text-popover-text dark:border-border">
@@ -307,26 +323,28 @@ export default function AdminDashboardClient() {
                 <SelectValue placeholder="Select a plan" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="plus">Plus (1000 standard, 100 premium)</SelectItem>
-                <SelectItem value="pro">Pro (2700 standard, 270 premium)</SelectItem>
-                <SelectItem value="enterprise">Enterprise (1000 standard, 100 premium, seats)</SelectItem>
+                <SelectItem value="enterprise">Enterprise (custom seats)</SelectItem>
+                <SelectItem value="vip">VIP (custom seats)</SelectItem>
+                <SelectItem value="startup">Startup (custom seats)</SelectItem>
+                <SelectItem value="pro_api">Pro API (2700 standard, 270 premium)</SelectItem>
+                <SelectItem value="plus_api">Plus API (1000 standard, 100 premium)</SelectItem>
               </SelectContent>
             </Select>
-            {selectedPlan === "enterprise" && (
+            {isSeatsPlan && (
               <div>
                 <label className="text-sm font-medium">Seats</label>
                 <Input
                   type="number"
                   min={1}
-                  value={enterpriseSeats}
+                  value={seats}
                   onChange={(e) => {
                     const raw = e.target.value;
                     if (raw === "") {
-                      setEnterpriseSeats(1);
+                      setSeats(1);
                       return;
                     }
                     const n = parseInt(raw, 10);
-                    if (!Number.isNaN(n) && n >= 1) setEnterpriseSeats(n);
+                    if (!Number.isNaN(n) && n >= 1) setSeats(n);
                   }}
                   className="mt-1 dark:bg-popover-secondary/20 dark:text-popover-text dark:border-border/60"
                 />

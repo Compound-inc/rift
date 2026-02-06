@@ -3,12 +3,13 @@
 import { createContext, useContext, ReactNode } from "react";
 import { useConvexAuth, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { PlanId } from "@/lib/plan-ids";
 
-export type OrgPlan = "free" | "plus" | "pro" | "enterprise";
+export type OrgPlan = PlanId;
 
 export interface OrgInfo {
   name: string;
-  plan: OrgPlan | null;
+  plan: PlanId | null;
   productStatus: string;
 }
 
