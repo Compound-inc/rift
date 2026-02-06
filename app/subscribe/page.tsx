@@ -11,7 +11,6 @@ import { Button } from "@/components/ai/ui/button";
 import { landingPlans } from "@/components/landing/data/pricing";
 import { ensureWorkosOrganization } from "@/actions/ensureWorkosOrganization";
 import { getSubscribeCheckoutUrl } from "@/actions/getSubscribeCheckoutUrl";
-import { useHasPermission } from "@/lib/permissions-client";
 
 const GRADIENTS: Record<string, React.ReactNode> = {
     "1": (
@@ -124,7 +123,6 @@ const BILLING_PERMISSION_MESSAGE =
 
 function SubscribePageContent() {
   const { user, organizationId, switchToOrganization } = useAuth();
-  const canManageBilling = useHasPermission("MANAGE_BILLING");
   const searchParams = useSearchParams();
   const planParam = searchParams.get("plan")?.toLowerCase() ?? null;
   const router = useRouter();
@@ -145,16 +143,14 @@ function SubscribePageContent() {
     }
   }, [planParam, router]);
 
-  // Has org + valid plan: run checkout (requires MANAGE_BILLING)
+  // Has org + valid plan: run checkout (server enforces MANAGE_BILLING)
+  // We don't block on client canManageBilling — after org creation the token can be stale
+  // and show no permission yet; the server has the authoritative session and will redirect.
   const userId = user?.id ?? null;
   const orgId = organizationId ?? null;
   useEffect(() => {
     if (!userId || !orgId || !isValidPlan(planParam)) return;
     if (startedRef.current) return;
-    if (!canManageBilling) {
-      setError(BILLING_PERMISSION_MESSAGE);
-      return;
-    }
 
     startedRef.current = true;
     setLoading(true);
@@ -191,7 +187,7 @@ function SubscribePageContent() {
         setLoading(false);
       }
     })();
-  }, [userId, orgId, planParam, canManageBilling, router]);
+  }, [userId, orgId, planParam, router]);
 
   if (!user || !planParam || !isValidPlan(planParam)) return null;
 
@@ -291,10 +287,10 @@ function SubscribePageContent() {
                 </div>
 
                 {error ? (
-                  <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900/50 dark:bg-red-950/40">
                     <div className="flex items-center">
-                      <InfoCircledIcon className="w-4 h-4 text-red-600 mr-2 flex-shrink-0" />
-                      <span className="text-sm text-red-700 ml-2">{error}</span>
+                      <InfoCircledIcon className="w-4 h-4 text-red-600 dark:text-red-400 mr-2 flex-shrink-0" />
+                      <span className="text-sm text-red-700 dark:text-red-300 ml-2">{error}</span>
                     </div>
                   </div>
                 ) : null}

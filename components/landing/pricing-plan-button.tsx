@@ -277,8 +277,12 @@ function getDefaultPlanHref(
     return plan.href;
   }
 
-  const basePath = isAuthenticated ? "/subscribe" : "/sign-up";
-  return `${basePath}?plan=${slug}`;
+  if (isAuthenticated) {
+    return `/subscribe?plan=${slug}`;
+  }
+  // For unauthenticated users, pass return_to so after sign-up they land on subscribe, not the landing page
+  const params = new URLSearchParams({ plan: slug, return_to: "/subscribe" });
+  return `/sign-up?${params.toString()}`;
 }
 
 function getPlanRank(plan: SubscriptionPlan | null): number {

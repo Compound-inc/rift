@@ -153,17 +153,23 @@ export const syncAutumnSubscriptionData = internalMutation({
       .withIndex("by_workos_id", (q) => q.eq("workos_id", args.workos_id))
       .first();
 
-    if (!organization) {
-      throw new Error(`Organization not found for workos_id: ${args.workos_id}`);
-    }
-
     // Always set plan from webhook: valid productId → that plan; no/invalid product → null (no subscription).
     const newPlan = planFromProductId(args.product.productId ?? null);
 
-    await ctx.db.patch(organization._id, {
+    const patch = {
       productStatus: args.product.status ?? undefined,
       plan: newPlan ?? null,
-    });
+    };
+
+    if (!organization) {
+      return await ctx.db.insert("organizations", {
+        workos_id: args.workos_id,
+        name: "Organization",
+        ...patch,
+      });
+    }
+
+    await ctx.db.patch(organization._id, patch);
     return organization._id;
   },
 });

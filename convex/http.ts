@@ -163,10 +163,11 @@ http.route({
           );
 
           if (!organization?._id) {
-            // TODO: compose more sophisticated error messaging?
-            throw new Error(
-              `Unhandled event type: organization not found: ${data.id}.`,
-            );
+            await ctx.runMutation(internal.organizations.createOrganization, {
+              name: data.name,
+              workos_id: data.id,
+            });
+            break;
           }
 
           const patch = { name: data.name };

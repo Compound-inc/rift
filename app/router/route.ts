@@ -20,13 +20,10 @@ export const GET = async (request: NextRequest) => {
       return NextResponse.redirect(subscribeUrl);
     }
 
-    if (session.organizationId) {
-      try {
-        await logUserLoggedIn();
-      } catch {}
-      return NextResponse.redirect(new URL("/chat", request.url));
-    }
-    return NextResponse.redirect(new URL("/", request.url));
+    try {
+      await logUserLoggedIn();
+    } catch {}
+    return NextResponse.redirect(new URL("/chat", request.url));
   } catch (error) {
     console.error("Authentication error in router:", error);
     return NextResponse.redirect(new URL("/", request.url));
