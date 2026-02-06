@@ -23,7 +23,6 @@ import {
 } from "@/components/ai/ui/tooltip";
 import {
   AutoIcon,
-  SorpresaIcon,
   ProblemasDificilesIcon,
   EscrituraIcon,
 } from "@/components/ui/icons/svg-icons";
@@ -121,10 +120,10 @@ const RECOMMENDED_OPTIONS = [
     borderColor: "hover:border-emerald-200 dark:hover:border-emerald-800",
   },
   {
-    id: "sorpresa",
-    name: "Sorpresa",
-    description: "Deja que el azar elija tu próxima experiencia",
-    icon: SorpresaIcon,
+    id: "imagen",
+    name: "Imagen",
+    description: "Genera imágenes con IA",
+    icon: ImageIcon,
     color: "text-amber-500 dark:text-amber-300",
     bgColor: "hover:bg-amber-50 dark:hover:bg-amber-950/20",
     borderColor: "hover:border-amber-200 dark:hover:border-amber-800",
@@ -200,11 +199,13 @@ function ModelSelector({
           >
             <SelectPrimitive.ItemText>
               <div className="flex flex-col items-center gap-4">
-                <IconComponent
-                  className={cn("size-6 transition-colors", option.color)}
-                />
+                <div className="flex size-6 shrink-0 items-center justify-center">
+                  <IconComponent
+                    className={cn("size-6 transition-colors", option.color)}
+                  />
+                </div>
 
-                <div className="text-center space-y-1 flex-1 flex flex-col justify-center">
+                <div className="text-center space-y-1 flex-1 flex flex-col justify-center min-h-0">
                   <h4 className="font-medium text-sm text-popover-text">
                     {option.name}
                   </h4>

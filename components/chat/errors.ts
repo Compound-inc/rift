@@ -71,6 +71,13 @@ export class NoSubscriptionError extends Data.TaggedError(
 }> {}
 
 /**
+ * Seat limit reached (org plan): org has reached max users.
+ */
+export class SeatLimitError extends Data.TaggedError("SeatLimitError")<{
+  readonly message: string;
+}> {}
+
+/**
  * Union of chat-specific errors
  */
 export type ChatError =
@@ -80,6 +87,7 @@ export type ChatError =
   | AbortError
   | QuotaExceededError
   | NoSubscriptionError
+  | SeatLimitError
   | ServerError;
 
 // ============================================================================
@@ -103,6 +111,8 @@ export const getErrorMessage = (error: ChatError): string => {
       return error.message;
     case "NoSubscriptionError":
       return error.message;
+    case "SeatLimitError":
+      return error.message;
     case "ServerError":
       return `Server error: ${error.message}`;
   }
@@ -121,6 +131,7 @@ export const isRetryable = (error: ChatError): boolean => {
     case "AbortError":
     case "QuotaExceededError":
     case "NoSubscriptionError":
+    case "SeatLimitError":
       return false;
   }
 };

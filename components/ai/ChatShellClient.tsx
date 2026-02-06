@@ -6,6 +6,7 @@ import { ChevronLeftIcon, ChevronRightIcon, XIcon } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
 import { Button } from "@/components/ai/ui/button";
+import { UpgradeButton } from "./UpgradeButton";
 
 type SidebarControlContextValue = {
   closeSidebar: () => void;
@@ -112,23 +113,28 @@ export function ChatShellClient({ children, className, sidebar }: ChatShellClien
           <div className={cn("flex-1 min-h-0")}>
             <div className="relative flex h-full min-h-0 flex-col bg-background rounded-3xl overflow-visible overflow-x-clip border border-border">
               {(!isMobile || !isOpen) && (
-                <div className="absolute top-4 left-4 z-10 flex gap-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="icon"
-                    onClick={toggle}
-                    aria-pressed={isOpen}
-                    title={`${isOpen ? 'Hide' : 'Show'} sidebar (⌘+B)`}
-                  >
-                    {isOpen ? (
-                      <ChevronLeftIcon className="size-4" />
-                    ) : (
-                      <ChevronRightIcon className="size-4" />
-                    )}
-                  </Button>
-                  <ThemeToggle size="md" styleType="secondary" />
-                </div>
+                <>
+                  <div className="absolute top-4 left-4 z-10 flex gap-2 items-center">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      onClick={toggle}
+                      aria-pressed={isOpen}
+                      title={`${isOpen ? 'Hide' : 'Show'} sidebar (⌘+B)`}
+                    >
+                      {isOpen ? (
+                        <ChevronLeftIcon className="size-4" />
+                      ) : (
+                        <ChevronRightIcon className="size-4" />
+                      )}
+                    </Button>
+                    <ThemeToggle size="md" styleType="secondary" />
+                  </div>
+                  <div className="absolute top-4 right-4 z-10 flex gap-2 items-center">
+                    <UpgradeButton />
+                  </div>
+                </>
               )}
               {children}
             </div>

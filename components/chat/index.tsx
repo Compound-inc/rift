@@ -6,6 +6,7 @@ import { DefaultChatTransport } from "ai";
 import { usePathname, useRouter } from "next/navigation";
 import { generateUUID } from "@/lib/utils";
 import { useModel } from "@/contexts/model-context";
+import { useLocale } from "@/contexts/locale-context";
 import { useInitialMessage } from "@/contexts/initial-message-context";
 import { useCallback, useEffect, useRef, useMemo, useState, useLayoutEffect } from "react";
 import { useRegeneration } from "./hooks/use-regeneration";
@@ -63,6 +64,7 @@ function ChatInterfaceInternal({
 }: ChatInterfaceProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const lang = useLocale();
   const convex = useConvex();
 
   const {
@@ -399,8 +401,9 @@ function ChatInterfaceInternal({
         return {};
       })()),
       onFinish() {
-        if (pathname === "/") {
-          router.push(`/chat/${id}`);
+        const isChatHome = pathname === `/${lang}/chat` || pathname === `/${lang}/chat/`;
+        if (isChatHome) {
+          router.push(`/${lang}/chat/${id}`);
           router.refresh();
         }
       },

@@ -9,17 +9,18 @@
  */
 
 import type * as admin_organizations from "../admin/organizations.js";
+import type * as admin_users from "../admin/users.js";
+import type * as autumn from "../autumn.js";
 import type * as bugs from "../bugs.js";
 import type * as customInstructions from "../customInstructions.js";
 import type * as helpers_auth from "../helpers/auth.js";
 import type * as helpers_authenticated from "../helpers/authenticated.js";
 import type * as helpers_getUser from "../helpers/getUser.js";
-import type * as helpers_quota from "../helpers/quota.js";
+import type * as helpers_identity from "../helpers/identity.js";
 import type * as http from "../http.js";
 import type * as organizations from "../organizations.js";
 import type * as share from "../share.js";
 import type * as storageActions from "../storageActions.js";
-import type * as stripe from "../stripe.js";
 import type * as threads from "../threads.js";
 import type * as userConfiguration from "../userConfiguration.js";
 import type * as users from "../users.js";
@@ -33,17 +34,18 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "admin/organizations": typeof admin_organizations;
+  "admin/users": typeof admin_users;
+  autumn: typeof autumn;
   bugs: typeof bugs;
   customInstructions: typeof customInstructions;
   "helpers/auth": typeof helpers_auth;
   "helpers/authenticated": typeof helpers_authenticated;
   "helpers/getUser": typeof helpers_getUser;
-  "helpers/quota": typeof helpers_quota;
+  "helpers/identity": typeof helpers_identity;
   http: typeof http;
   organizations: typeof organizations;
   share: typeof share;
   storageActions: typeof storageActions;
-  stripe: typeof stripe;
   threads: typeof threads;
   userConfiguration: typeof userConfiguration;
   users: typeof users;

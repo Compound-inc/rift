@@ -1,4 +1,5 @@
 import { useMemo, useCallback } from "react";
+import { useChatTranslations } from "@/contexts/locale-context";
 import { NoSubscriptionDialog } from "@/components/ui/no-subscription-dialog";
 import {
   AttachmentsIcon,
@@ -60,6 +61,7 @@ export const ChatInputArea = React.memo(function ChatInputArea({
   showScrollToBottom,
   status,
 }: ChatInputAreaProps) {
+  const t = useChatTranslations();
   const input = useChatUIStore((s) => s.input);
   const isSearchEnabled = useChatUIStore((s) => s.isSearchEnabled);
   const quotaError = useChatUIStore((s) => s.quotaError);
@@ -216,7 +218,7 @@ export const ChatInputArea = React.memo(function ChatInputArea({
           isOpen={showNoSubscriptionDialog}
           onClose={() => setShowNoSubscriptionDialog(false)}
         />
-        
+
         {/* Quota Error Message */}
         {quotaError && (
           <div className="mb-2 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/50 rounded-lg text-red-800 dark:text-red-200 text-sm shadow-sm">
@@ -282,7 +284,7 @@ export const ChatInputArea = React.memo(function ChatInputArea({
             onChange={handleInputChange}
             value={input}
             disabled={disableInput || isUploading}
-            placeholder="Escribe tu mensaje..."
+            placeholder={t.inputPlaceholder}
           />
           <PromptInputToolbar>
             <PromptInputTools>
@@ -316,10 +318,10 @@ export const ChatInputArea = React.memo(function ChatInputArea({
                     onClick={handleSearchToggle}
                     aria-label="Activar búsqueda web"
                     disabled={disableInput}
-                    variant={isSearchEnabled ? "default" : "ghost"}
+                    variant={isSearchEnabled ? "accent" : "ghost"}
                     className={
                       isSearchEnabled
-                        ? "bg-blue-600 hover:bg-blue-700 border-blue-600 text-white"
+                        ? "hover:bg-accent/50"
                         : undefined
                     }
                   >

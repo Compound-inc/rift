@@ -1,5 +1,5 @@
 import { landingPlans } from "@/components/landing/data/pricing";
-import type { PlanSlug } from "@/lib/pricing-context";
+import type { PlanSlug as PricingContextPlanSlug } from "@/lib/pricing-context";
 import { PricingPlanButton } from "@/components/landing/pricing-plan-button";
 import {
   StandarIcon,
@@ -12,38 +12,44 @@ import {
 } from "@/components/ui/icons/landing-icons";
 import { Scim, RedoIcon } from "@/components/ui/icons/svg-icons";
 import { Check, ShieldCheck } from "lucide-react";
+import type { Dictionary, PlanSlug } from "@/types/dictionary";
 
 const priceFormatters: Record<string, Intl.NumberFormat> = {};
 
-function formatPrice(amount: number, currency: string) {
-  if (!priceFormatters[currency]) {
-    priceFormatters[currency] = new Intl.NumberFormat("es-MX", {
+function formatPrice(amount: number, currency: string, locale: string) {
+  const localeTag = locale === "es" ? "es-MX" : "en-US";
+  const key = `${currency}-${localeTag}`;
+  if (!priceFormatters[key]) {
+    priceFormatters[key] = new Intl.NumberFormat(localeTag, {
       style: "currency",
       currency,
       maximumFractionDigits: 0,
     });
   }
-  return priceFormatters[currency].format(amount);
+  return priceFormatters[key].format(amount);
 }
 
 function getFeatureIcon(feature: string) {
   const lowerFeature = feature.toLowerCase();
-
-  if (lowerFeature.includes("mensajes estándar")) return StandarIcon;
-  if (lowerFeature.includes("mensajes premium")) return PremiumIcon;
-  if (lowerFeature.includes("modelos")) return AIModelsIcon;
-  if (lowerFeature.includes("historial")) return RedoIcon;
-  if (lowerFeature.includes("soporte")) return SoporteIcon;
-  if (lowerFeature.includes("límites")) return ExpandIcon;
+  if (lowerFeature.includes("standard") || lowerFeature.includes("estándar")) return StandarIcon;
+  if (lowerFeature.includes("premium")) return PremiumIcon;
+  if (lowerFeature.includes("model") || lowerFeature.includes("modelo")) return AIModelsIcon;
+  if (lowerFeature.includes("histor") || lowerFeature.includes("chat")) return RedoIcon;
+  if (lowerFeature.includes("support") || lowerFeature.includes("soporte")) return SoporteIcon;
+  if (lowerFeature.includes("limit") || lowerFeature.includes("límite")) return ExpandIcon;
   if (lowerFeature.includes("sso")) return SSOIcon;
-  if (lowerFeature.includes("logs")) return LogsIcon;
-  if (lowerFeature.includes("seicm")) return Scim;
+  if (lowerFeature.includes("log") || lowerFeature.includes("audit")) return LogsIcon;
+  if (lowerFeature.includes("scim") || lowerFeature.includes("seicm")) return Scim;
   if (lowerFeature.includes("sla")) return ShieldCheck;
-
   return Check;
 }
 
-export default function PricingSection() {
+type PricingSectionProps = {
+  dict: Dictionary["pricing"];
+  lang: string;
+};
+
+export default function PricingSection({ dict, lang }: PricingSectionProps) {
   return (
     <section
       className="flex w-full flex-col items-center scroll-mt-20 pt-24 md:pt-0"
@@ -56,38 +62,44 @@ export default function PricingSection() {
           id="pricing-heading"
           className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/1)] dark:text-white"
         >
-          Planes Simples y Transparentes
+          {dict.heading}
         </h2>
         <p
           id="pricing-summary"
           className="max-w-[700px] text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/0.6)] dark:text-zinc-400 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed"
         >
-          Elige el plan que mejor se adapte a tus necesidades.<br /> Sin costos ocultos.
+          {dict.summary}
         </p>
       </div>
 
       <div className="max-md:px-4 max-md:py-4 max-lg:p-4 relative w-full lg:p-12 max-w-[1082px]">
-        {/* Top border */}
         <div className="max-lg:top-3.5 absolute inset-x-0 top-12 flex w-full items-center justify-center">
           <svg width="100%" height="1" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" className="inline-block h-auto w-full will-change-transform max-w-[1082px]">
             <line x1="0" y1="0.5" x2="100%" y2="0.5" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" strokeOpacity="0.12" strokeDasharray="4 6" vectorEffect="non-scaling-stroke" className="stroke-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/1)] dark:stroke-white" />
           </svg>
         </div>
 
-        {/* Left border */}
         <div className="max-lg:left-3.5 absolute inset-y-0 left-12 flex h-full items-center justify-center">
           <svg width="1" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" className="inline-block h-full max-w-full will-change-transform">
             <line x1="0.5" y1="0" x2="0.5" y2="100%" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" strokeOpacity="0.12" strokeDasharray="4 6" vectorEffect="non-scaling-stroke" className="stroke-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/1)] dark:stroke-white" />
           </svg>
         </div>
 
-        {/* Content container */}
         <div className="max-lg:h-auto max-lg:flex-col relative flex w-full items-stretch justify-center gap-8 lg:gap-0 overflow-hidden">
           {landingPlans.map((plan, index) => {
-            const formattedPrice =
-              plan.priceAmount !== null ? formatPrice(plan.priceAmount, plan.currency) : "Custom";
-            const period = plan.billingPeriodLabel ? `/${plan.billingPeriodLabel}` : "";
             const planSlug = plan.name.toLowerCase() as PlanSlug;
+            const translated = dict.plans[planSlug];
+            const description = translated?.description ?? plan.description;
+            const features = translated?.features ?? plan.features;
+            const buttonText = translated?.buttonText ?? plan.buttonText;
+            const useUsd = lang === "en" && plan.usdPriceAmount != null;
+            const amount = useUsd ? plan.usdPriceAmount! : plan.priceAmount;
+            const currency = useUsd ? "USD" : plan.currency;
+            const periodLabel = useUsd && plan.billingPeriodLabelEn ? plan.billingPeriodLabelEn : plan.billingPeriodLabel;
+            const formattedPrice =
+              amount !== null ? formatPrice(amount, currency, lang) : dict.customPrice;
+            const period = periodLabel ? `/${periodLabel}` : "";
+            const slugForContext = planSlug as PricingContextPlanSlug;
 
             return (
               <div key={plan.name} className="contents">
@@ -100,7 +112,7 @@ export default function PricingSection() {
 
                   {plan.popular && (
                     <div className="absolute top-4 px-3 py-1 bg-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/1)] text-white dark:bg-white dark:text-black text-xs font-bold rounded-full uppercase tracking-wide">
-                      Más Popular
+                      {dict.mostPopular}
                     </div>
                   )}
 
@@ -112,19 +124,19 @@ export default function PricingSection() {
                       <span className="text-4xl font-bold tracking-tight">
                         {formattedPrice}
                       </span>
-                      {period && plan.priceAmount !== null && (
+                      {period && amount !== null && (
                         <span className="ml-1 text-sm font-medium opacity-60">
                           {period}
                         </span>
                       )}
                     </div>
                     <p className="text-sm leading-6 tracking-tight text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/0.6)] dark:text-zinc-400 max-w-[280px]">
-                      {plan.description}
+                      {description}
                     </p>
                   </div>
 
-                  <ul className="flex-1 space-y-4 w-full max-w-[280px]" aria-label={`Características del plan ${plan.name}`}>
-                    {plan.features.map((feature) => {
+                  <ul className="flex-1 space-y-4 w-full max-w-[280px]" aria-label={dict.featuresLabel.replace("{planName}", plan.name)}>
+                    {features.map((feature) => {
                       const Icon = getFeatureIcon(feature);
                       return (
                         <li
@@ -141,7 +153,11 @@ export default function PricingSection() {
                   </ul>
 
                   <footer className="w-full max-w-[280px] mt-auto">
-                    <PricingPlanButton plan={plan} slug={planSlug} />
+                    <PricingPlanButton
+                      plan={{ ...plan, description, features, buttonText }}
+                      slug={slugForContext}
+                      buttonLabels={dict.button}
+                    />
                   </footer>
                 </article>
               </div>

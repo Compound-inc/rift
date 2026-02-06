@@ -2,16 +2,16 @@
 
 import { useQuery, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { AlertTriangle, CreditCard } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { BillingButton } from "./BillingButton";
 import { BillingSkeleton } from "./BillingSkeleton";
 
 // Precios estimados en MXN (Hardcoded para visualización)
 // Plus: ~$10 USD -> $200 MXN
-// Pro: ~$27 USD -> $540 MXN
+// Pro: (autumn.config.ts) $490 MXN base
 const PLAN_PRICES_MXN = {
   plus: 190,
-  pro: 540,
+  pro: 490,
   enterprise: 0,
 } as const;
 
@@ -41,15 +41,6 @@ function StatusBadge({ status }: { status: string }) {
       {labels[statusKey as keyof typeof labels] || status}
     </span>
   );
-}
-
-function formatDate(timestamp?: number): string {
-  if (!timestamp) return "-";
-  return new Date(timestamp).toLocaleDateString("es-MX", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
 }
 
 function formatPrice(amount: number): string {
@@ -89,7 +80,7 @@ export function BillingContent() {
   }
 
   const planKey = (billingInfo.plan as keyof typeof PLAN_PRICES_MXN) || "plus";
-  const seatQuantity = billingInfo.seatQuantity ?? 1;
+  const seatQuantity = 1;
   const unitPrice = PLAN_PRICES_MXN[planKey] || 0;
   const totalPrice = unitPrice * seatQuantity;
 
@@ -106,48 +97,21 @@ export function BillingContent() {
               <span className="text-2xl font-bold capitalize text-gray-900 dark:text-white">
                 {billingInfo.plan || "Free"}
               </span>
-              <StatusBadge status={billingInfo.subscriptionStatus} />
+              <StatusBadge status={billingInfo.productStatus} />
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-gray-100 dark:border-border/50">
-          <div>
-            <p className="text-sm font-medium text-gray-500 dark:text-text-muted mb-2">
-              Inicio ciclo de facturación
-            </p>
-            <div className="flex flex-col space-y-1 text-gray-900 dark:text-white text-sm">
-              <div className="flex items-center">
-                <span>{formatDate(billingInfo.billingCycleStart)}</span>
-              </div>
-              <p className="text-sm font-medium text-gray-500 dark:text-text-muted mb-2">Vence el</p>
-              <div className="flex items-center">
-                <span>{formatDate(billingInfo.billingCycleEnd)}</span>
-              </div>
+          {billingInfo.plan !== "enterprise" && (
+            <div>
+              <BillingButton workosId={billingInfo.workosId} />
             </div>
-            {billingInfo.plan !== "enterprise" && (
-              <div className="mt-4">
-                <BillingButton stripeCustomerId={billingInfo.stripeCustomerId} />
-              </div>
-            )}
-          </div>
-          
+          )}
           {billingInfo.plan !== "enterprise" && (
             <div>
               <p className="text-sm font-medium text-gray-500 dark:text-text-muted mb-2">
-                Método de Pago
-              </p>
-              <div className="flex items-center text-gray-900 dark:text-white mb-4">
-                <CreditCard className="w-4 h-4 mr-2 text-gray-400" />
-                <span>
-                  {billingInfo.paymentMethodBrand && billingInfo.paymentMethodLast4
-                    ? `${billingInfo.paymentMethodBrand.toUpperCase()} •••• ${billingInfo.paymentMethodLast4}`
-                    : "No configurado"}
-                </span>
-              </div>
-
-              <p className="text-sm font-medium text-gray-500 dark:text-text-muted mb-2">
-                 Pago mensual actual
+                Pago mensual actual
               </p>
               <div className="flex items-center text-gray-900 dark:text-white">
                 <span className="text-lg font-semibold">

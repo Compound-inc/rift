@@ -1,16 +1,19 @@
 "use client";
 
+import type React from "react";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { LoadingIcon } from "@/components/ui/icons/svg-icons";
 import { Button } from "@/components/ai/ui/button";
 import { landingPlans } from "@/components/landing/data/pricing";
+import { ensureWorkosOrganization } from "@/actions/ensureWorkosOrganization";
+import { getSubscribeCheckoutUrl } from "@/actions/getSubscribeCheckoutUrl";
+import { useHasPermission } from "@/lib/permissions-client";
 
-function GradientBackground({ id }: { id: string }) {
-  const gradients = {
+const GRADIENTS: Record<string, React.ReactNode> = {
     "1": (
       <>
         <rect width="300" height="300" fill="url(#paint0_radial_262_665)" />
@@ -92,114 +95,134 @@ function GradientBackground({ id }: { id: string }) {
         </radialGradient>
       </>
     ),
-  };
+};
 
+function GradientBackground({ id }: { id: string }) {
   return (
     <svg viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 inline-block h-full w-full will-change-transform z-[-1]">
-      {gradients[id as keyof typeof gradients]}
+      {GRADIENTS[id]}
     </svg>
   );
 }
 
+const VALID_PLANS = ["plus", "pro"] as const;
+type Plan = (typeof VALID_PLANS)[number];
+
+const isValidPlan = (p: string | null): p is Plan =>
+  p === "plus" || p === "pro";
+
+const PLAN_BY_NAME = new Map(
+  landingPlans.map((p) => [p.name.toLowerCase(), p])
+);
+
+function getSuccessUrl(): string {
+  return new URL("/chat", window.location.origin).toString();
+}
+
+const BILLING_PERMISSION_MESSAGE =
+  "Solo los miembros con permiso de facturación pueden suscribirse. Contacta al administrador de tu organización.";
+
 function SubscribePageContent() {
   const { user, organizationId, switchToOrganization } = useAuth();
+  const canManageBilling = useHasPermission("MANAGE_BILLING");
   const searchParams = useSearchParams();
-  const planParam = searchParams.get("plan");
-  const cancelAllExistingSubscriptions = searchParams.get("cancel_existing_subscription") === "true";
-  const idempotencyKey = searchParams.get("idempotency_key");
+  const planParam = searchParams.get("plan")?.toLowerCase() ?? null;
   const router = useRouter();
-  
+  const startedRef = useRef(false);
+
   const [orgName, setOrgName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
 
-  const selectedPlan = landingPlans.find(
-    (p) => p.name.toLowerCase() === planParam?.toLowerCase()
-  );
+  const selectedPlan = planParam ? PLAN_BY_NAME.get(planParam) : null;
+  const gradientId = selectedPlan?.gradientId ?? "1";
+  const planName = selectedPlan?.name ?? planParam;
 
-  const gradientId = selectedPlan?.gradientId || "1";
-  const planName = selectedPlan?.name || planParam;
-
-  // Auto-redirect if user has organization
+  // Invalid or missing plan → chat
   useEffect(() => {
-    const handleAutoSubscribe = async () => {
-      if (user && organizationId && planParam && !loading) {
-        setLoading(true);
-        try {
-            const res = await fetch("/api/subscribe", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    userId: user.id,
-                    organizationId,
-                    subscriptionLevel: planParam.toLowerCase(),
-                    cancelAllExistingSubscriptions: cancelAllExistingSubscriptions,
-                    idempotencyKey,
-                }),
-            });
+    if (!planParam || !isValidPlan(planParam)) {
+      router.replace("/chat");
+    }
+  }, [planParam, router]);
 
-            const { error, url } = await res.json();
+  // Has org + valid plan: run checkout (requires MANAGE_BILLING)
+  const userId = user?.id ?? null;
+  const orgId = organizationId ?? null;
+  useEffect(() => {
+    if (!userId || !orgId || !isValidPlan(planParam)) return;
+    if (startedRef.current) return;
+    if (!canManageBilling) {
+      setError(BILLING_PERMISSION_MESSAGE);
+      return;
+    }
 
-            if (!error && url) {
-                router.push(url);
-            } else if (error && url) {
-                // Display error message to user instead of silently redirecting
-                setError(error);
-                setRedirectUrl(url);
-                setLoading(false);
-            } else {
-                setError(error || "Error desconocido al iniciar suscripción");
-                setLoading(false);
-            }
-        } catch (err) {
-            setError("Error de conexión al iniciar suscripción");
-            setLoading(false);
+    startedRef.current = true;
+    setLoading(true);
+    setError("");
+
+    (async () => {
+      try {
+        const result = await getSubscribeCheckoutUrl(
+          planParam,
+          getSuccessUrl(),
+        );
+        if ("url" in result) {
+          window.location.href = result.url;
+          return;
         }
+        if ("attached" in result) {
+          router.replace("/chat");
+          return;
+        }
+        setError(
+          result.error === "Forbidden"
+            ? BILLING_PERMISSION_MESSAGE
+            : result.error ?? "Error al iniciar suscripción",
+        );
+        startedRef.current = false;
+      } catch (err) {
+        startedRef.current = false;
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Error de conexión al iniciar suscripción",
+        );
+      } finally {
+        setLoading(false);
       }
-    };
+    })();
+  }, [userId, orgId, planParam, canManageBilling, router]);
 
-    handleAutoSubscribe();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, organizationId, planParam, router]);
+  if (!user || !planParam || !isValidPlan(planParam)) return null;
 
-  if (!planParam) {
-     return <div>Error: No plan selected.</div>;
-  }
-  
-  if (!user) {
-      return null; 
-  }
-
-  // Show loading state while auto-redirecting
+  // Show loading state while auto-redirecting, or billing permission error
   if (organizationId) {
       return (
         <div className="flex items-center justify-center min-h-screen">
             <div className="flex flex-col items-center space-y-4">
-                {!error && <LoadingIcon className="size-8 animate-spin" />}
-                {!error && <p className="text-sm text-muted-foreground">Redirigiendo a Stripe...</p>}
-                {error && (
-                    <>
-                        <p className="text-red-500 text-sm text-center max-w-md">{error}</p>
-                        {redirectUrl && (
-                            <Button
-                                onClick={() => router.push(redirectUrl)}
-                                className="mt-4"
-                            >
-                                Volver al chat
-                            </Button>
-                        )}
-                    </>
-                )}
+                {loading && !error ? (
+                  <LoadingIcon className="size-8 animate-spin" />
+                ) : null}
+                {!error ? (
+                  <p className="text-sm text-muted-foreground">
+                    Abriendo checkout…
+                  </p>
+                ) : null}
+                {error ? (
+                  <>
+                    <p className="text-red-500 text-sm text-center max-w-md">{error}</p>
+                    <Button onClick={() => router.replace("/")} className="mt-4">
+                      Volver
+                    </Button>
+                  </>
+                ) : null}
             </div>
         </div>
       );
   }
 
   // Handle manual subscription for users without organization
-  const handleCreateOrgAndSubscribe = async () => {
+  const handleCreateOrgAndContinue = async () => {
     setLoading(true);
     setError("");
     
@@ -208,36 +231,34 @@ function SubscribePageContent() {
         setLoading(false);
         return;
     }
+    if (orgName.length > 50) {
+      setError("El nombre de la organización no puede exceder los 50 caracteres.");
+      setLoading(false);
+      return;
+    }
 
     try {
-        const res = await fetch("/api/subscribe", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                userId: user.id,
-                orgName, 
-                organizationId: undefined, // Explicitly undefined for new org
-                subscriptionLevel: planParam.toLowerCase(),
-            }),
-        });
+      const { organizationId: newOrgId } = await ensureWorkosOrganization({ orgName });
+      await switchToOrganization(newOrgId);
 
-        const { error, url, organizationId: newOrgId } = await res.json();
-
-        if (!error && url) {
-            if (newOrgId) {
-                await switchToOrganization(newOrgId);
-            }
-            router.push(url);
-        } else {
-            setError(error || "Error desconocido");
-            setLoading(false);
-        }
+      const result = await getSubscribeCheckoutUrl(planParam, getSuccessUrl());
+      if ("url" in result) {
+        window.location.href = result.url;
+        return;
+      }
+      if ("attached" in result) {
+        router.replace("/chat");
+        return;
+      }
+      setError(
+        result.error === "Forbidden"
+          ? BILLING_PERMISSION_MESSAGE
+          : result.error ?? "Error al iniciar suscripción",
+      );
     } catch (err) {
-        setError("Error de conexión");
-        setLoading(false);
+      setError(err instanceof Error ? err.message : "Error de conexión");
     }
+    setLoading(false);
   };
 
   return (
@@ -269,17 +290,17 @@ function SubscribePageContent() {
                   />
                 </div>
 
-                {error && (
-                    <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-                      <div className="flex items-center">
-                        <InfoCircledIcon className="w-4 h-4 text-red-600 mr-2 flex-shrink-0" />
-                        <span className="text-sm text-red-700 ml-2">{error}</span>
-                      </div>
+                {error ? (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                    <div className="flex items-center">
+                      <InfoCircledIcon className="w-4 h-4 text-red-600 mr-2 flex-shrink-0" />
+                      <span className="text-sm text-red-700 ml-2">{error}</span>
                     </div>
-                )}
+                  </div>
+                ) : null}
 
                 <Button
-                    onClick={handleCreateOrgAndSubscribe}
+                    onClick={handleCreateOrgAndContinue}
                     disabled={loading}
                     className="hover:bg-white hover:text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/1)] hover:shadow-[rgba(0,0,0,0.1)_0px_0px_0px_1px] relative flex w-full cursor-pointer select-none items-center justify-center bg-white text-sm leading-4 tracking-normal duration-[0.17s] text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/1)] dark:bg-zinc-900 dark:text-white dark:hover:bg-zinc-800 shadow-[rgba(0,0,0,0.05)_0px_0px_0px_1px] rounded-[50px] h-10 border border-zinc-200 dark:border-zinc-800"
                 >

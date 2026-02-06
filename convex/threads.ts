@@ -2,13 +2,7 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId, getAuthUserIdentity } from "./helpers/getUser";
 import { paginationOptsValidator } from "convex/server";
-import {
-  extractOrganizationIdFromJWT,
-  checkQuotaLimit,
-  incrementQuotaUsage,
-  incrementToolCallQuota,
-  getOrganizationBillingCycle,
-} from "./helpers/quota";
+import { extractOrganizationIdFromJWT } from "./helpers/identity";
 import { ensureServerSecret } from "./helpers/auth";
 import { AuthMutation, AuthOrgMutation, AuthQuery } from "./helpers/authenticated";
 
@@ -659,7 +653,6 @@ export const serverSendMessage = mutation({
       );
     }
 
-    const billingCycle = await getOrganizationBillingCycle(ctx, args.orgId);
     const now = Date.now();
 
     // Idempotency: if a message with this messageId already exists for this user, return it
@@ -684,13 +677,6 @@ export const serverSendMessage = mutation({
     if (!thread) {
       throw new Error("Thread not found or access denied");
     }
-
-    await incrementQuotaUsage(
-      ctx,
-      args.userId,
-      args.quotaType,
-      billingCycle?.billingCycleStart,
-    );
 
     const messageDocId = await ctx.db.insert("messages", {
       messageId: args.messageId,
@@ -971,6 +957,41 @@ export const serverFinalizeAssistantMessage = mutation({
 });
 
 /**
+ * Set thread generation status (e.g. to "failed" when the chat route returns an error
+ * before or without calling serverFinalizeAssistantMessage). Called from the Next.js chat API.
+ * Only updates if current status is "pending" or "generation" so we do not overwrite "completed".
+ */
+export const serverSetThreadGenerationStatus = mutation({
+  args: {
+    secret: v.string(),
+    userId: v.string(),
+    threadId: v.string(),
+    status: v.union(v.literal("failed"), v.literal("completed")),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    ensureServerSecret(args.secret);
+    const thread = await ctx.db
+      .query("threads")
+      .withIndex("by_user_and_threadId", (q) =>
+        q.eq("userId", args.userId).eq("threadId", args.threadId),
+      )
+      .unique();
+    if (!thread) return null;
+    if (thread.generationStatus !== "pending" && thread.generationStatus !== "generation") {
+      return null;
+    }
+    const now = Date.now();
+    await ctx.db.patch(thread._id, {
+      generationStatus: args.status,
+      updatedAt: now,
+      lastMessageAt: now,
+    });
+    return null;
+  },
+});
+
+/**
  * Delete a specific message by messageId
  */
 export const deleteMessage = AuthMutation({
@@ -1046,19 +1067,94 @@ export const updateUserMessageContent = AuthMutation({
 });
 
 /**
- * Increment tool call quota for a user (server-side only)
- * This mutation is secured with a secret token to prevent client-side abuse
+ * Create an attachment record from a server-side generated file.
  */
-export const serverIncrementToolCallQuota = mutation({
+export const serverCreateAttachment = mutation({
   args: {
     secret: v.string(),
     userId: v.string(),
-    toolCallCount: v.number(),
+    dataUrl: v.string(),
+    fileName: v.string(),
+    mimeType: v.string(),
+    fileSize: v.string(),
+  },
+  returns: v.id("attachments"),
+  handler: async (ctx, args) => {
+    ensureServerSecret(args.secret);
+
+    const url = new URL(args.dataUrl);
+    const fileKey = url.pathname.startsWith("/") ? url.pathname.slice(1) : url.pathname;
+    if (!fileKey) {
+      throw new Error(`Failed to extract fileKey from dataUrl: ${args.dataUrl}`);
+    }
+
+    const attachmentId = await ctx.db.insert("attachments", {
+      publicMessageIds: [],
+      userId: args.userId,
+      attachmentType: args.mimeType.startsWith("image/")
+        ? ("image" as const)
+        : args.mimeType === "application/pdf"
+          ? ("pdf" as const)
+          : ("file" as const),
+      attachmentUrl: args.dataUrl,
+      fileName: args.fileName,
+      mimeType: args.mimeType,
+      fileSize: args.fileSize,
+      fileKey,
+      status: "uploaded",
+    });
+
+    return attachmentId;
+  },
+});
+
+/**
+ * Attach existing attachments to a message and mark them as public.
+ */
+export const serverAttachAttachmentsToMessage = mutation({
+  args: {
+    secret: v.string(),
+    userId: v.string(),
+    messageId: v.string(),
+    attachmentIds: v.array(v.id("attachments")),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     ensureServerSecret(args.secret);
-    await incrementToolCallQuota(ctx, args.userId, args.toolCallCount);
+
+    const message = await ctx.db
+      .query("messages")
+      .withIndex("by_messageId_and_userId", (q) =>
+        q.eq("messageId", args.messageId).eq("userId", args.userId),
+      )
+      .unique();
+
+    if (!message) {
+      throw new Error("Message not found or access denied");
+    }
+
+    const existingIds = new Set(message.attachmentsIds ?? []);
+    const uniqueIds = args.attachmentIds.filter((id) => !existingIds.has(id));
+
+    if (uniqueIds.length > 0) {
+      await ctx.db.patch(message._id, {
+        attachmentsIds: [...(message.attachmentsIds ?? []), ...uniqueIds],
+        updated_at: Date.now(),
+      });
+
+      for (const attachmentId of uniqueIds) {
+        const attachment = await ctx.db.get(attachmentId);
+        if (attachment && attachment.userId === args.userId) {
+          const existingPublicIds = new Set(attachment.publicMessageIds ?? []);
+          if (!existingPublicIds.has(message._id)) {
+            await ctx.db.patch(attachmentId, {
+              publicMessageIds: [...attachment.publicMessageIds, message._id],
+            });
+          }
+        }
+      }
+    }
+
     return null;
   },
 });

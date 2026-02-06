@@ -1,23 +1,50 @@
 import Link from "next/link";
+import type { Dictionary } from "@/types/dictionary";
 
-export default function Footer() {
+const defaultFooterDict: Dictionary["footer"] = {
+  tagline: "La mejor manera para usar Inteligencia Artificial.",
+  address: ["Av. Lago Zurich 219,", "Torre Carso II, Piso 12,", "Col. Ampliación Granada,", "Miguel Hidalgo, CDMX, MX. 11529"],
+  product: "Producto",
+  company: "Empresa",
+  support: "Soporte",
+  features: "Características",
+  availableModels: "Modelos disponibles",
+  pricing: "Precios",
+  integrations: "Integraciones",
+  updates: "Actualizaciones",
+  about: "Acerca de",
+  blog: "Blog",
+  careers: "Carreras",
+  contact: "Contacto",
+  helpCenter: "Centro de ayuda",
+  documentation: "Documentación",
+  status: "Estado del servicio",
+  privacyPolicy: "Política de privacidad",
+  termsOfService: "Términos de servicio",
+  copyright: "Todos los derechos reservados.",
+};
+
+type FooterProps = {
+  dict?: Dictionary["footer"];
+  lang?: string;
+};
+
+export default function Footer({ dict = defaultFooterDict, lang }: FooterProps) {
   return (
     <footer className="bg-white dark:bg-popover-main border-t border-gray-200 dark:border-border mt-12 md:mt-24">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-          {/* Brand Section */}
           <div className="md:col-span-1">
             <div className="flex items-center space-x-2 mb-4">
               <span className="text-xl font-semibold text-gray-900 dark:text-popover-text">RIFT</span>
             </div>
             <p className="text-gray-600 dark:text-text-secondary text-sm leading-relaxed mb-6">
-              La mejor manera para usar Inteligencia Artificial.
+              {dict.tagline}
             </p>
             <address className="text-gray-600 dark:text-text-secondary text-sm mb-6 not-italic">
-              Av. Lago Zurich 219,<br />
-              Torre Carso II, Piso 12,<br />
-              Col. Ampliacion Granada,<br />
-              Miguel Hidalgo, CDMX, MX. 11529
+              {dict.address.map((line, i) => (
+                <span key={i}>{line}{i < dict.address.length - 1 && <br />}</span>
+              ))}
             </address>
             {/* <div className="flex space-x-3">
               <Link
@@ -50,41 +77,39 @@ export default function Footer() {
             </div> */}
           </div>
 
-          {/* Product Links */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-popover-text mb-4">Producto</h3>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-popover-text mb-4">{dict.product}</h3>
             <ul className="space-y-3">
               <li>
                 <Link href="#features" className="text-sm text-gray-600 dark:text-text-secondary hover:text-gray-900 dark:hover:text-popover-text transition-colors">
-                  Características
+                  {dict.features}
                 </Link>
               </li>
               <li>
-                <Link href="/models" className="text-sm text-gray-600 dark:text-text-secondary hover:text-gray-900 dark:hover:text-popover-text transition-colors">
-                  Modelos disponibles
+                <Link href={lang ? `/${lang}/models` : "/models"} className="text-sm text-gray-600 dark:text-text-secondary hover:text-gray-900 dark:hover:text-popover-text transition-colors">
+                  {dict.availableModels}
                 </Link>
               </li>
               <li>
                 <Link href="/#pricing" className="text-sm text-gray-600 dark:text-text-secondary hover:text-gray-900 dark:hover:text-popover-text transition-colors">
-                  Precios
+                  {dict.pricing}
                 </Link>
               </li>
               <li>
                 <Link href="#integrations" className="text-sm text-gray-600 dark:text-text-secondary hover:text-gray-900 dark:hover:text-popover-text transition-colors">
-                  Integraciones
+                  {dict.integrations}
                 </Link>
               </li>
               <li>
                 <Link href="#changelog" className="text-sm text-gray-600 dark:text-text-secondary hover:text-gray-900 dark:hover:text-popover-text transition-colors">
-                  Actualizaciones
+                  {dict.updates}
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Company Links */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-popover-text mb-4">Empresa</h3>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-popover-text mb-4">{dict.company}</h3>
             <ul className="space-y-3">
               <li>
                 <Link
@@ -93,7 +118,7 @@ export default function Footer() {
                   rel="noreferrer"
                   className="text-sm text-gray-600 dark:text-text-secondary hover:text-gray-900 dark:hover:text-popover-text transition-colors"
                 >
-                  Acerca de
+                  {dict.about}
                 </Link>
               </li>
               <li>
@@ -103,58 +128,56 @@ export default function Footer() {
                   rel="noreferrer"
                   className="text-sm text-gray-600 dark:text-text-secondary hover:text-gray-900 dark:hover:text-popover-text transition-colors"
                 >
-                  Blog
+                  {dict.blog}
                 </Link>
               </li>
               <li>
                 <Link href="mailto:careers@rift.mx" className="text-sm text-gray-600 dark:text-text-secondary hover:text-gray-900 dark:hover:text-popover-text transition-colors">
-                  Carreras
+                  {dict.careers}
                 </Link>
               </li>
               <li>
                 <Link href="mailto:contact@rift.mx" className="text-sm text-gray-600 dark:text-text-secondary hover:text-gray-900 dark:hover:text-popover-text transition-colors">
-                  Contacto
+                  {dict.contact}
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Support & Legal */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-popover-text mb-4">Soporte</h3>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-popover-text mb-4">{dict.support}</h3>
             <ul className="space-y-3">
               <li>
                 <Link href="mailto:help@rift.mx" className="text-sm text-gray-600 dark:text-text-secondary hover:text-gray-900 dark:hover:text-popover-text transition-colors">
-                  Centro de ayuda
+                  {dict.helpCenter}
                 </Link>
               </li>
               <li>
                 <Link href="mailto:contact@rift.mx?subject=Documentacion" className="text-sm text-gray-600 dark:text-text-secondary hover:text-gray-900 dark:hover:text-popover-text transition-colors">
-                  Documentación
+                  {dict.documentation}
                 </Link>
               </li>
               <li>
                 <Link href="mailto:support@rift.mx?subject=Estado%20del%20servicio" className="text-sm text-gray-600 dark:text-text-secondary hover:text-gray-900 dark:hover:text-popover-text transition-colors">
-                  Estado del servicio
+                  {dict.status}
                 </Link>
               </li>
             </ul>
           </div>
         </div>
 
-        {/* Bottom Section */}
         <div className="mt-8 md:mt-12 pt-8 border-t border-gray-200 dark:border-border">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="flex space-x-6 justify-center md:justify-start">
               <Link href="/privacy-policy" className="text-xs text-gray-500 dark:text-text-muted hover:text-gray-700 dark:hover:text-text-secondary transition-colors">
-                Política de privacidad
+                {dict.privacyPolicy}
               </Link>
               <Link href="/terms-of-service" className="text-xs text-gray-500 dark:text-text-muted hover:text-gray-700 dark:hover:text-text-secondary transition-colors">
-                Términos de servicio
+                {dict.termsOfService}
               </Link>
             </div>
             <div className="text-xs text-gray-500 dark:text-text-muted text-center md:text-left">
-              © {new Date().getFullYear()} The Unreal Compound SA de CV. Todos los derechos reservados.
+              © {new Date().getFullYear()} The Unreal Compound SA de CV. {dict.copyright}
             </div>
           </div>
         </div>

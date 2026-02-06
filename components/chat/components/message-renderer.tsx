@@ -402,11 +402,11 @@ export const MessageRenderer = React.memo(function MessageRenderer({
                 
             if (attachmentType === "image" || mediaType.startsWith("image/")) {
               return (
-                <div key={`${message.id}-file-${i}`} className="rounded-lg overflow-hidden border">
+                <div key={`${message.id}-file-${i}`} className="inline-block max-w-full">
                   <img
                     src={url}
                     alt="Imagen subida"
-                    className="max-w-full h-auto max-h-96 object-contain"
+                    className="block max-w-full h-auto max-h-96 object-contain rounded-lg border"
                     loading="lazy"
                   />
                 </div>

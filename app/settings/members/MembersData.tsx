@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getPaginatedOrganizationMembers, getOrganizationMemberCount, getOrganizationSeatsAndPlan } from "@/actions/getOrganizationMembers";
+import { getPaginatedOrganizationMembers, getOrganizationMemberCount, getOrganizationPlanAndSeatLimit } from "@/actions/getOrganizationMembers";
 import { MembersContent } from "./MembersContent";
 import { MembersSkeleton } from "./MembersSkeleton";
 
@@ -25,7 +25,7 @@ export function MembersData({ currentUserId }: MembersDataProps) {
         const [data, count, seatsAndPlan] = await Promise.all([
           getPaginatedOrganizationMembers(50),
           getOrganizationMemberCount().catch(() => 0),
-          getOrganizationSeatsAndPlan().catch(() => ({ seatQuantity: null, plan: null })),
+          getOrganizationPlanAndSeatLimit().catch(() => ({ seatQuantity: null, plan: null })),
         ]);
         
         if (!cancelled) {

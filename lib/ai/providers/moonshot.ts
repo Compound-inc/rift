@@ -27,6 +27,23 @@ export const DEFAULT_MOONSHOT_SETTINGS: MoonshotSettings = {
 // Moonshot AI model configurations
 export const MOONSHOT_MODELS: BaseModelConfig[] = [
   {
+    id: "moonshotai/kimi-k2.5",
+    name: "Kimi K2.5",
+    provider: "moonshotai",
+    description: "Modelo versátil con 262K de contexto, imágenes, herramientas y razonamiento",
+    contextWindow: 262000,
+    isPremium: false,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsPDFInput: false,
+      supportsObjectGeneration: true,
+      maxTokens: 16384,
+    }),
+  },
+  {
     id: "moonshotai/kimi-k2",
     name: "Kimi K2",
     provider: "moonshotai",

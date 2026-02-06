@@ -64,8 +64,8 @@ globalThis.AI_SDK_DEFAULT_PROVIDER = gateway;
 const SHORTCUTS: Record<string, string> = {
   automatico: "openai/gpt-5.1-instant",
   problemas_dificiles: "openai/gpt-5.1-thinking",
-  escritura: "google/gemini-2.5-flash",
-  sorpresa: "mistral/mistral-medium",
+  escritura: "moonshotai/kimi-k2",
+  imagen: "google/gemini-2.5-flash-image",
 };
 
 // Simple model resolution

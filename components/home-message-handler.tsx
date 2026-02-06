@@ -11,6 +11,7 @@ import { ReactNode } from "react";
 import { logThreadCreated } from "@/actions/audit";
 import { toast } from "sonner";
 import { useChatUIStore } from "@/components/chat/ui-store";
+import { useLocale } from "@/contexts/locale-context";
 
 interface HomeMessageHandlerProps {
   action: (
@@ -20,6 +21,7 @@ interface HomeMessageHandlerProps {
 
 export function HomeMessageHandler({ action }: HomeMessageHandlerProps) {
   const router = useRouter();
+  const lang = useLocale();
   const { selectedModel } = useModel();
   const { setInitialMessage } = useInitialMessage();
   const createThread = useMutation(api.threads.createThread);
@@ -74,7 +76,7 @@ export function HomeMessageHandler({ action }: HomeMessageHandlerProps) {
       });
 
       // Navigate directly to the chat page - clean URL without parameters
-      router.push(`/chat/${newThreadId}`);
+      router.push(`/${lang}/chat/${newThreadId}`);
     } catch (error: any) {
       console.error("Failed to create thread:", error);
       

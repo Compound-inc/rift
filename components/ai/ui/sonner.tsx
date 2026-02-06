@@ -18,8 +18,15 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className={cn(
-        "toaster group [&_.sonner-toast]:bg-popover-main [&_.sonner-toast]:backdrop-blur-sm [&_.sonner-toast]:text-popover-text [&_.sonner-toast]:border-border/30 [&_.sonner-toast]:rounded-xl [&_.sonner-toast]:border"
+        "toaster group",
+        "[&_[data-sonner-toast]]:bg-popover-main/90 [&_[data-sonner-toast]]:backdrop-blur-md [&_[data-sonner-toast]]:text-popover-text [&_[data-sonner-toast]]:border-border/30 [&_[data-sonner-toast]]:rounded-xl [&_[data-sonner-toast]]:border",
+        "[&_[data-sonner-toast][data-type='error']]:bg-destructive/90 [&_[data-sonner-toast][data-type='error']]:border-destructive/30"
       )}
+      toastOptions={{
+        classNames: {
+          toast: "!backdrop-blur-md",
+        },
+      }}
       icons={{
         success: <CircleCheckIcon className="size-4" />,
         info: <InfoIcon className="size-4" />,

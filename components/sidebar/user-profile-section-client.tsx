@@ -2,6 +2,7 @@
 
 import { useConvexAuth, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { useOrgContext } from "@/contexts/org-context";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ai/ui/button";
@@ -42,11 +43,8 @@ function getPlanBadgeStyles(plan: string) {
 export function UserProfileSectionClient({ serverSkeleton }: UserProfileSectionClientProps) {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useConvexAuth();
+  const { orgInfo } = useOrgContext();
   const user = useQuery(api.users.getCurrentUser, isAuthenticated ? {} : "skip");
-  const orgInfo = useQuery(
-    api.organizations.getCurrentOrganizationInfo,
-    isAuthenticated ? {} : "skip",
-  );
 
   const isClient = useIsClient();
   const [initialUserKey] = useState<string | null>(() => getLastUserKey());

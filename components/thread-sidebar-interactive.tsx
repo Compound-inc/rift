@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { useLocale } from "@/contexts/locale-context";
 import {
   usePaginatedQuery,
   useMutation,
@@ -83,6 +84,7 @@ const sortThreads = (a: Thread, b: Thread) => {
 
 export function ThreadSidebarInteractive({
 }: {}) {
+  const lang = useLocale();
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const { closeSidebar, isMobile: isMobileViewport } = useChatSidebarControls();
   const selectedThreadId = useSelectedThreadStore((s) => s.selectedThreadId);
@@ -570,7 +572,7 @@ export function ThreadSidebarInteractive({
       <ContextMenu key={thread.threadId}>
         <ContextMenuTrigger>
           <a
-            href={`/chat/${thread.threadId}`}
+            href={`/${lang}/chat/${thread.threadId}`}
             onClick={(event) => handleThreadLinkClick(thread.threadId, event)}
             onPointerEnter={() => {
               // Warm both the route and local-first cache on hover (mouse/pen).

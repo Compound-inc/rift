@@ -119,7 +119,7 @@
 
   --button-ghost: #F1F2F2;
   --button-link: #343434;
-  --button-accent: #007AFF;
+  --button-accent: var(--accent);
 
   --popover-main: oklch(0.2046 0 0 / 85%);
   --popover-main-s: oklch(0.2046 0 0);
@@ -192,7 +192,7 @@
 
   --button-ghost: #F1F2F2;
   --button-link: #343434;
-  --button-accent: #007AFF;
+  --button-accent: var(--accent);
 
   --popover-main: oklch(0.2046 0 0 / 85%);
   --popover-main-s: oklch(0.2046 0 0);

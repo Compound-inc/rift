@@ -1,20 +1,25 @@
 import { Google, Microsoft, Okta, Scim } from "@/components/ui/icons/svg-icons";
+import type { Dictionary } from "@/types/dictionary";
 
-export default function IntegrationsSection() {
+type IntegrationsSectionProps = {
+  dict: Dictionary["integrations"];
+};
+
+export default function IntegrationsSection({ dict }: IntegrationsSectionProps) {
   return (
     <section className="pt-24 md:pt-0" id="integrations" aria-labelledby="integrations-heading">
       <div className="gap-8 flex flex-col ">
         <div className="gap-2 w-full flex flex-col -mb-4">
           <span className="transition-opacity duration-150 ease-out text-orange-400 font-semibold gap-1.5 items-center flex">
-            Integraciones
+            {dict.label}
           </span>
           <h2 id="integrations-heading" className="text-4xl leading-[54.4px] tracking-[-0.5px] font-bold m-0">
-            Conecta RIFT con tu organización
+            {dict.heading}
           </h2>
         </div>
         <div className="flex flex-col">
           <p className="text-landing-text-secondary mb-5">
-            Implementación instantánea sin fricción. Sincroniza usuarios y grupos automáticamente con las herramientas que ya utilizas.
+            {dict.intro}
           </p>
 
           <div className="w-full max-w-5xl mx-auto">
@@ -33,7 +38,7 @@ export default function IntegrationsSection() {
               </div>
             </div>
             <p className="text-center text-sm text-muted-foreground mt-8">
-              Soporte para SCIM, JIT, Directory Sync, SSO (SAML/OIDC), políticas MFA y registros de auditoria avanzados
+              {dict.supportNote}
             </p>
           </div>
         </div>

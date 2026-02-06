@@ -3,13 +3,18 @@ import {
   ExpandIcon,
   FastMessagesIcon,
 } from "@/components/ui/icons/landing-icons";
-
 import { GlobeIcon } from "@/components/ui/icons/svg-icons";
 import { MockChatDemo } from "./mock-chat-demo";
 import { ModelsMarquee } from "./models-marquee";
 import { ArrowRightIcon } from "lucide-react";
 import { Button } from "@/components/ai/ui/button";
 import Link from "next/link";
+import type { Dictionary } from "@/types/dictionary";
+
+type PerformanceSectionProps = {
+  dict: Dictionary["performance"];
+  lang: string;
+};
 
 function GradientBackground() {
   return (
@@ -50,44 +55,38 @@ function GradientBackground() {
   );
 }
 
-export default function PerformanceSection() {
+export default function PerformanceSection({ dict, lang }: PerformanceSectionProps) {
   return (
     <>
-      {/* Summaries & Action Items Section */}
       <section id="performance" aria-labelledby="performance-heading">
         <div className="gap-8 flex flex-col pt-24 md:pt-0">
           <div className="gap-2 w-full flex flex-col -mb-4">
             <span className="transition-opacity duration-150 ease-out text-blue-500 font-semibold gap-1.5 items-center flex">
-              Rendimiento
+              {dict.label}
             </span>
             <h2 id="performance-heading" className="text-4xl leading-[54.4px] tracking-[-0.5px] font-bold m-0">
-              Velocidad Inigualable
+              {dict.heading}
             </h2>
           </div>
           <div className="flex flex-col">
             <p className="text-landing-text-secondary mb-5">
-              Desde la creacion de RIFT, sabiamos que la velocidad era un factor
-              clave para la eficiencia de los equipos. Por eso, RIFT
-              te permite trabajar con modelos de hasta 4,000 tokens por segundo, sin problemas de rendimiento y latencia.
+              {dict.intro}
             </p>
 
             <div className="flex flex-col items-center justify-center gap-7 w-full mb-8">
-              <MockChatDemo />
+              <MockChatDemo examples={dict.mockChatExamples} />
             </div>
 
             <div className="flex flex-col gap-2 w-full mt-4">
               <h3 className="tracking-[-0.5px] font-semibold text-xl leading-7 m-0">
-                Todos los modelos, una suscripción
+                {dict.oneSubscriptionHeading}
               </h3>
             </div>
 
             <p className="text-landing-text-secondary m-0 mb-8">
-              Acceso a todos los modelos de IA disponibles en el mercado, desde
-              ChatGPT, Gemini, Grok, Anthropic, DeepSeek, Mistral, y muchos
-              otros modelos especiales.
+              {dict.catalogSummary}
             </p>
 
-            {/* 2x2 Bento Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6" role="list">
               <article className="flex items-start gap-4" aria-labelledby="performance-una-suscripcion" role="listitem">
                 <div className="flex-shrink-0">
@@ -95,11 +94,10 @@ export default function PerformanceSection() {
                 </div>
                 <div className="flex flex-col gap-2 w-full">
                   <h3 id="performance-una-suscripcion" className="tracking-[-0.5px] font-semibold text-xl leading-7 m-0">
-                    Una Sola Suscripción
+                    {dict.oneSubscription}
                   </h3>
                   <p className="text-landing-text-secondary m-0">
-                    Accede a todos los modelos de IA con una sola suscripción.
-                    No necesitas múltiples cuentas ni pagos separados.
+                    {dict.oneSubscriptionDesc}
                   </p>
                 </div>
               </article>
@@ -110,11 +108,10 @@ export default function PerformanceSection() {
                 </div>
                 <div className="flex flex-col gap-2 w-full">
                   <h3 id="performance-elige-modelos" className="tracking-[-0.5px] font-semibold text-xl leading-7 m-0">
-                    Elige entre decenas de modelos
+                    {dict.chooseModels}
                   </h3>
                   <p className="text-landing-text-secondary m-0">
-                    Selecciona el modelo más adecuado para cada tarea desde
-                    nuestra amplia gama de opciones disponibles.
+                    {dict.chooseModelsDesc}
                   </p>
                 </div>
               </article>
@@ -125,11 +122,10 @@ export default function PerformanceSection() {
                 </div>
                 <div className="flex flex-col gap-2 w-full">
                   <h3 id="performance-sin-limitaciones" className="tracking-[-0.5px] font-semibold text-xl leading-7 m-0">
-                    Sin limitaciones de empresa
+                    {dict.noLimits}
                   </h3>
                   <p className="text-landing-text-secondary m-0">
-                    No te limitamos a usar únicamente una empresa de IA. Combina
-                    lo mejor de cada proveedor en una sola plataforma.
+                    {dict.noLimitsDesc}
                   </p>
                 </div>
               </article>
@@ -140,11 +136,10 @@ export default function PerformanceSection() {
                 </div>
                 <div className="flex flex-col gap-2 w-full">
                   <h3 id="performance-mejores-resultados" className="tracking-[-0.5px] font-semibold text-xl leading-7 m-0">
-                    Mejores resultados, más rapidez y más seguridad
+                    {dict.bestResults}
                   </h3>
                   <p className="text-landing-text-secondary m-0">
-                    Obtén respuestas más precisas, rápidas y seguras combinando
-                    entre los mejores modelos de IA del mercado.
+                    {dict.bestResultsDesc}
                   </p>
                 </div>
               </article>
@@ -153,10 +148,10 @@ export default function PerformanceSection() {
             <section id="models" aria-labelledby="models-heading" className="w-full pt-24">
               <div className="text-center">
                 <h3 id="models-heading" className="text-2xl font-bold mb-4">
-                  Explora nuestro catálogo
+                  {dict.catalogHeading}
                 </h3>
                 <p className="text-landing-text-secondary max-w-2xl mx-auto">
-                  Contamos con una de las bibliotecas más completas de modelos de Inteligencia Artificial, actualizada constantemente.
+                  {dict.catalogSummary}
                 </p>
               </div>
 
@@ -168,11 +163,11 @@ export default function PerformanceSection() {
                 </div>
                 <div className="relative z-10 flex flex-col items-center gap-10">
                   <div className="w-full overflow-hidden">
-                    <ModelsMarquee />
+                    <ModelsMarquee modelDescriptions={dict.modelDescriptions} />
                   </div>
                   <Button asChild variant="accent" size="lg" className="font-semibold text-white">
-                    <Link href="/models" className="inline-flex items-center gap-2" aria-label="Ver catálogo completo de modelos">
-                      Conocer todos los modelos
+                    <Link href="/models" className="inline-flex items-center gap-2" aria-label={dict.viewAllModelsAria}>
+                      {dict.viewAllModels}
                       <ArrowRightIcon className="size-4" />
                     </Link>
                   </Button>

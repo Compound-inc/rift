@@ -41,6 +41,14 @@ export class NoSubscriptionError extends Data.TaggedError(
 }> {}
 
 /**
+ * Error when an organization has reached its seat/user limit.
+ * Maps to HTTP 403 Forbidden.
+ */
+export class SeatLimitError extends Data.TaggedError("SeatLimitError")<{
+  readonly message: string;
+}> {}
+
+/**
  * Error when bot detection flags the request.
  * Maps to HTTP 403 Forbidden.
  */
@@ -137,6 +145,7 @@ export type ChatRouteError =
   | AuthenticationError
   | NoOrganizationError
   | NoSubscriptionError
+  | SeatLimitError
   | BotDetectionError
   | QuotaExceededError
   | DatabaseError

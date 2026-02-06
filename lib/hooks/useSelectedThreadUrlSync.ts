@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useSelectedThreadStore } from "@/lib/stores/selected-thread-store";
+import { useLocale } from "@/contexts/locale-context";
 
 declare global {
   interface Window {
@@ -39,21 +40,25 @@ function ensureHistoryPatched() {
   }) as any;
 }
 
+const LOCALES = ["en", "es"] as const;
+
 function parseThreadIdFromPathname(pathname: string): string | null {
-  // Supported:
-  // - /chat
-  // - /chat/<threadId>
+  // Supported: /chat, /chat/<id>, /[lang]/chat, /[lang]/chat/<id>
   const parts = pathname.split("?")[0].split("#")[0].split("/").filter(Boolean);
   if (parts.length === 1 && parts[0] === "chat") return null;
   if (parts.length === 2 && parts[0] === "chat") return parts[1] || null;
+  if (parts.length === 2 && LOCALES.includes(parts[0] as any) && parts[1] === "chat") return null;
+  if (parts.length === 3 && LOCALES.includes(parts[0] as any) && parts[1] === "chat") return parts[2] || null;
   return null;
 }
 
-function pathnameForThreadId(threadId: string | null): string {
-  return threadId ? `/chat/${threadId}` : "/chat";
+function pathnameForThreadId(threadId: string | null, lang: string): string {
+  const base = `/${lang}/chat`;
+  return threadId ? `${base}/${threadId}` : base;
 }
 
 export function useSelectedThreadUrlSync() {
+  const lang = useLocale();
   const selectedThreadId = useSelectedThreadStore((s) => s.selectedThreadId);
   const setSelectedThreadId = useSelectedThreadStore((s) => s.setSelectedThreadId);
 
@@ -100,7 +105,7 @@ export function useSelectedThreadUrlSync() {
     if (typeof window === "undefined") return;
     if (!hasInitializedRef.current) return;
 
-    const nextPath = pathnameForThreadId(selectedThreadId);
+    const nextPath = pathnameForThreadId(selectedThreadId, lang);
     const currentPath = window.location.pathname;
     
     if (currentPath === nextPath) {
@@ -124,7 +129,7 @@ export function useSelectedThreadUrlSync() {
     } else {
       window.history.pushState({ threadId: selectedThreadId }, "", nextPath);
     }
-  }, [selectedThreadId]);
+  }, [selectedThreadId, lang]);
 }
 
 

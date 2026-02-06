@@ -10,7 +10,13 @@ import { ZaiIcon } from "@/components/ui/icons/zai-icon";
 import { PrimeIntellectIcon } from "@/components/ui/icons/prime-intellect-icon";
 import { cn } from "@/lib/utils";
 
-const MarqueeCard = ({ model }: { model: typeof MODELS[0] }) => {
+const MarqueeCard = ({
+  model,
+  descriptionOverride,
+}: {
+  model: (typeof MODELS)[0];
+  descriptionOverride?: string;
+}) => {
   // Provider icon mapping
   const providerIcons = {
     openai: TablerBrandOpenai,
@@ -83,7 +89,7 @@ const MarqueeCard = ({ model }: { model: typeof MODELS[0] }) => {
           </h4>
           
           <p className="text-sm text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/0.6)] dark:text-zinc-400">
-            {model.description}
+            {descriptionOverride ?? model.description}
           </p>
         </div>
       </div>
@@ -95,10 +101,12 @@ const MarqueeRow = ({
   models,
   reverse = false,
   duration = "40s",
+  modelDescriptions,
 }: {
   models: typeof MODELS;
   reverse?: boolean;
   duration?: string;
+  modelDescriptions?: Record<string, string>;
 }) => {
   return (
     <div className="flex overflow-hidden w-full group relative py-3">
@@ -116,7 +124,11 @@ const MarqueeRow = ({
         }}
       >
         {models.map((model, i) => (
-          <MarqueeCard key={`${model.id}-${i}`} model={model} />
+          <MarqueeCard
+            key={`${model.id}-${i}`}
+            model={model}
+            descriptionOverride={modelDescriptions?.[model.id]}
+          />
         ))}
       </div>
       <div 
@@ -134,7 +146,11 @@ const MarqueeRow = ({
         aria-hidden="true"
       >
         {models.map((model, i) => (
-          <MarqueeCard key={`${model.id}-duplicate-${i}`} model={model} />
+          <MarqueeCard
+            key={`${model.id}-duplicate-${i}`}
+            model={model}
+            descriptionOverride={modelDescriptions?.[model.id]}
+          />
         ))}
       </div>
     </div>
@@ -173,10 +189,13 @@ function seededShuffle<T>(array: T[], seed: number): T[] {
   return shuffled;
 }
 
-export function ModelsMarquee() {
+type ModelsMarqueeProps = {
+  modelDescriptions?: Record<string, string>;
+};
+
+export function ModelsMarquee({ modelDescriptions }: ModelsMarqueeProps = {}) {
   const shuffledModels = seededShuffle(MODELS, 12345);
 
-  // Split models into 3 rows
   const chunkSize = Math.ceil(shuffledModels.length / 3);
   const row1 = shuffledModels.slice(0, chunkSize);
   const row2 = shuffledModels.slice(chunkSize, chunkSize * 2);
@@ -184,9 +203,9 @@ export function ModelsMarquee() {
 
   return (
     <div className="w-full flex flex-col py-5">
-      <MarqueeRow models={row1} duration="140s" />
-      <MarqueeRow models={row2} reverse duration="210s" />
-      <MarqueeRow models={row3} duration="100s" />
+      <MarqueeRow models={row1} duration="140s" modelDescriptions={modelDescriptions} />
+      <MarqueeRow models={row2} reverse duration="210s" modelDescriptions={modelDescriptions} />
+      <MarqueeRow models={row3} duration="100s" modelDescriptions={modelDescriptions} />
     </div>
   );
 }

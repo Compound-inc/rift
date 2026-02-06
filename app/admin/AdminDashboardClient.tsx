@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, startTransition } from "react";
+import {
+  listOrganizationsAction,
+  setOrganizationPlanAction,
+  cancelOrganizationSubscriptionAction,
+  type OrganizationRow,
+} from "@/actions/admin-organizations";
 import { Button } from "@/components/ai/ui/button";
 import {
   Dialog,
@@ -26,39 +32,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ai/ui/dropdown-menu";
+import { Input } from "@/components/ai/ui/input";
 import { Loader2, RefreshCw, MoreHorizontal } from "lucide-react";
+import { toast } from "sonner";
 import { ColumnDef } from "@tanstack/react-table";
 
-interface Organization {
-  _id: string;
-  _creationTime: number;
-  workos_id: string;
-  name: string;
-  plan?: "plus" | "pro";
-  standardQuotaLimit?: number;
-  premiumQuotaLimit?: number;
-  billingCycleStart?: number;
-  billingCycleEnd?: number;
-  subscriptionStatus?: string;
-  stripeCustomerId?: string;
-  cancelAtPeriodEnd?: boolean;
-}
-
 export default function AdminDashboardClient() {
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [organizations, setOrganizations] = useState<OrganizationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
+  const [selectedOrg, setSelectedOrg] = useState<OrganizationRow | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<string>("");
-  const [customStandardQuota, setCustomStandardQuota] = useState<number>(2000);
-  const [customPremiumQuota, setCustomPremiumQuota] = useState<number>(500);
-  const [seatQuantity, setSeatQuantity] = useState<number>(1);
-  const [enterpriseFeatures, setEnterpriseFeatures] = useState({
-    domainVerification: false,
-    directorySync: false,
-    sso: false,
-    auditLogs: false,
-  });
+  const [enterpriseSeats, setEnterpriseSeats] = useState<number>(1);
   const [isSetPlanDialogOpen, setIsSetPlanDialogOpen] = useState(false);
   const [isSettingPlan, setIsSettingPlan] = useState(false);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
@@ -66,72 +51,61 @@ export default function AdminDashboardClient() {
   const [cancelType, setCancelType] = useState<"now" | "end_of_cycle">("now");
   const [cancelStatus, setCancelStatus] = useState<string>("canceled");
 
-  const fetchOrganizations = async () => {
+  const fetchOrganizations = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
-      const response = await fetch("/api/admin/organizations");
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to fetch organizations");
+      const result = await listOrganizationsAction();
+      if ("error" in result) {
+        setError(result.error);
+        return;
       }
-      
-      const data = await response.json();
-      setOrganizations(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setOrganizations(result.data);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to load organizations";
+      setError(message);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchOrganizations();
-  }, []);
+  }, [fetchOrganizations]);
 
   const handleSetPlan = async () => {
     if (!selectedOrg || !selectedPlan) return;
 
+    setIsSettingPlan(true);
     try {
-      setIsSettingPlan(true);
-      const response = await fetch("/api/admin/organizations/set-plan", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          organizationId: selectedOrg._id,
-          workos_id: selectedOrg.workos_id,
-          plan: selectedPlan,
-          customStandardQuotaLimit: selectedPlan === "enterprise" ? customStandardQuota : undefined,
-          customPremiumQuotaLimit: selectedPlan === "enterprise" ? customPremiumQuota : undefined,
-          seatQuantity: selectedPlan === "enterprise" ? seatQuantity : undefined,
-          features: selectedPlan === "enterprise" ? enterpriseFeatures : undefined,
-        }),
+      const result = await setOrganizationPlanAction({
+        organizationId: selectedOrg._id,
+        workos_id: selectedOrg.workos_id,
+        plan: selectedPlan as "plus" | "pro" | "enterprise",
+        organizationName: selectedOrg.name ?? undefined,
+        ...(selectedPlan === "enterprise"
+          ? { enterpriseSeats: Math.max(1, enterpriseSeats) }
+          : {}),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to set plan");
+      if ("error" in result) {
+        setError(result.error);
+        return;
       }
 
-      // Refresh organizations list
-      await fetchOrganizations();
+      setError(null);
+      toast.success("Plan attached in Autumn; quota will apply on next chat request.");
       setIsSetPlanDialogOpen(false);
       setSelectedOrg(null);
       setSelectedPlan("");
-      setCustomStandardQuota(2000);
-      setCustomPremiumQuota(500);
-      setSeatQuantity(1);
-      setEnterpriseFeatures({
-        domainVerification: false,
-        directorySync: false,
-        sso: false,
-        auditLogs: false,
+      setEnterpriseSeats(1);
+      startTransition(() => {
+        void fetchOrganizations();
       });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to set plan");
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to set plan";
+      setError(message);
+      toast.error(message);
     } finally {
       setIsSettingPlan(false);
     }
@@ -140,33 +114,32 @@ export default function AdminDashboardClient() {
   const handleCancelSubscription = async () => {
     if (!selectedOrg || !cancelStatus) return;
 
+    setIsCanceling(true);
     try {
-      setIsCanceling(true);
-      const response = await fetch("/api/admin/organizations/cancel-subscription", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          organizationId: selectedOrg._id,
-          cancelType,
-          subscriptionStatus: cancelStatus,
-        }),
+      const result = await cancelOrganizationSubscriptionAction({
+        organizationId: selectedOrg._id,
+        workos_id: selectedOrg.workos_id,
+        productId: selectedOrg.plan,
+        cancelType,
+        subscriptionStatus: cancelStatus,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to cancel subscription");
+      if ("error" in result) {
+        setError(result.error);
+        return;
       }
 
-      // Refresh organizations list
-      await fetchOrganizations();
       setIsCancelDialogOpen(false);
       setSelectedOrg(null);
       setCancelType("now");
       setCancelStatus("canceled");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to cancel subscription");
+      startTransition(() => {
+        void fetchOrganizations();
+      });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to cancel subscription";
+      setError(message);
+      toast.error(message);
     } finally {
       setIsCanceling(false);
     }
@@ -184,7 +157,7 @@ export default function AdminDashboardClient() {
     return str.charAt(0).toUpperCase() + str.slice(1);
   };
 
-  const columns: ColumnDef<Organization>[] = [
+  const columns: ColumnDef<OrganizationRow>[] = [
     {
       accessorKey: "name",
       header: "Name",
@@ -210,67 +183,11 @@ export default function AdminDashboardClient() {
       },
     },
     {
-      accessorKey: "standardQuotaLimit",
-      header: "Standard",
-      cell: ({ row }) => {
-        const quota = row.getValue("standardQuotaLimit") as number;
-        return (
-          <div className="text-sm font-medium">
-            {quota || 0}
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "premiumQuotaLimit",
-      header: "Premium",
-      cell: ({ row }) => {
-        const quota = row.getValue("premiumQuotaLimit") as number;
-        return (
-          <div className="text-sm font-medium">
-            {quota || 0}
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "billingCycleStart",
-      header: "Billing Start",
-      cell: ({ row }) => {
-        const start = row.getValue("billingCycleStart") as number;
-        return (
-          <div className="text-sm">
-            {formatDate(start)}
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "billingCycleEnd",
-      header: "Billing End",
-      cell: ({ row }) => {
-        const end = row.getValue("billingCycleEnd") as number;
-        return (
-          <div className="text-sm">
-            {formatDate(end)}
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "subscriptionStatus",
+      accessorKey: "productStatus",
       header: "Status",
       cell: ({ row }) => {
-        const status = row.getValue("subscriptionStatus") as string;
+        const status = row.getValue("productStatus") as string;
         return <span className="text-sm">{status ? capitalizeFirstLetter(status) : "None"}</span>;
-      },
-    },
-    {
-      accessorKey: "cancelAtPeriodEnd",
-      header: "CPE?",
-      cell: ({ row }) => {
-        const cancelAtPeriodEnd = row.getValue("cancelAtPeriodEnd") as boolean;
-        return <span className="text-sm">{cancelAtPeriodEnd ? "Yes" : "No"}</span>;
       },
     },
     {
@@ -278,7 +195,7 @@ export default function AdminDashboardClient() {
       header: "Actions",
       cell: ({ row }) => {
         const org = row.original;
-        const hasActiveSubscription = org.plan && org.subscriptionStatus === "active";
+        const hasActiveSubscription = org.plan && org.productStatus === "active";
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -374,15 +291,7 @@ export default function AdminDashboardClient() {
         if (!open) {
           setSelectedOrg(null);
           setSelectedPlan("");
-          setCustomStandardQuota(2000);
-          setCustomPremiumQuota(500);
-          setSeatQuantity(1);
-          setEnterpriseFeatures({
-            domainVerification: false,
-            directorySync: false,
-            sso: false,
-            auditLogs: false,
-          });
+          setEnterpriseSeats(1);
         }
       }}>
         <DialogContent className="dark:bg-popover-main dark:text-popover-text dark:border-border">
@@ -399,97 +308,28 @@ export default function AdminDashboardClient() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="plus">Plus (1000 standard, 100 premium)</SelectItem>
-                <SelectItem value="pro">Pro (1500 standard, 300 premium)</SelectItem>
-                <SelectItem value="enterprise">Enterprise (Custom)</SelectItem>
+                <SelectItem value="pro">Pro (2700 standard, 270 premium)</SelectItem>
+                <SelectItem value="enterprise">Enterprise (1000 standard, 100 premium, seats)</SelectItem>
               </SelectContent>
             </Select>
-
             {selectedPlan === "enterprise" && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Standard Quota</label>
-                    <input
-                      type="number"
-                      value={customStandardQuota}
-                      onChange={(e) => setCustomStandardQuota(parseInt(e.target.value) || 0)}
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-popover-secondary/20 dark:border-border/60"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Premium Quota</label>
-                    <input
-                      type="number"
-                      value={customPremiumQuota}
-                      onChange={(e) => setCustomPremiumQuota(parseInt(e.target.value) || 0)}
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-popover-secondary/20 dark:border-border/60"
-                    />
-                  </div>
-                  <div className="col-span-2 space-y-2">
-                    <label className="text-sm font-medium">Seat Quantity</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={seatQuantity}
-                      onChange={(e) => setSeatQuantity(parseInt(e.target.value) || 1)}
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-popover-secondary/20 dark:border-border/60"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-3 border-t pt-4 dark:border-border/60">
-                  <h4 className="text-sm font-medium">Enterprise Features</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="domainVerification"
-                        checked={enterpriseFeatures.domainVerification}
-                        onChange={(e) => setEnterpriseFeatures(prev => ({ ...prev, domainVerification: e.target.checked }))}
-                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary dark:bg-popover-secondary/20 dark:border-border/60"
-                      />
-                      <label htmlFor="domainVerification" className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        Domain Verification
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="directorySync"
-                        checked={enterpriseFeatures.directorySync}
-                        onChange={(e) => setEnterpriseFeatures(prev => ({ ...prev, directorySync: e.target.checked }))}
-                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary dark:bg-popover-secondary/20 dark:border-border/60"
-                      />
-                      <label htmlFor="directorySync" className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        Directory Sync
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="sso"
-                        checked={enterpriseFeatures.sso}
-                        onChange={(e) => setEnterpriseFeatures(prev => ({ ...prev, sso: e.target.checked }))}
-                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary dark:bg-popover-secondary/20 dark:border-border/60"
-                      />
-                      <label htmlFor="sso" className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        SSO
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="auditLogs"
-                        checked={enterpriseFeatures.auditLogs}
-                        onChange={(e) => setEnterpriseFeatures(prev => ({ ...prev, auditLogs: e.target.checked }))}
-                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary dark:bg-popover-secondary/20 dark:border-border/60"
-                      />
-                      <label htmlFor="auditLogs" className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        Audit Logs
-                      </label>
-                    </div>
-                  </div>
-                </div>
+              <div>
+                <label className="text-sm font-medium">Seats</label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={enterpriseSeats}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === "") {
+                      setEnterpriseSeats(1);
+                      return;
+                    }
+                    const n = parseInt(raw, 10);
+                    if (!Number.isNaN(n) && n >= 1) setEnterpriseSeats(n);
+                  }}
+                  className="mt-1 dark:bg-popover-secondary/20 dark:text-popover-text dark:border-border/60"
+                />
               </div>
             )}
           </div>
@@ -568,7 +408,7 @@ export default function AdminDashboardClient() {
             {cancelType === "end_of_cycle" && (
               <div className="p-3 bg-yellow-50 dark:bg-popover-secondary/20 border border-yellow-200 dark:border-border rounded-md">
                 <p className="text-sm text-yellow-800 dark:text-popover-text">
-                  <strong>Note:</strong> The subscription will remain active until the end of the current billing cycle ({selectedOrg?.billingCycleEnd ? new Date(selectedOrg.billingCycleEnd).toLocaleDateString() : "Unknown"}).
+                  <strong>Note:</strong> The subscription will remain active until the end of the current billing cycle.
                 </p>
               </div>
             )}

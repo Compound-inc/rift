@@ -4,12 +4,10 @@ import React, { useState } from "react";
 import { Dialog } from "@radix-ui/themes";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@workos-inc/authkit-nextjs/components";
 import { SettingsInput } from "@/components/settings";
+import { ensureWorkosOrganization } from "@/actions/ensureWorkosOrganization";
 
-/**
- * The 'subscriptionLevel' prop is the name of the subscription plan and is directly tied to the Stripe price lookup key.
- * We need to have a price in Stripe with the same lookup key as the subscriptionLevel.
- */
 export function ModalDialog({
   subscriptionLevel,
   userId,
@@ -24,6 +22,7 @@ export function ModalDialog({
   trigger?: React.ReactNode;
 }) {
   const router = useRouter();
+  const { switchToOrganization } = useAuth();
 
   const [orgName, setOrgName] = useState("");
   const [error, setError] = useState("");
@@ -42,29 +41,28 @@ export function ModalDialog({
       return;
     }
 
-    // Call API to create a new organization and subscribe to plan
-    // The user will be redirected to Stripe Checkout
-    const res = await fetch("/api/subscribe", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        userId,
-        orgName: organizationId ? undefined : orgName,
-        organizationId: organizationId || undefined,
-        subscriptionLevel: subscriptionLevel.toLowerCase(),
-      }),
-    });
+    try {
+      if (organizationId) {
+        router.push(`/subscribe?plan=${subscriptionLevel.toLowerCase()}`);
+        return;
+      }
 
-    const { error, url } = await res.json();
-
-    if (!error) {
-      return router.push(url);
+      const { organizationId: newOrgId } = await ensureWorkosOrganization({ orgName });
+      await switchToOrganization(newOrgId);
+      router.push(`/subscribe?plan=${subscriptionLevel.toLowerCase()}`);
+      return;
+    } catch (err) {
+      setLoading(false);
+      setError(
+        `Error al suscribirse al plan: ${
+          err instanceof Error ? err.message : "Error desconocido"
+        }`,
+      );
+      return;
     }
 
     setLoading(false);
-    setError(`Error al suscribirse al plan: ${error}`);
+    setError("Error desconocido al suscribirse.");
   };
 
   return (

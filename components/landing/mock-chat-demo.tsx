@@ -10,7 +10,7 @@ import {
   AvatarImage,
 } from "@/components/ai/ui/avatar";
 
-const EXAMPLES = [
+const DEFAULT_EXAMPLES: Array<{ user: string; ai: string }> = [
   {
     user: "Explica la computación cuántica brevemente",
     ai: "La **computación cuántica** es un paradigma que aprovecha fenómenos como la *superposición* y el *entrelazamiento*.\n\nDiferencias clave:\n- **Bits Clásicos**: 0 o 1.\n- **Qubits**: 0, 1 o ambos a la vez.\n\nEsto permite resolver problemas complejos (como criptografía) exponencialmente más rápido.",
@@ -25,7 +25,11 @@ const EXAMPLES = [
   },
 ];
 
-export function MockChatDemo() {
+type MockChatDemoProps = {
+  examples?: Array<{ user: string; ai: string }>;
+};
+
+export function MockChatDemo({ examples = DEFAULT_EXAMPLES }: MockChatDemoProps) {
   const [exampleIndex, setExampleIndex] = useState(0);
   const [displayedResponse, setDisplayedResponse] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -33,7 +37,7 @@ export function MockChatDemo() {
   const [phase, setPhase] = useState<"user_typing" | "thinking" | "streaming" | "done">("user_typing");
   const [userText, setUserText] = useState("");
 
-  const currentExample = EXAMPLES[exampleIndex];
+  const currentExample = examples[exampleIndex];
 
   // Cursor blinking effect
   useEffect(() => {
@@ -86,7 +90,7 @@ export function MockChatDemo() {
       // 4. Wait before next example
       timeout = setTimeout(() => {
         if (isMounted) {
-          setExampleIndex((prev) => (prev + 1) % EXAMPLES.length);
+          setExampleIndex((prev) => (prev + 1) % examples.length);
         }
       }, 4000);
     };
@@ -97,7 +101,7 @@ export function MockChatDemo() {
       isMounted = false;
       clearTimeout(timeout);
     };
-  }, [exampleIndex, currentExample.user, currentExample.ai]);
+  }, [exampleIndex, currentExample.user, currentExample.ai, examples.length]);
 
   return (
     <div className="relative w-full max-w-[1082px] mx-auto p-4 md:p-12">
