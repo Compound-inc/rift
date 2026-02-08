@@ -1,7 +1,6 @@
 "use server";
 
 import { withAuth } from "@workos-inc/authkit-nextjs";
-import { getAllowedReturnUrl } from "@/lib/allowed-return-url";
 import { parsePermissionsFromAccessToken, PERMISSIONS } from "@/lib/permissions";
 import { Autumn } from "autumn-js";
 
@@ -31,10 +30,9 @@ export async function getAutumnBillingPortalUrl(
     return { error: "AUTUMN_SECRET_KEY is not set" };
   }
 
-  const validatedReturnUrl = getAllowedReturnUrl(returnUrl);
   const autumn = new Autumn({ secretKey });
   const result = await autumn.customers.billingPortal(orgId, {
-    return_url: validatedReturnUrl,
+    return_url: returnUrl?.trim() || undefined,
   });
 
   if ("error" in result && result.error) {
