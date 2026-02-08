@@ -6,9 +6,16 @@ import { Autumn } from "autumn-js";
 
 const PAID_PLANS = ["plus", "pro"] as const;
 
+const WORKSPACE_ID_DEV = "ws_1KGWM89TGCDN4S6VP0667XN5N";
+const WORKSPACE_ID_PROD = "ws_1KGYYM2WDF4W3T3Z2RRMXVNW0";
+
 const CHECKOUT_METADATA = {
-  workspaceId: "ws_1KGWM89TGCDN4S6VP0667XN5N",
-} as const;
+  get workspaceId() {
+    return process.env.NODE_ENV === "development"
+      ? WORKSPACE_ID_DEV
+      : WORKSPACE_ID_PROD;
+  },
+};
 
 /** Options for attach (e.g. prepaid feature quantities). */
 export type AttachOptions = Array<{ feature_id: string; quantity: number }>;
