@@ -25,6 +25,7 @@ import {
 import { useCustomer } from "autumn-js/react";
 import { cn } from "@/lib/utils";
 import { getCheckoutContent } from "@/lib/autumn/checkout-content";
+import { getSubscribeCheckoutUrl } from "@/actions/getSubscribeCheckoutUrl";
 
 const CHECKOUT_CTA_CLASS =
 	"hover:bg-white hover:text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/1)] hover:shadow-[rgba(0,0,0,0.1)_0px_0px_0px_1px] relative flex w-full cursor-pointer select-none items-center justify-center whitespace-nowrap bg-white text-sm leading-4 tracking-normal duration-[0.17s] text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/1)] dark:bg-zinc-900 dark:text-white dark:hover:bg-zinc-800 shadow-[rgba(0,0,0,0.05)_0px_0px_0px_1px] rounded-[50px] h-10 border border-zinc-200 dark:border-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed";
@@ -196,8 +197,12 @@ function CheckoutGradientBackground({
 	);
 }
 
+function getDefaultSuccessUrl(): string {
+	return typeof window !== "undefined" ? new URL("/chat", window.location.origin).toString() : "";
+}
+
 export default function CheckoutDialog(params: CheckoutDialogProps) {
-	const { attach } = useCustomer();
+	const { refetch } = useCustomer();
 	const [checkoutResult, setCheckoutResult] = useState<
 		CheckoutResult | undefined
 	>(params?.checkoutResult);
@@ -266,16 +271,25 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
 						<Button
 							onClick={async () => {
 								setLoading(true);
-								const options = checkoutResult.options.map((option) => ({
-									featureId: option.feature_id,
-									quantity: option.quantity,
+								const attachOptions = checkoutResult.options.map((o) => ({
+									feature_id: o.feature_id,
+									quantity: o.quantity,
 								}));
-								await attach({
-									productId: checkoutResult.product.id,
-									...(params.checkoutParams || {}),
-									options,
-								});
-								setOpen(false);
+								const result = await getSubscribeCheckoutUrl(
+									checkoutResult.product.id,
+									getDefaultSuccessUrl(),
+									attachOptions.length ? attachOptions : undefined,
+								);
+								if ("url" in result) {
+									window.location.href = result.url;
+									return;
+								}
+								if ("attached" in result) {
+									setOpen(false);
+									refetch?.();
+									setLoading(false);
+									return;
+								}
 								setLoading(false);
 							}}
 							disabled={loading}

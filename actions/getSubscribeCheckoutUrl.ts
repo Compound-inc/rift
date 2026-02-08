@@ -1,19 +1,27 @@
 "use server";
 
 import { withAuth } from "@workos-inc/authkit-nextjs";
-import { getAllowedReturnUrl } from "@/lib/allowed-return-url";
 import { parsePermissionsFromAccessToken, PERMISSIONS } from "@/lib/permissions";
 import { Autumn } from "autumn-js";
 
 const PAID_PLANS = ["plus", "pro"] as const;
 
+const CHECKOUT_METADATA = {
+  workspaceId: "ws_1KGWM89TGCDN4S6VP0667XN5N",
+} as const;
+
+/** Options for attach (e.g. prepaid feature quantities). */
+export type AttachOptions = Array<{ feature_id: string; quantity: number }>;
+
 /**
  * Returns an Autumn checkout URL for subscribing to a paid plan.
  * Only users in an org with MANAGE_BILLING can subscribe.
+ * Used by both /subscribe and the in-app checkout dialog.
  */
 export async function getSubscribeCheckoutUrl(
   productId: string,
   successUrl: string,
+  options?: AttachOptions,
 ): Promise<{ url: string } | { attached: true } | { error: string }> {
   const session = await withAuth();
   if (!session?.accessToken) {
@@ -40,12 +48,23 @@ export async function getSubscribeCheckoutUrl(
     return { error: "AUTUMN_SECRET_KEY is not set" };
   }
 
-  const validatedSuccessUrl = getAllowedReturnUrl(successUrl);
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const finalSuccessUrl =
+    successUrl?.trim()?.startsWith("http")
+      ? successUrl.trim()
+      : new URL(successUrl?.trim() || "/chat", base).href;
+
+  const metadata: Record<string, string> = {
+    ...CHECKOUT_METADATA,
+    ...(session.user?.id ? { dubCustomerExternalId: session.user.id } : {}),
+  };
   const autumn = new Autumn({ secretKey });
   const result = await autumn.attach({
     customer_id: orgId,
     product_id: plan,
-    success_url: validatedSuccessUrl,
+    success_url: finalSuccessUrl,
+    metadata,
+    ...(options?.length ? { options } : {}),
   });
 
   if ("error" in result && result.error) {

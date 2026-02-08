@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { Analytics as DubAnalytics } from "@dub/analytics/react";
 import "@/styles/globals.css";
 import { ConvexClientProvider } from "@/components/ConvexClientProvider";
 import { ThemeProvider } from "next-themes";
@@ -105,6 +106,10 @@ export default function RootLayout({
             <Providers>{children}</Providers>
           </ThemeProvider>
         </ConvexClientProvider>
+        <DubAnalytics
+          publishableKey={process.env.NEXT_PUBLIC_DUB_PUBLISHABLE_KEY}
+          apiHost={process.env.NEXT_PUBLIC_DUB_API_HOST}
+        />
       </body>
     </html>
   );

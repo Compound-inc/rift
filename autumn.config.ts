@@ -38,7 +38,7 @@ export const enterprise = product({
 	items: [
 		featureItem({
 			feature_id: premium.id,
-			included_usage: 0,
+			included_usage: 100,
 			interval: "month",
 		}),
 
@@ -49,7 +49,7 @@ export const enterprise = product({
 
 		featureItem({
 			feature_id: standard.id,
-			included_usage: 0,
+			included_usage: 1000,
 			interval: "month",
 		}),
 	],
@@ -107,7 +107,7 @@ export const startup = product({
 	items: [
 		featureItem({
 			feature_id: premium.id,
-			included_usage: 0,
+			included_usage: 100,
 			interval: "month",
 		}),
 
@@ -118,7 +118,7 @@ export const startup = product({
 
 		featureItem({
 			feature_id: standard.id,
-			included_usage: 0,
+			included_usage: 1000,
 			interval: "month",
 		}),
 	],
@@ -130,7 +130,7 @@ export const vip = product({
 	items: [
 		featureItem({
 			feature_id: premium.id,
-			included_usage: 0,
+			included_usage: 100,
 			interval: "month",
 		}),
 
@@ -141,7 +141,7 @@ export const vip = product({
 
 		featureItem({
 			feature_id: standard.id,
-			included_usage: 0,
+			included_usage: 1000,
 			interval: "month",
 		}),
 	],

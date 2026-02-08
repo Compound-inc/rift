@@ -2,6 +2,7 @@
 
 import { refreshSession, withAuth } from '@workos-inc/authkit-nextjs';
 import { workos } from '@/app/api/workos';
+import { trackDubLead } from '@/lib/dub-tracking';
 
 type EnsureWorkosOrganizationArgs = {
   /**
@@ -57,6 +58,14 @@ export async function ensureWorkosOrganization(
   });
 
   await refreshSession({ ensureSignedIn: true, organizationId: organization.id });
+
+  // ── Dub: track "Organization Created" lead event ────────
+  await trackDubLead({
+    clickId: "",
+    eventName: "Organization Created",
+    userId,
+    metadata: { orgName: name, orgId: organization.id },
+  });
 
   return { organizationId: organization.id };
 }
