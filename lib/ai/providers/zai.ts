@@ -27,6 +27,20 @@ export const DEFAULT_ZAI_SETTINGS: ZAISettings = {
 
 export const ZAI_MODELS: BaseModelConfig[] = [
   {
+    id: "zai/glm-5",
+    name: "GLM 5",
+    provider: "zai",
+    description:
+      "Modelo de codigo abierto de nueva generación, comparable con Opus 4.5 en algunos casos.",
+    contextWindow: 203000,
+    isPremium: false,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsReasoning: true,
+      maxTokens: 16384,
+    }),
+  },
+  {
     id: "zai/glm-4.6v",
     name: "GLM 4.6V",
     provider: "zai",
