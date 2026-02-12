@@ -777,8 +777,12 @@ const handleChatRequest = (
     const stream = createUIMessageStream({
       originalMessages: messages,
       execute: async ({ writer }) => {
-        // Start assistant message with server-side generated id
-        writer.write({ type: "start", messageId: newMessageId });
+        // Start assistant message with server-side generated id and model for UI
+        writer.write({
+          type: "start",
+          messageId: newMessageId,
+          messageMetadata: { model: modelDisplayName },
+        });
 
         // Start assistant message in database (background)
         const startEffect = dbQueue.enqueue(

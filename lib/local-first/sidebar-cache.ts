@@ -11,6 +11,7 @@ export type SidebarThread = {
   shareId?: string;
   shareStatus?: "active" | "revoked";
   sharedAt?: number;
+  model?: string;
 };
 
 export type SidebarProfile = {
