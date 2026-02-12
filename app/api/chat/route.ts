@@ -694,8 +694,10 @@ const handleChatRequest = (
       
       if (trigger !== "regenerate-message") {
         const attachmentIds = userFiles
-          .filter((part) => part.attachmentId)
-          .map((part) => part.attachmentId! as Id<"attachments">);
+          .filter((part): part is typeof part & { attachmentId: string } =>
+            "attachmentId" in part && typeof (part as { attachmentId?: string }).attachmentId === "string"
+          )
+          .map((part) => (part as { attachmentId: string }).attachmentId as Id<"attachments">);
 
         // Run synchronously to ensure user message is saved before AI generation starts
         yield* sendUserMessage({
@@ -773,7 +775,7 @@ const handleChatRequest = (
 
     // Create the streaming response
     const stream = createUIMessageStream({
-      originalMessages: messages as UIMessage[],
+      originalMessages: messages,
       execute: async ({ writer }) => {
         // Start assistant message with server-side generated id
         writer.write({ type: "start", messageId: newMessageId });
@@ -930,7 +932,7 @@ const handleChatRequest = (
             const imageResult = await generateText({
               model: imageModel,
               messages: await convertToModelMessages(
-                filterMessagesForModel(messages as UIMessage[], modelId)
+                filterMessagesForModel(messages, modelId)
               ),
               system: systemPrompt,
               headers: getAttributionHeaders(),
@@ -1058,7 +1060,7 @@ const handleChatRequest = (
           const result = streamText({
             model: model as LanguageModel,
             messages: await convertToModelMessages(
-              filterMessagesForModel(messages as UIMessage[], modelId)
+              filterMessagesForModel(messages, modelId)
             ),
             tools: toolSet,
             system: systemPrompt,

@@ -114,9 +114,9 @@ export function WelcomeScreen({ user, onSuggestionClick }: WelcomeScreenProps) {
               icon: (
                 <IdeaIcon className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
               ),
-              title: "Habilidades de escritura",
+              title: "Mejora tus prompts",
               prompt:
-                "Enséñame a estructurar mejor mis ideas al escribir",
+                "Enséñame a estructurar mejor mis prompts para conseguir mejores resultados",
             },
             {
               icon: (

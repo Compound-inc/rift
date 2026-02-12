@@ -24,11 +24,13 @@ export type AttachOptions = Array<{ feature_id: string; quantity: number }>;
  * Returns an Autumn checkout URL for subscribing to a paid plan.
  * Only users in an org with MANAGE_BILLING can subscribe.
  * Used by both /subscribe and the in-app checkout dialog.
+ * @param rewardId - Optional Autumn reward ID (e.g. "just_use_ai") to apply at checkout.
  */
 export async function getSubscribeCheckoutUrl(
   productId: string,
   successUrl: string,
   options?: AttachOptions,
+  rewardId?: string | null,
 ): Promise<{ url: string } | { attached: true } | { error: string }> {
   const session = await withAuth();
   if (!session?.accessToken) {
@@ -72,6 +74,7 @@ export async function getSubscribeCheckoutUrl(
     success_url: finalSuccessUrl,
     metadata,
     ...(options?.length ? { options } : {}),
+    ...(rewardId?.trim() ? { reward: rewardId.trim() } : {}),
   });
 
   if ("error" in result && result.error) {

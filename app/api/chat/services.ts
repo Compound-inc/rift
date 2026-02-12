@@ -363,17 +363,7 @@ export const classifyProviderError = (error: unknown): ProviderError => {
 // ============================================================================
 
 export interface RequestBody {
-  messages: Array<{
-    id: string;
-    role: "user" | "assistant" | "system";
-    parts?: Array<{
-      type: string;
-      text?: string;
-      mediaType?: string;
-      url?: string;
-      attachmentId?: string;
-    }>;
-  }>;
+  messages: UIMessage[];
   modelId: string;
   threadId: string;
   enabledTools?: ToolType[];

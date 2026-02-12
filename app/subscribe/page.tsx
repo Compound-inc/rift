@@ -11,6 +11,11 @@ import { Button } from "@/components/ai/ui/button";
 import { landingPlans } from "@/components/landing/data/pricing";
 import { ensureWorkosOrganization } from "@/actions/ensureWorkosOrganization";
 import { getSubscribeCheckoutUrl } from "@/actions/getSubscribeCheckoutUrl";
+import {
+  getStoredPromoReward,
+  getActivePromoById,
+  getRewardIdForPlan,
+} from "@/lib/promos";
 
 const GRADIENTS: Record<string, React.ReactNode> = {
     "1": (
@@ -125,8 +130,16 @@ function SubscribePageContent() {
   const { user, organizationId, switchToOrganization } = useAuth();
   const searchParams = useSearchParams();
   const planParam = searchParams.get("plan")?.toLowerCase() ?? null;
+  const rewardParam = searchParams.get("reward")?.trim() ?? null;
   const router = useRouter();
   const startedRef = useRef(false);
+
+  const promoId = rewardParam || getStoredPromoReward();
+  const promo = getActivePromoById(promoId);
+  const rewardId =
+    promo && isValidPlan(planParam)
+      ? getRewardIdForPlan(promo, planParam)
+      : undefined;
 
   const [orgName, setOrgName] = useState("");
   const [error, setError] = useState("");
@@ -161,6 +174,8 @@ function SubscribePageContent() {
         const result = await getSubscribeCheckoutUrl(
           planParam,
           getSuccessUrl(),
+          undefined,
+          rewardId || undefined,
         );
         if ("url" in result) {
           window.location.href = result.url;
@@ -187,7 +202,7 @@ function SubscribePageContent() {
         setLoading(false);
       }
     })();
-  }, [userId, orgId, planParam, router]);
+  }, [userId, orgId, planParam, rewardId, router]);
 
   if (!user || !planParam || !isValidPlan(planParam)) return null;
 
@@ -237,7 +252,12 @@ function SubscribePageContent() {
       const { organizationId: newOrgId } = await ensureWorkosOrganization({ orgName });
       await switchToOrganization(newOrgId);
 
-      const result = await getSubscribeCheckoutUrl(planParam, getSuccessUrl());
+      const result = await getSubscribeCheckoutUrl(
+        planParam,
+        getSuccessUrl(),
+        undefined,
+        rewardId || undefined,
+      );
       if ("url" in result) {
         window.location.href = result.url;
         return;

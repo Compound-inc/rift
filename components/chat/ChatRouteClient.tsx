@@ -1,6 +1,7 @@
 "use client";
 
 import ChatInterface from "@/components/chat";
+import { FirstMessageSendAnimationProvider } from "@/components/chat/first-message-send-animation";
 import { HomeMessageHandler } from "@/components/home-message-handler";
 import { ChatMessagesClient } from "@/components/chat-messages-client";
 import { useSelectedThreadUrlSync } from "@/lib/hooks/useSelectedThreadUrlSync";
@@ -17,17 +18,22 @@ export function ChatRouteClient() {
     return null;
   }
 
-  if (!selectedThreadId) {
-    return (
-      <HomeMessageHandler
-        action={(handleInitialMessage) => (
-          <ChatInterface id="welcome" onInitialMessage={handleInitialMessage} />
-        )}
-      />
-    );
-  }
-
-  return <ChatMessagesClient threadId={selectedThreadId} />;
+  // Provider must wrap both branches so animation state (phase, sourcePoint) persists
+  // when navigating from welcome to thread; otherwise the thread mounts with a fresh
+  // provider and phase="idle", causing scroll-to-bottom to run and teleport the message.
+  return (
+    <FirstMessageSendAnimationProvider>
+      {!selectedThreadId ? (
+        <HomeMessageHandler
+          action={(handleInitialMessage) => (
+            <ChatInterface id="welcome" onInitialMessage={handleInitialMessage} />
+          )}
+        />
+      ) : (
+        <ChatMessagesClient threadId={selectedThreadId} />
+      )}
+    </FirstMessageSendAnimationProvider>
+  );
 }
 
 

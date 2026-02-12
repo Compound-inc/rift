@@ -46,11 +46,21 @@ type PricingPlanButtonProps = {
   plan: LandingPlan;
   slug: PlanSlug;
   buttonLabels?: Partial<PricingButtonLabels>;
+  /** Plan-specific reward ID for Autumn checkout (one per plan to avoid Stripe "max 1 discount"). */
+  rewardId?: string | null;
+  /** Promo ID for subscribe/sign-up URL (reward= param); resolved to rewardId per plan on subscribe page. */
+  promoId?: string | null;
 };
 
 const PAID_PLAN_SLUGS = new Set<PlanSlug>(["plus", "pro"]);
 
-export function PricingPlanButton({ plan, slug, buttonLabels }: PricingPlanButtonProps) {
+export function PricingPlanButton({
+  plan,
+  slug,
+  buttonLabels,
+  rewardId,
+  promoId,
+}: PricingPlanButtonProps) {
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [isPortalLoading, setIsPortalLoading] = useState(false);
   const { checkout } = useCustomer();
@@ -62,7 +72,9 @@ export function PricingPlanButton({ plan, slug, buttonLabels }: PricingPlanButto
 
   let linkHref: string | null =
     !cta.disabled && typeof cta.href === "string" ? cta.href : null;
-
+  if (linkHref && promoId?.trim()) {
+    linkHref = appendRewardToHref(linkHref, slug, promoId.trim()) ?? linkHref;
+  }
   if (cta.openBillingPortal && !canManageBilling) {
     linkHref = null;
   }
@@ -122,6 +134,7 @@ export function PricingPlanButton({ plan, slug, buttonLabels }: PricingPlanButto
       const { data, error } = await checkout({
         productId: slug,
         dialog: CheckoutDialog,
+        ...(rewardId?.trim() ? { reward: rewardId.trim() } : {}),
       });
       if (error) {
         console.error("Checkout error:", error);
@@ -283,6 +296,35 @@ function getDefaultPlanHref(
   // For unauthenticated users, pass return_to so after sign-up they land on subscribe, not the landing page
   const params = new URLSearchParams({ plan: slug, return_to: "/subscribe" });
   return `/sign-up?${params.toString()}`;
+}
+
+/**
+ * Appends reward param to subscribe or sign-up URLs so checkout applies the promo.
+ * For sign-up, encodes return_to as /subscribe?plan=X&reward=Y so the user lands with reward after auth.
+ */
+function appendRewardToHref(
+  href: string,
+  slug: PlanSlug,
+  rewardId: string,
+): string | null {
+  if (slug === "enterprise") return href;
+  try {
+    if (href.startsWith("/subscribe")) {
+      const u = new URL(href, "http://localhost");
+      u.searchParams.set("reward", rewardId);
+      return u.pathname + u.search;
+    }
+    if (href.startsWith("/sign-up")) {
+      const u = new URL(href, "http://localhost");
+      const returnTo = u.searchParams.get("return_to") ?? "/subscribe";
+      const subscribeWithReward = `/subscribe?plan=${slug}&reward=${encodeURIComponent(rewardId)}`;
+      u.searchParams.set("return_to", subscribeWithReward);
+      return u.pathname + u.search;
+    }
+  } catch {
+    return href;
+  }
+  return href;
 }
 
 function getPlanRank(plan: SubscriptionPlan | null): number {

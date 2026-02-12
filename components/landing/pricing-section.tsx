@@ -1,6 +1,10 @@
+"use client";
+
 import { landingPlans } from "@/components/landing/data/pricing";
 import type { PlanSlug as PricingContextPlanSlug } from "@/lib/pricing-context";
 import { PricingPlanButton } from "@/components/landing/pricing-plan-button";
+import { useLandingPromo } from "@/lib/hooks/use-landing-promo";
+import { getRewardIdForPlan, getPromoLabel, type PlanSlug as PromoPlanSlug } from "@/lib/promos";
 import {
   StandarIcon,
   PremiumIcon,
@@ -50,6 +54,8 @@ type PricingSectionProps = {
 };
 
 export default function PricingSection({ dict, lang }: PricingSectionProps) {
+  const activePromo = useLandingPromo();
+
   return (
     <section
       className="flex w-full flex-col items-center scroll-mt-20 pt-24 md:pt-0"
@@ -96,8 +102,19 @@ export default function PricingSection({ dict, lang }: PricingSectionProps) {
             const amount = useUsd ? plan.usdPriceAmount! : plan.priceAmount;
             const currency = useUsd ? "USD" : plan.currency;
             const periodLabel = useUsd && plan.billingPeriodLabelEn ? plan.billingPeriodLabelEn : plan.billingPeriodLabel;
+            const hasPromoOffer =
+              activePromo &&
+              (planSlug === "plus" || planSlug === "pro") &&
+              activePromo.plans[planSlug as PromoPlanSlug] &&
+              amount !== null;
+            const displayAmount =
+              hasPromoOffer && planSlug === "plus"
+                ? 0
+                : hasPromoOffer && planSlug === "pro"
+                  ? Math.round(amount * 0.5)
+                  : amount;
             const formattedPrice =
-              amount !== null ? formatPrice(amount, currency, lang) : dict.customPrice;
+              displayAmount !== null ? formatPrice(displayAmount, currency, lang) : dict.customPrice;
             const period = periodLabel ? `/${periodLabel}` : "";
             const slugForContext = planSlug as PricingContextPlanSlug;
 
@@ -110,11 +127,18 @@ export default function PricingSection({ dict, lang }: PricingSectionProps) {
                 >
                   <GradientBackground id={plan.gradientId} />
 
-                  {plan.popular && (
+                  {hasPromoOffer ? (
+                    <div className="absolute top-4 px-3 py-1 bg-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/1)] text-white dark:bg-white dark:text-black text-xs font-bold rounded-full uppercase tracking-wide">
+                      {getPromoLabel(
+                        activePromo!.plans[planSlug as PromoPlanSlug]!,
+                        dict,
+                      )}
+                    </div>
+                  ) : plan.popular ? (
                     <div className="absolute top-4 px-3 py-1 bg-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/1)] text-white dark:bg-white dark:text-black text-xs font-bold rounded-full uppercase tracking-wide">
                       {dict.mostPopular}
                     </div>
-                  )}
+                  ) : null}
 
                   <div className="flex flex-col items-center justify-center gap-2 text-center">
                     <h3 id={`plan-${plan.name.toLowerCase()}-title`} className="text-2xl font-medium leading-6 tracking-tight text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/1)] dark:text-white">
@@ -124,12 +148,18 @@ export default function PricingSection({ dict, lang }: PricingSectionProps) {
                       <span className="text-4xl font-bold tracking-tight">
                         {formattedPrice}
                       </span>
-                      {period && amount !== null && (
+                      {period && displayAmount !== null && (
                         <span className="ml-1 text-sm font-medium opacity-60">
                           {period}
                         </span>
                       )}
                     </div>
+                    {hasPromoOffer && amount !== null && (
+                      <p className="text-sm text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/0.6)] dark:text-zinc-400">
+                        {dict.promoThen}, {formatPrice(amount, currency, lang)}
+                        {periodLabel ? `/${periodLabel}` : ""}
+                      </p>
+                    )}
                     <p className="text-sm leading-6 tracking-tight text-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/0.6)] dark:text-zinc-400 max-w-[280px]">
                       {description}
                     </p>
@@ -157,6 +187,12 @@ export default function PricingSection({ dict, lang }: PricingSectionProps) {
                       plan={{ ...plan, description, features, buttonText }}
                       slug={slugForContext}
                       buttonLabels={dict.button}
+                      rewardId={
+                        activePromo && (planSlug === "plus" || planSlug === "pro")
+                          ? getRewardIdForPlan(activePromo, planSlug as PromoPlanSlug)
+                          : undefined
+                      }
+                      promoId={activePromo?.id}
                     />
                   </footer>
                 </article>

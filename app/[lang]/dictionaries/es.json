@@ -65,6 +65,9 @@
     "heading": "Planes Simples y Transparentes",
     "summary": "Elige el plan que mejor se adapte a tus necesidades. Sin costos ocultos.",
     "mostPopular": "Más Popular",
+    "promoFirstMonthFree": "Primer mes gratis",
+    "promoFirstMonthPercentOff": "Primer mes AL {percent}%",
+    "promoThen": "después",
     "featuresLabel": "Características del plan {planName}",
     "customPrice": "Custom",
     "plans": {

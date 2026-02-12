@@ -35,6 +35,9 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
+  /* Easing for first-message animation (Orchid-style) */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
   --color-surface-elevated: var(--surface-elevated);
   --color-surface-overlay: var(--surface-overlay);
   --color-surface-hover: var(--surface-hover);
@@ -142,6 +145,9 @@
   --border: oklch(0.9401 0 0);
   --input: oklch(0.922 0 0); /* #eaeaea */
   --ring: oklch(0.6028 0.2177 257.42); /* #b5b5b5 */
+
+  /* Easing (Orchid-style first-message animation) */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 
   /* Surface colors */
   --surface-elevated: #ffffff; /* #ffffff */
@@ -424,10 +430,7 @@
   animation-iteration-count: infinite;
 }
 
-/* Message list performance optimization (6.2 CSS content-visibility) */
-/* Defer off-screen message rendering for faster initial paint and scrolling */
 .message-item {
-  content-visibility: auto;
   contain-intrinsic-size: 0 120px;
 }
 

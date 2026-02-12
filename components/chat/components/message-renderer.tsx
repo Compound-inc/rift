@@ -7,13 +7,6 @@ import {
   CheckIcon,
   EditIcon,
 } from "@/components/ui/icons/svg-icons";
-import {
-  Tool,
-  ToolHeader,
-  ToolContent,
-  ToolInput,
-  ToolOutput,
-} from "@/components/ai/tool";
 import { Message, MessageContent } from "@/components/ai/message";
 import { MemoResponse } from "@/components/ai/memo-response";
 import { Actions, Action } from "@/components/ai/actions";
@@ -30,6 +23,7 @@ import {
 } from "@/components/ai/sources";
 import { Loader } from "@/components/ai/loader";
 import type { UIMessage } from "ai";
+import { isToolUIPart } from "ai";
 import React, { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import Image from "next/image";
 
@@ -169,6 +163,7 @@ interface MessageRendererProps {
   onEditUserMessage?: (messageId: string, newText: string) => Promise<void> | void;
   disableRegenerate?: boolean;
   onResponseReady?: (messageId: string) => void;
+  embedInRow?: boolean;
 }
 
 export const MessageRenderer = React.memo(function MessageRenderer({
@@ -179,6 +174,7 @@ export const MessageRenderer = React.memo(function MessageRenderer({
   onEditUserMessage,
   disableRegenerate = false,
   onResponseReady,
+  embedInRow,
 }: MessageRendererProps) {
   const [isEditing, setIsEditing] = useState(false);
   const textValue = message.parts
@@ -255,7 +251,6 @@ export const MessageRenderer = React.memo(function MessageRenderer({
     ),
   }), [message.parts]);
 
-  // Direct render without useCallback - React Compiler will optimize this
   const messageContent = (
     <>
       {reasoningParts.length > 0 && (
@@ -283,10 +278,12 @@ export const MessageRenderer = React.memo(function MessageRenderer({
 
       {(() => {
         let textIdx = 0;
-        let toolCallIdx = 0;
-        let toolResultIdx = 0;
         return message.parts.map((part) => {
         if (part.type === "reasoning" || part.type === "source-url" || part.type === "file") {
+          return null;
+        }
+
+        if (isToolUIPart(part)) {
           return null;
         }
 
@@ -313,95 +310,6 @@ export const MessageRenderer = React.memo(function MessageRenderer({
             </div>
           );
         }
-        if (part.type === "tool-call") {
-          const idx = toolCallIdx++;
-          const toolCall = part as {
-            toolName?: string;
-            args?: unknown;
-          };
-          const toolName = toolCall.toolName || "tool";
-
-          return (
-            <Tool
-              key={`${message.id}-tool-call-${idx}`}
-              className="my-2 border-blue-200 bg-blue-50/50"
-            >
-              <ToolHeader
-                type={
-                  `tool-${toolName}` as `tool-${string}`
-                }
-                state="input-available"
-              />
-              <ToolContent>
-                <ToolInput input={toolCall.args || {}} />
-              </ToolContent>
-            </Tool>
-          );
-        }
-        if (part.type === "tool-result") {
-          const idx = toolResultIdx++;
-          const toolResult = part as {
-            toolName?: string;
-            result?: unknown;
-            isError?: boolean;
-          };
-          const toolName = toolResult.toolName || "tool";
-
-          return (
-            <Tool
-              key={`${message.id}-tool-result-${idx}`}
-              className="my-2 border-green-200 bg-green-50/50"
-            >
-              <ToolHeader
-                type={
-                  `tool-${toolName}` as `tool-${string}`
-                }
-                state={
-                  toolResult.isError
-                    ? "output-error"
-                    : "output-available"
-                }
-              />
-              <ToolContent>
-                <ToolOutput
-                  output={
-                    toolName === "google_search" ||
-                    toolName === "url_context" ? (
-                      <div className="p-3 text-sm">
-                        <div className="text-green-700 font-medium mb-2">
-                          ✓ Información recuperada exitosamente
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          El contenido ha sido analizado e
-                          integrado en la respuesta anterior.
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-3">
-                        <pre className="whitespace-pre-wrap text-xs">
-                          {typeof toolResult.result ===
-                          "string"
-                            ? toolResult.result
-                            : JSON.stringify(
-                                toolResult.result,
-                                null,
-                                2,
-                              )}
-                        </pre>
-                      </div>
-                    )
-                  }
-                  errorText={
-                    toolResult.isError
-                      ? "Error al ejecutar la herramienta"
-                      : undefined
-                  }
-                />
-              </ToolContent>
-            </Tool>
-          );
-        }
-
         return null;
       });
       })()}
@@ -594,8 +502,11 @@ export const MessageRenderer = React.memo(function MessageRenderer({
       if ((prev as { text: string }).text !== (next as { text: string }).text) return false;
       continue;
     }
-    // For other part types (tool-call, tool-result, file, source-url),
-    // fall back to reference equality
+    if (isToolUIPart(prev) && isToolUIPart(next)) {
+      if (prev.toolCallId !== next.toolCallId) return false;
+      if (prev.state !== next.state) return false;
+      continue;
+    }
     return false;
   }
   return true;

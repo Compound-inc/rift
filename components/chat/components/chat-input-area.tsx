@@ -5,7 +5,6 @@ import {
   AttachmentsIcon,
   GlobeIcon,
 } from "@/components/ui/icons/svg-icons";
-import { ChevronDown } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -25,7 +24,7 @@ import { ChatErrorAlert } from "./chat-error-alert";
 import { ModelSelectorPanel } from "@/components/ai/model-selector-panel";
 import { InstructionSelector } from "@/components/custom-instructions/InstructionSelector";
 import { SelectedInstructionPill } from "@/components/custom-instructions/SelectedInstructionPill";
-import React from "react";
+import React, { forwardRef } from "react";
 type ChatStatus = "submitted" | "streaming" | "ready" | "error";
 import { useChatUIStore } from "../ui-store";
 import { Effect } from "effect";
@@ -42,25 +41,22 @@ interface ChatInputAreaProps {
   onSubmit: (e?: React.FormEvent) => void;
   onStop: () => void;
   threadId?: string;
-  isAtBottom?: boolean;
-  onScrollToBottom?: () => void;
-  showScrollToBottom?: boolean;
   // Pass status from parent to avoid duplicate subscriptions (5.1 Defer State Reads)
   status: ChatStatus;
 }
 
-export const ChatInputArea = React.memo(function ChatInputArea({
-  disableInput,
-  selectedModel,
-  onModelChange,
-  onSubmit,
-  onStop,
-  threadId,
-  isAtBottom,
-  onScrollToBottom,
-  showScrollToBottom,
-  status,
-}: ChatInputAreaProps) {
+const ChatInputAreaInner = forwardRef<HTMLDivElement, ChatInputAreaProps>(function ChatInputAreaInner(
+  {
+    disableInput,
+    selectedModel,
+    onModelChange,
+    onSubmit,
+    onStop,
+    threadId,
+    status,
+  },
+  ref,
+) {
   const t = useChatTranslations();
   const input = useChatUIStore((s) => s.input);
   const isSearchEnabled = useChatUIStore((s) => s.isSearchEnabled);
@@ -200,19 +196,8 @@ export const ChatInputArea = React.memo(function ChatInputArea({
   }, [disableInput]);
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 md:pb-0 z-[20]">
+    <div ref={ref} className="absolute bottom-0 left-0 right-0 md:pb-0 z-[20]">
       <div className="mx-auto w-full max-w-full md:max-w-3xl px-0 md:px-2 pb-0 md:pb-0 relative">
-        {showScrollToBottom && (
-          <div className="absolute -top-12 left-0 right-0 flex justify-center pointer-events-none z-20">
-            <button
-              onClick={onScrollToBottom}
-              className="pointer-events-auto flex items-center justify-center size-9 bg-background dark:bg-[oklch(0.2046_0_0)] border border-border rounded-full cursor-pointer"
-              aria-label="Scroll to bottom"
-            >
-              <ChevronDown className="size-5" />
-            </button>
-          </div>
-        )}
         {/* No Subscription Dialog */}
         <NoSubscriptionDialog
           isOpen={showNoSubscriptionDialog}
@@ -361,3 +346,5 @@ export const ChatInputArea = React.memo(function ChatInputArea({
     </div>
   );
 });
+
+export const ChatInputArea = React.memo(ChatInputAreaInner);

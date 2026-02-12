@@ -40,6 +40,7 @@ export const enterprise = product({
 			feature_id: premium.id,
 			included_usage: 100,
 			interval: "month",
+			reset_usage_when_enabled: false,
 		}),
 
 		featureItem({
@@ -51,6 +52,7 @@ export const enterprise = product({
 			feature_id: standard.id,
 			included_usage: 1000,
 			interval: "month",
+			reset_usage_when_enabled: false,
 		}),
 	],
 });
@@ -63,6 +65,7 @@ export const plusApi = product({
 			feature_id: premium.id,
 			included_usage: 100,
 			interval: "month",
+			reset_usage_when_enabled: false,
 		}),
 
 		featureItem({
@@ -74,6 +77,7 @@ export const plusApi = product({
 			feature_id: standard.id,
 			included_usage: 1000,
 			interval: "month",
+			reset_usage_when_enabled: false,
 		}),
 	],
 });
@@ -86,6 +90,7 @@ export const proApi = product({
 			feature_id: premium.id,
 			included_usage: 270,
 			interval: "month",
+			reset_usage_when_enabled: false,
 		}),
 
 		featureItem({
@@ -97,6 +102,7 @@ export const proApi = product({
 			feature_id: standard.id,
 			included_usage: 2700,
 			interval: "month",
+			reset_usage_when_enabled: false,
 		}),
 	],
 });
@@ -109,6 +115,7 @@ export const startup = product({
 			feature_id: premium.id,
 			included_usage: 100,
 			interval: "month",
+			reset_usage_when_enabled: false,
 		}),
 
 		featureItem({
@@ -120,6 +127,7 @@ export const startup = product({
 			feature_id: standard.id,
 			included_usage: 1000,
 			interval: "month",
+			reset_usage_when_enabled: false,
 		}),
 	],
 });
@@ -132,6 +140,7 @@ export const vip = product({
 			feature_id: premium.id,
 			included_usage: 100,
 			interval: "month",
+			reset_usage_when_enabled: false,
 		}),
 
 		featureItem({
@@ -143,6 +152,7 @@ export const vip = product({
 			feature_id: standard.id,
 			included_usage: 1000,
 			interval: "month",
+			reset_usage_when_enabled: false,
 		}),
 	],
 });
@@ -157,12 +167,14 @@ export const free = product({
 			feature_id: premium.id,
 			included_usage: 5,
 			interval: "month",
+			reset_usage_when_enabled: false,
 		}),
 
 		featureItem({
 			feature_id: standard.id,
 			included_usage: 20,
 			interval: "month",
+			reset_usage_when_enabled: false,
 		}),
 	],
 });
@@ -181,12 +193,14 @@ export const plus = product({
 			feature_id: premium.id,
 			included_usage: 100,
 			interval: "month",
+			reset_usage_when_enabled: false,
 		}),
 
 		featureItem({
 			feature_id: standard.id,
 			included_usage: 1000,
 			interval: "month",
+			reset_usage_when_enabled: false,
 		}),
 	],
 });
@@ -205,12 +219,14 @@ export const pro = product({
 			feature_id: premium.id,
 			included_usage: 270,
 			interval: "month",
+			reset_usage_when_enabled: false,
 		}),
 
 		featureItem({
 			feature_id: standard.id,
 			included_usage: 2700,
 			interval: "month",
+			reset_usage_when_enabled: false,
 		}),
 	],
 });

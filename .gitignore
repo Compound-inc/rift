@@ -1,7 +1,7 @@
 node_modules
 .next/
 bun.lock
-/reference
+
 .env.local
 lib/local/
 .cursor/rules/effect.mdc

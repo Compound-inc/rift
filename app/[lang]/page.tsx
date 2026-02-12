@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Script from "next/script";
 import {
@@ -148,7 +149,17 @@ export default async function LandingPage({
       >
         <HeroSection dict={dict.hero} lang={lang} />
         <WhatIsRIFTSection dict={dict.whatIsRift} />
-        <PricingSection dict={dict.pricing} lang={lang} />
+        <Suspense
+          fallback={
+            <section
+              className="flex w-full flex-col items-center scroll-mt-20 pt-24 md:pt-0 min-h-[480px]"
+              id="pricing"
+              aria-label={dict.pricing.heading}
+            />
+          }
+        >
+          <PricingSection dict={dict.pricing} lang={lang} />
+        </Suspense>
         <ArchitectureSection dict={dict.architecture} />
         <PerformanceSection dict={dict.performance} lang={lang} />
         <IntegrationsSection dict={dict.integrations} />

@@ -73,6 +73,12 @@ export type Dictionary = {
     heading: string;
     summary: string;
     mostPopular: string;
+    /** Promo badge: first month free */
+    promoFirstMonthFree: string;
+    /** Promo badge: first month X% off, use {percent} placeholder */
+    promoFirstMonthPercentOff: string;
+    /** Promo disclaimer before regular price, e.g. "then, $9/mo" */
+    promoThen: string;
     featuresLabel: string; // use {planName} as placeholder
     customPrice: string;
     plans: Record<PlanSlug, { description: string; buttonText: string; features: string[] }>;
