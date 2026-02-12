@@ -73,6 +73,16 @@ export const resolveModel = (id: string): string => {
   return SHORTCUTS[id] || id;
 };
 
+export function getModelShortcutDisplayName(modelId: string): string | null {
+  const resolved = resolveModel(modelId);
+  for (const [key, value] of Object.entries(SHORTCUTS)) {
+    if (value === resolved) {
+      return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+  }
+  return null;
+}
+
 export const getModel = (id: string) =>
   MODELS.find((m) => m.id === resolveModel(id));
 

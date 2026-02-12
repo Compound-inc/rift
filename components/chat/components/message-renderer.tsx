@@ -22,7 +22,7 @@ import {
   SourcesTrigger,
 } from "@/components/ai/sources";
 import { Loader } from "@/components/ai/loader";
-import { getModel } from "@/lib/ai/ai-providers";
+import { getModel, getModelShortcutDisplayName } from "@/lib/ai/ai-providers";
 import type { UIMessage } from "ai";
 import { isToolUIPart } from "ai";
 import React, { useCallback, useEffect, useState, useRef, useMemo } from "react";
@@ -42,7 +42,13 @@ function getModelDisplayName(value: string | undefined): string | null {
   if (!value) return null;
   const cached = modelDisplayNameCache.get(value);
   if (cached !== undefined) return cached;
-  // Stream sends display name
+  // Prefer shortcut label (e.g. "Automatico", "Problemas dificiles") when the model matches one
+  const shortcutLabel = getModelShortcutDisplayName(value);
+  if (shortcutLabel) {
+    modelDisplayNameCache.set(value, shortcutLabel);
+    return shortcutLabel;
+  }
+  // Otherwise show model name or id
   const resolved = value.includes("/") ? getModel(value)?.name ?? value : value;
   modelDisplayNameCache.set(value, resolved);
   return resolved;
