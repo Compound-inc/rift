@@ -22,6 +22,7 @@ import {
   SourcesTrigger,
 } from "@/components/ai/sources";
 import { Loader } from "@/components/ai/loader";
+import { getModel } from "@/lib/ai/ai-providers";
 import type { UIMessage } from "ai";
 import { isToolUIPart } from "ai";
 import React, { useCallback, useEffect, useState, useRef, useMemo } from "react";
@@ -34,10 +35,24 @@ function useLatest<T>(value: T) {
   return ref;
 }
 
+// Cache resolved display names
+const modelDisplayNameCache = new Map<string, string>();
+
+function getModelDisplayName(value: string | undefined): string | null {
+  if (!value) return null;
+  const cached = modelDisplayNameCache.get(value);
+  if (cached !== undefined) return cached;
+  // Stream sends display name
+  const resolved = value.includes("/") ? getModel(value)?.name ?? value : value;
+  modelDisplayNameCache.set(value, resolved);
+  return resolved;
+}
+
 const MessageActions = React.memo(function MessageActions({
   messageId,
   messageRole,
   messageParts,
+  modelDisplayName,
   onRegenerateAssistantMessage,
   onRegenerateAfterUserMessage,
   onStartEdit,
@@ -46,6 +61,7 @@ const MessageActions = React.memo(function MessageActions({
   messageId: string;
   messageRole: "user" | "assistant" | "system";
   messageParts: UIMessage["parts"];
+  modelDisplayName?: string | null;
   onRegenerateAssistantMessage: (messageId: string) => void;
   onRegenerateAfterUserMessage: (messageId: string) => void;
   onStartEdit?: () => void;
@@ -85,7 +101,7 @@ const MessageActions = React.memo(function MessageActions({
 
   if (messageRole === "assistant") {
     return (
-      <div className="px-0">
+      <div className="px-0 flex items-center gap-2 flex-wrap">
         <Actions className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity justify-start">
           <Action
             onClick={handleRegenerateAssistant}
@@ -104,6 +120,14 @@ const MessageActions = React.memo(function MessageActions({
             {isCopied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
           </Action>
         </Actions>
+        {modelDisplayName ? (
+          <span
+            className="mt-1 text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+            aria-label={`Modelo: ${modelDisplayName}`}
+          >
+            {modelDisplayName}
+          </span>
+        ) : null}
       </div>
     );
   }
@@ -151,7 +175,8 @@ const MessageActions = React.memo(function MessageActions({
     prevProps.messageId === nextProps.messageId &&
     prevProps.messageRole === nextProps.messageRole &&
     prevProps.disableRegenerate === nextProps.disableRegenerate &&
-    !!prevProps.onStartEdit === !!nextProps.onStartEdit
+    !!prevProps.onStartEdit === !!nextProps.onStartEdit &&
+    prevProps.modelDisplayName === nextProps.modelDisplayName
   );
 });
 
@@ -461,6 +486,13 @@ export const MessageRenderer = React.memo(function MessageRenderer({
           messageId={message.id}
           messageRole={message.role}
           messageParts={message.parts}
+          modelDisplayName={
+            message.role === "assistant"
+              ? getModelDisplayName(
+                  (message.metadata as { model?: string } | undefined)?.model
+                )
+              : undefined
+          }
           onRegenerateAssistantMessage={onRegenerateAssistantMessage}
           onRegenerateAfterUserMessage={onRegenerateAfterUserMessage}
           disableRegenerate={disableRegenerate}
@@ -483,6 +515,14 @@ export const MessageRenderer = React.memo(function MessageRenderer({
   // micro-shifts caused by browser style recalculation during re-renders.
   if (prevProps.message.id !== nextProps.message.id) return false;
   if (prevProps.disableRegenerate !== nextProps.disableRegenerate) return false;
+  // Re-render when assistant message metadata (e.g. model) changes
+  if (
+    prevProps.message.role === "assistant" &&
+    (prevProps.message.metadata as { model?: string } | undefined)?.model !==
+      (nextProps.message.metadata as { model?: string } | undefined)?.model
+  ) {
+    return false;
+  }
   // Fast path: same reference means same content
   if (prevProps.message.parts === nextProps.message.parts) return true;
   // Deep compare parts by content

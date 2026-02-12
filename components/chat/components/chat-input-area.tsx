@@ -177,6 +177,31 @@ const ChatInputAreaInner = forwardRef<HTMLDivElement, ChatInputAreaProps>(functi
     void runUpload(fileArray);
   }, [runUpload]);
 
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      if (disableInput || isUploading) return;
+      const clipboardData = e.clipboardData;
+      if (!clipboardData?.files?.length) return;
+      const pastedFiles = Array.from(clipboardData.files).filter((file) =>
+        file.type.startsWith("image/")
+      );
+      if (pastedFiles.length === 0) return;
+      const currentTotal = uploadedAttachments.length + uploadingFiles.length;
+      const remainingSlots = Math.max(0, MAX_TOTAL_FILES - currentTotal);
+      if (remainingSlots <= 0) return;
+      e.preventDefault();
+      const toUpload = pastedFiles.slice(0, remainingSlots);
+      void runUpload(toUpload);
+    },
+    [
+      disableInput,
+      isUploading,
+      uploadedAttachments.length,
+      uploadingFiles.length,
+      runUpload,
+    ]
+  );
+
   const handleAttachmentClick = useCallback(() => {
     if (disableInput) return;
     const currentTotalFiles = uploadedAttachments.length + uploadingFiles.length;
@@ -270,6 +295,7 @@ const ChatInputAreaInner = forwardRef<HTMLDivElement, ChatInputAreaProps>(functi
             value={input}
             disabled={disableInput || isUploading}
             placeholder={t.inputPlaceholder}
+            onPaste={handlePaste}
           />
           <PromptInputToolbar>
             <PromptInputTools>
