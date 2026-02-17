@@ -12,7 +12,6 @@ import { useInitialMessage } from "@/contexts/initial-message-context";
 import { useCallback, useEffect, useRef, useMemo, useState, useLayoutEffect } from "react";
 import { useRegeneration } from "./hooks/use-regeneration";
 import { ToolType, getDefaultTools } from "@/lib/ai/model-tools";
-import { resolveModel } from "@/lib/ai/ai-providers";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
 import { useConvexAuth, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -289,7 +288,7 @@ function ChatInterfaceInternal({
           return {
             body: {
               messages: requestMessages,
-              modelId: resolveModel(currentModel),
+              modelId: currentModel,
               threadId: id,
               enabledTools: currentEnabledTools,
               customInstructionId: currentCustomInstructionId,

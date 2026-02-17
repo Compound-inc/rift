@@ -766,6 +766,7 @@ export const serverStartAssistantMessage = mutation({
       generationStatus: "generation" as const,
       updatedAt: now,
       lastMessageAt: now,
+      model: args.model,
     });
     return { messageDocId };
   },
