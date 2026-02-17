@@ -21,6 +21,7 @@ import { withSupermemory, supermemoryTools } from "@supermemory/tools/ai-sdk";
 import {
   getLanguageModel,
   getModel,
+  getModelShortcutDisplayName,
   getProviderDisplayName,
   getProviderOptions,
   isPremium,
@@ -607,7 +608,10 @@ const handleChatRequest = (
     const fallbackModelName = modelId.includes("/")
       ? modelId.split("/").pop() ?? modelId
       : modelId;
-    const modelDisplayName = modelConfig?.name ?? fallbackModelName;
+    const modelDisplayName =
+      getModelShortcutDisplayName(modelId) ??
+      modelConfig?.name ??
+      fallbackModelName;
 
     // Tools setup - run in parallel with quota check
     const [providerTools, _quotaResult] = yield* Effect.all([
