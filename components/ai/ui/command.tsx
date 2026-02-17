@@ -21,7 +21,7 @@ function Command({
     <CommandPrimitive
       data-slot="command"
       className={cn(
-        "bg-popover-main backdrop-blur-sm text-popover-text flex h-full w-full flex-col overflow-hidden rounded-xl",
+        "bg-popover-main text-popover-text flex h-full w-full flex-col overflow-hidden rounded-xl",
         className
       )}
       {...props}
@@ -50,7 +50,7 @@ function CommandDialog({
       </DialogHeader>
       <DialogContent
         className={cn(
-          "overflow-hidden p-0 bg-popover-main backdrop-blur-sm text-popover-text rounded-xl border border-[oklch(0.35_0_0)] shadow-lg md:shadow-2xl",
+          "overflow-hidden p-0 bg-popover-main text-popover-text rounded-xl border border-[oklch(0.35_0_0)] shadow-lg md:shadow-2xl",
           "!data-[state=open]:animate-none !data-[state=closed]:animate-none",
           "!data-[state=open]:fade-in-0 !data-[state=closed]:fade-out-0",
           "!data-[state=open]:zoom-in-100 !data-[state=closed]:zoom-out-100",

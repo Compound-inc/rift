@@ -187,6 +187,7 @@ export default defineSchema({
   userConfiguration: defineTable({
     userId: v.string(),
     supermemoryEnabled: v.optional(v.boolean()),
+    onboardingCompleted: v.optional(v.boolean()),
   }).index("by_userId", ["userId"]),
 
   bugs: defineTable({

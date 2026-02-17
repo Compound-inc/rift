@@ -1,3 +1,7 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "packrun": {
+      "url": "https://mcp.packrun.dev/mcp"
+    }
+  }
 }

@@ -248,5 +248,25 @@
       "supportsImageInput": "Visión",
       "supportsPDFInput": "PDF"
     }
+  },
+  "onboarding": {
+    "modelSelectorTitle": "Elige el modelo de IA que quieres usar",
+    "modelSelectorBody": "Aquí puedes seleccionar el modelo de IA que prefieras para esta conversación. Tenemos disponibles GPT, Claude, Gemini y más.",
+    "modelSelectorDialogTitle": "Selecciona el modelo de IA que prefieras",
+    "modelSelectorDialogBody": "Elige entre los modelos que recomendamos o busca el que prefieras.",
+    "modelSelectorProvidersTitle": "Filtrar por proveedor",
+    "modelSelectorProvidersBody": "Haz clic en la empresa de IA que prefieras y escoge entre todos sus modelos.",
+    "searchToggleTitle": "Búsqueda web",
+    "searchToggleBody": "Activa la búsqueda web y permite a la IA buscar información actualizada, patentes, papers y documentos.",
+    "attachFilesTitle": "Adjuntar archivos",
+    "attachFilesBody": "Puedes adjuntar imágenes, PDFs y otros archivos a tus mensajes para que el modelo los tenga en cuenta al responder.",
+    "customInstructionsTitle": "Instrucciones personalizadas",
+    "customInstructionsBody": "Añade instrucciones personalizadas para este chat (tono, forma de hablar, formato) que el modelo aplicará en cada respuesta.",
+    "doneTitle": "Listo",
+    "doneBody": "Ya puedes empezar a usar RIFT. Escribe tu mensaje y elige el modelo que prefieras.",
+    "next": "Siguiente",
+    "previous": "Anterior",
+    "skip": "Saltar",
+    "done": "Listo"
   }
 }

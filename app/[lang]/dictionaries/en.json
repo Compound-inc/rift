@@ -248,5 +248,25 @@
       "supportsImageInput": "Vision",
       "supportsPDFInput": "PDF"
     }
+  },
+  "onboarding": {
+    "modelSelectorTitle": "Choose your AI model",
+    "modelSelectorBody": "Here you can select your preferred AI model for this conversation. We have GPT, Claude, Gemini and more available.",
+    "modelSelectorDialogTitle": "Select the AI model you prefer",
+    "modelSelectorDialogBody": "Choose from our recommended models or search for the one you want.",
+    "modelSelectorProvidersTitle": "Filter by provider",
+    "modelSelectorProvidersBody": "Click the provider you prefer and choose from all its models.",
+    "searchToggleTitle": "Web search",
+    "searchToggleBody": "Enable web search so the AI can look up up-to-date information, patents, papers, and documents.",
+    "attachFilesTitle": "Attach files",
+    "attachFilesBody": "You can attach images, PDFs and other files to your messages so the model can use them in its responses.",
+    "customInstructionsTitle": "Custom instructions",
+    "customInstructionsBody": "Add fixed instructions for this chat (tone, language, format) that the model will follow in every response.",
+    "doneTitle": "You're all set",
+    "doneBody": "You can start chatting. Type your message and pick the model you prefer.",
+    "next": "Next",
+    "previous": "Previous",
+    "skip": "Skip",
+    "done": "Done"
   }
 }

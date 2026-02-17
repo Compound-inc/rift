@@ -4,6 +4,7 @@ import ChatInterface from "@/components/chat";
 import { FirstMessageSendAnimationProvider } from "@/components/chat/first-message-send-animation";
 import { HomeMessageHandler } from "@/components/home-message-handler";
 import { ChatMessagesClient } from "@/components/chat-messages-client";
+import { ChatOnboardingTour } from "@/components/onboarding/ChatOnboardingTour";
 import { useSelectedThreadUrlSync } from "@/lib/hooks/useSelectedThreadUrlSync";
 import { useSelectedThreadStore } from "@/lib/stores/selected-thread-store";
 import { useIsClient } from "@/lib/hooks/useIsClient";
@@ -32,6 +33,7 @@ export function ChatRouteClient() {
       ) : (
         <ChatMessagesClient threadId={selectedThreadId} />
       )}
+      <ChatOnboardingTour />
     </FirstMessageSendAnimationProvider>
   );
 }

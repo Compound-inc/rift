@@ -154,4 +154,24 @@ export type Dictionary = {
       supportsPDFInput: string;
     };
   };
+  onboarding: {
+    modelSelectorTitle: string;
+    modelSelectorBody: string;
+    modelSelectorDialogTitle: string;
+    modelSelectorDialogBody: string;
+    modelSelectorProvidersTitle: string;
+    modelSelectorProvidersBody: string;
+    searchToggleTitle: string;
+    searchToggleBody: string;
+    attachFilesTitle: string;
+    attachFilesBody: string;
+    customInstructionsTitle: string;
+    customInstructionsBody: string;
+    doneTitle: string;
+    doneBody: string;
+    next: string;
+    previous: string;
+    skip: string;
+    done: string;
+  };
 };

@@ -197,7 +197,7 @@ export function ModelSelectorPanel({
   const handleModelSelect = React.useCallback(
     (modelId: string) => {
       onValueChange(modelId);
-      setOpen(false);
+      if (!tourOnDialogStepRef.current) setOpen(false);
     },
     [onValueChange]
   );
@@ -206,8 +206,36 @@ export function ModelSelectorPanel({
     setSelectedProvider(provider);
   }, []);
 
+  const tourOnDialogStepRef = React.useRef(false);
+
+  React.useEffect(() => {
+    const openHandler = () => setOpen(true);
+    const closeHandler = () => setOpen(false);
+    const onStepEnter = () => {
+      tourOnDialogStepRef.current = true;
+    };
+    const onStepLeave = () => {
+      tourOnDialogStepRef.current = false;
+    };
+    window.addEventListener("open-model-selector", openHandler);
+    window.addEventListener("close-model-selector", closeHandler);
+    window.addEventListener("tour-on-model-selector-step", onStepEnter);
+    window.addEventListener("tour-left-model-selector-step", onStepLeave);
+    return () => {
+      window.removeEventListener("open-model-selector", openHandler);
+      window.removeEventListener("close-model-selector", closeHandler);
+      window.removeEventListener("tour-on-model-selector-step", onStepEnter);
+      window.removeEventListener("tour-left-model-selector-step", onStepLeave);
+    };
+  }, []);
+
+  const handleOpenChange = React.useCallback((next: boolean) => {
+    if (!next && tourOnDialogStepRef.current) return;
+    setOpen(next);
+  }, []);
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button variant="ghost" className={cn("w-fit", className)}>
           <div className="flex items-center gap-2">
@@ -248,6 +276,7 @@ export function ModelSelectorPanel({
         </Button>
       </PopoverTrigger>
       <PopoverContent
+        data-onboarding="model-selector-dialog"
         align="start"
         sideOffset={8}
         className="h-[520px] w-[88vw] max-w-[640px] p-0 bg-popover-main/95 text-popover-text border-border/60 shadow-2xl rounded-xl backdrop-blur-md !data-[state=open]:animate-none !data-[state=closed]:animate-none !data-[state=open]:fade-in-0 !data-[state=closed]:fade-out-0 !data-[state=open]:zoom-in-100 !data-[state=closed]:zoom-out-100 !data-[side=bottom]:slide-in-from-top-0 !data-[side=left]:slide-in-from-right-0 !data-[side=right]:slide-in-from-left-0 !data-[side=top]:slide-in-from-bottom-0 !duration-0"
@@ -273,7 +302,10 @@ export function ModelSelectorPanel({
             </button>
           </div>
           <div className="flex flex-1 min-h-0">
-            <aside className="w-[64px] py-3 overflow-y-auto border border-border/40 rounded-tr-3xl [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <aside
+              data-onboarding="model-selector-providers"
+              className="w-[64px] py-3 overflow-y-auto border border-border/40 rounded-tr-3xl [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            >
               <div className="flex flex-col items-center gap-2 pb-2">
                 <Tooltip>
                   <TooltipTrigger asChild>

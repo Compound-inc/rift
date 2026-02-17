@@ -304,14 +304,17 @@ const ChatInputAreaInner = forwardRef<HTMLDivElement, ChatInputAreaProps>(functi
                 onFilesSelected={handleFilesSelected}
                 disabled={disableInput || isUploading}
               />
-              <InstructionSelector
-                selectedId={customInstructionId}
-                onSelect={handleInstructionChange}
-                disabled={disableInput}
-                open={instructionSelectorOpen}
-                onOpenChange={setInstructionSelectorOpen}
-              />
+              <div data-onboarding="custom-instructions">
+                <InstructionSelector
+                  selectedId={customInstructionId}
+                  onSelect={handleInstructionChange}
+                  disabled={disableInput}
+                  open={instructionSelectorOpen}
+                  onOpenChange={setInstructionSelectorOpen}
+                />
+              </div>
               <PromptInputButton
+                data-onboarding="attach-files"
                 onClick={handleAttachmentClick}
                 aria-label="Agregar archivos adjuntos"
                 disabled={disableInput || (uploadedAttachments.length + uploadingFiles.length) >= MAX_TOTAL_FILES}
@@ -326,6 +329,7 @@ const ChatInputAreaInner = forwardRef<HTMLDivElement, ChatInputAreaProps>(functi
               <Tooltip>
                 <TooltipTrigger asChild>
                   <PromptInputButton
+                    data-onboarding="search-toggle"
                     onClick={handleSearchToggle}
                     aria-label="Activar búsqueda web"
                     disabled={disableInput}
@@ -350,10 +354,12 @@ const ChatInputAreaInner = forwardRef<HTMLDivElement, ChatInputAreaProps>(functi
                 </TooltipContent>
               </Tooltip>
               <div className="flex items-center gap-1">
-                <ModelSelectorPanel
-                  value={selectedModel}
-                  onValueChange={onModelChange}
-                />
+                <div data-onboarding="model-selector">
+                  <ModelSelectorPanel
+                    value={selectedModel}
+                    onValueChange={onModelChange}
+                  />
+                </div>
                 <SelectedInstructionPill 
                   instructionId={customInstructionId}
                   onClick={handleInstructionPillClick}

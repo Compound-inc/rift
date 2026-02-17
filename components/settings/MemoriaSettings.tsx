@@ -17,12 +17,12 @@ export function MemoriaSettings() {
     .withOptimisticUpdate((localStore, args) => {
       const { enabled } = args;
       const currentConfig = localStore.getQuery(api.userConfiguration.getUserConfiguration, {});
-      if (currentConfig !== undefined) {
-        // Update the query result optimistically
+      if (currentConfig !== undefined && currentConfig !== null) {
+        // Update the query result optimistically (preserve onboardingCompleted)
         localStore.setQuery(
           api.userConfiguration.getUserConfiguration,
           {},
-          { supermemoryEnabled: enabled }
+          { ...currentConfig, supermemoryEnabled: enabled }
         );
       }
     });
