@@ -1,8 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "@radix-ui/themes/styles.css";
-@import "@rift/tailwind-config";
-@import "@rift/tailwind-config/base.css";
+@import "@rift/tailwind-config/legacy";
+@import "@rift/tailwind-config/legacy/base.css";
 
 @source "../../node_modules/streamdown/dist/index.js";
 @source "../../node_modules/@streamdown/code/dist/index.js";

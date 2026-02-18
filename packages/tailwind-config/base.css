@@ -1,40 +1,16 @@
 /**
- * @rift/tailwind-config — shared base layer.
+ * @rift/tailwind-config — default base layer (minimal, used by TanStack Start).
  * Optional: @import '@rift/tailwind-config/base.css';
  */
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
   html {
     background-color: var(--background);
-    overscroll-behavior: none;
-    touch-action: pan-x pan-y;
   }
   body {
     @apply bg-background text-foreground;
-    overscroll-behavior: none;
-    touch-action: pan-x pan-y;
-  }
-
-  ::selection {
-    background-color: var(--accent) !important;
-    color: white !important;
-  }
-
-  ::-moz-selection {
-    background-color: var(--accent) !important;
-    color: white !important;
-  }
-
-  .dark ::selection {
-    background-color: var(--accent) !important;
-    color: white !important;
-  }
-
-  .dark ::-moz-selection {
-    background-color: var(--accent) !important;
-    color: white !important;
   }
 }
