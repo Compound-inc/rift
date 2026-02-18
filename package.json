@@ -3,18 +3,22 @@
   "version": "1.2.0",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*", "apps/*", "apps/start/rift"],
+  "workspaces": ["packages/*", "apps/*"],
   "packageManager": "bun@1.2.23",
   "scripts": {
-    "dev": "turbo run dev convex --filter=rift --ui tui",
-    "build": "turbo run build",
-    "start": "bun run --filter rift start",
+    "dev": "turbo run dev convex --filter=tanstack --ui tui",
+    "build": "turbo run build --filter=tanstack",
+    "start": "bun run --filter tanstack preview",
     "lint": "turbo run lint",
-    "convex": "bun run --filter rift convex",
+    "convex": "bun run --filter tanstack convex",
     "check": "turbo run check",
     "clean": "turbo run clean",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "dev:next": "turbo run dev --filter=web --ui tui",
+    "build:next": "turbo run build --filter=web",
+    "start:next": "bun run --filter web start",
+    "convex:next": "bun run --filter web convex"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.3",

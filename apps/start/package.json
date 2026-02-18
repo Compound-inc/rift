@@ -9,6 +9,7 @@
     "dev": "vite dev --port 3000",
     "build": "vite build",
     "preview": "vite preview",
+    "convex": "convex dev",
     "test": "vitest run",
     "lint": "eslint",
     "format": "prettier --check .",
