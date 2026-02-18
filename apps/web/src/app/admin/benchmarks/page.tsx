@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/admin-auth";
-import Navbar from "@/components/landing/navbar";
-import Footer from "@/components/landing/footer";
+import { Navbar, Footer } from "@/components/layout";
 import { BenchmarksTable } from "./BenchmarksTable";
 
 export const metadata: Metadata = {

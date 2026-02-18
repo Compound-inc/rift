@@ -1,7 +1,7 @@
 "use client";
 
-import { PasswordChangeDialog } from "./PasswordChangeDialog";
+import { PasswordChangeModal } from "./PasswordChangeModal";
 
 export function PasswordSettings() {
-  return <PasswordChangeDialog hasPassword={true} isPending={false} />;
+  return <PasswordChangeModal hasPassword={true} isPending={false} />;
 }

@@ -1,4 +1,4 @@
-import { LightWeightCards } from "@/components/landing/subcomponents/sideway";
+import { LightWeightCards } from "@/components/landing/components/sideway";
 import Image from "next/image";
 
 export default function KnowledgeCenterSection() {

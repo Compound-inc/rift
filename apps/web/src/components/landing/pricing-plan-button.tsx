@@ -4,8 +4,8 @@ import { useCustomer } from "autumn-js/react";
 import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@rift/ui/button";
-import CheckoutDialog from "@/components/autumn/checkout-dialog";
-import type { LandingPlan } from "@/components/landing/data/pricing";
+import CheckoutModal from "@/components/autumn/checkout-modal";
+import type { LandingPlan } from "@/lib/pricing";
 import { CUSTOM_PLANS } from "@/lib/plan-ids";
 import { PlanSlug, PricingContext, SubscriptionPlan } from "@/lib/pricing-context";
 import { usePricingContext } from "@/lib/use-pricing-context";
@@ -133,7 +133,7 @@ export function PricingPlanButton({
     try {
       const { data, error } = await checkout({
         productId: slug,
-        dialog: CheckoutDialog,
+        dialog: CheckoutModal,
         ...(rewardId?.trim() ? { reward: rewardId.trim() } : {}),
       });
       if (error) {

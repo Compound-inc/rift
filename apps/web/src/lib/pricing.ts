@@ -60,4 +60,3 @@ export const landingPlans: LandingPlan[] = [
     gradientId: "3",
   },
 ];
-

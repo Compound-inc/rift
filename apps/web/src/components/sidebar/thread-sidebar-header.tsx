@@ -3,7 +3,7 @@
 import { Button } from "@rift/ui/button";
 import { Input } from "@rift/ui/input";
 import { AppLogo } from "@/components/ui/icons/svg-icons";
-import { useChatSidebarControls } from "@/components/ai/ChatShellClient";
+import { useChatSidebarControls } from "@/components/chat/ChatShellClient";
 import { useSelectedThreadStore } from "@/store/selected-thread-store";
 import { Search } from "lucide-react";
 

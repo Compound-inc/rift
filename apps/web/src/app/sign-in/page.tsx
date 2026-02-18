@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { Loader } from "@/components/ai/loader";
+import { Loader } from "@/components/chat/loader";
 
 export default function SignInPage() {
   useEffect(() => {

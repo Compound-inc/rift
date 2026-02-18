@@ -10,7 +10,7 @@ import {
   CommandList,
   CommandSeparator,
 } from "@rift/ui/command";
-import { PromptInputButton } from "@/components/ai/prompt-input";
+import { PromptInputButton } from "@/components/chat/prompt-input";
 import {
   Check,
   type LucideIcon,

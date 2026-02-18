@@ -9,7 +9,7 @@ import {
 import { cn } from "@rift/utils";
 import { ChevronDownIcon } from "lucide-react";
 import { ReasoningIcon } from "@/components/ui/icons/svg-icons";
-import { Shimmer } from "@/components/ai/shimmer";
+import { Shimmer } from "@/components/chat/shimmer";
 import type { ComponentProps } from "react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 

@@ -9,8 +9,8 @@ import {
   PromptInputTextarea,
   PromptInputToolbar,
   PromptInputSubmit,
-} from "@/components/ai/prompt-input";
-import { Message, MessageContent } from "@/components/ai/message";
+} from "@/components/chat/prompt-input";
+import { Message, MessageContent } from "@/components/chat/message";
 
 type TranscriptMessage = {
   id: string;

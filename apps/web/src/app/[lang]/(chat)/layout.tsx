@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import ChatShell from "@/components/ai/ChatShell";
+import ChatShell from "@/components/chat/ChatShell";
 import { ThreadSidebar } from "@/components/sidebar";
-import { NoOrgModal } from "@/components/ai/NoOrgModal";
+import { NoOrgModal } from "@/components/modals/NoOrgModal";
 import { ModelProvider } from "@/contexts/model-context";
 import { LocaleProvider } from "@/contexts/locale-context";
 import { cookies } from "next/headers";

@@ -2,8 +2,8 @@
 
 import { useState, useTransition, useCallback, useEffect } from "react";
 import { Button } from "@rift/ui/button";
-import { MfaEnableDialog } from "./MfaEnableDialog";
-import { MfaDisableDialog } from "./MfaDisableDialog";
+import { MfaEnableModal } from "./MfaEnableModal";
+import { MfaDisableModal } from "./MfaDisableModal";
 import { getCurrentUserSecurityState } from "@/actions/settings/security/getCurrentUserSecurityState";
 import type { SecurityAuthFactor } from "@/actions/settings/security/getCurrentUserSecurityState";
 
@@ -53,11 +53,11 @@ export function MfaSettings() {
           Desactivar
         </Button>
 
-        <MfaDisableDialog
-          isPreDialogOpen={isDeleteMfaPreDialogOpen}
-          onPreDialogOpenChange={setIsDeleteMfaPreDialogOpen}
-          isDialogOpen={isDeleteMfaDialogOpen}
-          onDialogOpenChange={(open) => {
+        <MfaDisableModal
+          isPreModalOpen={isDeleteMfaPreDialogOpen}
+          onPreModalOpenChange={setIsDeleteMfaPreDialogOpen}
+          isModalOpen={isDeleteMfaDialogOpen}
+          onModalOpenChange={(open) => {
             setIsDeleteMfaDialogOpen(open);
             if (!open) {
               setIsMfaDialogOpen(false);
@@ -83,7 +83,7 @@ export function MfaSettings() {
         Activar MFA
       </Button>
 
-      <MfaEnableDialog
+      <MfaEnableModal
         isOpen={isMfaDialogOpen}
         onOpenChange={setIsMfaDialogOpen}
         onSuccess={refresh}

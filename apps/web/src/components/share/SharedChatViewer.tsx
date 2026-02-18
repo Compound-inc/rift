@@ -8,10 +8,10 @@ import { isTextUIPart } from "ai";
 import {
   Conversation,
   ConversationContent,
-} from "@/components/ai/conversation";
+} from "@/components/chat/conversation";
 import type { ConvexMessage } from "@/components/chat/types";
 import { MessageRenderer } from "@/components/chat/components/message-renderer";
-import { Loader } from "@/components/ai/loader";
+import { Loader } from "@/components/chat/loader";
 import { toast } from "sonner";
 import { ChatStoreProvider } from "@/store/hooks";
 import { ThemeToggle } from "@/components/ui/theme-toggle";

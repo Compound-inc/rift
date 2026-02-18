@@ -15,25 +15,25 @@ import { sendSecurityEmailVerification } from "@/actions/settings/security/sendS
 import { confirmSecurityEmailVerification } from "@/actions/settings/security/confirmSecurityEmailVerification";
 import { toast } from "sonner";
 
-interface MfaDisableDialogProps {
-  isPreDialogOpen: boolean;
-  onPreDialogOpenChange: (open: boolean) => void;
-  isDialogOpen: boolean;
-  onDialogOpenChange: (open: boolean) => void;
+interface MfaDisableModalProps {
+  isPreModalOpen: boolean;
+  onPreModalOpenChange: (open: boolean) => void;
+  isModalOpen: boolean;
+  onModalOpenChange: (open: boolean) => void;
   factorId: string;
   onSuccess: () => void;
   isPending: boolean;
 }
 
-export function MfaDisableDialog({
-  isPreDialogOpen,
-  onPreDialogOpenChange,
-  isDialogOpen,
-  onDialogOpenChange,
+export function MfaDisableModal({
+  isPreModalOpen,
+  onPreModalOpenChange,
+  isModalOpen,
+  onModalOpenChange,
   factorId,
   onSuccess,
   isPending: parentIsPending,
-}: MfaDisableDialogProps) {
+}: MfaDisableModalProps) {
   const [isPending, startTransition] = useTransition();
   const [deleteMfaStepUpCode, setDeleteMfaStepUpCode] = useState("");
   const [deleteMfaStepUpError, setDeleteMfaStepUpError] = useState<string | null>(null);
@@ -71,18 +71,18 @@ export function MfaDisableDialog({
         return;
       }
       toast.success("MFA desactivado correctamente");
-      onDialogOpenChange(false);
+      onModalOpenChange(false);
       onSuccess();
     });
 
   const openDeleteMfaFlow = () => {
-    onPreDialogOpenChange(false);
-    onDialogOpenChange(true);
+    onPreModalOpenChange(false);
+    onModalOpenChange(true);
     beginDeleteMfaStepUp();
   };
 
   const handleDialogOpenChange = (open: boolean) => {
-    onDialogOpenChange(open);
+    onModalOpenChange(open);
     if (!open) {
       setDeleteMfaStepUpCode("");
       setDeleteMfaStepUpError(null);
@@ -96,8 +96,8 @@ export function MfaDisableDialog({
     <>
       {/* Pre-step-up confirmation for disabling MFA */}
       <Dialog
-        open={isPreDialogOpen}
-        onOpenChange={onPreDialogOpenChange}
+        open={isPreModalOpen}
+        onOpenChange={onPreModalOpenChange}
       >
         <DialogContent 
           className="max-w-md rounded-2xl border border-border/50 bg-white/95 dark:bg-popover-main shadow-2xl !data-[state=closed]:animate-none !data-[state=closed]:fade-out-0 !data-[state=closed]:zoom-out-100 !duration-0"
@@ -120,7 +120,7 @@ export function MfaDisableDialog({
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => onPreDialogOpenChange(false)}
+                  onClick={() => onPreModalOpenChange(false)}
                   disabled={isLoading}
                   className="cursor-pointer rounded-lg font-medium"
                 >
@@ -142,7 +142,7 @@ export function MfaDisableDialog({
       </Dialog>
 
       <Dialog 
-        open={isDialogOpen} 
+        open={isModalOpen} 
         onOpenChange={handleDialogOpenChange}
       >
         <DialogContent 

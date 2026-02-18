@@ -1,5 +1,5 @@
 import { ThreadSidebarHeader } from "./thread-sidebar-header";
-import { ThreadSidebarInteractive } from "../thread-sidebar-interactive";
+import { ThreadSidebarInteractive } from "./thread-sidebar-interactive";
 import { UserProfileSection } from "./user-profile-section";
 
 export function ThreadSidebarLayout() {

@@ -1,19 +1,18 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Script from "next/script";
+import { Navbar, Footer } from "@/components/layout";
 import {
   HeroSection,
   IntegrationsSection,
   ArchitectureSection,
-  Navbar,
   WhatIsRIFTSection,
   PerformanceSection,
-  Footer,
   CTASection,
   PricingSection,
   FaqSection,
 } from "@/components/landing";
-import { landingPlans } from "@/components/landing/data/pricing";
+import { landingPlans } from "@/lib/pricing";
 import { getDictionary, hasLocale, type Dictionary } from "./dictionaries";
 
 const deploymentDomain =

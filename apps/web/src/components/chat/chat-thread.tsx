@@ -11,7 +11,7 @@ import type { UIMessage } from "ai";
 import { useOptimizedScroll } from "@/hooks/use-optimized-scroll";
 import { useFirstMessageSendAnimation } from "@/components/chat/first-message-send-animation";
 import { MessageRenderer } from "@/components/chat/components/message-renderer";
-import { Loader } from "@/components/ai/loader";
+import { Loader } from "@/components/chat/loader";
 
 const BOTTOM_PADDING_PX = 164;
 

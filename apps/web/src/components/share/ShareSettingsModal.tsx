@@ -25,7 +25,7 @@ type ThreadSummary = {
   shareStatus?: "active" | "revoked";
 };
 
-type ShareSettingsDialogProps = {
+type ShareSettingsModalProps = {
   thread: ThreadSummary | null;
   shareState: ShareState | null;
   onClose: () => void;
@@ -69,7 +69,7 @@ const ToggleRow = ({ label, description, checked, disabled, onChange }: ToggleRo
   </div>
 );
 
-export function ShareSettingsDialog({
+export function ShareSettingsModal({
   thread,
   shareState,
   onClose,
@@ -77,7 +77,7 @@ export function ShareSettingsDialog({
   handleCopyShareLink,
   updateShareSettings,
   regenerateShareLink,
-}: ShareSettingsDialogProps) {
+}: ShareSettingsModalProps) {
   const shareStatus = useQuery(
     api.share.getShareStatus,
     thread ? { threadId: thread.threadId } : "skip",

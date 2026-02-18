@@ -18,7 +18,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { PeakHoursChart } from "@/components/classroom/PeakHoursChart";
+import { PeakHoursChart } from "@/components/insights/classroom/PeakHoursChart";
 import { 
   Select,
   SelectContent,
@@ -312,7 +312,7 @@ export function GeographyInsights() {
   const router = useRouter();
   const [selectedGrade, setSelectedGrade] = useState<Grade>("all");
   const MapboxMexicoGlobe = useMemo(
-    () => dynamic(() => import("@/components/classroom/MapboxMexicoGlobe"), { ssr: false }),
+    () => dynamic(() => import("@/components/insights/classroom/MapboxMexicoGlobe"), { ssr: false }),
     []
   );
 

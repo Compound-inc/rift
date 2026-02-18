@@ -19,7 +19,7 @@ import { confirmSecurityEmailVerification } from "@/actions/settings/security/co
 import { validatePassword, PASSWORD_REQUIREMENTS } from "@/lib/password-validation";
 import { cn } from "@rift/utils";
 
-interface PasswordChangeDialogProps {
+interface PasswordChangeModalProps {
   hasPassword: boolean;
   isPending: boolean;
 }
@@ -37,7 +37,7 @@ function PasswordRequirement({ label, met, show }: { label: string; met: boolean
   );
 }
 
-export function PasswordChangeDialog({ hasPassword, isPending: parentIsPending }: PasswordChangeDialogProps) {
+export function PasswordChangeModal({ hasPassword, isPending: parentIsPending }: PasswordChangeModalProps) {
   const [isPending, startTransition] = useTransition();
   const [isPasswordPreDialogOpen, setIsPasswordPreDialogOpen] = useState(false);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);

@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { LoadingIcon } from "@/components/ui/icons/svg-icons";
 import { Button } from "@rift/ui/button";
-import { landingPlans } from "@/components/landing/data/pricing";
+import { landingPlans } from "@/lib/pricing";
 import { ensureWorkosOrganization } from "@/actions/ensureWorkosOrganization";
 import { getSubscribeCheckoutUrl } from "@/actions/getSubscribeCheckoutUrl";
 import {

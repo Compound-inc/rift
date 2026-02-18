@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from "react";
 import { useChatTranslations } from "@/contexts/locale-context";
-import { NoSubscriptionDialog } from "@/components/ui/no-subscription-dialog";
+import { NoSubscriptionModal } from "@/components/modals/NoSubscriptionModal";
 import {
   AttachmentsIcon,
   GlobeIcon,
@@ -19,9 +19,9 @@ import {
   PromptInputTools,
   PromptInputFileUpload,
   PromptInputFilePreview,
-} from "@/components/ai/prompt-input";
+} from "@/components/chat/prompt-input";
 import { ChatErrorAlert } from "./chat-error-alert";
-import { ModelSelectorPanel } from "@/components/ai/model-selector-panel";
+import { ModelSelectorPanel } from "@/components/chat/model-selector-panel";
 import { InstructionSelector } from "@/components/custom-instructions/InstructionSelector";
 import { SelectedInstructionPill } from "@/components/custom-instructions/SelectedInstructionPill";
 import React, { forwardRef } from "react";
@@ -223,8 +223,8 @@ const ChatInputAreaInner = forwardRef<HTMLDivElement, ChatInputAreaProps>(functi
   return (
     <div ref={ref} className="absolute bottom-0 left-0 right-0 md:pb-0 z-[20]">
       <div className="mx-auto w-full max-w-full md:max-w-3xl px-0 md:px-2 pb-0 md:pb-0 relative">
-        {/* No Subscription Dialog */}
-        <NoSubscriptionDialog
+        {/* No Subscription Modal */}
+        <NoSubscriptionModal
           isOpen={showNoSubscriptionDialog}
           onClose={() => setShowNoSubscriptionDialog(false)}
         />

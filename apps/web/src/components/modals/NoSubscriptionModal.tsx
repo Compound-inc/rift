@@ -13,7 +13,7 @@ import Link from "next/link";
 import { useConvexAuth, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 
-interface NoSubscriptionDialogProps {
+interface NoSubscriptionModalProps {
   isOpen: boolean;
   onClose: () => void;
   orgName?: string | null;
@@ -84,13 +84,13 @@ function GradientBackground() {
   );
 }
 
-export function NoSubscriptionDialog({
+export function NoSubscriptionModal({
   isOpen,
   onClose,
   orgName,
   canManageBilling,
   subscriptionStatus,
-}: NoSubscriptionDialogProps) {
+}: NoSubscriptionModalProps) {
   const { isAuthenticated } = useConvexAuth();
 
   const organizationInfo = useQuery(

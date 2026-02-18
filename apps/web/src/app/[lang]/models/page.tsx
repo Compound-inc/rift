@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ModelsGrid } from "@/components/landing/models-grid";
-import Navbar from "@/components/landing/navbar";
-import Footer from "@/components/landing/footer";
+import { Navbar, Footer } from "@/components/layout";
 import CTASection from "@/components/landing/cta-section";
 import { getDictionary, hasLocale } from "../dictionaries";
 

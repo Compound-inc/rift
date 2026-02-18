@@ -6,7 +6,7 @@ import { ChevronLeftIcon, ChevronRightIcon, XIcon } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@rift/ui/button";
-import { UpgradeButton } from "./UpgradeButton";
+import { UpgradeButton } from "@/components/modals/UpgradeButton";
 
 type SidebarControlContextValue = {
   closeSidebar: () => void;

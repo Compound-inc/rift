@@ -37,14 +37,14 @@ type TotpEnrollmentState =
       status: "success";
     };
 
-interface MfaEnableDialogProps {
+interface MfaEnableModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
   isPending: boolean;
 }
 
-export function MfaEnableDialog({ isOpen, onOpenChange, onSuccess, isPending: parentIsPending }: MfaEnableDialogProps) {
+export function MfaEnableModal({ isOpen, onOpenChange, onSuccess, isPending: parentIsPending }: MfaEnableModalProps) {
   const [isPending, startTransition] = useTransition();
   const [totp, setTotp] = useState<TotpEnrollmentState>({ status: "idle" });
   const [mfaError, setMfaError] = useState<string | null>(null);

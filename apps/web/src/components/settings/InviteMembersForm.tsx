@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { SettingsInput } from './SettingsInput';
+import { SettingsInput } from '@/components/ui/SettingsInput';
 import {
   Select,
   SelectContent,

@@ -1,6 +1,6 @@
 "use client";
 
-import { PromptInputError } from "@/components/ai/prompt-input";
+import { PromptInputError } from "@/components/chat/prompt-input";
 import { useChatUIStore } from "../ui-store";
 
 export function ChatErrorAlert() {

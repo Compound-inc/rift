@@ -2,9 +2,9 @@
 
 import { useState, useTransition, useCallback, useEffect } from "react";
 import { Button } from "@rift/ui/button";
-import { PasswordChangeDialog } from "./PasswordChangeDialog";
-import { MfaEnableDialog } from "./MfaEnableDialog";
-import { MfaDisableDialog } from "./MfaDisableDialog";
+import { PasswordChangeModal } from "./PasswordChangeModal";
+import { MfaEnableModal } from "./MfaEnableModal";
+import { MfaDisableModal } from "./MfaDisableModal";
 import { getCurrentUserSecurityState } from "@/actions/settings/security/getCurrentUserSecurityState";
 import type { SecurityAuthFactor } from "@/actions/settings/security/getCurrentUserSecurityState";
 
@@ -60,7 +60,7 @@ export function SecuritySettingsCard() {
               </p>
             </div>
 
-            <PasswordChangeDialog hasPassword={hasPassword} isPending={isPending} />
+            <PasswordChangeModal hasPassword={hasPassword} isPending={isPending} />
           </div>
         </div>
 
@@ -88,11 +88,11 @@ export function SecuritySettingsCard() {
                     Desactivar
                   </Button>
 
-                  <MfaDisableDialog
-                    isPreDialogOpen={isDeleteMfaPreDialogOpen}
-                    onPreDialogOpenChange={setIsDeleteMfaPreDialogOpen}
-                    isDialogOpen={isDeleteMfaDialogOpen}
-                    onDialogOpenChange={(open) => {
+                  <MfaDisableModal
+                    isPreModalOpen={isDeleteMfaPreDialogOpen}
+                    onPreModalOpenChange={setIsDeleteMfaPreDialogOpen}
+                    isModalOpen={isDeleteMfaDialogOpen}
+                    onModalOpenChange={(open) => {
                       setIsDeleteMfaDialogOpen(open);
                       if (!open) {
                         setIsMfaDialogOpen(false);
@@ -114,7 +114,7 @@ export function SecuritySettingsCard() {
                     Activar MFA
                   </Button>
 
-                  <MfaEnableDialog
+                  <MfaEnableModal
                     isOpen={isMfaDialogOpen}
                     onOpenChange={setIsMfaDialogOpen}
                     onSuccess={refresh}

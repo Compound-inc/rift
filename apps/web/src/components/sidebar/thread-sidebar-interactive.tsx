@@ -12,10 +12,10 @@ import {
 } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Button } from "@rift/ui/button";
-import { Loader } from "@/components/ai/loader";
+import { Loader } from "@/components/chat/loader";
 import { toast } from "sonner";
 import { cn, copyToClipboard } from "@rift/utils";
-import { useChatSidebarControls } from "@/components/ai/ChatShellClient";
+import { useChatSidebarControls } from "@/components/chat/ChatShellClient";
 import { logThreadRemoved, logThreadRenamed } from "@/actions/audit";
 import { AlertTriangleIcon } from "lucide-react";
 import { EditIcon, DeleteIcon, PinIcon, ShareIcon } from "@/components/ui/icons/svg-icons";
@@ -32,7 +32,7 @@ import {
   ContextMenuSeparator,
 } from "@rift/ui/context-menu";
 import { useThreadShare } from "@/hooks/useThreadShare";
-import { ShareSettingsDialog } from "@/components/share/ShareSettingsDialog";
+import { ShareSettingsModal } from "@/components/share/ShareSettingsModal";
 import { prefetchCachedThreadMessages } from "@/lib/local-first/thread-messages-cache";
 import { useSelectedThreadStore } from "@/store/selected-thread-store";
 import { useModel } from "@/contexts/model-context";
@@ -95,7 +95,7 @@ export function ThreadSidebarInteractive({
   const [editingTitle, setEditingTitle] = useState("");
   const [loadingSource, setLoadingSource] = useState<null | "scroll">(null);
   const [hasHydrated, setHasHydrated] = useState(false);
-  const [shareDialogThread, setShareDialogThread] = useState<Thread | null>(null);
+  const [shareModalThread, setShareModalThread] = useState<Thread | null>(null);
   const requestInFlightRef = useRef(false);
   const [optimisticTitles, setOptimisticTitles] = useState<Record<string, string>>({});
   const prefetchedThreadIdsRef = useRef<Set<string>>(new Set());
@@ -659,7 +659,7 @@ export function ThreadSidebarInteractive({
             className="hover:bg-hover"
             onClick={(event: React.MouseEvent) => {
               event.stopPropagation();
-              setShareDialogThread(thread);
+              setShareModalThread(thread);
             }}
           >
             <ShareIcon className="mr-2 h-3 w-3" />
@@ -760,19 +760,19 @@ export function ThreadSidebarInteractive({
 
       {/* Button removed: automatic infinite scroll handles pagination */}
 
-      <ShareSettingsDialog
+      <ShareSettingsModal
         thread={
-          shareDialogThread
+          shareModalThread
             ? {
-                threadId: shareDialogThread.threadId,
-                title: shareDialogThread.title,
-                shareId: shareDialogThread.shareId,
-                shareStatus: shareDialogThread.shareStatus,
+                threadId: shareModalThread.threadId,
+                title: shareModalThread.title,
+                shareId: shareModalThread.shareId,
+                shareStatus: shareModalThread.shareStatus,
               }
             : null
         }
-        shareState={shareDialogThread ? resolveShareState(shareDialogThread) : null}
-        onClose={() => setShareDialogThread(null)}
+        shareState={shareModalThread ? resolveShareState(shareModalThread) : null}
+        onClose={() => setShareModalThread(null)}
         handleToggleShare={handleToggleShare}
         handleCopyShareLink={handleCopyShareLink}
         updateShareSettings={handleUpdateShareSettings}

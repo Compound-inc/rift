@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@rift/utils";
 import { AIModelsIcon } from "@/components/ui/icons/landing-icons";
-import { Response } from "@/components/ai/response";
+import { Response } from "@/components/chat/response";
 import {
   Avatar,
   AvatarFallback,

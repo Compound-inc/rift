@@ -2,8 +2,8 @@
 
 import ChatInterface from "@/components/chat";
 import { FirstMessageSendAnimationProvider } from "@/components/chat/first-message-send-animation";
-import { HomeMessageHandler } from "@/components/home-message-handler";
-import { ChatMessagesClient } from "@/components/chat-messages-client";
+import { HomeMessageHandler } from "@/components/chat/home-message-handler";
+import { ChatMessagesClient } from "@/components/chat/chat-messages-client";
 import { ChatOnboardingTour } from "@/components/onboarding/ChatOnboardingTour";
 import { useSelectedThreadUrlSync } from "@/hooks/useSelectedThreadUrlSync";
 import { useSelectedThreadStore } from "@/store/selected-thread-store";

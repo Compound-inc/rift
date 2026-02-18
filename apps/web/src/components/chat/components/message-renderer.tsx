@@ -7,21 +7,21 @@ import {
   CheckIcon,
   EditIcon,
 } from "@/components/ui/icons/svg-icons";
-import { Message, MessageContent } from "@/components/ai/message";
-import { MemoResponse } from "@/components/ai/memo-response";
-import { Actions, Action } from "@/components/ai/actions";
+import { Message, MessageContent } from "@/components/chat/message";
+import { MemoResponse } from "@/components/chat/memo-response";
+import { Actions, Action } from "@/components/chat/actions";
 import {
   Reasoning,
   ReasoningContent,
   ReasoningTrigger,
-} from "@/components/ai/reasoning";
+} from "@/components/chat/reasoning";
 import {
   Source,
   Sources,
   SourcesContent,
   SourcesTrigger,
-} from "@/components/ai/sources";
-import { Loader } from "@/components/ai/loader";
+} from "@/components/chat/sources";
+import { Loader } from "@/components/chat/loader";
 import { getModel, getModelShortcutDisplayName } from "@/lib/ai/ai-providers";
 import type { UIMessage } from "ai";
 import { isToolUIPart } from "ai";

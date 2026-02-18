@@ -5,7 +5,7 @@ import { Dialog } from "@radix-ui/themes";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
-import { SettingsInput } from "@/components/settings";
+import { SettingsInput } from "@/components/ui/SettingsInput";
 import { ensureWorkosOrganization } from "@/actions/ensureWorkosOrganization";
 
 export function ModalDialog({

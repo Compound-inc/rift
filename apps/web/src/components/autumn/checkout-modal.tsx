@@ -39,7 +39,7 @@ const TEXT_SECONDARY =
 const STROKE_MUTED =
 	"stroke-[color(display-p3_0.1725490196_0.1764705882_0.1882352941/1)] dark:stroke-white";
 
-export interface CheckoutDialogProps {
+export interface CheckoutModalProps {
 	open: boolean;
 	setOpen: (open: boolean) => void;
 	checkoutResult: CheckoutResult;
@@ -201,7 +201,7 @@ function getDefaultSuccessUrl(): string {
 	return typeof window !== "undefined" ? new URL("/chat", window.location.origin).toString() : "";
 }
 
-export default function CheckoutDialog(params: CheckoutDialogProps) {
+export default function CheckoutModal(params: CheckoutModalProps) {
 	const { refetch } = useCustomer();
 	const [checkoutResult, setCheckoutResult] = useState<
 		CheckoutResult | undefined
@@ -537,7 +537,7 @@ const PrepaidItem = ({
 			const { data, error } = await checkout({
 				productId: checkoutResult.product.id,
 				options: newOptions,
-				dialog: CheckoutDialog,
+				dialog: CheckoutModal,
 			});
 
 			if (error) {
@@ -645,7 +645,7 @@ export const PriceItem = ({
 	);
 };
 
-export const PricingDialogButton = ({
+export const PricingModalButton = ({
 	children,
 	size,
 	onClick,

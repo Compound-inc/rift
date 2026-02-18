@@ -2,7 +2,7 @@ export { SettingsSection } from './SettingsSection';
 export { StatusBadge } from './StatusBadge';
 export { SettingRow } from './SettingRow';
 export { OrganizationIcon } from './OrganizationIcon';
-export { SettingsInput } from './SettingsInput';
+export { SettingsInput } from '@/components/ui/SettingsInput';
 export { SettingsDivider } from './SettingsDivider';
 export { MembersTable } from './MembersTable';
 export { InviteMembersForm } from './InviteMembersForm';

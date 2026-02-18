@@ -1,6 +1,6 @@
 "use client";
 
-import { landingPlans } from "@/components/landing/data/pricing";
+import { landingPlans } from "@/lib/pricing";
 import type { PlanSlug as PricingContextPlanSlug } from "@/lib/pricing-context";
 import { PricingPlanButton } from "@/components/landing/pricing-plan-button";
 import { useLandingPromo } from "@/hooks/use-landing-promo";

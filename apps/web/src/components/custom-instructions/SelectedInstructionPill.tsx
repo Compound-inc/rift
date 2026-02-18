@@ -6,7 +6,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { cn } from "@rift/utils";
 import { getIconByName } from "./icon-registry";
-import { PromptInputButton } from "@/components/ai/prompt-input";
+import { PromptInputButton } from "@/components/chat/prompt-input";
 
 export function SelectedInstructionPill({
   instructionId,
