@@ -189,6 +189,11 @@
       "import": "./src/components/textarea.tsx",
       "default": "./src/components/textarea.tsx"
     },
+    "./theme-toggle": {
+      "types": "./src/components/theme-toggle.tsx",
+      "import": "./src/components/theme-toggle.tsx",
+      "default": "./src/components/theme-toggle.tsx"
+    },
     "./tooltip": {
       "types": "./src/components/tooltip.tsx",
       "import": "./src/components/tooltip.tsx",
@@ -201,6 +206,7 @@
     "@tanstack/react-table": "^8.21.3",
     "class-variance-authority": "^0.7.1",
     "cmdk": "^1.1.1",
+    "motion": "^12.23.26",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.542.0",
     "react-day-picker": "^9.13.0",

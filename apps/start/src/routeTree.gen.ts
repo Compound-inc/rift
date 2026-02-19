@@ -9,50 +9,84 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as appLayoutRouteImport } from './routes/(app)/_layout'
-import { Route as appLayoutIndexRouteImport } from './routes/(app)/_layout.index'
-import { Route as ApiAuthCallbackRouteImport } from './routes/api.auth.callback'
+import { Route as appLayoutRouteRouteImport } from './routes/(app)/_layout/route'
+import { Route as appLayoutIndexRouteImport } from './routes/(app)/_layout/index'
+import { Route as appLayoutSplatRouteImport } from './routes/(app)/_layout/$'
+import { Route as ApiAuthCallbackRouteRouteImport } from './routes/api/auth/callback/route'
+import { Route as appLayoutWriterRouteRouteImport } from './routes/(app)/_layout/writer/route'
+import { Route as appLayoutChatRouteRouteImport } from './routes/(app)/_layout/chat/route'
 
-const appLayoutRoute = appLayoutRouteImport.update({
+const appLayoutRouteRoute = appLayoutRouteRouteImport.update({
   id: '/(app)/_layout',
   getParentRoute: () => rootRouteImport,
 } as any)
 const appLayoutIndexRoute = appLayoutIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => appLayoutRoute,
+  getParentRoute: () => appLayoutRouteRoute,
 } as any)
-const ApiAuthCallbackRoute = ApiAuthCallbackRouteImport.update({
+const appLayoutSplatRoute = appLayoutSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => appLayoutRouteRoute,
+} as any)
+const ApiAuthCallbackRouteRoute = ApiAuthCallbackRouteRouteImport.update({
   id: '/api/auth/callback',
   path: '/api/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const appLayoutWriterRouteRoute = appLayoutWriterRouteRouteImport.update({
+  id: '/writer',
+  path: '/writer',
+  getParentRoute: () => appLayoutRouteRoute,
+} as any)
+const appLayoutChatRouteRoute = appLayoutChatRouteRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => appLayoutRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
-  '/api/auth/callback': typeof ApiAuthCallbackRoute
+  '/chat': typeof appLayoutChatRouteRoute
+  '/writer': typeof appLayoutWriterRouteRoute
+  '/api/auth/callback': typeof ApiAuthCallbackRouteRoute
+  '/$': typeof appLayoutSplatRoute
   '/': typeof appLayoutIndexRoute
 }
 export interface FileRoutesByTo {
-  '/api/auth/callback': typeof ApiAuthCallbackRoute
+  '/chat': typeof appLayoutChatRouteRoute
+  '/writer': typeof appLayoutWriterRouteRoute
+  '/api/auth/callback': typeof ApiAuthCallbackRouteRoute
+  '/$': typeof appLayoutSplatRoute
   '/': typeof appLayoutIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/(app)/_layout': typeof appLayoutRouteWithChildren
-  '/api/auth/callback': typeof ApiAuthCallbackRoute
+  '/(app)/_layout': typeof appLayoutRouteRouteWithChildren
+  '/(app)/_layout/chat': typeof appLayoutChatRouteRoute
+  '/(app)/_layout/writer': typeof appLayoutWriterRouteRoute
+  '/api/auth/callback': typeof ApiAuthCallbackRouteRoute
+  '/(app)/_layout/$': typeof appLayoutSplatRoute
   '/(app)/_layout/': typeof appLayoutIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/api/auth/callback' | '/'
+  fullPaths: '/chat' | '/writer' | '/api/auth/callback' | '/$' | '/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/api/auth/callback' | '/'
-  id: '__root__' | '/(app)/_layout' | '/api/auth/callback' | '/(app)/_layout/'
+  to: '/chat' | '/writer' | '/api/auth/callback' | '/$' | '/'
+  id:
+    | '__root__'
+    | '/(app)/_layout'
+    | '/(app)/_layout/chat'
+    | '/(app)/_layout/writer'
+    | '/api/auth/callback'
+    | '/(app)/_layout/$'
+    | '/(app)/_layout/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  appLayoutRoute: typeof appLayoutRouteWithChildren
-  ApiAuthCallbackRoute: typeof ApiAuthCallbackRoute
+  appLayoutRouteRoute: typeof appLayoutRouteRouteWithChildren
+  ApiAuthCallbackRouteRoute: typeof ApiAuthCallbackRouteRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -61,7 +95,7 @@ declare module '@tanstack/react-router' {
       id: '/(app)/_layout'
       path: ''
       fullPath: ''
-      preLoaderRoute: typeof appLayoutRouteImport
+      preLoaderRoute: typeof appLayoutRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(app)/_layout/': {
@@ -69,33 +103,60 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof appLayoutIndexRouteImport
-      parentRoute: typeof appLayoutRoute
+      parentRoute: typeof appLayoutRouteRoute
+    }
+    '/(app)/_layout/$': {
+      id: '/(app)/_layout/$'
+      path: '/$'
+      fullPath: '/$'
+      preLoaderRoute: typeof appLayoutSplatRouteImport
+      parentRoute: typeof appLayoutRouteRoute
     }
     '/api/auth/callback': {
       id: '/api/auth/callback'
       path: '/api/auth/callback'
       fullPath: '/api/auth/callback'
-      preLoaderRoute: typeof ApiAuthCallbackRouteImport
+      preLoaderRoute: typeof ApiAuthCallbackRouteRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/(app)/_layout/writer': {
+      id: '/(app)/_layout/writer'
+      path: '/writer'
+      fullPath: '/writer'
+      preLoaderRoute: typeof appLayoutWriterRouteRouteImport
+      parentRoute: typeof appLayoutRouteRoute
+    }
+    '/(app)/_layout/chat': {
+      id: '/(app)/_layout/chat'
+      path: '/chat'
+      fullPath: '/chat'
+      preLoaderRoute: typeof appLayoutChatRouteRouteImport
+      parentRoute: typeof appLayoutRouteRoute
     }
   }
 }
 
-interface appLayoutRouteChildren {
+interface appLayoutRouteRouteChildren {
+  appLayoutChatRouteRoute: typeof appLayoutChatRouteRoute
+  appLayoutWriterRouteRoute: typeof appLayoutWriterRouteRoute
+  appLayoutSplatRoute: typeof appLayoutSplatRoute
   appLayoutIndexRoute: typeof appLayoutIndexRoute
 }
 
-const appLayoutRouteChildren: appLayoutRouteChildren = {
+const appLayoutRouteRouteChildren: appLayoutRouteRouteChildren = {
+  appLayoutChatRouteRoute: appLayoutChatRouteRoute,
+  appLayoutWriterRouteRoute: appLayoutWriterRouteRoute,
+  appLayoutSplatRoute: appLayoutSplatRoute,
   appLayoutIndexRoute: appLayoutIndexRoute,
 }
 
-const appLayoutRouteWithChildren = appLayoutRoute._addFileChildren(
-  appLayoutRouteChildren,
+const appLayoutRouteRouteWithChildren = appLayoutRouteRoute._addFileChildren(
+  appLayoutRouteRouteChildren,
 )
 
 const rootRouteChildren: RootRouteChildren = {
-  appLayoutRoute: appLayoutRouteWithChildren,
-  ApiAuthCallbackRoute: ApiAuthCallbackRoute,
+  appLayoutRouteRoute: appLayoutRouteRouteWithChildren,
+  ApiAuthCallbackRouteRoute: ApiAuthCallbackRouteRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

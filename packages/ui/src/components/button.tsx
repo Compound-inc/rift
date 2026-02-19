@@ -15,12 +15,15 @@ const buttonVariants = cva(
           "bg-bg-inverted text-content-inverted [a]:hover:bg-bg-inverted/80",
         sidebarIcon:
           "hover:bg-bg-subtle active:bg-bg-muted focus-visible:ring-2 focus-visible:ring-border-emphasis/50 data-[active=true]:bg-bg-default data-[active=true]:hover:bg-bg-default data-[active=true]:active:bg-bg-default",
+        sidebarNavItem:
+          "flex h-8 w-full items-center justify-between rounded-lg p-2 text-sm leading-none font-normal text-content-default outline-none transition-[background-color,color,font-weight] duration-75 focus-visible:ring-2 focus-visible:ring-border-emphasis hover:bg-bg-inverted/5 active:bg-bg-inverted/10 data-[active=true]:bg-bg-info/25 data-[active=true]:font-medium data-[active=true]:text-content-info data-[active=true]:hover:bg-bg-info/45 data-[active=true]:active:bg-bg-info/75",
       },
       size: {
         default:
           "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
         iconSidebar:
           "size-11 rounded-lg transition-colors duration-150 [&_svg:not([class*='size-'])]:size-5",
+        sidebarNavItem: "min-h-8 shrink-0",
       },
     },
     defaultVariants: {
