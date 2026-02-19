@@ -3,9 +3,9 @@ import {
   getCurrentArea,
   NAV_AREAS,
 } from '@/components/layout/sidebar/app-sidebar-nav.config'
-import { SidebarAreaPanel } from '@/components/layout/sidebar/SidebarAreaPanel'
+import { SidebarAreaPanel } from '@/components/layout/sidebar/sidebar-area-panel'
 import { SETTINGS_AREA_KEY } from '@/components/layout/sidebar/app-sidebar-nav.config'
-import { UserProfileAvatar } from '@/components/layout/UserProfileAvatar'
+import { UserProfileAvatar } from '@/components/layout/user-profile-avatar'
 import { Avatar, AvatarFallback } from '@rift/ui/avatar'
 import { Button } from '@rift/ui/button'
 import { SidebarGroupTooltip, TooltipProvider } from '@rift/ui/tooltip'

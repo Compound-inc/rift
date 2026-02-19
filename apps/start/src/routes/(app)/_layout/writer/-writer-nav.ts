@@ -1,4 +1,4 @@
-import { isAreaPath } from '@/lib/nav-utils'
+import { isAreaPath } from '@/utils/nav-utils'
 import { DollarSign, FileText, LayoutDashboard, MessageSquare } from 'lucide-react'
 
 export const WRITER_HREF = '/writer'

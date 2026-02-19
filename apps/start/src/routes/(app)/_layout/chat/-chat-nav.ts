@@ -1,4 +1,4 @@
-import { isAreaPath } from '@/lib/nav-utils'
+import { isAreaPath } from '@/utils/nav-utils'
 import { Compass, Globe, Link2, MessageSquare } from 'lucide-react'
 
 export const CHAT_HREF = '/chat'

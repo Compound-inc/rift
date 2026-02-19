@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { getSignInUrl, getSignUpUrl } from '@workos/authkit-tanstack-react-start'
-import { DebugAuth } from '@/components/settings/DebugAuth'
+import { DebugAuth } from '@/components/settings/debug-auth'
 
 export const Route = createFileRoute('/(app)/_layout/settings/debug-auth')({
   loader: async () => {

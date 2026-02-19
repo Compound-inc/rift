@@ -1,4 +1,4 @@
-import { isAreaPath } from '@/lib/nav-utils'
+import { isAreaPath } from '@/utils/nav-utils'
 import { Bug, Settings, User } from 'lucide-react'
 
 export const SETTINGS_HREF = '/settings'

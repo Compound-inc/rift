@@ -1,6 +1,6 @@
 import { cn } from '@rift/utils'
 import type { SidebarNavAreaConfig, SidebarNavAreas, SidebarNavData } from './app-sidebar-nav.config'
-import { SidebarNavItem } from './SidebarNavItem'
+import { SidebarNavItem } from './sidebar-nav-item'
 
 /**
  * Renders the area panel from config.

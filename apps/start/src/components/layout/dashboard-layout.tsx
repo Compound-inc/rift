@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
-import { MainNav } from '@/components/layout/MainNav'
-import { AppSidebar } from '@/components/layout/AppSidebar'
+import { MainNav } from '@/components/layout/main-nav'
+import { AppSidebar } from '@/components/layout/app-sidebar'
 
 export function DashboardLayout({ children }: { children: ReactNode }) {
   return (

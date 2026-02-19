@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 
 import { cn } from '@rift/utils'
 import { Button } from '@rift/ui/button'
-import { isPathActive } from '@/lib/nav-utils'
+import { isPathActive } from '@/utils/nav-utils'
 import type { NavItemType } from './app-sidebar-nav.config'
 
 export function SidebarNavItem({
