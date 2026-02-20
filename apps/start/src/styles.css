@@ -17,3 +17,25 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
     monospace;
 }
+
+/* Thinking-state pulse (from reference orchid) */
+@keyframes pulseSize {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.5);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-pulse-size {
+  animation: pulseSize 0.8s cubic-bezier(1, 0, 0, 1) infinite;
+  transform-origin: 4px 4px;
+}
+
+.bg-ai {
+  background-color: #ad46ff;
+}

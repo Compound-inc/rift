@@ -74,7 +74,7 @@ export function ChatThread() {
               <div className="py-1">
                 <div className="flex items-center gap-2">
                   <div
-                    className="size-2 shrink-0 animate-pulse rounded-full bg-content-emphasis"
+                    className="size-2 shrink-0 rounded-full bg-ai animate-pulse-size"
                     aria-hidden
                   />
                   <span className="text-sm leading-[21px] text-content-muted">

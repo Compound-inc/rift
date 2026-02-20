@@ -32,7 +32,7 @@ const statusConfig: Record<
 export function PromptInputSubmit({
   className,
   variant = 'default',
-  size = 'default',
+  size = 'icon',
   status = 'ready',
   children,
   onStop,

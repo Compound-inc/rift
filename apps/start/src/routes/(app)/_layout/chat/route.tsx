@@ -16,7 +16,7 @@ function ChatPage() {
           <ChatThread />
         </div>
 
-        <div className="sticky bottom-6 z-40 mx-auto w-full max-w-2xl overflow-visible px-4 pt-4 sm:pl-9 sm:pr-5">
+        <div className="sticky bottom-6 z-40 mx-auto w-full max-w-2xl overflow-visible px-4 pt-4">
           <ChatInput />
         </div>
       </div>
