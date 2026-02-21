@@ -53,6 +53,10 @@
     "convex": {
       "cache": false,
       "persistent": true
+    },
+    "zero-cache": {
+      "cache": false,
+      "persistent": true
     }
   }
 }

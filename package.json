@@ -6,7 +6,7 @@
   "workspaces": ["packages/*", "apps/*"],
   "packageManager": "bun@1.2.23",
   "scripts": {
-    "dev": "turbo run dev convex --filter=tanstack --ui tui",
+    "dev": "turbo run dev zero-cache --filter=tanstack --ui tui",
     "build": "turbo run build --filter=tanstack",
     "start": "bun run --filter tanstack preview",
     "lint": "turbo run lint",

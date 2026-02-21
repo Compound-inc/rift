@@ -10,6 +10,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "convex": "convex dev",
+    "zero-cache": "zero-cache-dev",
     "test": "vitest run",
     "lint": "eslint",
     "format": "prettier --check .",

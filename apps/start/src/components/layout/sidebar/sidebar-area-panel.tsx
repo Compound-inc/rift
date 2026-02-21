@@ -1,6 +1,6 @@
 import { cn } from '@rift/utils'
 import type { SidebarNavAreaConfig, SidebarNavAreas, SidebarNavData } from './app-sidebar-nav.config'
-import { SidebarNavItem } from './sidebar-nav-item'
+import { SidebarAreaLayout } from './sidebar-area-layout'
 
 /**
  * Renders the area panel from config.
@@ -44,7 +44,7 @@ function Area({
   config: SidebarNavAreaConfig
   data: SidebarNavData
 }) {
-  const { title, content } = config
+  const { ContentComponent, title, content } = config
   return (
     <div
       className={cn(
@@ -58,31 +58,15 @@ function Area({
       )}
       aria-hidden={!visible ? 'true' : undefined}
     >
-      {title ? (
-        <div className="mb-2 flex items-center gap-3 px-3 py-2">
-          <span className="text-lg font-semibold text-content-emphasis">
-            {title}
-          </span>
-        </div>
-      ) : null}
-      <div className="flex flex-col gap-8">
-        {content.map((section, idx) => (
-          <div key={idx} className="flex flex-col gap-0.5">
-            {section.name ? (
-              <div className="mb-2 pl-3 text-sm text-content-muted">
-                {section.name}
-              </div>
-            ) : null}
-            {section.items.map((item) => (
-              <SidebarNavItem
-                key={item.name}
-                item={item}
-                pathname={data.pathname}
-              />
-            ))}
-          </div>
-        ))}
-      </div>
+      {ContentComponent ? (
+        <ContentComponent pathname={data.pathname} />
+      ) : (
+        <SidebarAreaLayout
+          title={title}
+          sections={content}
+          pathname={data.pathname}
+        />
+      )}
     </div>
   )
 }

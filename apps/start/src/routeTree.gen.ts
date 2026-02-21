@@ -20,7 +20,9 @@ import { Route as appLayoutWriterRouteRouteImport } from './routes/(app)/_layout
 import { Route as appLayoutSettingsRouteRouteImport } from './routes/(app)/_layout/settings/route'
 import { Route as appLayoutChatRouteRouteImport } from './routes/(app)/_layout/chat/route'
 import { Route as appLayoutSettingsIndexRouteImport } from './routes/(app)/_layout/settings/index'
+import { Route as appLayoutChatIndexRouteImport } from './routes/(app)/_layout/chat/index'
 import { Route as appLayoutSettingsDebugAuthRouteRouteImport } from './routes/(app)/_layout/settings/debug-auth/route'
+import { Route as appLayoutChatThreadIdRouteRouteImport } from './routes/(app)/_layout/chat/$threadId/route'
 
 const ApiChatRouteRoute = ApiChatRouteRouteImport.update({
   id: '/api/chat',
@@ -76,16 +78,27 @@ const appLayoutSettingsIndexRoute = appLayoutSettingsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => appLayoutSettingsRouteRoute,
 } as any)
+const appLayoutChatIndexRoute = appLayoutChatIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => appLayoutChatRouteRoute,
+} as any)
 const appLayoutSettingsDebugAuthRouteRoute =
   appLayoutSettingsDebugAuthRouteRouteImport.update({
     id: '/debug-auth',
     path: '/debug-auth',
     getParentRoute: () => appLayoutSettingsRouteRoute,
   } as any)
+const appLayoutChatThreadIdRouteRoute =
+  appLayoutChatThreadIdRouteRouteImport.update({
+    id: '/$threadId',
+    path: '/$threadId',
+    getParentRoute: () => appLayoutChatRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRouteRoute
-  '/chat': typeof appLayoutChatRouteRoute
+  '/chat': typeof appLayoutChatRouteRouteWithChildren
   '/settings': typeof appLayoutSettingsRouteRouteWithChildren
   '/writer': typeof appLayoutWriterRouteRoute
   '/api/auth/callback': typeof ApiAuthCallbackRouteRoute
@@ -93,26 +106,29 @@ export interface FileRoutesByFullPath {
   '/api/zero/query': typeof ApiZeroQueryRouteRoute
   '/$': typeof appLayoutSplatRoute
   '/': typeof appLayoutIndexRoute
+  '/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
   '/settings/debug-auth': typeof appLayoutSettingsDebugAuthRouteRoute
+  '/chat/': typeof appLayoutChatIndexRoute
   '/settings/': typeof appLayoutSettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRouteRoute
-  '/chat': typeof appLayoutChatRouteRoute
   '/writer': typeof appLayoutWriterRouteRoute
   '/api/auth/callback': typeof ApiAuthCallbackRouteRoute
   '/api/zero/mutate': typeof ApiZeroMutateRouteRoute
   '/api/zero/query': typeof ApiZeroQueryRouteRoute
   '/$': typeof appLayoutSplatRoute
   '/': typeof appLayoutIndexRoute
+  '/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
   '/settings/debug-auth': typeof appLayoutSettingsDebugAuthRouteRoute
+  '/chat': typeof appLayoutChatIndexRoute
   '/settings': typeof appLayoutSettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/(app)/_layout': typeof appLayoutRouteRouteWithChildren
   '/api/chat': typeof ApiChatRouteRoute
-  '/(app)/_layout/chat': typeof appLayoutChatRouteRoute
+  '/(app)/_layout/chat': typeof appLayoutChatRouteRouteWithChildren
   '/(app)/_layout/settings': typeof appLayoutSettingsRouteRouteWithChildren
   '/(app)/_layout/writer': typeof appLayoutWriterRouteRoute
   '/api/auth/callback': typeof ApiAuthCallbackRouteRoute
@@ -120,7 +136,9 @@ export interface FileRoutesById {
   '/api/zero/query': typeof ApiZeroQueryRouteRoute
   '/(app)/_layout/$': typeof appLayoutSplatRoute
   '/(app)/_layout/': typeof appLayoutIndexRoute
+  '/(app)/_layout/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
   '/(app)/_layout/settings/debug-auth': typeof appLayoutSettingsDebugAuthRouteRoute
+  '/(app)/_layout/chat/': typeof appLayoutChatIndexRoute
   '/(app)/_layout/settings/': typeof appLayoutSettingsIndexRoute
 }
 export interface FileRouteTypes {
@@ -135,19 +153,22 @@ export interface FileRouteTypes {
     | '/api/zero/query'
     | '/$'
     | '/'
+    | '/chat/$threadId'
     | '/settings/debug-auth'
+    | '/chat/'
     | '/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/api/chat'
-    | '/chat'
     | '/writer'
     | '/api/auth/callback'
     | '/api/zero/mutate'
     | '/api/zero/query'
     | '/$'
     | '/'
+    | '/chat/$threadId'
     | '/settings/debug-auth'
+    | '/chat'
     | '/settings'
   id:
     | '__root__'
@@ -161,7 +182,9 @@ export interface FileRouteTypes {
     | '/api/zero/query'
     | '/(app)/_layout/$'
     | '/(app)/_layout/'
+    | '/(app)/_layout/chat/$threadId'
     | '/(app)/_layout/settings/debug-auth'
+    | '/(app)/_layout/chat/'
     | '/(app)/_layout/settings/'
   fileRoutesById: FileRoutesById
 }
@@ -252,6 +275,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appLayoutSettingsIndexRouteImport
       parentRoute: typeof appLayoutSettingsRouteRoute
     }
+    '/(app)/_layout/chat/': {
+      id: '/(app)/_layout/chat/'
+      path: '/'
+      fullPath: '/chat/'
+      preLoaderRoute: typeof appLayoutChatIndexRouteImport
+      parentRoute: typeof appLayoutChatRouteRoute
+    }
     '/(app)/_layout/settings/debug-auth': {
       id: '/(app)/_layout/settings/debug-auth'
       path: '/debug-auth'
@@ -259,8 +289,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appLayoutSettingsDebugAuthRouteRouteImport
       parentRoute: typeof appLayoutSettingsRouteRoute
     }
+    '/(app)/_layout/chat/$threadId': {
+      id: '/(app)/_layout/chat/$threadId'
+      path: '/$threadId'
+      fullPath: '/chat/$threadId'
+      preLoaderRoute: typeof appLayoutChatThreadIdRouteRouteImport
+      parentRoute: typeof appLayoutChatRouteRoute
+    }
   }
 }
+
+interface appLayoutChatRouteRouteChildren {
+  appLayoutChatThreadIdRouteRoute: typeof appLayoutChatThreadIdRouteRoute
+  appLayoutChatIndexRoute: typeof appLayoutChatIndexRoute
+}
+
+const appLayoutChatRouteRouteChildren: appLayoutChatRouteRouteChildren = {
+  appLayoutChatThreadIdRouteRoute: appLayoutChatThreadIdRouteRoute,
+  appLayoutChatIndexRoute: appLayoutChatIndexRoute,
+}
+
+const appLayoutChatRouteRouteWithChildren =
+  appLayoutChatRouteRoute._addFileChildren(appLayoutChatRouteRouteChildren)
 
 interface appLayoutSettingsRouteRouteChildren {
   appLayoutSettingsDebugAuthRouteRoute: typeof appLayoutSettingsDebugAuthRouteRoute
@@ -279,7 +329,7 @@ const appLayoutSettingsRouteRouteWithChildren =
   )
 
 interface appLayoutRouteRouteChildren {
-  appLayoutChatRouteRoute: typeof appLayoutChatRouteRoute
+  appLayoutChatRouteRoute: typeof appLayoutChatRouteRouteWithChildren
   appLayoutSettingsRouteRoute: typeof appLayoutSettingsRouteRouteWithChildren
   appLayoutWriterRouteRoute: typeof appLayoutWriterRouteRoute
   appLayoutSplatRoute: typeof appLayoutSplatRoute
@@ -287,7 +337,7 @@ interface appLayoutRouteRouteChildren {
 }
 
 const appLayoutRouteRouteChildren: appLayoutRouteRouteChildren = {
-  appLayoutChatRouteRoute: appLayoutChatRouteRoute,
+  appLayoutChatRouteRoute: appLayoutChatRouteRouteWithChildren,
   appLayoutSettingsRouteRoute: appLayoutSettingsRouteRouteWithChildren,
   appLayoutWriterRouteRoute: appLayoutWriterRouteRoute,
   appLayoutSplatRoute: appLayoutSplatRoute,

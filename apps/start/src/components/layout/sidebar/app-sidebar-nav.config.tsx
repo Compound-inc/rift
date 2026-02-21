@@ -1,8 +1,4 @@
-import {
-  chatNavArea,
-  CHAT_AREA_KEY,
-  isChatPath,
-} from '@/routes/(app)/_layout/chat/-chat-nav'
+import { CHAT_AREA_KEY, chatNavArea, isChatPath } from '@/components/chat'
 import {
   isSettingsPath,
   settingsNavArea,
@@ -34,11 +30,14 @@ export type NavSection = {
 
 export type SidebarNavAreaConfig = {
   title?: string
+  /** Static sections; ignored when ContentComponent is set. */
   content: NavSection[]
   href: string
   description?: string
   learnMoreHref?: string
   icon: ComponentType<SVGProps<SVGSVGElement>>
+  /** When set, this component is rendered instead of content (for dynamic areas e.g. chat threads). */
+  ContentComponent?: ComponentType<{ pathname: string }>
 }
 
 export type SidebarNavAreas = Record<
