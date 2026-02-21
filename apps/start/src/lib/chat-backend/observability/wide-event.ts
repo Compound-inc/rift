@@ -1,5 +1,6 @@
 import { Effect } from 'effect'
 
+// Wide-event logging is intentionally structured for downstream ingestion (Sentry, etc).
 export type WideErrorEvent = {
   readonly eventName: string
   readonly route: string

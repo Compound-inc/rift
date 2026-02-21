@@ -1,3 +1,4 @@
+// Client-side chat state and transport wiring. Keeps server concerns out of React.
 'use client'
 
 import {
@@ -14,7 +15,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useChat as useAIChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import type { UIMessage } from 'ai'
-import type { ChatMessageMetadata } from '@/lib/chat-backend'
+import type { ChatMessageMetadata } from '@/lib/chat-contracts/message-metadata'
 
 type ChatUIMessage = UIMessage<ChatMessageMetadata>
 
@@ -28,6 +29,7 @@ type ChatContextValue = Pick<
 
 const ChatContext = createContext<ChatContextValue | null>(null)
 
+// Bootstraps a server thread so the URL can be updated before streaming starts.
 async function createServerThread(): Promise<string> {
   const response = await fetch('/api/chat/threads', { method: 'POST' })
   const payload = await response.json().catch(() => null)
@@ -69,7 +71,10 @@ export function ChatProvider({
   threadId?: string
 }) {
   const navigate = useNavigate()
+  // Mutable refs avoid stale values inside async callbacks owned by the transport hook.
   const threadIdRef = useRef<string | undefined>(threadId)
+  // Prevents duplicate thread creation during quick repeated submissions.
+  const inFlightThreadRef = useRef<Promise<string> | null>(null)
   const [localError, setLocalError] = useState<Error | null>(null)
 
   const transport = useMemo(
@@ -109,7 +114,14 @@ export function ChatProvider({
       let resolvedThreadId = threadIdRef.current
       if (!resolvedThreadId) {
         try {
-          resolvedThreadId = await createServerThread()
+          const inFlight =
+            inFlightThreadRef.current ??
+            createServerThread().finally(() => {
+              inFlightThreadRef.current = null
+            })
+          inFlightThreadRef.current = inFlight
+
+          resolvedThreadId = await inFlight
           threadIdRef.current = resolvedThreadId
           setLocalError(null)
           navigate({

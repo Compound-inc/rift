@@ -1,5 +1,8 @@
 import { Schema } from 'effect'
 
+// Tagged domain errors for chat flows. Keep these specific so UI can display
+// precise copy and logs can preserve intent for debugging.
+
 const ErrorFields = {
   message: Schema.String,
   requestId: Schema.String,

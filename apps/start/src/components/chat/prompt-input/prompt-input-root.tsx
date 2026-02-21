@@ -1,3 +1,4 @@
+// Prompt input container with named slots for error/attachments/thinking UI.
 'use client'
 
 import { cn } from '@rift/utils'

@@ -4,21 +4,21 @@ import { Effect } from 'effect'
 import {
   ChatOrchestratorService,
   UnauthorizedError,
-  chatErrorCodeFromTag,
-  toErrorResponse,
   runChatEffect,
   jsonResponse,
 } from '@/lib/chat-backend'
-import { emitWideErrorEvent, getErrorTag } from '@/lib/chat-backend/observability/wide-event'
+import { handleRouteFailure } from '@/lib/chat-backend/http/route-failure'
 
 export const Route = createFileRoute('/api/chat/threads')({
   server: {
     handlers: {
       POST: async () => {
         const requestId = crypto.randomUUID()
+        const authPromise = getAuth()
 
+        // Build the Effect program so auth + thread creation are consistently handled.
         const program = Effect.gen(function* () {
-          const { user } = yield* Effect.promise(() => getAuth())
+          const { user } = yield* Effect.promise(() => authPromise)
           if (!user) {
             return yield* Effect.fail(
               new UnauthorizedError({
@@ -40,30 +40,15 @@ export const Route = createFileRoute('/api/chat/threads')({
         try {
           return await runChatEffect(program)
         } catch (error) {
-          const { user } = await getAuth()
-          try {
-            await Effect.runPromise(
-              emitWideErrorEvent({
-                eventName: 'chat.thread.route.failed',
-                route: '/api/chat/threads',
-                requestId,
-                userId: user?.id,
-                errorCode: chatErrorCodeFromTag(getErrorTag(error)),
-                errorTag: getErrorTag(error),
-                message:
-                  typeof error === 'object' &&
-                  error !== null &&
-                  'message' in error &&
-                  typeof error.message === 'string'
-                    ? error.message
-                    : 'Thread bootstrap failed unexpectedly',
-                retryable: true,
-              }),
-            )
-          } catch {
-            // Ignore observability failures to avoid masking the main API error.
-          }
-          return toErrorResponse(error, requestId)
+          const userId = await authPromise.then(({ user }) => user?.id).catch(() => undefined)
+          return handleRouteFailure({
+            error,
+            requestId,
+            route: '/api/chat/threads',
+            eventName: 'chat.thread.route.failed',
+            userId,
+            defaultMessage: 'Thread bootstrap failed unexpectedly',
+          })
         }
       },
     },

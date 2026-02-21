@@ -1,6 +1,8 @@
-import { ChatErrorCode } from '@/lib/chat-backend/domain/error-codes'
-import type { ChatErrorCode as TChatErrorCode } from '@/lib/chat-backend/domain/error-codes'
-import { getChatErrorMessage } from '@/lib/chat-backend/domain/error-messages'
+// Parses API error envelopes into user-facing messages for the prompt UI.
+import { ChatErrorCode } from '@/lib/chat-contracts/error-codes'
+import type { ChatApiErrorEnvelope } from '@/lib/chat-contracts/error-envelope'
+import type { ChatErrorCode as TChatErrorCode } from '@/lib/chat-contracts/error-codes'
+import { getChatErrorMessage } from '@/lib/chat-contracts/error-messages'
 
 export type ParsedChatApiError = {
   readonly code?: TChatErrorCode
@@ -40,13 +42,7 @@ export function parseChatApiError(input: unknown): ParsedChatApiError | null {
       return { ...fallback, message: raw }
     }
 
-    const envelope = parsed as {
-      requestId?: unknown
-      error?: {
-        code?: unknown
-        message?: unknown
-      }
-    }
+    const envelope = parsed as Partial<ChatApiErrorEnvelope>
 
     const requestId =
       typeof envelope.requestId === 'string' ? envelope.requestId : undefined

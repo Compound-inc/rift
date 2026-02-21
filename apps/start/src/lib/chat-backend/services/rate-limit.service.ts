@@ -2,6 +2,7 @@ import { Context, Effect, Layer } from 'effect'
 import { RateLimitExceededError } from '../domain/errors'
 import { getMemoryState } from '../infra/memory/state'
 
+// Simple fixed-window in-memory rate limiting. Replace with Redis-backed limiter.
 const RATE_LIMIT_WINDOW_MS = 60_000
 const RATE_LIMIT_MAX_REQUESTS = 30
 

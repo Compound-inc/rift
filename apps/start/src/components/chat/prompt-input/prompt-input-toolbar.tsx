@@ -1,6 +1,7 @@
 'use client'
 
 import { Mic, Plus } from 'lucide-react'
+// Toolbar controls: file picker, stop button, and submit state.
 import type { ChatStatus } from 'ai'
 import { cn } from '@rift/utils'
 import type { HTMLAttributes } from 'react'

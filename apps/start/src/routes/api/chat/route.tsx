@@ -6,20 +6,20 @@ import {
   ChatStreamRequest,
   InvalidRequestError,
   UnauthorizedError,
-  chatErrorCodeFromTag,
-  toErrorResponse,
   runChatEffect,
 } from '@/lib/chat-backend'
-import { emitWideErrorEvent, getErrorTag } from '@/lib/chat-backend/observability/wide-event'
+import { handleRouteFailure } from '@/lib/chat-backend/http/route-failure'
 
 export const Route = createFileRoute('/api/chat')({
   server: {
     handlers: {
       POST: async ({ request }) => {
         const requestId = crypto.randomUUID()
+        const authPromise = getAuth()
 
+        // Build the Effect program so auth + validation + streaming are consistently handled.
         const program = Effect.gen(function* () {
-          const { user } = yield* Effect.promise(() => getAuth())
+          const { user } = yield* Effect.promise(() => authPromise)
           if (!user) {
             return yield* Effect.fail(
               new UnauthorizedError({
@@ -61,37 +61,15 @@ export const Route = createFileRoute('/api/chat')({
         try {
           return await runChatEffect(program)
         } catch (error) {
-          const { user } = await getAuth()
-          try {
-            await Effect.runPromise(
-              emitWideErrorEvent({
-                eventName: 'chat.route.failed',
-                route: '/api/chat',
-                requestId,
-                userId: user?.id,
-                threadId:
-                  typeof error === 'object' &&
-                  error !== null &&
-                  'threadId' in error &&
-                  typeof error.threadId === 'string'
-                    ? error.threadId
-                    : undefined,
-                errorCode: chatErrorCodeFromTag(getErrorTag(error)),
-                errorTag: getErrorTag(error),
-                message:
-                  typeof error === 'object' &&
-                  error !== null &&
-                  'message' in error &&
-                  typeof error.message === 'string'
-                    ? error.message
-                    : 'Chat route failed unexpectedly',
-                retryable: true,
-              }),
-            )
-          } catch {
-            // Ignore observability failures to avoid masking the main API error.
-          }
-          return toErrorResponse(error, requestId)
+          const userId = await authPromise.then(({ user }) => user?.id).catch(() => undefined)
+          return handleRouteFailure({
+            error,
+            requestId,
+            route: '/api/chat',
+            eventName: 'chat.route.failed',
+            userId,
+            defaultMessage: 'Chat route failed unexpectedly',
+          })
         }
       },
     },

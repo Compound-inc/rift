@@ -1,5 +1,7 @@
 import { Schema } from 'effect'
+import type { ChatMessageMetadata } from '@/lib/chat-contracts/message-metadata'
 
+// Validation for inbound chat payloads and shared types used by the orchestrator.
 const IncomingMessagePart = Schema.Struct({
   type: Schema.String,
   text: Schema.optional(Schema.String),
@@ -28,15 +30,6 @@ export type ChatThreadCreateResponse = Schema.Schema.Type<
   typeof ChatThreadCreateResponse
 >
 
-export type ChatMessageMetadata = {
-  readonly threadId?: string
-  readonly requestId?: string
-  readonly model?: string
-  readonly startedAt?: number
-  readonly completedAt?: number
-  readonly totalTokens?: number
-}
-
 export function getUserMessageText(message: IncomingUserMessage): string {
   return message.parts
     .filter((part) => part.type === 'text' && typeof part.text === 'string')
@@ -44,3 +37,5 @@ export function getUserMessageText(message: IncomingUserMessage): string {
     .join('\n\n')
     .trim()
 }
+
+export type { ChatMessageMetadata }

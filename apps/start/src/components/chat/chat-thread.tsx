@@ -1,3 +1,4 @@
+// Renders chat messages and keeps scroll pinned to the latest user message.
 import { useMemo } from 'react'
 import { useChat } from './chat-context'
 import { ChatMessage } from './chat-message'
@@ -15,7 +16,8 @@ export function ChatThread() {
   )
   const lastUserMessageId = useMemo(() => {
     for (let i = sorted.length - 1; i >= 0; i--) {
-      if (sorted[i]?.role === 'user') return sorted[i].id
+      const message = sorted[i]
+      if (message.role === 'user') return message.id
     }
     return null
   }, [sorted])
@@ -34,9 +36,8 @@ export function ChatThread() {
   })
 
   const isStreaming = status === 'submitted' || status === 'streaming'
-  const lastMessage = messages[messages.length - 1]
-  const showThinking =
-    isStreaming && (!lastMessage || lastMessage.role === 'user')
+  const lastMessage = messages.at(-1)
+  const showThinking = isStreaming && (!lastMessage || lastMessage.role === 'user')
 
   return (
     <div

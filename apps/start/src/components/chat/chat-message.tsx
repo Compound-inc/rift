@@ -1,7 +1,8 @@
+// Single chat message renderer (user/assistant).
 import type { UIMessage } from 'ai'
 
 function getMessageText(message: UIMessage): string {
-  if (!message.parts?.length) return ''
+  if (message.parts.length === 0) return ''
   return message.parts
     .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
     .map((p) => p.text)

@@ -1,3 +1,4 @@
+// Error banner for prompt input, with optional trace ID display.
 'use client'
 
 import { useRef, useEffect, useState } from 'react'

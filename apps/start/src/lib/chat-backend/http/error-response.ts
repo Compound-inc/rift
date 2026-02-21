@@ -1,7 +1,9 @@
 import type { ChatDomainError } from '../domain/errors'
 import { ChatErrorCode, chatErrorCodeFromTag } from '../domain/error-codes'
 import { getChatErrorMessage } from '../domain/error-messages'
+import type { ChatApiErrorEnvelope } from '@/lib/chat-contracts/error-envelope'
 
+// Convert domain errors into the normalized API envelope consumed by the UI.
 export function toErrorResponse(error: unknown, fallbackRequestId: string): Response {
   if (
     typeof error === 'object' &&
@@ -22,7 +24,7 @@ export function toErrorResponse(error: unknown, fallbackRequestId: string): Resp
         ? tagged.threadId
         : undefined
 
-    const payload = {
+    const payload: ChatApiErrorEnvelope = {
       ok: false,
       error: {
         code: errorCode,

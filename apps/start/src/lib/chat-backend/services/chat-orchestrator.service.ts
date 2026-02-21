@@ -13,6 +13,7 @@ import { RateLimitService } from './rate-limit.service'
 import { ThreadService } from './thread.service'
 import { ToolRegistryService } from './tool-registry.service'
 
+// Orchestrates rate limiting, authorization, persistence, and streaming for chat.
 export type ChatOrchestratorServiceShape = {
   readonly createThread: (input: {
     readonly userId: string
@@ -80,6 +81,7 @@ export const ChatOrchestratorLive = Layer.effect(
         return result.toUIMessageStreamResponse({
           originalMessages: messages,
           onError: (error: unknown) => {
+            // Fire-and-forget observability; do not block the stream response.
             void Effect.runPromise(
               emitWideErrorEvent({
                 eventName: 'chat.stream.transport.failed',
@@ -144,6 +146,7 @@ export const ChatOrchestratorLive = Layer.effect(
                 })
                 .pipe(
                   Effect.catchAll((error) =>
+                    // Persist failures shouldn't break the response stream.
                     emitWideErrorEvent({
                       eventName: 'chat.stream.persist.failed',
                       route,

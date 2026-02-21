@@ -1,3 +1,4 @@
+// Attachment previews displayed above the prompt input.
 'use client'
 
 import { Button } from '@rift/ui/button'

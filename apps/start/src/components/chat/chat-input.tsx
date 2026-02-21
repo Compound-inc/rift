@@ -1,3 +1,4 @@
+// Chat prompt input with error slot and file attachments.
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'

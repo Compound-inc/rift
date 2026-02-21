@@ -1,5 +1,6 @@
 import { Context, Effect, Layer } from 'effect'
 
+// Tool registry returns model + enabled tools for a given thread/user.
 export type ToolRegistryResult = {
   readonly model: string
   readonly tools: Record<string, never>

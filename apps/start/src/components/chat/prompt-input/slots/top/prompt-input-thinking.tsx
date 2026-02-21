@@ -1,3 +1,4 @@
+// Streaming indicator shown while the model is responding.
 'use client'
 
 import { cn } from '@rift/utils'

@@ -1,6 +1,7 @@
 import { Cause, Effect, Exit, Option } from 'effect'
 import { ChatLiveLayer } from './live'
 
+// Runs a chat Effect with the live layer and surfaces tagged domain errors.
 export function runChatEffect<TValue, TError, TRequirements>(
   effect: Effect.Effect<TValue, TError, TRequirements>,
 ) {

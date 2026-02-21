@@ -6,6 +6,8 @@ import { RateLimitMemory } from '../services/rate-limit.service'
 import { ThreadServiceMemory } from '../services/thread.service'
 import { ToolRegistryMemory } from '../services/tool-registry.service'
 
+// Default in-memory wiring for the chat backend. Swap these layers for
+// real persistence/rate limiting when the DB is ready.
 export const ChatLiveLayer = ChatOrchestratorLive.pipe(
   Layer.provideMerge(ThreadServiceMemory),
   Layer.provideMerge(MessageStoreMemory),

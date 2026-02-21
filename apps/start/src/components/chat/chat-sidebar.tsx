@@ -1,3 +1,4 @@
+// Chat navigation sidebar with static links + dynamic thread history.
 'use client'
 
 import { useQuery } from '@rocicorp/zero/react'
@@ -44,7 +45,7 @@ export function chatNavStaticConfig() {
 
 export function ChatSidebarContent({ pathname }: { pathname: string }) {
   const [threads] = useQuery(queries.threads.byUser())
-  const threadItems: NavItemType[] = (threads ?? []).map((thread) => ({
+  const threadItems: NavItemType[] = threads.map((thread) => ({
     name: thread.title || 'Untitled',
     href: `${CHAT_HREF}/${thread.threadId}`,
     icon: MessageSquare,

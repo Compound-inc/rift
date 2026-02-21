@@ -1,3 +1,4 @@
+// Auto-growing textarea that handles Enter-to-submit on desktop.
 'use client'
 
 import { Textarea } from '@rift/ui/textarea'
@@ -14,7 +15,7 @@ const isMobileLike = () =>
   typeof window !== 'undefined' &&
   (window.matchMedia('(max-width: 768px)').matches ||
     'ontouchstart' in window ||
-    (navigator.maxTouchPoints != null && navigator.maxTouchPoints > 0))
+    navigator.maxTouchPoints > 0)
 
 /**
  * Auto-growing textarea with Enter to submit (desktop) / Shift+Enter newline.

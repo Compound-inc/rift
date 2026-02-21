@@ -5,6 +5,7 @@ export const Route = createFileRoute('/(app)/_layout/chat')({
   component: ChatLayout,
 })
 
+// Reserved segments that are not thread IDs (static chat pages).
 const reservedSegments = new Set(['new-chat', 'projects'])
 
 function ChatLayout() {

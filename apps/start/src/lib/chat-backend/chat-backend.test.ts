@@ -1,3 +1,4 @@
+// Smoke tests for the chat backend scaffold (memory layers + error envelope).
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { UIMessage } from 'ai'
 import { Effect, Layer } from 'effect'

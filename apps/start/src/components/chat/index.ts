@@ -2,6 +2,7 @@ export { ChatProvider, useChat } from './chat-context'
 export { ChatMessage } from './chat-message'
 export { ChatThread } from './chat-thread'
 export { ChatInput } from './chat-input'
+export { ChatPageShell } from './chat-page-shell'
 
 export {
   CHAT_AREA_KEY,

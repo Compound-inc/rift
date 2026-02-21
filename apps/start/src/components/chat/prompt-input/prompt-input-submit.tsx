@@ -2,6 +2,7 @@
 
 import { Button } from '@rift/ui/button'
 import { cn } from '@rift/utils'
+// Submit button shows busy state based on chat status.
 import type { ChatStatus } from 'ai'
 import { AlertTriangle, Loader2, Send, Square } from 'lucide-react'
 import type { ComponentProps } from 'react'

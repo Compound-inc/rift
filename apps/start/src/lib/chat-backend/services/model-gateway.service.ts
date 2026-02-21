@@ -3,6 +3,7 @@ import type { UIMessage } from 'ai'
 import { Context, Effect, Layer } from 'effect'
 import { ModelProviderError } from '../domain/errors'
 
+// Model gateway encapsulates the AI SDK. Keep this isolated to swap providers.
 const SYSTEM_PROMPT = 'You are a helpful assistant.'
 
 export type ModelStreamResult = {
@@ -37,6 +38,7 @@ export const ModelGatewayLive = Layer.succeed(ModelGatewayService, {
   streamResponse: ({ messages, model, requestId, tools }) =>
     Effect.tryPromise({
       try: async () => {
+        // Dynamic import keeps server-only dependency out of client bundles.
         const { openai } = await import('@ai-sdk/openai')
         const modelMessages = await convertToModelMessages(messages)
         return streamText({

@@ -5,6 +5,7 @@ import type { IncomingUserMessage } from '../domain/schemas'
 import { getUserMessageText } from '../domain/schemas'
 import { getMemoryState } from '../infra/memory/state'
 
+// Message persistence adapter. In-memory for now; swap with DB-backed storage later.
 export type MessageStoreServiceShape = {
   readonly loadThreadMessages: (input: {
     readonly threadId: string

@@ -1,5 +1,6 @@
 import type { UIMessage } from 'ai'
 
+// In-memory state used for local development and tests until DB wiring lands.
 type ThreadRecord = {
   readonly threadId: string
   readonly userId: string

@@ -1,3 +1,4 @@
+// Prompt input component exports.
 export { TEXTAREA_MAX_HEIGHT } from './constants'
 export { PromptInputRoot } from './prompt-input-root'
 export type {

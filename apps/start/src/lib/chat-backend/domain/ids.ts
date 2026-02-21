@@ -1,5 +1,6 @@
 import { Schema } from 'effect'
 
+// Branded IDs protect cross-service boundaries and keep logs consistent.
 export const ThreadId = Schema.String.pipe(Schema.brand('@rift/ThreadId'))
 export type ThreadId = Schema.Schema.Type<typeof ThreadId>
 

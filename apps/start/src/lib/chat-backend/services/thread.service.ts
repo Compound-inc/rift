@@ -2,6 +2,10 @@ import { Context, Effect, Layer } from 'effect'
 import { ThreadForbiddenError, ThreadNotFoundError } from '../domain/errors'
 import { getMemoryState } from '../infra/memory/state'
 
+/**
+ * Thread lifecycle and authorization checks.
+ * Current implementation uses in-memory storage as a temporary adapter.
+ */
 export type ThreadServiceShape = {
   readonly createThread: (input: {
     readonly userId: string
