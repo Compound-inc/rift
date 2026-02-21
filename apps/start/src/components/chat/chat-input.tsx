@@ -11,6 +11,7 @@ import {
   PromptInputAttachments,
 } from './prompt-input'
 import { useFileAttachments } from '../../hooks/chat/upload'
+import { parseChatApiError } from './chat-error-messages'
 
 export function ChatInput() {
   const { sendMessage, status, stop, error } = useChat()
@@ -29,8 +30,9 @@ export function ChatInput() {
 
   const isBusy = status === 'submitted' || status === 'streaming'
   const isEmpty = !input.trim()
-  const chatErrorMessage =
-    error?.message ?? (typeof error === 'string' ? error : null)
+  const parsedChatError = parseChatApiError(error)
+  const chatErrorMessage = parsedChatError?.message ?? null
+  const chatErrorTraceId = parsedChatError?.traceId ?? null
   const uploadErrorMessage =
     files.find((file) => !!file.uploadError)?.uploadError ?? null
   const showChatError = !!chatErrorMessage && !errorDismissed
@@ -60,10 +62,13 @@ export function ChatInput() {
       e.preventDefault()
       const text = input.trim()
       if (!text || isBusy) return
-      void sendMessage({ text }).catch(() => {
-        // useChat exposes failure state via `error`; avoid unhandled promise rejection noise.
-      })
-      setInput('')
+      void sendMessage({ text })
+        .then(() => {
+          setInput('')
+        })
+        .catch(() => {
+          // Error is surfaced by chat context.
+        })
     },
     [input, isBusy, sendMessage]
   )
@@ -73,6 +78,7 @@ export function ChatInput() {
       {activeErrorMessage ? (
         <PromptInputError
           error={activeErrorMessage}
+          traceId={showChatError ? chatErrorTraceId : undefined}
           onDismiss={showChatError ? handleDismissError : handleDismissUploadError}
         />
       ) : null}

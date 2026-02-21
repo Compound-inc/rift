@@ -7,6 +7,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
 } from 'react'
 import type { ReactNode } from 'react'
 import { useNavigate } from '@tanstack/react-router'
@@ -36,8 +37,11 @@ async function createServerThread(): Promise<string> {
       payload &&
       typeof payload === 'object' &&
       'error' in payload &&
-      typeof payload.error === 'string'
-        ? payload.error
+      payload.error &&
+      typeof payload.error === 'object' &&
+      'message' in payload.error &&
+      typeof payload.error.message === 'string'
+        ? payload.error.message
         : payload &&
             typeof payload === 'object' &&
             'details' in payload &&
@@ -66,6 +70,7 @@ export function ChatProvider({
 }) {
   const navigate = useNavigate()
   const threadIdRef = useRef<string | undefined>(threadId)
+  const [localError, setLocalError] = useState<Error | null>(null)
 
   const transport = useMemo(
     () =>
@@ -96,21 +101,34 @@ export function ChatProvider({
     if (!threadId) {
       setMessages([])
     }
+    setLocalError(null)
   }, [threadId, setMessages])
 
   const sendMessage = useCallback<ChatContextValue['sendMessage']>(
     async (message, options) => {
       let resolvedThreadId = threadIdRef.current
       if (!resolvedThreadId) {
-        resolvedThreadId = await createServerThread()
-        threadIdRef.current = resolvedThreadId
-        navigate({
-          to: '/chat/$threadId',
-          params: { threadId: resolvedThreadId },
-        })
+        try {
+          resolvedThreadId = await createServerThread()
+          threadIdRef.current = resolvedThreadId
+          setLocalError(null)
+          navigate({
+            to: '/chat/$threadId',
+            params: { threadId: resolvedThreadId },
+          })
+        } catch (threadCreateError) {
+          setLocalError(
+            threadCreateError instanceof Error
+              ? threadCreateError
+              : new Error('Failed to create thread'),
+          )
+          throw threadCreateError
+        }
       }
 
-      return sendAIMessage(message, options)
+      const result = await sendAIMessage(message, options)
+      setLocalError(null)
+      return result
     },
     [navigate, sendAIMessage],
   )
@@ -121,13 +139,13 @@ export function ChatProvider({
     () => ({
       messages,
       status,
-      error,
+      error: localError ?? error,
       sendMessage,
       stop,
       setMessages,
       clear,
     }),
-    [messages, status, error, sendMessage, stop, setMessages, clear],
+    [messages, status, error, localError, sendMessage, stop, setMessages, clear],
   )
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>

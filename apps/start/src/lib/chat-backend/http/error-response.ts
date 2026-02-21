@@ -1,4 +1,6 @@
 import type { ChatDomainError } from '../domain/errors'
+import { ChatErrorCode, chatErrorCodeFromTag } from '../domain/error-codes'
+import { getChatErrorMessage } from '../domain/error-messages'
 
 export function toErrorResponse(error: unknown, fallbackRequestId: string): Response {
   if (
@@ -9,7 +11,8 @@ export function toErrorResponse(error: unknown, fallbackRequestId: string): Resp
   ) {
     const tagged = error as ChatDomainError
     const status = statusForTag(tagged._tag)
-    const userMessage = userMessageForTag(tagged._tag)
+    const errorCode = chatErrorCodeFromTag(tagged._tag)
+    const userMessage = getChatErrorMessage(errorCode)
     const requestId =
       'requestId' in tagged && typeof tagged.requestId === 'string'
         ? tagged.requestId
@@ -20,8 +23,13 @@ export function toErrorResponse(error: unknown, fallbackRequestId: string): Resp
         : undefined
 
     const payload = {
-      error: userMessage,
-      errorCode: tagged._tag,
+      ok: false,
+      error: {
+        code: errorCode,
+        message: userMessage,
+        requestId,
+        retryable: isRetryable(tagged._tag),
+      },
       requestId,
       details: {
         tag: tagged._tag,
@@ -30,7 +38,6 @@ export function toErrorResponse(error: unknown, fallbackRequestId: string): Resp
             ? tagged.message
             : userMessage,
         threadId,
-        retryable: isRetryable(tagged._tag),
       },
     }
 
@@ -39,42 +46,21 @@ export function toErrorResponse(error: unknown, fallbackRequestId: string): Resp
 
   return jsonResponse(
     {
-      error: 'Unexpected server error',
-      errorCode: 'UnknownError',
+      ok: false,
+      error: {
+        code: ChatErrorCode.Unknown,
+        message: getChatErrorMessage(ChatErrorCode.Unknown),
+        requestId: fallbackRequestId,
+        retryable: false,
+      },
       requestId: fallbackRequestId,
       details: {
         tag: 'UnknownError',
         message: 'Unexpected server error',
-        retryable: false,
       },
     },
     500,
   )
-}
-
-function userMessageForTag(tag: string): string {
-  switch (tag) {
-    case 'UnauthorizedError':
-      return 'Please sign in and try again.'
-    case 'InvalidRequestError':
-      return 'Your request was invalid. Please refresh and retry.'
-    case 'ThreadNotFoundError':
-      return 'This chat thread could not be found.'
-    case 'ThreadForbiddenError':
-      return 'You do not have access to this chat thread.'
-    case 'RateLimitExceededError':
-      return 'Too many requests. Please wait a moment and retry.'
-    case 'ModelProviderError':
-      return 'The AI provider is currently unavailable. Please retry.'
-    case 'ToolExecutionError':
-      return 'A tool failed while processing your request.'
-    case 'MessagePersistenceError':
-      return 'Your message could not be saved. Please retry.'
-    case 'StreamProtocolError':
-      return 'The response stream failed. Please retry.'
-    default:
-      return 'Unexpected server error'
-  }
 }
 
 function statusForTag(tag: string): number {

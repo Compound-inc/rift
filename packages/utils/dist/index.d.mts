@@ -14,6 +14,7 @@ declare function generateUUID(): string;
 
 /**
  * Copy text to clipboard with fallback support.
+ * Triggers a success toast on copy, or an error toast on failure.
  */
 declare function copyToClipboard(text: string): Promise<void>;
 

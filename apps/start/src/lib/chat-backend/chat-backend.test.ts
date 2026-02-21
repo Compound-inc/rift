@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { UIMessage } from 'ai'
 import { Effect, Layer } from 'effect'
 import { RateLimitExceededError } from '@/lib/chat-backend/domain/errors'
+import { ChatErrorCode } from '@/lib/chat-backend/domain/error-codes'
 import { getMemoryState } from '@/lib/chat-backend/infra/memory/state'
 import { toErrorResponse } from '@/lib/chat-backend/http/error-response'
 import { ChatOrchestratorLive, ChatOrchestratorService } from '@/lib/chat-backend/services/chat-orchestrator.service'
@@ -119,10 +120,11 @@ describe('chat-backend scaffold', () => {
 
     const payload = await response.json()
 
-    expect(payload.error).toBe('Too many requests. Please wait a moment and retry.')
-    expect(payload.errorCode).toBe('RateLimitExceededError')
+    expect(payload.ok).toBe(false)
+    expect(payload.error.code).toBe(ChatErrorCode.RateLimited)
+    expect(payload.error.message).toBe('Too many requests. Please wait a moment and retry.')
     expect(payload.requestId).toBe('req-rate')
-    expect(payload.details.retryable).toBe(true)
+    expect(payload.error.retryable).toBe(true)
   })
 
   it('enforces deterministic in-memory rate limiting', async () => {

@@ -6,6 +6,7 @@ import {
   ChatStreamRequest,
   InvalidRequestError,
   UnauthorizedError,
+  chatErrorCodeFromTag,
   toErrorResponse,
   runChatEffect,
 } from '@/lib/chat-backend'
@@ -75,6 +76,7 @@ export const Route = createFileRoute('/api/chat')({
                   typeof error.threadId === 'string'
                     ? error.threadId
                     : undefined,
+                errorCode: chatErrorCodeFromTag(getErrorTag(error)),
                 errorTag: getErrorTag(error),
                 message:
                   typeof error === 'object' &&
@@ -83,7 +85,6 @@ export const Route = createFileRoute('/api/chat')({
                   typeof error.message === 'string'
                     ? error.message
                     : 'Chat route failed unexpectedly',
-                userMessage: 'Unable to process your message right now. Please retry.',
                 retryable: true,
               }),
             )

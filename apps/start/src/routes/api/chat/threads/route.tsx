@@ -4,6 +4,7 @@ import { Effect } from 'effect'
 import {
   ChatOrchestratorService,
   UnauthorizedError,
+  chatErrorCodeFromTag,
   toErrorResponse,
   runChatEffect,
   jsonResponse,
@@ -47,6 +48,7 @@ export const Route = createFileRoute('/api/chat/threads')({
                 route: '/api/chat/threads',
                 requestId,
                 userId: user?.id,
+                errorCode: chatErrorCodeFromTag(getErrorTag(error)),
                 errorTag: getErrorTag(error),
                 message:
                   typeof error === 'object' &&
@@ -55,7 +57,6 @@ export const Route = createFileRoute('/api/chat/threads')({
                   typeof error.message === 'string'
                     ? error.message
                     : 'Thread bootstrap failed unexpectedly',
-                userMessage: 'Could not create a new chat thread. Please retry.',
                 retryable: true,
               }),
             )

@@ -1,6 +1,7 @@
 import type { UIMessage } from 'ai'
 import { Context, Effect, Layer } from 'effect'
 import type { ChatDomainError } from '../domain/errors'
+import { chatErrorCodeFromTag } from '../domain/error-codes'
 import type { IncomingUserMessage } from '../domain/schemas'
 import {
   emitWideErrorEvent,
@@ -87,9 +88,9 @@ export const ChatOrchestratorLive = Layer.effect(
                 userId,
                 threadId,
                 model: toolRegistry.model,
+                errorCode: chatErrorCodeFromTag(getErrorTag(error)),
                 errorTag: getErrorTag(error),
                 message: error instanceof Error ? error.message : String(error),
-                userMessage: 'There was a problem while streaming the assistant response.',
                 latencyMs: Date.now() - startedAt,
                 retryable: true,
               }),
@@ -150,10 +151,9 @@ export const ChatOrchestratorLive = Layer.effect(
                       userId,
                       threadId,
                       model: toolRegistry.model,
+                      errorCode: chatErrorCodeFromTag(error._tag),
                       errorTag: error._tag,
                       message: error.message,
-                      userMessage:
-                        'The response was generated but could not be saved. Please retry.',
                       latencyMs: Date.now() - startedAt,
                       cause: isAborted
                         ? 'stream_aborted_before_persistence'
@@ -174,9 +174,9 @@ export const ChatOrchestratorLive = Layer.effect(
             requestId,
             userId,
             threadId,
+            errorCode: chatErrorCodeFromTag(getErrorTag(error)),
             errorTag: getErrorTag(error),
             message: error.message,
-            userMessage: 'Unable to process your message right now. Please try again.',
             latencyMs: Date.now() - startedAt,
             retryable: true,
           }),

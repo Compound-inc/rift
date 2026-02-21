@@ -7,9 +7,9 @@ export type WideErrorEvent = {
   readonly userId?: string
   readonly threadId?: string
   readonly model?: string
+  readonly errorCode?: string
   readonly errorTag: string
   readonly message: string
-  readonly userMessage?: string
   readonly latencyMs?: number
   readonly retryable?: boolean
   readonly cause?: string
@@ -23,9 +23,9 @@ export const emitWideErrorEvent = (event: WideErrorEvent) =>
     user_id: event.userId,
     thread_id: event.threadId,
     model: event.model,
+    error_code: event.errorCode,
     error_tag: event.errorTag,
     message: event.message,
-    user_message: event.userMessage,
     latency_ms: event.latencyMs,
     retryable: event.retryable,
     cause: event.cause,

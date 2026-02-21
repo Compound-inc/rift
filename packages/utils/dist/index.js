@@ -46,6 +46,7 @@ function generateUUID() {
 }
 
 // src/clipboard.ts
+var import_sonner = require("sonner");
 async function copyToClipboard(text) {
   try {
     if (navigator.clipboard?.writeText) {
@@ -58,8 +59,10 @@ async function copyToClipboard(text) {
       document.execCommand("copy");
       document.body.removeChild(textArea);
     }
+    import_sonner.toast.success("Copied to clipboard");
   } catch (error) {
     console.error("Failed to copy to clipboard:", error);
+    import_sonner.toast.error("Failed to copy");
     throw error;
   }
 }
