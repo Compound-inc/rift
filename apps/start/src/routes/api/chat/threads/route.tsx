@@ -1,20 +1,19 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { getAuth } from '@workos/authkit-tanstack-react-start'
-import { Effect, Schema } from 'effect'
+import { Effect } from 'effect'
 import {
   ChatOrchestratorService,
-  ChatStreamRequest,
-  InvalidRequestError,
   UnauthorizedError,
   toErrorResponse,
   runChatEffect,
+  jsonResponse,
 } from '@/lib/chat-backend'
 import { emitWideErrorEvent, getErrorTag } from '@/lib/chat-backend/observability/wide-event'
 
-export const Route = createFileRoute('/api/chat')({
+export const Route = createFileRoute('/api/chat/threads')({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: async () => {
         const requestId = crypto.randomUUID()
 
         const program = Effect.gen(function* () {
@@ -28,33 +27,13 @@ export const Route = createFileRoute('/api/chat')({
             )
           }
 
-          const rawBody = yield* Effect.tryPromise({
-            try: () => request.json(),
-            catch: () =>
-              new InvalidRequestError({
-                message: 'Invalid JSON body',
-                requestId,
-              }),
-          })
-
-          const body = yield* Effect.try({
-            try: () => Schema.decodeUnknownSync(ChatStreamRequest)(rawBody),
-            catch: (error) =>
-              new InvalidRequestError({
-                message: 'Validation failed',
-                requestId,
-                issue: String(error),
-              }),
-          })
-
           const orchestrator = yield* ChatOrchestratorService
-          return yield* orchestrator.streamChat({
+          const created = yield* orchestrator.createThread({
             userId: user.id,
-            threadId: body.threadId,
             requestId,
-            message: body.message,
-            route: '/api/chat',
           })
+
+          return jsonResponse(created, 200)
         })
 
         try {
@@ -64,17 +43,10 @@ export const Route = createFileRoute('/api/chat')({
           try {
             await Effect.runPromise(
               emitWideErrorEvent({
-                eventName: 'chat.route.failed',
-                route: '/api/chat',
+                eventName: 'chat.thread.route.failed',
+                route: '/api/chat/threads',
                 requestId,
                 userId: user?.id,
-                threadId:
-                  typeof error === 'object' &&
-                  error !== null &&
-                  'threadId' in error &&
-                  typeof error.threadId === 'string'
-                    ? error.threadId
-                    : undefined,
                 errorTag: getErrorTag(error),
                 message:
                   typeof error === 'object' &&
@@ -82,8 +54,8 @@ export const Route = createFileRoute('/api/chat')({
                   'message' in error &&
                   typeof error.message === 'string'
                     ? error.message
-                    : 'Chat route failed unexpectedly',
-                userMessage: 'Unable to process your message right now. Please retry.',
+                    : 'Thread bootstrap failed unexpectedly',
+                userMessage: 'Could not create a new chat thread. Please retry.',
                 retryable: true,
               }),
             )

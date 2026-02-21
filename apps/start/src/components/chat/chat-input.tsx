@@ -60,7 +60,9 @@ export function ChatInput() {
       e.preventDefault()
       const text = input.trim()
       if (!text || isBusy) return
-      sendMessage({ text })
+      void sendMessage({ text }).catch(() => {
+        // useChat exposes failure state via `error`; avoid unhandled promise rejection noise.
+      })
       setInput('')
     },
     [input, isBusy, sendMessage]

@@ -21,13 +21,14 @@
     "convex:next": "bun run --filter web convex"
   },
   "devDependencies": {
+    "@effect/language-service": "^0.75.1",
     "@eslint/eslintrc": "^3.3.3",
     "eslint": "^9.39.2",
     "eslint-config-next": "16.0.0",
     "prettier": "^3.7.4",
     "prettier-plugin-tailwindcss": "^0.6.14",
-    "typescript": "^5.9.3",
-    "turbo": "^2.3.3"
+    "turbo": "^2.3.3",
+    "typescript": "^5.9.3"
   },
   "trustedDependencies": [
     "@tailwindcss/oxide",
