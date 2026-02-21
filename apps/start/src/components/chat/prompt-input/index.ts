@@ -5,7 +5,10 @@ export type {
   PromptInputSlots,
 } from './prompt-input-root'
 export { PromptInputTextarea } from './prompt-input-textarea'
-export type { PromptInputTextareaProps } from './prompt-input-textarea'
+export type {
+  PromptInputTextareaProps,
+  PromptInputTextareaRef,
+} from './prompt-input-textarea'
 export { PromptInputToolbar } from './prompt-input-toolbar'
 export type { PromptInputToolbarProps } from './prompt-input-toolbar'
 export { PromptInputSubmit } from './prompt-input-submit'

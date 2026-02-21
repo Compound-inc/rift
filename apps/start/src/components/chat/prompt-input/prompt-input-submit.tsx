@@ -1,6 +1,7 @@
 'use client'
 
 import { Button } from '@rift/ui/button'
+import { cn } from '@rift/utils'
 import type { ChatStatus } from 'ai'
 import { AlertTriangle, Loader2, Send, Square } from 'lucide-react'
 import type { ComponentProps } from 'react'
@@ -53,13 +54,12 @@ export function PromptInputSubmit({
 
   return (
     <Button
-      className={className}
+      className={cn(className, 'disabled:opacity-100 disabled:pointer-events-auto')}
       size={size}
       type={isStreaming ? 'button' : 'submit'}
       variant={variant}
       onClick={handleClick}
       title={label}
-      aria-label={label}
       {...props}
     >
       {children ?? (

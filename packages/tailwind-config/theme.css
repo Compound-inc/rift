@@ -17,7 +17,7 @@
   --color-bg-success: var(--bg-success);
   --color-bg-attention: var(--bg-attention);
   --color-bg-error: var(--bg-error);
-
+  --color-accent-default: var(--accent-default);
   /* Borders */
   --color-border-emphasis: var(--border-emphasis);
   --color-border-default: var(--border-default);
@@ -71,6 +71,8 @@
   --content-success: rgb(21 128 61);
   --content-attention: rgb(194 65 12);
   --content-error: rgb(185 28 28);
+
+  --accent-default: rgb(54 115 252);
 }
 
 .dark {
@@ -100,4 +102,6 @@
   --content-success: rgb(220 252 231);
   --content-attention: rgb(255 237 213);
   --content-error: rgb(254 226 226);
+
+  --accent-default: rgb(54 115 252);
 }

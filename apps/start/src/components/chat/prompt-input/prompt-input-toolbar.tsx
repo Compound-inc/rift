@@ -16,6 +16,8 @@ export type PromptInputToolbarProps = HTMLAttributes<HTMLDivElement> & {
   onStop: () => void
   isEmpty: boolean
   isBusy: boolean
+  /** When the user clicks empty space in the toolbar (not a button), focus the prompt input. */
+  onFocusInput?: () => void
 }
 
 /**
@@ -29,17 +31,30 @@ export function PromptInputToolbar({
   onStop,
   isEmpty,
   isBusy,
+  onFocusInput,
   ...props
 }: PromptInputToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const handleToolbarClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement
+    const isButton = target.closest('button')
+    const isFileInput = target.closest('input[type="file"]')
+    if (!isButton && !isFileInput) {
+      onFocusInput?.()
+    }
+  }
+
   return (
     <div
+      role="presentation"
       className={cn(
         'flex shrink-0 items-center justify-between gap-2 pt-1',
         'pb-[max(env(safe-area-inset-bottom),0.25rem)]',
+        onFocusInput && 'cursor-text',
         className
       )}
+      onClick={onFocusInput ? handleToolbarClick : undefined}
       {...props}
     >
       <input
@@ -74,11 +89,6 @@ export function PromptInputToolbar({
         status={status}
         onStop={onStop}
         disabled={isEmpty || isBusy}
-        className={cn(
-          'size-9 shrink-0 rounded-lg border-0 !bg-bg-muted !text-content-emphasis',
-          'shadow-sm hover:!bg-bg-muted/90 focus-visible:ring-2 focus-visible:ring-border-emphasis',
-          '[&_svg]:size-4'
-        )}
       />
     </div>
   )

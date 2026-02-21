@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useChat } from './chat-context'
 import {
   PromptInputRoot,
@@ -12,12 +12,11 @@ import {
 } from './prompt-input'
 import { useFileAttachments } from '../../hooks/chat/upload'
 
-const PLACEHOLDER = 'Outline your product, flow, or idea…'
-
 export function ChatInput() {
   const { sendMessage, status, stop, error } = useChat()
   const [input, setInput] = useState('')
   const [errorDismissed, setErrorDismissed] = useState(false)
+  const inputRef = useRef<{ focus: () => void }>(null)
 
   // File upload: images and PDF, max 10 files.
   const {
@@ -73,9 +72,9 @@ export function ChatInput() {
       slots={{ top: topSlot }}
     >
       <PromptInputTextarea
+        ref={inputRef}
         value={input}
         onChange={(e) => setInput(e.target.value)}
-        placeholder={PLACEHOLDER}
         disabled={isBusy}
         aria-label="Message"
       />
@@ -87,6 +86,7 @@ export function ChatInput() {
         onStop={stop}
         isEmpty={isEmpty}
         isBusy={isBusy}
+        onFocusInput={() => inputRef.current?.focus()}
       />
     </PromptInputRoot>
   )

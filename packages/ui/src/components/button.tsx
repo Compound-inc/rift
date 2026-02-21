@@ -12,7 +12,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-bg-inverted text-content-inverted [a]:hover:bg-bg-inverted/80",
+          "bg-accent-default text-content-inverted hover:bg-accent-default hover:opacity-80",
         ghost:
           "bg-transparent text-content-default",
         danger:
@@ -28,7 +28,7 @@ const buttonVariants = cva(
         default:
           "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
         icon:
-          "aspect-square h-10 w-10",
+          "aspect-square h-10 w-10 rounded-lg",
         iconSmall: 
           "aspect-square h-5 w-5",
         iconSidebar:
