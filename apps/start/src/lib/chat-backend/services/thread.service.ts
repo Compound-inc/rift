@@ -1,4 +1,5 @@
 import { Effect, Layer, ServiceMap } from 'effect'
+import { generateText } from 'ai'
 import {
   MessagePersistenceError,
   ThreadForbiddenError,
@@ -33,6 +34,12 @@ export type ThreadServiceShape = {
     },
     ThreadNotFoundError | ThreadForbiddenError | MessagePersistenceError
   >
+  readonly autoGenerateTitle: (input: {
+    readonly userId: string
+    readonly threadId: string
+    readonly userMessage: string
+    readonly requestId: string
+  }) => Effect.Effect<void, MessagePersistenceError>
 }
 
 export class ThreadService extends ServiceMap.Service<
@@ -41,6 +48,29 @@ export class ThreadService extends ServiceMap.Service<
 >()('chat-backend/ThreadService') {}
 
 const DEFAULT_THREAD_MODEL = 'gpt-4o-mini'
+const DEFAULT_THREAD_TITLE = 'Nuevo Chat'
+const MAX_USER_MESSAGE_LENGTH = 200
+const MAX_TITLE_WORDS = 8
+const MAX_TITLE_LENGTH = 50
+
+function trimUserMessage(message: string): string {
+  const trimmed = message.trim()
+  if (trimmed.length <= MAX_USER_MESSAGE_LENGTH) {
+    return trimmed
+  }
+  return `${trimmed.slice(0, MAX_USER_MESSAGE_LENGTH)}...`
+}
+
+function cleanGeneratedTitle(text: string): string {
+  return text
+    .replace(/[#*_`"'~-]/g, '')
+    .replace(/[^\w\s]/g, '')
+    .trim()
+    .split(/\s+/)
+    .slice(0, MAX_TITLE_WORDS)
+    .join(' ')
+    .slice(0, MAX_TITLE_LENGTH)
+}
 
 export const ThreadServiceZero = Layer.succeed(ThreadService, {
   createThread: ({ userId, requestId }) =>
@@ -159,6 +189,59 @@ export const ThreadServiceZero = Layer.succeed(ThreadService, {
         })
       },
     }),
+  autoGenerateTitle: ({ userId, threadId, userMessage, requestId }) =>
+    Effect.tryPromise({
+      try: async () => {
+        const db = getZeroDatabase()
+        if (!db) {
+          throw new Error('ZERO_UPSTREAM_DB is not configured')
+        }
+
+        const trimmedMessage = trimUserMessage(userMessage)
+        if (!trimmedMessage) return
+
+        const thread = await db.run(zql.thread.where('threadId', threadId).one())
+        if (!thread) return
+        if (thread.userId !== userId) return
+        if (thread.userSetTitle) return
+        if (thread.title !== DEFAULT_THREAD_TITLE) return
+
+        const { openai } = await import('@ai-sdk/openai')
+        const generation = await generateText({
+          model: openai(DEFAULT_THREAD_MODEL),
+          prompt: `You are an expert title generator. You are given a message and you need to generate a short title based on it.
+- you will generate a short 3-4 words title based on the first message a user begins a conversation with
+- the title should creative and unique
+- do not write anything other than the title
+- do not use quotes or colons
+- do not use any other text other than the title
+- the title should be in same language as the user message
+User message: ${trimmedMessage}`,
+          temperature: 0.5,
+          maxOutputTokens: 50,
+        })
+
+        const cleanTitle = cleanGeneratedTitle(generation.text)
+        const finalTitle = cleanTitle || DEFAULT_THREAD_TITLE
+
+        if (finalTitle === DEFAULT_THREAD_TITLE) return
+
+        await db.transaction(async (tx) => {
+          await tx.mutate.thread.update({
+            id: thread.id,
+            title: finalTitle,
+            updatedAt: Date.now(),
+          })
+        })
+      },
+      catch: (error) =>
+        new MessagePersistenceError({
+          message: 'Failed to auto-generate thread title',
+          requestId,
+          threadId,
+          cause: String(error),
+        }),
+    }),
 })
 
 // Test-only adapter retained for deterministic unit tests.
@@ -213,4 +296,5 @@ export const ThreadServiceMemory = Layer.succeed(ThreadService, {
         model: DEFAULT_THREAD_MODEL,
       }
     }),
+  autoGenerateTitle: () => Effect.void,
 })

@@ -3,6 +3,7 @@ import { Effect, Layer, ServiceMap } from 'effect'
 import type { ChatDomainError } from '../domain/errors'
 import { chatErrorCodeFromTag } from '../domain/error-codes'
 import type { IncomingUserMessage } from '../domain/schemas'
+import { getUserMessageText } from '../domain/schemas'
 import {
   emitWideErrorEvent,
   getErrorTag,
@@ -70,6 +71,37 @@ export const ChatOrchestratorLive = Layer.effect(
           requestId,
           createIfMissing,
         })
+
+        // Fire-and-forget title generation after the first message bootstrap path.
+        if (createIfMissing) {
+          const userMessage = getUserMessageText(message)
+          if (userMessage) {
+            void Effect.runPromise(
+              threads
+                .autoGenerateTitle({
+                  userId,
+                  threadId,
+                  userMessage,
+                  requestId,
+                })
+                .pipe(
+                  Effect.catch((titleError) =>
+                    emitWideErrorEvent({
+                      eventName: 'chat.thread.title.generation.failed',
+                      route,
+                      requestId,
+                      userId,
+                      threadId,
+                      model: threadAccess.model,
+                      errorCode: chatErrorCodeFromTag(titleError._tag),
+                      errorTag: titleError._tag,
+                      message: titleError.message,
+                    }),
+                  ),
+                ),
+            )
+          }
+        }
 
         const toolRegistry = yield* tools.resolveForThread({
           threadId,
