@@ -5,5 +5,4 @@
 export {
   ChatErrorCode,
   chatErrorCodeFromTag,
-  type ChatErrorCode,
 } from '@/lib/chat-contracts/error-codes'

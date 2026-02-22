@@ -12,10 +12,7 @@
     "preview": "vite preview",
     "convex": "convex dev",
     "zero-cache": "zero-cache-dev",
-    "test": "vitest run",
-    "lint": "eslint",
-    "format": "prettier --check .",
-    "check": "prettier --write . && eslint --fix"
+    "test": "vitest run"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.0",

@@ -26,6 +26,7 @@ export type ModelGatewayServiceShape = {
     readonly model: string
     readonly requestId: string
     readonly tools: Record<string, never>
+    readonly onChunk?: (chunk: unknown) => void
   }) => Effect.Effect<ModelStreamResult, ModelProviderError>
 }
 
@@ -35,7 +36,7 @@ export class ModelGatewayService extends ServiceMap.Service<
 >()('chat-backend/ModelGatewayService') {}
 
 export const ModelGatewayLive = Layer.succeed(ModelGatewayService, {
-  streamResponse: ({ messages, model, requestId, tools }) =>
+  streamResponse: ({ messages, model, requestId, tools, onChunk }) =>
     Effect.tryPromise({
       try: async () => {
         // Dynamic import keeps server-only dependency out of client bundles.
@@ -46,6 +47,11 @@ export const ModelGatewayLive = Layer.succeed(ModelGatewayService, {
           system: SYSTEM_PROMPT,
           messages: modelMessages,
           tools,
+          onChunk: onChunk
+            ? ({ chunk }) => {
+                onChunk(chunk)
+              }
+            : undefined,
         }) as unknown as ModelStreamResult
       },
       catch: (error) =>

@@ -31,7 +31,10 @@ const ChatContext = createContext<ChatContextValue | null>(null)
 
 // Bootstraps a server thread so the URL can be updated before streaming starts.
 async function createServerThread(): Promise<string> {
-  const response = await fetch('/api/chat/threads', { method: 'POST' })
+  const response = await fetch('/api/chat/threads', {
+    method: 'POST',
+    credentials: 'include',
+  })
   const payload = await response.json().catch(() => null)
 
   if (!response.ok) {
@@ -81,6 +84,7 @@ export function ChatProvider({
     () =>
       new DefaultChatTransport({
         api: '/api/chat',
+        credentials: 'include',
         prepareSendMessagesRequest: ({ messages }) => ({
           body: {
             threadId: threadIdRef.current,
@@ -138,9 +142,18 @@ export function ChatProvider({
         }
       }
 
-      const result = await sendAIMessage(message, options)
-      setLocalError(null)
-      return result
+      try {
+        const result = await sendAIMessage(message, options)
+        setLocalError(null)
+        return result
+      } catch (sendError) {
+        setLocalError(
+          sendError instanceof Error
+            ? sendError
+            : new Error('Failed to send message'),
+        )
+        throw sendError
+      }
     },
     [navigate, sendAIMessage],
   )

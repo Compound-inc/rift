@@ -18,12 +18,13 @@ export const queries = defineQueriesWithType<Schema>()({
     ),
   },
   messages: {
-    /** Messages in a thread. Caller must ensure thread access (e.g. via threads.byUser). */
+    /** Messages in a thread, always scoped to the authenticated user context. */
     byThread: defineQuery(
       z.object({ threadId: z.string() }),
-      ({ args }) =>
+      ({ args, ctx }) =>
         zql.message
           .where('threadId', args.threadId)
+          .where('userId', ctx.userID)
           .orderBy('created_at', 'asc'),
     ),
   },

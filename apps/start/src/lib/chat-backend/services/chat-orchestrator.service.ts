@@ -63,25 +63,89 @@ export const ChatOrchestratorLive = Layer.effect(
 
         yield* rateLimit.assertAllowed({ userId, requestId })
         yield* threads.assertThreadAccess({ userId, threadId, requestId })
-        yield* messageStore.appendUserMessage({ threadId, message, requestId })
-
-        const messages = yield* messageStore.loadThreadMessages({ threadId, requestId })
         const toolRegistry = yield* tools.resolveForThread({
           threadId,
           userId,
           requestId,
         })
+        yield* messageStore.appendUserMessage({
+          threadId,
+          message,
+          userId,
+          model: toolRegistry.model,
+          requestId,
+        })
+
+        const messages = yield* messageStore.loadThreadMessages({ threadId, requestId })
+
+        // This ID is generated server-side so start/finalize writes are deterministic
+        // and idempotent even when transport retries happen.
+        const assistantMessageId = crypto.randomUUID()
+        let assistantStarted = false
+        let assistantFinalized = false
+        let bufferedAssistantText = ''
+
+        const finalizeAssistant = (input: { ok: boolean; errorMessage?: string }) => {
+          if (assistantFinalized) return
+          assistantFinalized = true
+
+          void Effect.runPromise(
+            messageStore
+              .finalizeAssistantMessage({
+                threadId,
+                userId,
+                assistantMessageId,
+                ok: input.ok,
+                finalContent: bufferedAssistantText,
+                errorMessage: input.errorMessage,
+                requestId,
+              })
+              .pipe(
+                Effect.catch((error) =>
+                  emitWideErrorEvent({
+                    eventName: 'chat.stream.persist.failed',
+                    route,
+                    requestId,
+                    userId,
+                    threadId,
+                    model: toolRegistry.model,
+                    errorCode: chatErrorCodeFromTag(error._tag),
+                    errorTag: error._tag,
+                    message: error.message,
+                    latencyMs: Date.now() - startedAt,
+                    cause: input.ok ? 'assistant_finalize_success' : 'assistant_finalize_error',
+                  }),
+                ),
+              ),
+          )
+        }
 
         const result = yield* modelGateway.streamResponse({
           messages,
           model: toolRegistry.model,
           requestId,
           tools: toolRegistry.tools,
+          onChunk: (chunk: unknown) => {
+            const candidate = chunk as { type?: unknown; text?: unknown }
+            if (
+              typeof candidate === 'object' &&
+              candidate !== null &&
+              candidate.type === 'text-delta' &&
+              typeof candidate.text === 'string'
+            ) {
+              bufferedAssistantText += candidate.text
+            }
+          },
         })
 
         return result.toUIMessageStreamResponse({
           originalMessages: messages,
           onError: (error: unknown) => {
+            finalizeAssistant({
+              ok: false,
+              errorMessage: error instanceof Error ? error.message : String(error),
+            })
+
             // Fire-and-forget observability; do not block the stream response.
             void Effect.runPromise(
               emitWideErrorEvent({
@@ -103,6 +167,39 @@ export const ChatOrchestratorLive = Layer.effect(
           },
           messageMetadata: ({ part }: { part: any }) => {
             if (part.type === 'start') {
+              // Persist assistant row exactly when streaming begins so the DB
+              // reflects generation state even if the stream later fails.
+              if (!assistantStarted) {
+                assistantStarted = true
+                void Effect.runPromise(
+                  messageStore
+                    .startAssistantMessage({
+                      threadId,
+                      userId,
+                      assistantMessageId,
+                      model: toolRegistry.model,
+                      requestId,
+                    })
+                    .pipe(
+                      Effect.catch((error) =>
+                        emitWideErrorEvent({
+                          eventName: 'chat.stream.persist.failed',
+                          route,
+                          requestId,
+                          userId,
+                          threadId,
+                          model: toolRegistry.model,
+                          errorCode: chatErrorCodeFromTag(error._tag),
+                          errorTag: error._tag,
+                          message: error.message,
+                          latencyMs: Date.now() - startedAt,
+                          cause: 'assistant_start',
+                        }),
+                      ),
+                    ),
+                )
+              }
+
               return {
                 threadId,
                 requestId,
@@ -122,52 +219,34 @@ export const ChatOrchestratorLive = Layer.effect(
             return undefined
           },
           onFinish: ({
-            messages: finishedMessages,
             isAborted,
             responseMessage,
           }: {
-            messages: UIMessage[]
             isAborted: boolean
             responseMessage: UIMessage
           }) => {
-            const totalTokens =
-              typeof responseMessage.metadata === 'object' &&
-              responseMessage.metadata !== null &&
-              'totalTokens' in responseMessage.metadata &&
-              typeof responseMessage.metadata.totalTokens === 'number'
-                ? responseMessage.metadata.totalTokens
-                : undefined
+            // If we missed some content in chunk callbacks, use the response payload as fallback.
+            if (!bufferedAssistantText) {
+              bufferedAssistantText = responseMessage.parts
+                .filter(
+                  (
+                    part,
+                  ): part is Extract<typeof part, { type: 'text'; text: string }> =>
+                    part.type === 'text' && typeof (part as { text?: unknown }).text === 'string',
+                )
+                .map((part) => part.text)
+                .join('')
+            }
 
-            return Effect.runPromise(
-              messageStore
-                .appendAssistantMessage({
-                  threadId,
-                  messages: finishedMessages,
-                  requestId,
-                })
-                .pipe(
-                  Effect.catch((error) =>
-                    // Persist failures shouldn't break the response stream.
-                    emitWideErrorEvent({
-                      eventName: 'chat.stream.persist.failed',
-                      route,
-                      requestId,
-                      userId,
-                      threadId,
-                      model: toolRegistry.model,
-                      errorCode: chatErrorCodeFromTag(error._tag),
-                      errorTag: error._tag,
-                      message: error.message,
-                      latencyMs: Date.now() - startedAt,
-                      cause: isAborted
-                        ? 'stream_aborted_before_persistence'
-                        : totalTokens !== undefined
-                          ? `tokens=${totalTokens}`
-                          : undefined,
-                    }),
-                  ),
-                ),
-            )
+            const ok = bufferedAssistantText.length > 0
+            finalizeAssistant({
+              ok,
+              errorMessage: isAborted
+                ? 'Stream aborted before completion'
+                : ok
+                  ? undefined
+                  : 'No assistant content generated',
+            })
           },
         })
       }).pipe(
