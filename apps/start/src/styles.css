@@ -1,8 +1,11 @@
 @import "@rift/tailwind-config";
 @import "@rift/tailwind-config/base.css";
 @import "tailwindcss";
+@import "streamdown/styles.css";
+@import "katex/dist/katex.min.css";
 
 @source "../../../packages/ui/src";
+@source "../../../node_modules/streamdown/dist/*.js";
 
 body {
   @apply m-0;

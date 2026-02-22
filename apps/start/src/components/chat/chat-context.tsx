@@ -17,6 +17,7 @@ import { useChat as useAIChat } from '@ai-sdk/react'
 import { useQuery } from '@rocicorp/zero/react'
 import { DefaultChatTransport } from 'ai'
 import type { UIMessage } from 'ai'
+import { flushSync } from 'react-dom'
 import { queries } from '@/integrations/zero'
 import { CACHE_CHAT_NAV } from '@/integrations/zero/query-cache-policy'
 import type { ChatMessageMetadata } from '@/lib/chat-contracts/message-metadata'
@@ -131,9 +132,13 @@ export function ChatProvider({
   const inFlightThreadRef = useRef<Promise<string> | null>(null)
   // First send after optimistic creation can ask server to create-if-missing.
   const createIfMissingRef = useRef(false)
+  const [provisionalThreadId, setProvisionalThreadId] = useState<
+    string | undefined
+  >(undefined)
   const [localError, setLocalError] = useState<Error | null>(null)
+  const activeThreadId = threadId ?? provisionalThreadId
   const [storedMessages, storedMessagesResult] = useQuery(
-    queries.messages.byThread({ threadId: threadId ?? '' }),
+    queries.messages.byThread({ threadId: activeThreadId ?? '' }),
     CACHE_CHAT_NAV,
   )
   const threadStatusesVersion = useSyncExternalStore(
@@ -141,8 +146,6 @@ export function ChatProvider({
     getThreadStatusesVersion,
     getThreadStatusesVersion,
   )
-  const chatSessionId = threadId ? `chat-ui:${threadId}` : 'chat-ui:composer'
-
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -173,50 +176,62 @@ export function ChatProvider({
     setMessages,
     resumeStream,
   } = useAIChat<ChatUIMessage>({
-    id: chatSessionId,
+    id: activeThreadId ? `chat-ui:${activeThreadId}` : 'chat-ui:composer',
     transport,
   })
+  const sendAIMessageRef = useRef(sendAIMessage)
+  sendAIMessageRef.current = sendAIMessage
 
   useEffect(() => {
-    threadIdRef.current = threadId
+    threadIdRef.current = activeThreadId
     const previousThreadId = previousThreadIdRef.current
 
     // Reset ephemeral UI state when the route switches to a different thread.
-    if (threadId !== previousThreadId) {
-      setMessages([])
+    if (activeThreadId !== previousThreadId) {
+      const shouldPreserveDuringFirstSendTransition =
+        !previousThreadId &&
+        !!activeThreadId &&
+        (status === 'submitted' || status === 'streaming')
+
+      if (!shouldPreserveDuringFirstSendTransition) {
+        setMessages([])
+      }
       setLocalError(null)
       resumeAttemptedThreadIdRef.current = undefined
     }
 
-    if (!threadId) {
+    if (!activeThreadId) {
       createIfMissingRef.current = false
-      previousThreadIdRef.current = threadId
+      previousThreadIdRef.current = activeThreadId
       return
     }
 
-    previousThreadIdRef.current = threadId
-  }, [threadId, setMessages])
+    previousThreadIdRef.current = activeThreadId
+    if (threadId && provisionalThreadId === threadId) {
+      setProvisionalThreadId(undefined)
+    }
+  }, [activeThreadId, provisionalThreadId, setMessages, status, threadId])
 
   useEffect(() => {
-    if (!threadId) return
+    if (!activeThreadId) return
     if (status === 'submitted' || status === 'streaming') return
-    if (resumeAttemptedThreadIdRef.current === threadId) return
+    if (resumeAttemptedThreadIdRef.current === activeThreadId) return
 
-    const generationStatus = getThreadGenerationStatus(threadId)
+    const generationStatus = getThreadGenerationStatus(activeThreadId)
     if (!generationStatus) return
 
     const shouldResume =
       generationStatus === 'pending' || generationStatus === 'generation'
     if (!shouldResume) return
 
-    resumeAttemptedThreadIdRef.current = threadId
+    resumeAttemptedThreadIdRef.current = activeThreadId
     void resumeStream().catch(() => {
       // Resume is best-effort; fall back to Zero snapshot hydration.
     })
-  }, [threadId, threadStatusesVersion, status, resumeStream])
+  }, [activeThreadId, threadStatusesVersion, status, resumeStream])
 
   useEffect(() => {
-    if (!threadId) return
+    if (!activeThreadId) return
     if (storedMessagesResult.type !== 'complete') return
     // Never clobber messages while a new answer is actively streaming.
     if (status === 'submitted' || status === 'streaming') return
@@ -239,7 +254,7 @@ export function ChatProvider({
 
     setMessages(nextMessages)
   }, [
-    threadId,
+    activeThreadId,
     storedMessages,
     storedMessagesResult.type,
     status,
@@ -270,6 +285,9 @@ export function ChatProvider({
 
           resolvedThreadId = await inFlight
           threadIdRef.current = resolvedThreadId
+          flushSync(() => {
+            setProvisionalThreadId(resolvedThreadId)
+          })
           setLocalError(null)
           navigate({
             to: '/chat/$threadId',
@@ -286,7 +304,7 @@ export function ChatProvider({
       }
 
       try {
-        const result = await sendAIMessage(message, options)
+        const result = await sendAIMessageRef.current(message, options)
         createIfMissingRef.current = false
         setLocalError(null)
         return result
@@ -299,7 +317,7 @@ export function ChatProvider({
         throw sendError
       }
     },
-    [navigate, sendAIMessage],
+    [navigate],
   )
 
   const clear = useCallback(() => setMessages([]), [setMessages])

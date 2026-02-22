@@ -55,12 +55,14 @@ export function ChatThread() {
       {messages.map((m) => {
         const isLastUserMessage =
           m.role === 'user' && lastUserMessageId != null && m.id === lastUserMessageId
+        const isAnimatingMessage =
+          isStreaming && lastMessage?.id === m.id && m.role === 'assistant'
         return (
           <div
             key={m.id}
             ref={isLastUserMessage ? lastUserMessageRef : undefined}
           >
-            <ChatMessage message={m} />
+            <ChatMessage message={m} isAnimating={isAnimatingMessage} />
           </div>
         )
       })}
