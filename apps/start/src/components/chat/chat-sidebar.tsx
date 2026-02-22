@@ -1,13 +1,17 @@
 // Chat navigation sidebar with static links + dynamic thread history.
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { useQuery } from '@rocicorp/zero/react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useQuery, useZero } from '@rocicorp/zero/react'
 import { Compass, Globe, Link2, MessageSquare } from 'lucide-react'
 import { isAreaPath } from '@/utils/nav-utils'
 import { SidebarAreaLayout } from '@/components/layout/sidebar/sidebar-area-layout'
-import type { NavItemType, NavSection } from '@/components/layout/sidebar/app-sidebar-nav.config'
+import type {
+  NavItemType,
+  NavSection,
+} from '@/components/layout/sidebar/app-sidebar-nav.config'
 import { queries } from '@/integrations/zero'
+import { CACHE_CHAT_NAV } from '@/integrations/zero/query-cache-policy'
 
 // --- Single source of truth: constants and static content ---
 
@@ -20,6 +24,7 @@ export const isChatPath = (pathname: string) =>
 const CHAT_SIDEBAR_TITLE = 'AI Chat'
 const CHAT_HISTORY_SECTION_NAME = 'Chat History'
 const OPTIMISTIC_THREAD_CREATED_EVENT = 'chat:thread-created'
+const MAX_PRELOADED_THREADS = 100
 
 type OptimisticThread = {
   readonly threadId: string
@@ -52,15 +57,29 @@ export function chatNavStaticConfig() {
 // --- Dynamic content component (uses static config + Zero threads) ---
 
 export function ChatSidebarContent({ pathname }: { pathname: string }) {
-  const [threads] = useQuery(queries.threads.byUser())
-  const [optimisticThreads, setOptimisticThreads] = useState<readonly OptimisticThread[]>([])
+  const z = useZero()
+  const [threads] = useQuery(queries.threads.byUser(), CACHE_CHAT_NAV)
+  const [optimisticThreads, setOptimisticThreads] = useState<
+    readonly OptimisticThread[]
+  >([])
+  const preloadedThreadIdsRef = useRef(new Set<string>())
+
+  useEffect(() => {
+    for (const thread of threads.slice(0, MAX_PRELOADED_THREADS)) {
+      if (preloadedThreadIdsRef.current.has(thread.threadId)) continue
+      z.preload(
+        queries.messages.byThread({ threadId: thread.threadId }),
+        CACHE_CHAT_NAV,
+      )
+      preloadedThreadIdsRef.current.add(thread.threadId)
+    }
+  }, [threads, z])
 
   useEffect(() => {
     const onOptimisticThread = (event: Event) => {
       const custom = event as CustomEvent<OptimisticThread>
       const payload = custom.detail
       if (
-        !payload ||
         typeof payload.threadId !== 'string' ||
         typeof payload.title !== 'string' ||
         typeof payload.createdAt !== 'number'
@@ -77,7 +96,11 @@ export function ChatSidebarContent({ pathname }: { pathname: string }) {
     }
 
     window.addEventListener(OPTIMISTIC_THREAD_CREATED_EVENT, onOptimisticThread)
-    return () => window.removeEventListener(OPTIMISTIC_THREAD_CREATED_EVENT, onOptimisticThread)
+    return () =>
+      window.removeEventListener(
+        OPTIMISTIC_THREAD_CREATED_EVENT,
+        onOptimisticThread,
+      )
   }, [])
 
   const mergedThreads = useMemo(() => {

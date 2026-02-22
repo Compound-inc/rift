@@ -17,6 +17,7 @@ import { useQuery } from '@rocicorp/zero/react'
 import { DefaultChatTransport } from 'ai'
 import type { UIMessage } from 'ai'
 import { queries } from '@/integrations/zero'
+import { CACHE_CHAT_NAV } from '@/integrations/zero/query-cache-policy'
 import type { ChatMessageMetadata } from '@/lib/chat-contracts/message-metadata'
 
 type ChatUIMessage = UIMessage<ChatMessageMetadata>
@@ -126,6 +127,7 @@ export function ChatProvider({
   const [localError, setLocalError] = useState<Error | null>(null)
   const [storedMessages, storedMessagesResult] = useQuery(
     queries.messages.byThread({ threadId: threadId ?? '' }),
+    CACHE_CHAT_NAV,
   )
 
   const transport = useMemo(
