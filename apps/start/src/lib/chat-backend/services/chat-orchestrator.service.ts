@@ -25,6 +25,7 @@ export type ChatOrchestratorServiceShape = {
     readonly threadId: string
     readonly requestId: string
     readonly message: IncomingUserMessage
+    readonly createIfMissing?: boolean
     readonly route: string
   }) => Effect.Effect<Response, ChatDomainError>
 }
@@ -56,19 +57,28 @@ export const ChatOrchestratorLive = Layer.effect(
       threadId,
       requestId,
       message,
+      createIfMissing,
       route,
     }) => {
       const startedAt = Date.now()
       return Effect.gen(function* () {
-
         yield* rateLimit.assertAllowed({ userId, requestId })
-        yield* threads.assertThreadAccess({ userId, threadId, requestId })
+
+        const threadAccess = yield* threads.assertThreadAccess({
+          userId,
+          threadId,
+          requestId,
+          createIfMissing,
+        })
+
         const toolRegistry = yield* tools.resolveForThread({
           threadId,
           userId,
           requestId,
         })
+
         yield* messageStore.appendUserMessage({
+          threadDbId: threadAccess.dbId,
           threadId,
           message,
           userId,
@@ -83,6 +93,7 @@ export const ChatOrchestratorLive = Layer.effect(
         const assistantMessageId = crypto.randomUUID()
         let assistantStarted = false
         let assistantFinalized = false
+        let firstTextChunkSeen = false
         let bufferedAssistantText = ''
 
         const finalizeAssistant = (input: { ok: boolean; errorMessage?: string }) => {
@@ -92,6 +103,8 @@ export const ChatOrchestratorLive = Layer.effect(
           void Effect.runPromise(
             messageStore
               .finalizeAssistantMessage({
+                threadDbId: threadAccess.dbId,
+                threadModel: threadAccess.model,
                 threadId,
                 userId,
                 assistantMessageId,
@@ -133,6 +146,9 @@ export const ChatOrchestratorLive = Layer.effect(
               candidate.type === 'text-delta' &&
               typeof candidate.text === 'string'
             ) {
+              if (!firstTextChunkSeen) {
+                firstTextChunkSeen = true
+              }
               bufferedAssistantText += candidate.text
             }
           },
@@ -174,6 +190,7 @@ export const ChatOrchestratorLive = Layer.effect(
                 void Effect.runPromise(
                   messageStore
                     .startAssistantMessage({
+                      threadDbId: threadAccess.dbId,
                       threadId,
                       userId,
                       assistantMessageId,

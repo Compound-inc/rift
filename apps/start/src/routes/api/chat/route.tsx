@@ -49,13 +49,15 @@ export const Route = createFileRoute('/api/chat')({
           })
 
           const orchestrator = yield* ChatOrchestratorService
-          return yield* orchestrator.streamChat({
+          const response = yield* orchestrator.streamChat({
             userId: user.id,
             threadId: body.threadId,
             requestId,
             message: body.message,
+            createIfMissing: body.createIfMissing,
             route: '/api/chat',
           })
+          return response
         })
 
         try {

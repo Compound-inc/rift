@@ -13,6 +13,7 @@ export type MessageStoreServiceShape = {
     readonly requestId: string
   }) => Effect.Effect<UIMessage[], MessagePersistenceError>
   readonly appendUserMessage: (input: {
+    readonly threadDbId: string
     readonly threadId: string
     readonly message: IncomingUserMessage
     readonly userId: string
@@ -20,6 +21,7 @@ export type MessageStoreServiceShape = {
     readonly requestId: string
   }) => Effect.Effect<UIMessage, MessagePersistenceError>
   readonly startAssistantMessage: (input: {
+    readonly threadDbId: string
     readonly threadId: string
     readonly userId: string
     readonly assistantMessageId: string
@@ -27,6 +29,8 @@ export type MessageStoreServiceShape = {
     readonly requestId: string
   }) => Effect.Effect<void, MessagePersistenceError>
   readonly finalizeAssistantMessage: (input: {
+    readonly threadDbId: string
+    readonly threadModel: string
     readonly threadId: string
     readonly userId: string
     readonly assistantMessageId: string
@@ -81,7 +85,7 @@ export const MessageStoreZero = Layer.succeed(MessageStoreService, {
           cause: String(error),
         }),
     }),
-  appendUserMessage: ({ threadId, message, userId, model, requestId }) =>
+  appendUserMessage: ({ threadDbId, threadId, message, userId, model, requestId }) =>
     Effect.tryPromise({
       try: async () => {
         const db = getZeroDatabase()
@@ -90,13 +94,11 @@ export const MessageStoreZero = Layer.succeed(MessageStoreService, {
         }
 
         const now = Date.now()
-        const existing = await db.run(
-          zql.message.where('messageId', message.id).where('userId', userId).one(),
-        )
-        if (!existing) {
-          await db.transaction(async (tx) => {
+        await db.transaction(async (tx) => {
+          try {
             await tx.mutate.message.insert({
-              id: crypto.randomUUID(),
+              // Deterministic key makes retries naturally idempotent.
+              id: message.id,
               messageId: message.id,
               threadId,
               userId,
@@ -108,17 +110,17 @@ export const MessageStoreZero = Layer.succeed(MessageStoreService, {
               model,
               attachmentsIds: [],
             })
+          } catch {
+            // Duplicate insert on retry; row already exists.
+            return
+          }
 
-            const thread = await tx.run(zql.thread.where('threadId', threadId).one())
-            if (thread) {
-              await tx.mutate.thread.update({
-                id: thread.id,
-                updatedAt: now,
-                lastMessageAt: now,
-              })
-            }
+          await tx.mutate.thread.update({
+            id: threadDbId,
+            updatedAt: now,
+            lastMessageAt: now,
           })
-        }
+        })
 
         return toUserMessage(message)
       },
@@ -130,7 +132,7 @@ export const MessageStoreZero = Layer.succeed(MessageStoreService, {
           cause: String(error),
         }),
     }),
-  startAssistantMessage: ({ threadId, userId, assistantMessageId, model, requestId }) =>
+  startAssistantMessage: ({ threadDbId, threadId, userId, assistantMessageId, model, requestId }) =>
     Effect.tryPromise({
       try: async () => {
         const db = getZeroDatabase()
@@ -139,17 +141,11 @@ export const MessageStoreZero = Layer.succeed(MessageStoreService, {
         }
 
         const now = Date.now()
-        const existing = await db.run(
-          zql.message
-            .where('messageId', assistantMessageId)
-            .where('userId', userId)
-            .one(),
-        )
-        if (existing) return
-
         await db.transaction(async (tx) => {
+          try {
           await tx.mutate.message.insert({
-            id: crypto.randomUUID(),
+            // Deterministic key makes retries naturally idempotent.
+            id: assistantMessageId,
             messageId: assistantMessageId,
             threadId,
             userId,
@@ -161,17 +157,18 @@ export const MessageStoreZero = Layer.succeed(MessageStoreService, {
             model,
             attachmentsIds: [],
           })
-
-          const thread = await tx.run(zql.thread.where('threadId', threadId).one())
-          if (thread) {
-            await tx.mutate.thread.update({
-              id: thread.id,
-              generationStatus: 'generation',
-              updatedAt: now,
-              lastMessageAt: now,
-              model,
-            })
+          } catch {
+            // Duplicate insert on retry; row already exists.
+            return
           }
+
+          await tx.mutate.thread.update({
+            id: threadDbId,
+            generationStatus: 'generation',
+            updatedAt: now,
+            lastMessageAt: now,
+            model,
+          })
         })
       },
       catch: (error) =>
@@ -183,6 +180,8 @@ export const MessageStoreZero = Layer.succeed(MessageStoreService, {
         }),
     }),
   finalizeAssistantMessage: ({
+    threadDbId,
+    threadModel,
     threadId,
     userId,
     assistantMessageId,
@@ -200,10 +199,9 @@ export const MessageStoreZero = Layer.succeed(MessageStoreService, {
 
         const now = Date.now()
         await db.transaction(async (tx) => {
-          const thread = await tx.run(zql.thread.where('threadId', threadId).one())
           const existing = await tx.run(
             zql.message
-              .where('messageId', assistantMessageId)
+              .where('id', assistantMessageId)
               .where('userId', userId)
               .one(),
           )
@@ -230,7 +228,7 @@ export const MessageStoreZero = Layer.succeed(MessageStoreService, {
             }
 
             await tx.mutate.message.update(update)
-          } else if (thread) {
+          } else {
             const insert: {
               id: string
               messageId: string
@@ -245,7 +243,7 @@ export const MessageStoreZero = Layer.succeed(MessageStoreService, {
               attachmentsIds: readonly string[]
               serverError?: { type: string; message: string }
             } = {
-              id: crypto.randomUUID(),
+              id: assistantMessageId,
               messageId: assistantMessageId,
               threadId,
               userId,
@@ -254,7 +252,7 @@ export const MessageStoreZero = Layer.succeed(MessageStoreService, {
               role: 'assistant',
               created_at: now,
               updated_at: now,
-              model: thread.model,
+              model: threadModel,
               attachmentsIds: [],
             }
             if (!ok) {
@@ -266,14 +264,12 @@ export const MessageStoreZero = Layer.succeed(MessageStoreService, {
             await tx.mutate.message.insert(insert)
           }
 
-          if (thread) {
-            await tx.mutate.thread.update({
-              id: thread.id,
-              generationStatus: ok ? 'completed' : 'failed',
-              updatedAt: now,
-              lastMessageAt: now,
-            })
-          }
+          await tx.mutate.thread.update({
+            id: threadDbId,
+            generationStatus: ok ? 'completed' : 'failed',
+            updatedAt: now,
+            lastMessageAt: now,
+          })
         })
       },
       catch: (error) =>

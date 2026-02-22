@@ -16,7 +16,6 @@ import { Route as appLayoutSplatRouteImport } from './routes/(app)/_layout/$'
 import { Route as ApiZeroQueryRouteRouteImport } from './routes/api/zero/query/route'
 import { Route as ApiZeroMutateRouteRouteImport } from './routes/api/zero/mutate/route'
 import { Route as ApiFilesUploadRouteRouteImport } from './routes/api/files/upload/route'
-import { Route as ApiChatThreadsRouteRouteImport } from './routes/api/chat/threads/route'
 import { Route as ApiAuthCallbackRouteRouteImport } from './routes/api/auth/callback/route'
 import { Route as appLayoutWriterRouteRouteImport } from './routes/(app)/_layout/writer/route'
 import { Route as appLayoutSettingsRouteRouteImport } from './routes/(app)/_layout/settings/route'
@@ -59,11 +58,6 @@ const ApiFilesUploadRouteRoute = ApiFilesUploadRouteRouteImport.update({
   id: '/api/files/upload',
   path: '/api/files/upload',
   getParentRoute: () => rootRouteImport,
-} as any)
-const ApiChatThreadsRouteRoute = ApiChatThreadsRouteRouteImport.update({
-  id: '/threads',
-  path: '/threads',
-  getParentRoute: () => ApiChatRouteRoute,
 } as any)
 const ApiAuthCallbackRouteRoute = ApiAuthCallbackRouteRouteImport.update({
   id: '/api/auth/callback',
@@ -109,12 +103,11 @@ const appLayoutChatThreadIdRouteRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
-  '/api/chat': typeof ApiChatRouteRouteWithChildren
+  '/api/chat': typeof ApiChatRouteRoute
   '/chat': typeof appLayoutChatRouteRouteWithChildren
   '/settings': typeof appLayoutSettingsRouteRouteWithChildren
   '/writer': typeof appLayoutWriterRouteRoute
   '/api/auth/callback': typeof ApiAuthCallbackRouteRoute
-  '/api/chat/threads': typeof ApiChatThreadsRouteRoute
   '/api/files/upload': typeof ApiFilesUploadRouteRoute
   '/api/zero/mutate': typeof ApiZeroMutateRouteRoute
   '/api/zero/query': typeof ApiZeroQueryRouteRoute
@@ -126,10 +119,9 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof appLayoutSettingsIndexRoute
 }
 export interface FileRoutesByTo {
-  '/api/chat': typeof ApiChatRouteRouteWithChildren
+  '/api/chat': typeof ApiChatRouteRoute
   '/writer': typeof appLayoutWriterRouteRoute
   '/api/auth/callback': typeof ApiAuthCallbackRouteRoute
-  '/api/chat/threads': typeof ApiChatThreadsRouteRoute
   '/api/files/upload': typeof ApiFilesUploadRouteRoute
   '/api/zero/mutate': typeof ApiZeroMutateRouteRoute
   '/api/zero/query': typeof ApiZeroQueryRouteRoute
@@ -143,12 +135,11 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/(app)/_layout': typeof appLayoutRouteRouteWithChildren
-  '/api/chat': typeof ApiChatRouteRouteWithChildren
+  '/api/chat': typeof ApiChatRouteRoute
   '/(app)/_layout/chat': typeof appLayoutChatRouteRouteWithChildren
   '/(app)/_layout/settings': typeof appLayoutSettingsRouteRouteWithChildren
   '/(app)/_layout/writer': typeof appLayoutWriterRouteRoute
   '/api/auth/callback': typeof ApiAuthCallbackRouteRoute
-  '/api/chat/threads': typeof ApiChatThreadsRouteRoute
   '/api/files/upload': typeof ApiFilesUploadRouteRoute
   '/api/zero/mutate': typeof ApiZeroMutateRouteRoute
   '/api/zero/query': typeof ApiZeroQueryRouteRoute
@@ -167,7 +158,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/writer'
     | '/api/auth/callback'
-    | '/api/chat/threads'
     | '/api/files/upload'
     | '/api/zero/mutate'
     | '/api/zero/query'
@@ -182,7 +172,6 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/writer'
     | '/api/auth/callback'
-    | '/api/chat/threads'
     | '/api/files/upload'
     | '/api/zero/mutate'
     | '/api/zero/query'
@@ -200,7 +189,6 @@ export interface FileRouteTypes {
     | '/(app)/_layout/settings'
     | '/(app)/_layout/writer'
     | '/api/auth/callback'
-    | '/api/chat/threads'
     | '/api/files/upload'
     | '/api/zero/mutate'
     | '/api/zero/query'
@@ -214,7 +202,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   appLayoutRouteRoute: typeof appLayoutRouteRouteWithChildren
-  ApiChatRouteRoute: typeof ApiChatRouteRouteWithChildren
+  ApiChatRouteRoute: typeof ApiChatRouteRoute
   ApiAuthCallbackRouteRoute: typeof ApiAuthCallbackRouteRoute
   ApiFilesUploadRouteRoute: typeof ApiFilesUploadRouteRoute
   ApiZeroMutateRouteRoute: typeof ApiZeroMutateRouteRoute
@@ -271,13 +259,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/files/upload'
       preLoaderRoute: typeof ApiFilesUploadRouteRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/api/chat/threads': {
-      id: '/api/chat/threads'
-      path: '/threads'
-      fullPath: '/api/chat/threads'
-      preLoaderRoute: typeof ApiChatThreadsRouteRouteImport
-      parentRoute: typeof ApiChatRouteRoute
     }
     '/api/auth/callback': {
       id: '/api/auth/callback'
@@ -387,21 +368,9 @@ const appLayoutRouteRouteWithChildren = appLayoutRouteRoute._addFileChildren(
   appLayoutRouteRouteChildren,
 )
 
-interface ApiChatRouteRouteChildren {
-  ApiChatThreadsRouteRoute: typeof ApiChatThreadsRouteRoute
-}
-
-const ApiChatRouteRouteChildren: ApiChatRouteRouteChildren = {
-  ApiChatThreadsRouteRoute: ApiChatThreadsRouteRoute,
-}
-
-const ApiChatRouteRouteWithChildren = ApiChatRouteRoute._addFileChildren(
-  ApiChatRouteRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   appLayoutRouteRoute: appLayoutRouteRouteWithChildren,
-  ApiChatRouteRoute: ApiChatRouteRouteWithChildren,
+  ApiChatRouteRoute: ApiChatRouteRoute,
   ApiAuthCallbackRouteRoute: ApiAuthCallbackRouteRoute,
   ApiFilesUploadRouteRoute: ApiFilesUploadRouteRoute,
   ApiZeroMutateRouteRoute: ApiZeroMutateRouteRoute,

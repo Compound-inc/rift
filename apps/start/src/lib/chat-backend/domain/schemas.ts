@@ -18,6 +18,7 @@ export type IncomingUserMessage = Schema.Schema.Type<typeof IncomingUserMessage>
 export const ChatStreamRequest = Schema.Struct({
   threadId: Schema.String,
   message: IncomingUserMessage,
+  createIfMissing: Schema.optional(Schema.Boolean),
 })
 
 export type ChatStreamRequest = Schema.Schema.Type<typeof ChatStreamRequest>

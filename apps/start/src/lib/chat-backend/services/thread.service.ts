@@ -23,8 +23,14 @@ export type ThreadServiceShape = {
     readonly userId: string
     readonly threadId: string
     readonly requestId: string
+    readonly createIfMissing?: boolean
   }) => Effect.Effect<
-    void,
+    {
+      readonly dbId: string
+      readonly threadId: string
+      readonly userId: string
+      readonly model: string
+    },
     ThreadNotFoundError | ThreadForbiddenError | MessagePersistenceError
   >
 }
@@ -77,7 +83,7 @@ export const ThreadServiceZero = Layer.succeed(ThreadService, {
           cause: String(error),
         }),
     }),
-  assertThreadAccess: ({ userId, threadId, requestId }) =>
+  assertThreadAccess: ({ userId, threadId, requestId, createIfMissing }) =>
     Effect.tryPromise({
       try: async () => {
         const db = getZeroDatabase()
@@ -85,13 +91,43 @@ export const ThreadServiceZero = Layer.succeed(ThreadService, {
           throw new Error('ZERO_UPSTREAM_DB is not configured')
         }
 
-        const thread = await db.run(zql.thread.where('threadId', threadId).one())
+        const now = Date.now()
+        let thread = await db.run(zql.thread.where('threadId', threadId).one())
         if (!thread) {
-          throw new ThreadNotFoundError({
-            message: 'Thread not found',
-            requestId,
-            threadId,
-          })
+          if (!createIfMissing) {
+            throw new ThreadNotFoundError({
+              message: 'Thread not found',
+              requestId,
+              threadId,
+            })
+          }
+
+          try {
+            await db.transaction(async (tx) => {
+              await tx.mutate.thread.insert({
+                id: threadId,
+                threadId,
+                title: 'Nuevo Chat',
+                createdAt: now,
+                updatedAt: now,
+                lastMessageAt: now,
+                generationStatus: 'pending',
+                visibility: 'visible',
+                userSetTitle: false,
+                userId,
+                model: DEFAULT_THREAD_MODEL,
+                pinned: false,
+                allowAttachments: true,
+              })
+            })
+          } catch {
+            // Another writer may have created this thread concurrently.
+          }
+
+          thread = await db.run(zql.thread.where('threadId', threadId).one())
+          if (!thread) {
+            throw new Error('Thread was not created')
+          }
         }
 
         if (thread.userId !== userId) {
@@ -101,6 +137,13 @@ export const ThreadServiceZero = Layer.succeed(ThreadService, {
             threadId,
             userId,
           })
+        }
+
+        return {
+          dbId: thread.id,
+          threadId: thread.threadId,
+          userId: thread.userId,
+          model: thread.model,
         }
       },
       catch: (error) => {
@@ -133,13 +176,25 @@ export const ThreadServiceMemory = Layer.succeed(ThreadService, {
       getMemoryState().messages.set(threadId, [])
       return { threadId, createdAt: now }
     }),
-  assertThreadAccess: ({ userId, threadId, requestId }) =>
+  assertThreadAccess: ({ userId, threadId, requestId, createIfMissing }) =>
     Effect.gen(function* () {
-      const thread = getMemoryState().threads.get(threadId)
+      let thread = getMemoryState().threads.get(threadId)
       if (!thread) {
-        return yield* Effect.fail(
-          new ThreadNotFoundError({ message: 'Thread not found', requestId, threadId }),
-        )
+        if (!createIfMissing) {
+          return yield* Effect.fail(
+            new ThreadNotFoundError({ message: 'Thread not found', requestId, threadId }),
+          )
+        }
+        const now = Date.now()
+        const created = {
+          threadId,
+          userId,
+          createdAt: now,
+          updatedAt: now,
+        }
+        getMemoryState().threads.set(threadId, created)
+        getMemoryState().messages.set(threadId, [])
+        thread = created
       }
       if (thread.userId !== userId) {
         return yield* Effect.fail(
@@ -151,6 +206,11 @@ export const ThreadServiceMemory = Layer.succeed(ThreadService, {
           }),
         )
       }
-      return undefined
+      return {
+        dbId: thread.threadId,
+        threadId: thread.threadId,
+        userId: thread.userId,
+        model: DEFAULT_THREAD_MODEL,
+      }
     }),
 })
