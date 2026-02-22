@@ -22,7 +22,7 @@ const buttonVariants = cva(
         sidebarIcon:
           "focus-visible:ring-2 focus-visible:ring-border-emphasis/50 data-[active=true]:bg-bg-default data-[active=true]:hover:bg-bg-default data-[active=true]:active:bg-bg-default",
         sidebarNavItem:
-          "flex h-8 w-full items-center justify-between rounded-lg p-2 text-sm leading-none font-normal text-content-default outline-none transition-[background-color,color,font-weight] duration-75 focus-visible:ring-2 focus-visible:ring-border-emphasis hover:bg-bg-inverted/5 active:bg-bg-inverted/10 data-[active=true]:bg-bg-info/25 data-[active=true]:font-medium data-[active=true]:text-content-info data-[active=true]:hover:bg-bg-info/45 data-[active=true]:active:bg-bg-info/75",
+          "flex h-8 w-full items-center justify-between rounded-lg p-2 text-sm leading-none font-normal text-content-default outline-none transition-[background-color,color,font-weight] duration-0 active:duration-75 focus-visible:ring-2 focus-visible:ring-border-emphasis hover:bg-bg-inverted/5 active:bg-bg-inverted/10 data-[active=true]:bg-bg-info/25 data-[active=true]:font-medium data-[active=true]:text-content-info data-[active=true]:hover:bg-bg-info/45 data-[active=true]:active:bg-bg-info/75",
       },
       size: {
         default:

@@ -4,9 +4,6 @@ import { useChat } from './chat-context'
 import { ChatMessage } from './chat-message'
 import { usePinToLastUserMessage } from '@rift/chat-scroll'
 
-/** Space reserved for the fixed prompt at the bottom (match Orchid). */
-const BOTTOM_PADDING_PX = 164
-
 export function ChatThread() {
   const { messages, status } = useChat()
   const sorted = useMemo(() => messages.slice(), [messages])
@@ -32,7 +29,6 @@ export function ChatThread() {
     lastUserMessageId,
     messages: sorted,
     status,
-    bottomPaddingPx: BOTTOM_PADDING_PX,
   })
 
   const isStreaming = status === 'submitted' || status === 'streaming'
@@ -42,7 +38,6 @@ export function ChatThread() {
   return (
     <div
       className="mx-auto w-full max-w-2xl flex flex-col pt-9"
-      style={{ paddingBottom: BOTTOM_PADDING_PX }}
       role="log"
       aria-live="polite"
       aria-label="Chat messages"
