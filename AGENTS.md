@@ -44,3 +44,8 @@ Run from repo root unless noted.
 ## Security & Configuration Tips
 - Keep secrets in local env files (for example `.env.local`); never commit credentials.
 - `turbo.json` passes through deployment/env keys (Convex, WorkOS, Sentry, Redis). Document any new required variables in your PR.
+
+## Comments in code
+- You need to add comprehensive documentation for the code you write, so future devs and underestend the code with ease
+- DO NOT abuse comments and a way to "respond" to user question or request, they need to be real informatives
+- DO NOT spam comments for irelevant code 
