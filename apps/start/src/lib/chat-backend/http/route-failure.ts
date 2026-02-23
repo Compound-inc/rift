@@ -1,5 +1,6 @@
 import { Effect } from 'effect'
 import { ChatErrorCode } from '../domain/error-codes'
+import { toReadableErrorMessage } from '../domain/error-formatting'
 import { getChatErrorMessage } from '../domain/error-messages'
 import { emitWideErrorEvent, getErrorTag } from '../observability/wide-event'
 import { jsonResponse, toErrorResponse } from './error-response'
@@ -21,6 +22,7 @@ export type RouteFailureInput = {
 export async function handleRouteFailure(input: RouteFailureInput): Promise<Response> {
   const { error, requestId, route, eventName, userId, defaultMessage } = input
   const errorTag = getErrorTag(error)
+  const readableMessage = toReadableErrorMessage(error, defaultMessage)
   const isTaggedDomainError =
     typeof error === 'object' &&
     error !== null &&
@@ -37,7 +39,7 @@ export async function handleRouteFailure(input: RouteFailureInput): Promise<Resp
         userId,
         errorCode: undefined,
         errorTag,
-        message: error instanceof Error ? error.message : String(error),
+        message: readableMessage,
       }),
     )
   }
@@ -59,7 +61,7 @@ export async function handleRouteFailure(input: RouteFailureInput): Promise<Resp
     requestId,
     details: {
       tag: errorTag,
-      message: error instanceof Error ? error.message : String(error),
+      message: readableMessage,
     },
   }
 

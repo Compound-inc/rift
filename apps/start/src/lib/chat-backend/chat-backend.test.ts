@@ -4,6 +4,7 @@ import type { UIMessage } from 'ai'
 import { Effect, Layer } from 'effect'
 import { RateLimitExceededError } from '@/lib/chat-backend/domain/errors'
 import { ChatErrorCode } from '@/lib/chat-backend/domain/error-codes'
+import { toReadableErrorMessage } from '@/lib/chat-backend/domain/error-formatting'
 import { getMemoryState } from '@/lib/chat-backend/infra/memory/state'
 import { toErrorResponse } from '@/lib/chat-backend/http/error-response'
 import { ChatOrchestratorLive, ChatOrchestratorService } from '@/lib/chat-backend/services/chat-orchestrator.service'
@@ -130,6 +131,41 @@ describe('chat-backend scaffold', () => {
     expect(payload.error.message).toBe('Too many requests. Please wait a moment and retry.')
     expect(payload.requestId).toBe('req-rate')
     expect(payload.error.retryable).toBe(true)
+  })
+
+  it('normalizes nested gateway beta-flag errors into readable copy', () => {
+    const error = {
+      message: '[object Object]',
+      responseBody: JSON.stringify({
+        error: {
+          message:
+            'undefined: The model returned the following errors: invalid beta flag',
+        },
+        providerMetadata: {
+          gateway: {
+            routing: {
+              attempts: [
+                {
+                  provider: 'vertexAnthropic',
+                  error:
+                    'Unexpected value(s) `web-fetch-2025-09-10` for the `anthropic-beta` header.',
+                },
+              ],
+            },
+          },
+        },
+      }),
+    }
+
+    const readable = toReadableErrorMessage(error, 'fallback')
+    expect(readable).toBe(
+      'The request was rejected because an unsupported Anthropic beta flag was sent.',
+    )
+  })
+
+  it('falls back when the source error is not human-readable', () => {
+    const readable = toReadableErrorMessage('[object Object]', 'fallback message')
+    expect(readable).toBe('fallback message')
   })
 
   it('enforces deterministic in-memory rate limiting', async () => {

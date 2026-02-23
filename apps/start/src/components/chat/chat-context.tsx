@@ -294,6 +294,9 @@ export function ChatProvider({
   } = useAIChat<ChatUIMessage>({
     id: activeThreadId ? `chat-ui:${activeThreadId}` : 'chat-ui:composer',
     transport,
+    onError: (chatError) => {
+      setLocalError(chatError)
+    },
   })
   const sendAIMessageRef = useRef(sendAIMessage)
   sendAIMessageRef.current = sendAIMessage

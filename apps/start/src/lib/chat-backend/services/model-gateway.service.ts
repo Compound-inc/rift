@@ -2,6 +2,7 @@ import { convertToModelMessages, streamText } from 'ai'
 import type { UIMessage } from 'ai'
 import type { ToolSet } from 'ai'
 import { Effect, Layer, ServiceMap } from 'effect'
+import { toReadableErrorCause, toReadableErrorMessage } from '../domain/error-formatting'
 import { ModelProviderError } from '../domain/errors'
 
 /**
@@ -82,13 +83,21 @@ export const ModelGatewayLive = Layer.succeed(ModelGatewayService, {
                 onChunk(chunk)
               }
             : undefined,
+          // AI SDK defaults to `console.error` for stream errors; we disable that
+          // because chat-orchestrator emits structured, normalized wide events.
+          onError: () => {},
         }) as unknown as ModelStreamResult
       },
-      catch: (error) =>
-        new ModelProviderError({
-          message: 'Model provider failed to start stream',
+      catch: (error) => {
+        const message = toReadableErrorMessage(
+          error,
+          'Model provider failed to start stream',
+        )
+        return new ModelProviderError({
+          message,
           requestId,
-          cause: String(error),
-        }),
+          cause: toReadableErrorCause(error),
+        })
+      },
     }),
 })

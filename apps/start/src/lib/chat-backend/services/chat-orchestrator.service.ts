@@ -2,6 +2,7 @@ import type { UIMessage } from 'ai'
 import { Effect, Layer, ServiceMap } from 'effect'
 import type { ChatDomainError } from '../domain/errors'
 import { chatErrorCodeFromTag } from '../domain/error-codes'
+import { toReadableErrorMessage } from '../domain/error-formatting'
 import type { IncomingUserMessage } from '../domain/schemas'
 import { getUserMessageText } from '../domain/schemas'
 import {
@@ -45,58 +46,6 @@ export class ChatOrchestratorService extends ServiceMap.Service<
   ChatOrchestratorService,
   ChatOrchestratorServiceShape
 >()('chat-backend/ChatOrchestratorService') {}
-
-function getStreamErrorMessage(error: unknown): string {
-  const visited = new Set<unknown>()
-
-  const visit = (value: unknown): string | undefined => {
-    if (value == null) return undefined
-    if (visited.has(value)) return undefined
-    if (typeof value === 'object') visited.add(value)
-
-    if (typeof value === 'string') {
-      const trimmed = value.trim()
-      return trimmed.length > 0 ? trimmed : undefined
-    }
-
-    if (value instanceof Error) {
-      if (value.message && value.message !== '[object Object]') {
-        return value.message
-      }
-    }
-
-    if (typeof value !== 'object') return undefined
-
-    const record = value as Record<string, unknown>
-
-    if (typeof record.message === 'string' && record.message !== '[object Object]') {
-      return record.message
-    }
-
-    if (typeof record.responseBody === 'string') {
-      try {
-        const parsed = JSON.parse(record.responseBody) as Record<string, unknown>
-        const parsedMessage = visit(parsed)
-        if (parsedMessage) return parsedMessage
-      } catch {
-        // ignore parse errors
-      }
-    }
-
-    const nestedKeys = ['error', 'data', 'param', 'cause'] as const
-    for (const key of nestedKeys) {
-      const nestedMessage = visit(record[key])
-      if (nestedMessage) return nestedMessage
-    }
-
-    return undefined
-  }
-
-  return (
-    visit(error) ??
-    'The assistant response failed while streaming. Please retry.'
-  )
-}
 
 /** Live orchestration implementation used by API routes. */
 export const ChatOrchestratorLive = Layer.effect(
@@ -242,6 +191,9 @@ export const ChatOrchestratorLive = Layer.effect(
         let assistantFinalized = false
         let streamCleanedUp = false
         let bufferedAssistantText = ''
+        let transportErrorHandled = false
+        const defaultStreamFailureMessage =
+          'The assistant response failed while streaming. Please retry.'
 
         const cleanupActiveStream = () => {
           if (streamCleanedUp) return
@@ -375,10 +327,20 @@ export const ChatOrchestratorLive = Layer.effect(
             )
           },
           onError: (error: unknown) => {
-            const errorMessage = getStreamErrorMessage(error)
+            // The AI SDK can invoke stream error hooks more than once for the same
+            // transport failure. We only persist/log once per request.
+            if (transportErrorHandled) {
+              return defaultStreamFailureMessage
+            }
+            transportErrorHandled = true
+
+            const readableMessage = toReadableErrorMessage(
+              error,
+              defaultStreamFailureMessage,
+            )
             finalizeAssistant({
               ok: false,
-              errorMessage,
+              errorMessage: readableMessage,
             })
             cleanupActiveStream()
 
@@ -393,13 +355,13 @@ export const ChatOrchestratorLive = Layer.effect(
                 model: modelResolution.modelId,
                 errorCode: chatErrorCodeFromTag(getErrorTag(error)),
                 errorTag: getErrorTag(error),
-                message: errorMessage,
+                message: readableMessage,
                 latencyMs: Date.now() - startedAt,
                 retryable: true,
               }),
             )
 
-            return errorMessage
+            return readableMessage
           },
           messageMetadata: ({ part }: { part: any }) => {
             // Metadata is attached only for lifecycle events consumed by the client.
