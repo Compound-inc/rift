@@ -52,6 +52,7 @@
   "devDependencies": {
     "@tanstack/devtools-vite": "^0.3.11",
     "@tanstack/eslint-config": "^0.3.0",
+    "@tanstack/router-cli": "^1.162.2",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.2.0",
     "@types/node": "^22.10.2",

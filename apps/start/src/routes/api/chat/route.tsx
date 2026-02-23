@@ -20,7 +20,8 @@ export const Route = createFileRoute('/api/chat')({
         const authPromise = getAuth()
 
         const program = Effect.gen(function* () {
-          const { user } = yield* Effect.promise(() => authPromise)
+          const auth = yield* Effect.promise(() => authPromise)
+          const { user } = auth
           if (!user) {
             return yield* Effect.fail(
               new UnauthorizedError({
@@ -78,7 +79,8 @@ export const Route = createFileRoute('/api/chat')({
 
         // Build the Effect program so auth + validation + streaming are consistently handled.
         const program = Effect.gen(function* () {
-          const { user } = yield* Effect.promise(() => authPromise)
+          const auth = yield* Effect.promise(() => authPromise)
+          const { user } = auth
           if (!user) {
             return yield* Effect.fail(
               new UnauthorizedError({
@@ -108,9 +110,14 @@ export const Route = createFileRoute('/api/chat')({
           })
 
           const orchestrator = yield* ChatOrchestratorService
+          const orgWorkosId =
+            'organizationId' in auth && typeof auth.organizationId === 'string'
+              ? auth.organizationId
+              : undefined
           const response = yield* orchestrator.streamChat({
             userId: user.id,
             threadId: body.threadId,
+            orgWorkosId,
             requestId,
             message: body.message,
             createIfMissing: body.createIfMissing,

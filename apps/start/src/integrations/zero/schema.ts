@@ -36,6 +36,20 @@ const organization = table('organization')
   })
   .primaryKey('id')
 
+const orgAiPolicy = table('orgAiPolicy')
+  .from('org_ai_policy')
+  .columns({
+    id: string(),
+    orgWorkosId: string().from('org_workos_id'),
+    disabledProviderIds: json<readonly string[]>()
+      .from('disabled_provider_ids'),
+    disabledModelIds: json<readonly string[]>().from('disabled_model_ids'),
+    complianceFlags: json<Record<string, boolean>>().from('compliance_flags'),
+    version: number(),
+    updatedAt: number().from('updated_at'),
+  })
+  .primaryKey('id')
+
 const thread = table('thread')
   .from('threads')
   .columns({
@@ -145,7 +159,7 @@ const messageRelationships = relationships(message, ({ one }) => ({
 // ---------------------------------------------------------------------------
 
 export const schema = createSchema({
-  tables: [user, organization, thread, message],
+  tables: [user, organization, orgAiPolicy, thread, message],
   relationships: [threadRelationships, messageRelationships],
 })
 

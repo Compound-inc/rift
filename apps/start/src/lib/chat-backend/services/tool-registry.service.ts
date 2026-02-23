@@ -1,8 +1,7 @@
 import { Effect, Layer, ServiceMap } from 'effect'
 
-// Tool registry returns model + enabled tools for a given thread/user.
+// Tool registry returns enabled tools for a given thread/user.
 export type ToolRegistryResult = {
-  readonly model: string
   readonly tools: Record<string, never>
 }
 
@@ -19,10 +18,16 @@ export class ToolRegistryService extends ServiceMap.Service<
   ToolRegistryServiceShape
 >()('chat-backend/ToolRegistryService') {}
 
+export const ToolRegistryLive = Layer.succeed(ToolRegistryService, {
+  resolveForThread: () =>
+    Effect.succeed({
+      tools: {},
+    }),
+})
+
 export const ToolRegistryMemory = Layer.succeed(ToolRegistryService, {
   resolveForThread: () =>
     Effect.succeed({
-      model: 'gpt-4o-mini',
       tools: {},
     }),
 })

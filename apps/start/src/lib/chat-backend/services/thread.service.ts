@@ -1,5 +1,6 @@
 import { Effect, Layer, ServiceMap } from 'effect'
 import { generateText } from 'ai'
+import { CHAT_FIXED_MODEL_ID } from '@/lib/ai-catalog'
 import {
   MessagePersistenceError,
   ThreadForbiddenError,
@@ -47,7 +48,7 @@ export class ThreadService extends ServiceMap.Service<
   ThreadServiceShape
 >()('chat-backend/ThreadService') {}
 
-const DEFAULT_THREAD_MODEL = 'gpt-4o-mini'
+const DEFAULT_THREAD_MODEL = CHAT_FIXED_MODEL_ID
 const DEFAULT_THREAD_TITLE = 'Nuevo Chat'
 const MAX_USER_MESSAGE_LENGTH = 200
 const MAX_TITLE_WORDS = 8
@@ -207,8 +208,11 @@ export const ThreadServiceZero = Layer.succeed(ThreadService, {
         if (thread.title !== DEFAULT_THREAD_TITLE) return
 
         const { openai } = await import('@ai-sdk/openai')
+        const titleModel = DEFAULT_THREAD_MODEL.startsWith('openai/')
+          ? DEFAULT_THREAD_MODEL.slice('openai/'.length)
+          : DEFAULT_THREAD_MODEL
         const generation = await generateText({
-          model: openai(DEFAULT_THREAD_MODEL),
+          model: openai(titleModel),
           prompt: `You are an expert title generator. You are given a message and you need to generate a short title based on it.
 - you will generate a short 3-4 words title based on the first message a user begins a conversation with
 - the title should creative and unique

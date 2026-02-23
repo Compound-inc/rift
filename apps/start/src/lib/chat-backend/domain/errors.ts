@@ -55,6 +55,16 @@ export class ModelProviderError extends Schema.TaggedErrorClass<ModelProviderErr
   },
 ) {}
 
+export class ModelPolicyDeniedError extends Schema.TaggedErrorClass<ModelPolicyDeniedError>()(
+  'ModelPolicyDeniedError',
+  {
+    ...ErrorFields,
+    modelId: Schema.String,
+    threadId: Schema.String,
+    reason: Schema.String,
+  },
+) {}
+
 export class ToolExecutionError extends Schema.TaggedErrorClass<ToolExecutionError>()(
   'ToolExecutionError',
   {
@@ -88,6 +98,7 @@ export type ChatDomainError =
   | ThreadForbiddenError
   | RateLimitExceededError
   | ModelProviderError
+  | ModelPolicyDeniedError
   | ToolExecutionError
   | MessagePersistenceError
   | StreamProtocolError

@@ -10,6 +10,7 @@ import {
 } from '../observability/wide-event'
 import { MessageStoreService } from './message-store.service'
 import { ModelGatewayService } from './model-gateway.service'
+import { ModelPolicyService } from './model-policy.service'
 import { RateLimitService } from './rate-limit.service'
 import { StreamResumeService } from './stream-resume.service'
 import { ThreadService } from './thread.service'
@@ -25,6 +26,7 @@ export type ChatOrchestratorServiceShape = {
   readonly streamChat: (input: {
     readonly userId: string
     readonly threadId: string
+    readonly orgWorkosId?: string
     readonly requestId: string
     readonly message: IncomingUserMessage
     readonly createIfMissing?: boolean
@@ -44,6 +46,7 @@ export const ChatOrchestratorLive = Layer.effect(
     const messageStore = yield* MessageStoreService
     const rateLimit = yield* RateLimitService
     const modelGateway = yield* ModelGatewayService
+    const modelPolicy = yield* ModelPolicyService
     const streamResume = yield* StreamResumeService
     const tools = yield* ToolRegistryService
 
@@ -58,6 +61,7 @@ export const ChatOrchestratorLive = Layer.effect(
     const streamChat: ChatOrchestratorServiceShape['streamChat'] = ({
       userId,
       threadId,
+      orgWorkosId,
       requestId,
       message,
       createIfMissing,
@@ -111,6 +115,11 @@ export const ChatOrchestratorLive = Layer.effect(
           userId,
           requestId,
         })
+        const modelResolution = yield* modelPolicy.resolveThreadModel({
+          threadId,
+          orgWorkosId,
+          requestId,
+        })
 
         const existingStreamId = yield* streamResume.getActiveStreamId({
           userId,
@@ -146,7 +155,7 @@ export const ChatOrchestratorLive = Layer.effect(
           threadId,
           message,
           userId,
-          model: toolRegistry.model,
+          model: modelResolution.modelId,
           requestId,
         })
 
@@ -183,7 +192,7 @@ export const ChatOrchestratorLive = Layer.effect(
                   requestId,
                   userId,
                   threadId,
-                  model: toolRegistry.model,
+                  model: modelResolution.modelId,
                   errorCode: chatErrorCodeFromTag(error._tag),
                   errorTag: error._tag,
                   message: error.message,
@@ -202,7 +211,7 @@ export const ChatOrchestratorLive = Layer.effect(
             messageStore
               .finalizeAssistantMessage({
                 threadDbId: threadAccess.dbId,
-                threadModel: threadAccess.model,
+                threadModel: modelResolution.modelId,
                 threadId,
                 userId,
                 assistantMessageId,
@@ -219,7 +228,7 @@ export const ChatOrchestratorLive = Layer.effect(
                     requestId,
                     userId,
                     threadId,
-                    model: toolRegistry.model,
+                    model: modelResolution.modelId,
                     errorCode: chatErrorCodeFromTag(error._tag),
                     errorTag: error._tag,
                     message: error.message,
@@ -233,7 +242,7 @@ export const ChatOrchestratorLive = Layer.effect(
 
         const result = yield* modelGateway.streamResponse({
           messages,
-          model: toolRegistry.model,
+          model: modelResolution.modelId,
           requestId,
           tools: toolRegistry.tools,
           abortSignal: streamAbortController.signal,
@@ -264,7 +273,7 @@ export const ChatOrchestratorLive = Layer.effect(
                       requestId,
                       userId,
                       threadId,
-                      model: toolRegistry.model,
+                      model: modelResolution.modelId,
                       errorCode: chatErrorCodeFromTag(error._tag),
                       errorTag: error._tag,
                       message: error.message,
@@ -289,7 +298,7 @@ export const ChatOrchestratorLive = Layer.effect(
                 requestId,
                 userId,
                 threadId,
-                model: toolRegistry.model,
+                model: modelResolution.modelId,
                 errorCode: chatErrorCodeFromTag(getErrorTag(error)),
                 errorTag: getErrorTag(error),
                 message: error instanceof Error ? error.message : String(error),
@@ -305,7 +314,8 @@ export const ChatOrchestratorLive = Layer.effect(
               return {
                 threadId,
                 requestId,
-                model: toolRegistry.model,
+                model: modelResolution.modelId,
+                modelSource: modelResolution.source,
                 startedAt,
               }
             }
@@ -313,7 +323,8 @@ export const ChatOrchestratorLive = Layer.effect(
               return {
                 threadId,
                 requestId,
-                model: toolRegistry.model,
+                model: modelResolution.modelId,
+                modelSource: modelResolution.source,
                 completedAt: Date.now(),
                 totalTokens: part.totalUsage.totalTokens,
               }

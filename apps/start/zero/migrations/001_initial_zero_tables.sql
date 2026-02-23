@@ -1,7 +1,7 @@
 -- Zero upstream tables (run against ZERO_UPSTREAM_DB).
 -- Zero syncs these via logical replication; zero-cache uses ZERO_APP_PUBLICATIONS
 -- (default: all tables in public schema) or create a publication, e.g.:
---   CREATE PUBLICATION zero_data FOR TABLE users, organizations, threads, messages;
+--   CREATE PUBLICATION zero_data FOR TABLE users, organizations, threads, messages, org_ai_policy;
 
 -- users (mirrors Convex users)
 CREATE TABLE IF NOT EXISTS users (

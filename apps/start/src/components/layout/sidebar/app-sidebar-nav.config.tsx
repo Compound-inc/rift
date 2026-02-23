@@ -1,5 +1,10 @@
 import { CHAT_AREA_KEY, chatNavArea, isChatPath } from '@/components/chat'
 import {
+  isOrgSettingsPath,
+  orgSettingsNavArea,
+  ORG_SETTINGS_AREA_KEY,
+} from '@/routes/(app)/_layout/org-settings/-org-settings-nav'
+import {
   isSettingsPath,
   settingsNavArea,
   SETTINGS_AREA_KEY,
@@ -53,6 +58,7 @@ export type SidebarNavAreas = Record<
 >
 
 export const NAV_AREAS: SidebarNavAreas = {
+  [ORG_SETTINGS_AREA_KEY]: orgSettingsNavArea,
   [CHAT_AREA_KEY]: chatNavArea,
   [WRITER_AREA_KEY]: writerNavArea,
   [SETTINGS_AREA_KEY]: settingsNavArea,
@@ -64,6 +70,7 @@ export { SETTINGS_AREA_KEY }
  * Resolve current area from pathname.
  */
 export function getCurrentArea(pathname: string): string | null {
+  if (isOrgSettingsPath(pathname)) return ORG_SETTINGS_AREA_KEY
   if (isWriterPath(pathname)) return WRITER_AREA_KEY
   if (isSettingsPath(pathname)) return SETTINGS_AREA_KEY
   if (isChatPath(pathname)) return CHAT_AREA_KEY

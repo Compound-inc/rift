@@ -7,6 +7,7 @@ export const ChatErrorCode = {
   InvalidRequest: 'error_chat_invalid_request',
   ThreadNotFound: 'error_chat_thread_not_found',
   ThreadForbidden: 'error_chat_thread_forbidden',
+  ModelNotAllowed: 'error_chat_model_not_allowed',
   RateLimited: 'error_chat_rate_limited',
   ProviderUnavailable: 'error_chat_provider_unavailable',
   ToolFailed: 'error_chat_tool_failed',
@@ -30,6 +31,8 @@ export function chatErrorCodeFromTag(tag: string): ChatErrorCode {
       return ChatErrorCode.ThreadNotFound
     case 'ThreadForbiddenError':
       return ChatErrorCode.ThreadForbidden
+    case 'ModelPolicyDeniedError':
+      return ChatErrorCode.ModelNotAllowed
     case 'RateLimitExceededError':
       return ChatErrorCode.RateLimited
     case 'ModelProviderError':

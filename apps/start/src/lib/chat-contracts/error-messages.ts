@@ -10,6 +10,7 @@ export const chatErrorMessages: Record<TChatErrorCode, string> = {
   [ChatErrorCode.InvalidRequest]: 'Your request was invalid. Please refresh and retry.',
   [ChatErrorCode.ThreadNotFound]: 'This chat thread could not be found.',
   [ChatErrorCode.ThreadForbidden]: 'You do not have access to this chat thread.',
+  [ChatErrorCode.ModelNotAllowed]: 'The selected AI model is not allowed for your organization.',
   [ChatErrorCode.RateLimited]: 'Too many requests. Please wait a moment and retry.',
   [ChatErrorCode.ProviderUnavailable]: 'The AI provider is currently unavailable. Please retry.',
   [ChatErrorCode.ToolFailed]: 'A tool failed while processing your request.',

@@ -46,8 +46,11 @@ export const ModelGatewayLive = Layer.succeed(ModelGatewayService, {
         // Dynamic import keeps server-only dependency out of client bundles.
         const { openai } = await import('@ai-sdk/openai')
         const modelMessages = await convertToModelMessages(messages)
+        const runtimeModel = model.startsWith('openai/')
+          ? model.slice('openai/'.length)
+          : model
         return streamText({
-          model: openai(model),
+          model: openai(runtimeModel),
           system: SYSTEM_PROMPT,
           messages: modelMessages,
           tools,

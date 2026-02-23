@@ -75,6 +75,8 @@ function statusForTag(tag: string): number {
       return 404
     case 'ThreadForbiddenError':
       return 403
+    case 'ModelPolicyDeniedError':
+      return 403
     case 'RateLimitExceededError':
       return 429
     case 'ModelProviderError':

@@ -6,6 +6,7 @@ export type ChatMessageMetadata = {
   readonly threadId?: string
   readonly requestId?: string
   readonly model?: string
+  readonly modelSource?: 'fixed'
   readonly startedAt?: number
   readonly completedAt?: number
   readonly totalTokens?: number

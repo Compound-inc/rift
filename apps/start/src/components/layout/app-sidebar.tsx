@@ -5,6 +5,10 @@ import {
 } from '@/components/layout/sidebar/app-sidebar-nav.config'
 import { SidebarAreaPanel } from '@/components/layout/sidebar/sidebar-area-panel'
 import { SETTINGS_AREA_KEY } from '@/components/layout/sidebar/app-sidebar-nav.config'
+import {
+  ORG_SETTINGS_AREA_KEY,
+  ORG_SETTINGS_HREF,
+} from '@/routes/(app)/_layout/org-settings/-org-settings-nav'
 import { UserProfileAvatar } from '@/components/layout/user-profile-avatar'
 import { Avatar, AvatarFallback } from '@rift/ui/avatar'
 import { Button } from '@rift/ui/button'
@@ -45,13 +49,28 @@ export const AppSidebar: ComponentType = () => {
       <nav className="flex size-full flex-col items-center justify-between p-2">
         <div className="flex flex-col items-center gap-3">
             <div className="pb-1 pt-2" />
-            <Button variant="sidebarIcon" size="iconSidebar" aria-label="Workspace">
-              <Avatar size="xs">
-                <AvatarFallback />
-              </Avatar>
-            </Button>
+            <SidebarGroupTooltip
+              name="Organization"
+              description="Organization-level settings and controls."
+            >
+              <Button
+                asChild
+                variant="sidebarIcon"
+                size="iconSidebar"
+                data-active={currentArea === ORG_SETTINGS_AREA_KEY}
+              >
+                <Link to={ORG_SETTINGS_HREF} aria-label="Organization settings">
+                  <Avatar size="xs">
+                    <AvatarFallback />
+                  </Avatar>
+                </Link>
+              </Button>
+            </SidebarGroupTooltip>
             {Object.entries(NAV_AREAS)
-              .filter(([key]) => key !== SETTINGS_AREA_KEY)
+              .filter(
+                ([key]) =>
+                  key !== SETTINGS_AREA_KEY && key !== ORG_SETTINGS_AREA_KEY,
+              )
               .map(([areaKey, areaFn]) => {
                 const config = areaFn({ pathname })
                 const Icon = config.icon
