@@ -40,6 +40,14 @@ type ChatUIMessage = UIMessage<ChatMessageMetadata>
 type ChatModelOption = {
   readonly id: string
   readonly name: string
+  readonly providerId: string
+  readonly description: string
+  readonly capabilities: {
+    readonly supportsReasoning: boolean
+    readonly supportsTools: boolean
+    readonly supportsImageInput: boolean
+    readonly supportsPdfInput: boolean
+  }
   readonly reasoningEfforts: readonly AiReasoningEffort[]
   readonly defaultReasoningEffort?: AiReasoningEffort
   readonly visibleTools: readonly string[]
@@ -229,6 +237,14 @@ export function ChatProvider({
       .map((model) => ({
         id: model.id,
         name: model.name,
+        providerId: model.providerId,
+        description: model.description,
+        capabilities: {
+          supportsReasoning: model.capabilities.supportsReasoning,
+          supportsTools: model.capabilities.supportsTools,
+          supportsImageInput: model.capabilities.supportsImageInput,
+          supportsPdfInput: model.capabilities.supportsPdfInput,
+        },
         reasoningEfforts: canUseReasoningControls()
           ? model.reasoningEfforts
           : [],

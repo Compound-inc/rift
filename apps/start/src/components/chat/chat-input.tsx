@@ -13,6 +13,7 @@ import {
 } from './prompt-input'
 import { useFileAttachments } from '../../hooks/chat/upload'
 import { parseChatApiError } from './chat-error-messages'
+import { ModelSelectorMenu } from './model-selector-menu'
 
 export function ChatInput() {
   const {
@@ -80,19 +81,12 @@ export function ChatInput() {
   const topSlot = (
     <>
       <div className="flex flex-wrap items-center gap-2 pb-1">
-        <select
-          className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+        <ModelSelectorMenu
           value={selectedModelId}
-          onChange={(e) => setSelectedModelId(e.target.value)}
+          options={selectableModels}
           disabled={isBusy}
-          aria-label="Model"
-        >
-          {selectableModels.map((model) => (
-            <option key={model.id} value={model.id}>
-              {model.name}
-            </option>
-          ))}
-        </select>
+          onValueChange={setSelectedModelId}
+        />
         <select
           className="h-8 rounded-md border border-border bg-background px-2 text-xs"
           value={selectedReasoningEffort ?? ''}
