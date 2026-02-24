@@ -5,10 +5,7 @@ function readOpenAiFileSearchVectorStoreIds(): string[] {
   const raw = process.env.OPENAI_FILE_SEARCH_VECTOR_STORE_IDS
   if (!raw) return []
 
-  return raw
-    .split(',')
-    .map((id) => id.trim())
-    .filter((id) => id.length > 0)
+  return raw.split(',')
 }
 
 /**

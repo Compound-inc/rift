@@ -47,7 +47,7 @@ function buildPolicyPayload(input: {
         name: model.name,
         providerId: model.providerId,
         description: model.description,
-        collectsData: model.collectsData,
+        zeroDataRetention: model.zeroDataRetention,
         disabled: !decision.allowed,
         deniedBy: [...decision.deniedBy],
       }

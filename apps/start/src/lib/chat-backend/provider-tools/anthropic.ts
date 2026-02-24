@@ -8,6 +8,13 @@ function getAnthropicToolFactory(
 ): ProviderToolFactory | undefined {
   const tools = anthropic.tools as unknown as Record<string, (...args: any[]) => unknown>
 
+  if (toolId.startsWith('web_search_')) {
+    const version = toolId.slice('web_search_'.length)
+    const fn = tools[`webSearch_${version}`]
+    if (!fn) return undefined
+    return () => fn({ maxUses: 3 }) as ReturnType<ProviderToolFactory>
+  }
+
   if (toolId.startsWith('web_fetch_')) {
     const version = toolId.slice('web_fetch_'.length)
     const fn = tools[`webFetch_${version}`]

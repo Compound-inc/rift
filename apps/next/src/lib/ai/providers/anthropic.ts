@@ -81,7 +81,7 @@ export const ANTHROPIC_MODELS: BaseModelConfig[] = [
     id: "anthropic/claude-sonnet-4.5",
     name: "Claude Sonnet 4.5",
     provider: "anthropic",
-    description: "Claude Sonnet 4.5 es el modelo más reciente de la serie Sonnet, que ofrece mejoras y actualizaciones sobre Sonnet 4",
+    description: "Claude Sonnet 4.5 es el modelo mรกs reciente de la serie Sonnet, que ofrece mejoras y actualizaciones sobre Sonnet 4",
     contextWindow: 200000,
     isPremium: true,
     capabilities: mergeCapabilities({
@@ -115,7 +115,7 @@ export const ANTHROPIC_MODELS: BaseModelConfig[] = [
     id: "anthropic/claude-3.7-sonnet",
     name: "Claude Sonnet 3.7",
     provider: "anthropic",
-    description: "Ofrece un rendimiento de vanguardia para programación, generación de contenido, análisis de datos y tareas de planificación",
+    description: "Ofrece un rendimiento de vanguardia para programaciรณn, generaciรณn de contenido, anรกlisis de datos y tareas de planificaciรณn",
     contextWindow: 200000,
     isPremium: true,
     capabilities: mergeCapabilities({
@@ -147,7 +147,7 @@ export const ANTHROPIC_MODELS: BaseModelConfig[] = [
     id: "anthropic/claude-haiku-4.5",
     name: "Claude Haiku 4.5",
     provider: "anthropic",
-    description: "Haiku 4.5 tiene un nivel de inteligencia igual que Sonnet 4.5 pero es más rápido.",
+    description: "Haiku 4.5 tiene un nivel de inteligencia igual que Sonnet 4.5 pero es mรกs rรกpido.",
     contextWindow: 200000,
     isPremium: false,
     capabilities: mergeCapabilities({
@@ -163,7 +163,7 @@ export const ANTHROPIC_MODELS: BaseModelConfig[] = [
     id: "anthropic/claude-3.5-haiku",
     name: "Claude Haiku 3.5",
     provider: "anthropic",
-    description: "Haiku 3.5 es la próxima generación del modelo más rápido de Anthropic.",
+    description: "Haiku 3.5 es la prรณxima generaciรณn del modelo mรกs rรกpido de Anthropic.",
     contextWindow: 200000,
     isPremium: false,
     capabilities: mergeCapabilities({
@@ -178,7 +178,7 @@ export const ANTHROPIC_MODELS: BaseModelConfig[] = [
     id: "anthropic/claude-3-haiku",
     name: "Claude Haiku 3",
     provider: "anthropic",
-    description: "Haiku 3 analiza rápidamente grandes volúmenes de documentos, como informes trimestrales, contratos o casos legales",
+    description: "Haiku 3 analiza rรกpidamente grandes volรบmenes de documentos, como informes trimestrales, contratos o casos legales",
     contextWindow: 200000,
     isPremium: true,
     capabilities: mergeCapabilities({

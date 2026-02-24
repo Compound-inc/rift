@@ -12,7 +12,7 @@ type ComplianceFlagsSectionProps = {
 
 /**
  * Compliance flags section: single Form card with toggleSection for flags
- * (e.g. block_data_collection). Updates policy on toggle change.
+ * (e.g. require_zdr). Updates policy on toggle change.
  */
 export function ComplianceFlagsSection({
   payload,
@@ -28,14 +28,14 @@ export function ComplianceFlagsSection({
         sectionTitle: 'Flags',
         items: [
           {
-            id: 'block_data_collection',
-            title: 'Block data-collection models',
-            description: 'Denies catalog models with collectsData enabled.',
-            checked: Boolean(payload.policy.complianceFlags.block_data_collection),
+            id: 'require_zdr',
+            title: 'Require ZDR (Zero Data Retention)',
+            description: 'Only allow models that do not retain training data.',
+            checked: Boolean(payload.policy.complianceFlags.require_zdr),
             onCheckedChange: (enabled) =>
               void update({
                 action: 'toggle_compliance_flag',
-                flag: 'block_data_collection',
+                flag: 'require_zdr',
                 enabled,
               }),
             disabled: updating,

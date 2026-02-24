@@ -26,6 +26,7 @@ export type AiModelCapabilities = {
   readonly supportsReasoning: boolean
   readonly supportsImageInput: boolean
   readonly supportsFileInput: boolean
+  readonly supportsPdfInput: boolean
 }
 
 /**
@@ -77,7 +78,8 @@ export type AiModelCatalogEntry<
   readonly name: string
   readonly description: string
   readonly contextWindow: number
-  readonly collectsData: boolean
+  /** ZDR: Zero Data Retention. True when the provider does not retain training data. */
+  readonly zeroDataRetention: boolean
   readonly capabilities: AiModelCapabilities
   /** Provider-specific tools explicitly enabled for this model. */
   readonly providerToolIds: readonly ProviderToolIdByProvider[TProviderId][]

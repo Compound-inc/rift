@@ -1,6 +1,14 @@
+import { ALIBABA_MODELS } from './providers/alibaba'
 import { ANTHROPIC_MODELS } from './providers/anthropic'
+import { DEEPSEEK_MODELS } from './providers/deepseek'
 import { GOOGLE_MODELS } from './providers/google'
+import { META_MODELS } from './providers/meta'
+import { MISTRAL_MODELS } from './providers/mistral'
+import { MINIMAX_MODELS } from './providers/minimax'
+import { MOONSHOTAI_MODELS } from './providers/moonshotai'
 import { OPENAI_MODELS } from './providers/openai'
+import { XAI_MODELS } from './providers/xai'
+import { ZAI_MODELS } from './providers/zai'
 import type { AiModelCatalogEntry } from './types'
 
 /**
@@ -11,6 +19,14 @@ export const AI_CATALOG: readonly AiModelCatalogEntry[] = [
   ...OPENAI_MODELS,
   ...ANTHROPIC_MODELS,
   ...GOOGLE_MODELS,
+  ...ALIBABA_MODELS,
+  ...DEEPSEEK_MODELS,
+  ...META_MODELS,
+  ...MISTRAL_MODELS,
+  ...MINIMAX_MODELS,
+  ...MOONSHOTAI_MODELS,
+  ...XAI_MODELS,
+  ...ZAI_MODELS,
 ]
 
 /** O(1) catalog lookup for request-path model resolution. */

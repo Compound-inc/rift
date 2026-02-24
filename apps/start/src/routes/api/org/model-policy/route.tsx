@@ -91,7 +91,7 @@ function toModelPayload(input: {
   readonly name: string
   readonly providerId: string
   readonly description: string
-  readonly collectsData: boolean
+  readonly zeroDataRetention: boolean
   readonly disabled: boolean
   readonly deniedBy: readonly ('provider' | 'model' | 'compliance')[]
 }) {
@@ -100,7 +100,7 @@ function toModelPayload(input: {
     name: input.name,
     providerId: input.providerId,
     description: input.description,
-    collectsData: input.collectsData,
+    zeroDataRetention: input.zeroDataRetention,
     disabled: input.disabled,
     deniedBy: input.deniedBy,
   }
@@ -117,7 +117,7 @@ async function buildResponsePayload(orgWorkosId: string) {
       name: model.name,
       providerId: model.providerId,
       description: model.description,
-      collectsData: model.collectsData,
+      zeroDataRetention: model.zeroDataRetention,
       disabled: !decision.allowed,
       deniedBy: decision.deniedBy,
     })

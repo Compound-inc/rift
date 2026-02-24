@@ -1,6 +1,6 @@
 import type { ProviderToolDefinition } from './types'
 
-type AnthropicToolFamily = 'web_fetch' | 'computer' | 'text_editor'
+type AnthropicToolFamily = 'web_search' | 'web_fetch' | 'computer' | 'text_editor'
 
 /**
  * Anthropic tool ids are versioned by suffix (typically a date-like number),
@@ -15,6 +15,15 @@ export type AnthropicProviderToolId = `${AnthropicToolFamily}_${number}`
 export function getAnthropicProviderToolDefinition(
   toolId: AnthropicProviderToolId,
 ): ProviderToolDefinition | undefined {
+  if (toolId.startsWith('web_search_')) {
+    return {
+      id: toolId,
+      name: 'Web Search',
+      description: 'Performs web search for up-to-date external information.',
+      advanced: false,
+    }
+  }
+
   if (toolId.startsWith('web_fetch_')) {
     return {
       id: toolId,
