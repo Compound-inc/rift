@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "bun --bun vite dev --port 3000",
     "build": "bun --bun vite build",
+    "start": "bun run .output/server/index.mjs",
     "start:bun": "bun run .output/server/index.mjs",
     "preview": "vite preview",
     "convex": "convex dev",
