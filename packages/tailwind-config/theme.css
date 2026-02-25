@@ -66,8 +66,8 @@
   --border-emphasis: rgb(163 163 163);
   --border-default: rgb(212 212 212);
   --border-muted: rgb(245 245 245);
-  --border-subtle: rgb(229 229 229);
-
+  --border-subtle: rgb(247 247 247);
+ 
   --content-inverted: rgb(255 255 255);
   --content-muted: rgb(163 163 163);
   --content-subtle: rgb(115 115 115);
@@ -101,8 +101,8 @@
   --bg-error: rgb(165, 32, 32);
 
   --border-muted: rgb(38 38 38);
-  --border-subtle: rgb(64 64 64);
-  --border-default: rgb(82 82 82);
+  --border-subtle: rgba(252, 252, 252, 0.08);
+  --border-default: rgba(82, 82, 82, 0.25);
   --border-emphasis: rgb(115 115 115);
 
   --content-inverted: rgb(0 0 0);

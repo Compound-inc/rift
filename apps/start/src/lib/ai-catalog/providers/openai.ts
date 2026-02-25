@@ -62,7 +62,7 @@ export const OPENAI_MODELS: readonly AiModelCatalogEntry<'openai'>[] = [
       supportsFileInput: true,
       supportsPdfInput: true,
     },
-    providerToolIds: [],
+    providerToolIds: ["web_search"],
     reasoningEfforts: ['minimal', 'low', 'medium', 'high'],
     defaultReasoningEffort: 'medium',
     providerOptionsByReasoning: {
