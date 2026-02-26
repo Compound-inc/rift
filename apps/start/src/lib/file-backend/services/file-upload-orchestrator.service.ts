@@ -1,4 +1,5 @@
 import { Effect, Layer, ServiceMap } from 'effect'
+import { isEmbeddingFeatureEnabled } from '@/lib/app-feature-flags'
 import { emitWideErrorEvent } from '@/lib/chat-backend/observability/wide-event'
 import { getZeroDatabase } from '@/lib/chat-backend/infra/zero/db'
 import { AttachmentRagService } from '@/lib/chat-backend/services/rag'
@@ -227,6 +228,20 @@ export const FileUploadOrchestratorLive = Layer.effect(
                 cause: String(error),
               }),
           })
+          if (
+            isEmbeddingFeatureEnabled() &&
+            chunkBuild.metrics.embeddingStatus === 'failed'
+          ) {
+            yield* Effect.logError(
+              'Attachment embeddings failed during upload; continuing with markdown fallback',
+              {
+                requestId,
+                route,
+                userId,
+                attachmentId,
+              },
+            )
+          }
 
           const db = getZeroDatabase()
           if (!db) {

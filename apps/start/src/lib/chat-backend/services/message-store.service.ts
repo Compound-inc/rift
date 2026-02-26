@@ -2,6 +2,7 @@ import type { UIMessage } from 'ai'
 import { Effect, Layer, ServiceMap } from 'effect'
 import { getCatalogModel } from '@/lib/ai-catalog'
 import type { AiReasoningEffort } from '@/lib/ai-catalog/types'
+import { isEmbeddingFeatureEnabled } from '@/lib/app-feature-flags'
 import type {
   ChatAttachment,
   ChatAttachmentInput,
@@ -62,6 +63,16 @@ export class MessageStoreService extends ServiceMap.Service<
   MessageStoreService,
   MessageStoreServiceShape
 >()('chat-backend/MessageStoreService') {}
+
+type QueryEmbeddingFallbackError = {
+  readonly _tag: 'QueryEmbeddingFallbackError'
+  readonly cause: string
+}
+
+type VectorRetrievalFallbackError = {
+  readonly _tag: 'VectorRetrievalFallbackError'
+  readonly cause: string
+}
 
 /** Converts validated inbound payload into UIMessage shape expected by AI SDK. */
 const toUserMessage = (
@@ -189,8 +200,21 @@ export const MessageStoreZero = Layer.effect(
         const retrievalLimits = getRetrievalLimits()
         const queryEmbedding = yield* Effect.tryPromise({
           try: () => buildQueryEmbedding(latestUserText),
-          catch: (error) => error,
-        }).pipe(Effect.catch(() => Effect.succeed(null)))
+          catch: (error): QueryEmbeddingFallbackError => ({
+            _tag: 'QueryEmbeddingFallbackError',
+            cause: String(error),
+          }),
+        }).pipe(
+          Effect.catchTag('QueryEmbeddingFallbackError', (error) =>
+            isEmbeddingFeatureEnabled()
+              ? Effect.logError('Embedding query generation failed, using fallback excerpts', {
+                  requestId,
+                  threadId,
+                  cause: error.cause,
+                }).pipe(Effect.as(null))
+              : Effect.succeed(null),
+          ),
+        )
         const rankedChunks = queryEmbedding
           ? yield* attachmentRag
               .searchThreadAttachments({
@@ -203,7 +227,23 @@ export const MessageStoreZero = Layer.effect(
                   limit: retrievalLimits.maxChunks * 3,
                 },
               })
-              .pipe(Effect.catch(() => Effect.succeed([])))
+              .pipe(
+                Effect.mapError(
+                  (error): VectorRetrievalFallbackError => ({
+                    _tag: 'VectorRetrievalFallbackError',
+                    cause: String(error),
+                  }),
+                ),
+                Effect.catchTag('VectorRetrievalFallbackError', (error) =>
+                  isEmbeddingFeatureEnabled()
+                    ? Effect.logError('Vector retrieval failed, using fallback excerpts', {
+                        requestId,
+                        threadId,
+                        cause: error.cause,
+                      }).pipe(Effect.as([]))
+                    : Effect.succeed([]),
+                ),
+              )
           : []
 
         if (rankedChunks.length > 0) {
