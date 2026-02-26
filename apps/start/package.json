@@ -12,6 +12,7 @@
     "start:bun": "bun run .output/server/index.mjs",
     "preview": "vite preview",
     "zero-cache": "zero-cache-dev",
+    "zero:reset": "bun run scripts/zero-dev-reset.ts",
     "test": "vitest run"
   },
   "dependencies": {

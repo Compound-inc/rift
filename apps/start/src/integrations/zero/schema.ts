@@ -153,7 +153,6 @@ const attachment = table('attachment')
     fileContent: string().from('file_content'),
     embeddingModel: string().from('embedding_model').optional(),
     embeddingTokens: number().from('embedding_tokens').optional(),
-    embeddingCostUsd: number().from('embedding_cost_usd').optional(),
     embeddingDimensions: number().from('embedding_dimensions').optional(),
     embeddingChunks: number().from('embedding_chunks').optional(),
     embeddingStatus: string().from('embedding_status').optional(),

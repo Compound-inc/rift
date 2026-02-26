@@ -19,7 +19,6 @@ export type RagChunkRow = {
 export type AttachmentEmbeddingMetrics = {
   readonly embeddingModel: string
   readonly embeddingTokens: number
-  readonly embeddingCostUsd: number
   readonly embeddingDimensions: number
   readonly embeddingChunks: number
   readonly embeddingStatus: 'indexed' | 'disabled' | 'failed'
@@ -29,7 +28,6 @@ export type QueryEmbeddingResult = {
   readonly embedding: readonly number[]
   readonly embeddingModel: string
   readonly embeddingTokens: number
-  readonly embeddingCostUsd: number
 }
 
 function resolveEmbeddingModelId(): string {
@@ -38,15 +36,6 @@ function resolveEmbeddingModelId(): string {
 
 function isEmbeddingsEnabled(): boolean {
   return isEmbeddingFeatureEnabled()
-}
-
-function resolveEmbeddingCostPerMillionTokensUsd(): number {
-  return ATTACHMENT_PIPELINE_CONFIG.embeddingCostPerMillionTokensUsd
-}
-
-function estimateEmbeddingCostUsd(tokens: number): number {
-  if (!Number.isFinite(tokens) || tokens <= 0) return 0
-  return (tokens / 1_000_000) * resolveEmbeddingCostPerMillionTokensUsd()
 }
 
 function normalizeWhitespace(input: string): string {
@@ -133,7 +122,6 @@ export async function buildAttachmentChunkRows(input: {
       metrics: {
         embeddingModel,
         embeddingTokens: 0,
-        embeddingCostUsd: 0,
         embeddingDimensions: 0,
         embeddingChunks: 0,
         embeddingStatus: isEmbeddingsEnabled() ? 'indexed' : 'disabled',
@@ -188,7 +176,6 @@ export async function buildAttachmentChunkRows(input: {
     metrics: {
       embeddingModel,
       embeddingTokens,
-      embeddingCostUsd: estimateEmbeddingCostUsd(embeddingTokens),
       embeddingDimensions,
       embeddingChunks: rows.length,
       embeddingStatus,
@@ -219,7 +206,6 @@ export async function buildQueryEmbedding(
       embedding,
       embeddingModel: model,
       embeddingTokens: tokens,
-      embeddingCostUsd: estimateEmbeddingCostUsd(tokens),
     }
   } catch {
     return null

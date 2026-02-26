@@ -11,7 +11,6 @@ import {
   FileText,
 } from 'lucide-react'
 import { cn } from '@rift/utils'
-import { Button } from '@rift/ui/button'
 import {
   Popover,
   PopoverContent,
@@ -152,38 +151,33 @@ export function ModelSelectorPanel({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         tabIndex={-1}
-        className="outline-none rounded-lg focus:!outline-none focus-visible:!outline-none [&:focus]:!outline-none [&:focus-visible]:!outline-none"
+        className={cn(
+          'h-10 rounded-lg border border-transparent bg-transparent px-3 pr-8 text-sm font-medium text-content-default outline-none focus:!outline-none focus-visible:!outline-none transition-colors hover:bg-bg-inverted/5 active:bg-bg-inverted/10 focus-visible:border-border-emphasis focus-visible:ring-[3px] focus-visible:ring-border-emphasis/50 disabled:pointer-events-none disabled:opacity-50',
+          'relative flex items-center gap-2 w-fit group',
+          'outline-none rounded-lg [&:focus]:!outline-none [&:focus-visible]:!outline-none',
+          className
+        )}
+        disabled={disabled}
+        aria-label="Select model"
       >
-        <Button
-          type="button"
-          variant="ghost"
-          disabled={disabled}
-          className={cn(
-            'h-10 rounded-lg border border-transparent bg-transparent px-3 pr-8 text-sm font-medium text-content-default outline-none focus:!outline-none focus-visible:!outline-none transition-colors hover:bg-bg-inverted/5 active:bg-bg-inverted/10 focus-visible:border-border-emphasis focus-visible:ring-[3px] focus-visible:ring-border-emphasis/50 disabled:pointer-events-none disabled:opacity-50',
-            'relative flex items-center gap-2 w-fit group',
-            className
-          )}
-          aria-label="Select model"
-        >
-          {selectedCatalog ? (() => {
-            const Icon = getProviderIcon(selectedCatalog.providerId)
-            return Icon ? (
-              <Icon
-                className={cn(
-                  'size-4 shrink-0 text-content-default transition-[filter]',
-                  'grayscale group-hover:grayscale-0',
-                  'grayscale-0'
-                )}
-                aria-hidden
-              />
-            ) : null
-          })() : null}
-          <span className="truncate">{triggerLabel}</span>
-          <ChevronDown
-            className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-content-muted shrink-0"
-            aria-hidden
-          />
-        </Button>
+        {selectedCatalog ? (() => {
+          const Icon = getProviderIcon(selectedCatalog.providerId)
+          return Icon ? (
+            <Icon
+              className={cn(
+                'size-4 shrink-0 text-content-default transition-[filter]',
+                'grayscale group-hover:grayscale-0',
+                'grayscale-0'
+              )}
+              aria-hidden
+            />
+          ) : null
+        })() : null}
+        <span className="truncate">{triggerLabel}</span>
+        <ChevronDown
+          className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-content-muted shrink-0"
+          aria-hidden
+        />
       </PopoverTrigger>
       <PopoverContent
         align="start"

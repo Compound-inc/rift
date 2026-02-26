@@ -3,7 +3,6 @@
 import * as React from 'react'
 import { ChevronDown, Brain } from 'lucide-react'
 import { cn } from '@rift/utils'
-import { Button } from '@rift/ui/button'
 import {
   Popover,
   PopoverContent,
@@ -67,33 +66,28 @@ export function ReasoningSelectorPanel({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         tabIndex={-1}
-        className="outline-none rounded-lg focus:!outline-none focus-visible:!outline-none [&:focus]:!outline-none [&:focus-visible]:!outline-none"
+        disabled={disabled}
+        aria-label="Select reasoning effort"
+        className={cn(
+          'h-10 rounded-lg border border-transparent bg-transparent px-3 pr-8 text-sm font-medium text-content-default outline-none focus:!outline-none focus-visible:!outline-none transition-colors hover:bg-bg-inverted/5 active:bg-bg-inverted/10 focus-visible:border-border-emphasis focus-visible:ring-[3px] focus-visible:ring-border-emphasis/50 disabled:pointer-events-none disabled:opacity-50',
+          'relative flex items-center gap-2 w-fit group',
+          'outline-none rounded-lg [&:focus]:!outline-none [&:focus-visible]:!outline-none',
+          className
+        )}
       >
-        <Button
-          type="button"
-          variant="ghost"
-          disabled={disabled}
+        <Brain
           className={cn(
-            'h-10 rounded-lg border border-transparent bg-transparent px-3 pr-8 text-sm font-medium text-content-default outline-none focus:!outline-none focus-visible:!outline-none transition-colors hover:bg-bg-inverted/5 active:bg-bg-inverted/10 focus-visible:border-border-emphasis focus-visible:ring-[3px] focus-visible:ring-border-emphasis/50 disabled:pointer-events-none disabled:opacity-50',
-            'relative flex items-center gap-2 w-fit group',
-            className
+            'size-4 shrink-0 text-content-default transition-[filter]',
+            'grayscale group-hover:grayscale-0',
+            value ? 'grayscale-0' : ''
           )}
-          aria-label="Select reasoning effort"
-        >
-          <Brain
-            className={cn(
-              'size-4 shrink-0 text-content-default transition-[filter]',
-              'grayscale group-hover:grayscale-0',
-              value ? 'grayscale-0' : ''
-            )}
-            aria-hidden
-          />
-          <span className="truncate">{triggerLabel}</span>
-          <ChevronDown
-            className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-content-muted shrink-0"
-            aria-hidden
-          />
-        </Button>
+          aria-hidden
+        />
+        <span className="truncate">{triggerLabel}</span>
+        <ChevronDown
+          className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-content-muted shrink-0"
+          aria-hidden
+        />
       </PopoverTrigger>
       <PopoverContent
         align="start"

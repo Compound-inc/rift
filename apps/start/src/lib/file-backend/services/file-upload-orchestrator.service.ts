@@ -254,7 +254,6 @@ export const FileUploadOrchestratorLive = Layer.effect(
                   fileContent: markdown,
                   embeddingModel: chunkBuild.metrics.embeddingModel,
                   embeddingTokens: chunkBuild.metrics.embeddingTokens,
-                  embeddingCostUsd: chunkBuild.metrics.embeddingCostUsd,
                   embeddingDimensions: chunkBuild.metrics.embeddingDimensions,
                   embeddingChunks: chunkBuild.metrics.embeddingChunks,
                   embeddingStatus: chunkBuild.metrics.embeddingStatus,

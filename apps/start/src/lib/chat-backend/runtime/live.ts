@@ -9,6 +9,10 @@ import { StreamResumeLive } from '../services/stream-resume.service'
 import { ThreadServiceZero } from '../services/thread.service'
 import { ToolRegistryLive } from '../services/tool-registry.service'
 
+const MessageStoreZeroWithRag = MessageStoreZero.pipe(
+  Layer.provideMerge(AttachmentRagLive),
+)
+
 /**
  * Production dependency graph for chat runtime.
  * Persistence uses Zero/Postgres, stream resume uses Redis, and rate limiting
@@ -16,9 +20,8 @@ import { ToolRegistryLive } from '../services/tool-registry.service'
  */
 export const ChatLiveLayer = ChatOrchestratorLive.pipe(
   Layer.provideMerge(ThreadServiceZero),
-  Layer.provideMerge(AttachmentRagLive),
   Layer.provideMerge(OrgKnowledgeRagNoop),
-  Layer.provideMerge(MessageStoreZero),
+  Layer.provideMerge(MessageStoreZeroWithRag),
   Layer.provideMerge(RateLimitMemory),
   Layer.provideMerge(ModelPolicyLive),
   Layer.provideMerge(ToolRegistryLive),

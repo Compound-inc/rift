@@ -10,9 +10,7 @@ import { queries } from '@/integrations/zero/queries'
 import type { ZeroContext } from '@/integrations/zero/schema'
 
 /**
- * Zero query endpoint. zero-cache calls this to resolve query name + args to ZQL.
- * Requires cookie auth: set ZERO_QUERY_FORWARD_COOKIES=true on zero-cache so
- * the session cookie is forwarded; we derive userID from getAuth(), not from headers.
+ * Zero query endpoint.
  */
 export const Route = createFileRoute('/api/zero/query')({
   server: {

@@ -10,7 +10,6 @@ export type RagPipelineConfig = {
   readonly maxRetrievalChars: number
   readonly fallbackExcerptChars: number
   readonly embeddingModel: string
-  readonly embeddingCostPerMillionTokensUsd: number
 }
 
 const ATTACHMENT_RAG_PIPELINE_CONFIG: RagPipelineConfig = Object.freeze({
@@ -22,7 +21,6 @@ const ATTACHMENT_RAG_PIPELINE_CONFIG: RagPipelineConfig = Object.freeze({
   maxRetrievalChars: 12_000,
   fallbackExcerptChars: 2_000,
   embeddingModel: 'openai/text-embedding-3-small',
-  embeddingCostPerMillionTokensUsd: 0.02,
 })
 
 const ORG_KNOWLEDGE_RAG_PIPELINE_CONFIG: RagPipelineConfig = Object.freeze({
@@ -34,7 +32,6 @@ const ORG_KNOWLEDGE_RAG_PIPELINE_CONFIG: RagPipelineConfig = Object.freeze({
   maxRetrievalChars: 14_000,
   fallbackExcerptChars: 2_200,
   embeddingModel: 'openai/text-embedding-3-small',
-  embeddingCostPerMillionTokensUsd: 0.02,
 })
 
 export function getAttachmentRagPipelineConfig(): RagPipelineConfig {
@@ -44,4 +41,3 @@ export function getAttachmentRagPipelineConfig(): RagPipelineConfig {
 export function getOrgKnowledgeRagPipelineConfig(): RagPipelineConfig {
   return ORG_KNOWLEDGE_RAG_PIPELINE_CONFIG
 }
-
