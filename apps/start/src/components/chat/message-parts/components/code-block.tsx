@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentProps, CSSProperties, HTMLAttributes } from "react";
+import type { ComponentProps, CSSProperties, HTMLAttributes, ReactNode } from "react";
 import type {
   BundledLanguage,
   BundledTheme,
@@ -17,7 +17,13 @@ import {
   SelectValue,
 } from "@rift/ui/select";
 import { cn } from "@rift/utils";
-import { CheckIcon, CopyIcon } from "lucide-react";
+import {
+  CheckIcon,
+  CopyIcon,
+  ExpandIcon,
+  MinimizeIcon,
+  WrapTextIcon,
+} from "lucide-react";
 import {
   createContext,
   memo,
@@ -28,6 +34,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { createHighlighter } from "shiki";
 
 // Shiki uses bitflags for font styles: 1=italic, 2=bold, 4=underline
@@ -85,16 +92,40 @@ const TokenSpan = ({ token }: { token: ThemedToken }) => (
 const LineSpan = ({
   keyedLine,
   showLineNumbers,
+  isLineWrapped,
+  lineNumber,
 }: {
   keyedLine: KeyedLine;
   showLineNumbers: boolean;
+  isLineWrapped: boolean;
+  lineNumber: number;
 }) => (
-  <span className={showLineNumbers ? LINE_NUMBER_CLASSES : "block"}>
-    {keyedLine.tokens.length === 0
-      ? "\n"
-      : keyedLine.tokens.map(({ token, key }) => (
-          <TokenSpan key={key} token={token} />
-        ))}
+  <span className="block">
+    {showLineNumbers ? (
+      <span className="grid grid-cols-[3rem_minmax(0,1fr)] items-start gap-4">
+        <span
+          aria-hidden="true"
+          className="select-none text-right font-mono text-content-muted/60"
+        >
+          {lineNumber}
+        </span>
+        <span className={cn(isLineWrapped && "whitespace-pre-wrap break-words")}>
+          {keyedLine.tokens.length === 0
+            ? "\n"
+            : keyedLine.tokens.map(({ token, key }) => (
+                <TokenSpan key={key} token={token} />
+              ))}
+        </span>
+      </span>
+    ) : (
+      <span className={cn(isLineWrapped && "whitespace-pre-wrap break-words")}>
+        {keyedLine.tokens.length === 0
+          ? "\n"
+          : keyedLine.tokens.map(({ token, key }) => (
+              <TokenSpan key={key} token={token} />
+            ))}
+      </span>
+    )}
   </span>
 );
 
@@ -113,11 +144,19 @@ interface TokenizedCode {
 
 interface CodeBlockContextType {
   code: string;
+  isLineWrapped: boolean;
+  isFullscreen: boolean;
+  toggleLineWrap: () => void;
+  toggleFullscreen: () => void;
 }
 
 // Context
 const CodeBlockContext = createContext<CodeBlockContextType>({
   code: "",
+  isLineWrapped: false,
+  isFullscreen: false,
+  toggleLineWrap: () => {},
+  toggleFullscreen: () => {},
 });
 
 // Highlighter cache (singleton per language)
@@ -236,28 +275,16 @@ export const highlightCode = (
   return null;
 };
 
-// Line number styles using CSS counters
-const LINE_NUMBER_CLASSES = cn(
-  "block",
-  "before:content-[counter(line)]",
-  "before:inline-block",
-  "before:[counter-increment:line]",
-  "before:w-8",
-  "before:mr-4",
-  "before:text-right",
-  "before:text-muted-foreground/50",
-  "before:font-mono",
-  "before:select-none"
-);
-
 const CodeBlockBody = memo(
   ({
     tokenized,
     showLineNumbers,
+    isLineWrapped,
     className,
   }: {
     tokenized: TokenizedCode;
     showLineNumbers: boolean;
+    isLineWrapped: boolean;
     className?: string;
   }) => {
     const preStyle = useMemo(
@@ -276,7 +303,7 @@ const CodeBlockBody = memo(
     return (
       <pre
         className={cn(
-          "dark:!bg-[var(--shiki-dark-bg)] dark:!text-[var(--shiki-dark)] m-0 p-4 text-sm",
+          "dark:!bg-[var(--shiki-dark-bg)] dark:!text-[var(--shiki-dark)] m-0 overflow-auto rounded-b-xl px-4 pb-4 pt-3 text-sm leading-6",
           className
         )}
         style={preStyle}
@@ -284,14 +311,16 @@ const CodeBlockBody = memo(
         <code
           className={cn(
             "font-mono text-sm",
-            showLineNumbers && "[counter-increment:line_0] [counter-reset:line]"
+            !showLineNumbers && isLineWrapped && "whitespace-pre-wrap break-words"
           )}
         >
-          {keyedLines.map((keyedLine) => (
+          {keyedLines.map((keyedLine, lineIdx) => (
             <LineSpan
               key={keyedLine.key}
               keyedLine={keyedLine}
               showLineNumbers={showLineNumbers}
+              isLineWrapped={isLineWrapped}
+              lineNumber={lineIdx + 1}
             />
           ))}
         </code>
@@ -301,6 +330,7 @@ const CodeBlockBody = memo(
   (prevProps, nextProps) =>
     prevProps.tokenized === nextProps.tokenized &&
     prevProps.showLineNumbers === nextProps.showLineNumbers &&
+    prevProps.isLineWrapped === nextProps.isLineWrapped &&
     prevProps.className === nextProps.className
 );
 
@@ -314,7 +344,7 @@ export const CodeBlockContainer = ({
 }: HTMLAttributes<HTMLDivElement> & { language: string }) => (
   <div
     className={cn(
-      "group relative w-full overflow-hidden rounded-md border bg-background text-foreground",
+      "group relative w-full overflow-hidden rounded-xl border border-border-muted bg-bg-default text-content-emphasis",
       className
     )}
     data-language={language}
@@ -334,7 +364,7 @@ export const CodeBlockHeader = ({
 }: HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "flex items-center justify-between border-b bg-muted/80 px-3 py-2 text-muted-foreground text-xs",
+      "flex items-center justify-between border-border-muted border-b bg-bg-default px-4 py-2 text-[13px] leading-[22px] text-content-subtle",
       className
     )}
     {...props}
@@ -358,7 +388,7 @@ export const CodeBlockFilename = ({
   className,
   ...props
 }: HTMLAttributes<HTMLSpanElement>) => (
-  <span className={cn("font-mono", className)} {...props}>
+  <span className={cn("font-mono text-[13px] text-content-subtle", className)} {...props}>
     {children}
   </span>
 );
@@ -369,7 +399,10 @@ export const CodeBlockActions = ({
   ...props
 }: HTMLAttributes<HTMLDivElement>) => (
   <div
-    className={cn("-my-1 -mr-1 flex items-center gap-2", className)}
+    className={cn(
+      "flex items-center gap-1",
+      className
+    )}
     {...props}
   >
     {children}
@@ -379,12 +412,13 @@ export const CodeBlockActions = ({
 export const CodeBlockContent = ({
   code,
   language,
-  showLineNumbers = false,
+  showLineNumbers = true,
 }: {
   code: string;
   language: BundledLanguage;
   showLineNumbers?: boolean;
 }) => {
+  const { isLineWrapped } = useContext(CodeBlockContext);
   // Memoized raw tokens for immediate display
   const rawTokens = useMemo(() => createRawTokens(code), [code]);
 
@@ -412,8 +446,17 @@ export const CodeBlockContent = ({
   }, [code, language, rawTokens]);
 
   return (
-    <div className="relative overflow-auto">
-      <CodeBlockBody showLineNumbers={showLineNumbers} tokenized={tokenized} />
+    <div
+      className={cn(
+        "relative h-full bg-bg-default",
+        isLineWrapped ? "overflow-y-auto overflow-x-hidden" : "overflow-auto"
+      )}
+    >
+      <CodeBlockBody
+        isLineWrapped={isLineWrapped}
+        showLineNumbers={showLineNumbers}
+        tokenized={tokenized}
+      />
     </div>
   );
 };
@@ -421,23 +464,93 @@ export const CodeBlockContent = ({
 export const CodeBlock = ({
   code,
   language,
-  showLineNumbers = false,
+  showLineNumbers = true,
   className,
   children,
   ...props
 }: CodeBlockProps) => {
-  const contextValue = useMemo(() => ({ code }), [code]);
+  const [isLineWrapped, setIsLineWrapped] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
-  return (
-    <CodeBlockContext.Provider value={contextValue}>
-      <CodeBlockContainer className={className} language={language} {...props}>
-        {children}
+  useEffect(() => {
+    if (!isFullscreen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsFullscreen(false);
+      }
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleEscape);
+
+    return () => {
+      window.removeEventListener("keydown", handleEscape);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isFullscreen]);
+
+  const toggleLineWrap = useCallback(() => {
+    setIsLineWrapped((current) => !current);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    setIsFullscreen((current) => !current);
+  }, []);
+
+  const contextValue = useMemo(
+    () => ({
+      code,
+      isLineWrapped,
+      isFullscreen,
+      toggleLineWrap,
+      toggleFullscreen,
+    }),
+    [code, isLineWrapped, isFullscreen, toggleLineWrap, toggleFullscreen]
+  );
+
+  const blockChildren: ReactNode = (
+    <>
+      {children}
+      <div className="min-h-0 flex-1">
         <CodeBlockContent
           code={code}
           language={language}
           showLineNumbers={showLineNumbers}
         />
-      </CodeBlockContainer>
+      </div>
+    </>
+  );
+
+  return (
+    <CodeBlockContext.Provider value={contextValue}>
+      {isFullscreen && typeof document !== "undefined" ? (
+        createPortal(
+          <div className="fixed inset-0 z-[110] flex p-4">
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 bg-black/60"
+              onClick={toggleFullscreen}
+            />
+            <CodeBlockContainer
+              className={cn(
+                className,
+                "relative z-10 !m-0 flex h-full min-h-0 w-full max-w-none flex-1 flex-col shadow-2xl"
+              )}
+              language={language}
+              {...props}
+            >
+              {blockChildren}
+            </CodeBlockContainer>
+          </div>,
+          document.body
+        )
+      ) : (
+        <CodeBlockContainer className={className} language={language} {...props}>
+          {blockChildren}
+        </CodeBlockContainer>
+      )}
     </CodeBlockContext.Provider>
   );
 };
@@ -499,6 +612,57 @@ export const CodeBlockCopyButton = ({
       {...props}
     >
       {children ?? <Icon size={14} />}
+    </Button>
+  );
+};
+
+export type CodeBlockLineWrapButtonProps = ComponentProps<typeof Button>;
+
+/**
+ * Toggles soft-wrapping for long lines while preserving original copied text.
+ */
+export const CodeBlockLineWrapButton = ({
+  className,
+  ...props
+}: CodeBlockLineWrapButtonProps) => {
+  const { isLineWrapped, toggleLineWrap } = useContext(CodeBlockContext);
+
+  return (
+    <Button
+      aria-label={isLineWrapped ? "Disable line wrap" : "Enable line wrap"}
+      className={cn("shrink-0", className)}
+      onClick={toggleLineWrap}
+      size="icon"
+      variant="ghost"
+      {...props}
+    >
+      <WrapTextIcon size={14} />
+    </Button>
+  );
+};
+
+export type CodeBlockFullscreenButtonProps = ComponentProps<typeof Button>;
+
+/**
+ * Expands the code block into a fullscreen overlay for easier reading.
+ */
+export const CodeBlockFullscreenButton = ({
+  className,
+  ...props
+}: CodeBlockFullscreenButtonProps) => {
+  const { isFullscreen, toggleFullscreen } = useContext(CodeBlockContext);
+  const Icon = isFullscreen ? MinimizeIcon : ExpandIcon;
+
+  return (
+    <Button
+      aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+      className={cn("shrink-0", className)}
+      onClick={toggleFullscreen}
+      size="icon"
+      variant="ghost"
+      {...props}
+    >
+      <Icon size={14} />
     </Button>
   );
 };

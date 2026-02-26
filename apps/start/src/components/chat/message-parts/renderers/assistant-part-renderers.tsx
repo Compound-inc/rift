@@ -2,6 +2,7 @@ import { Streamdown, type PluginConfig } from 'streamdown'
 import { code } from '@streamdown/code'
 import { math } from '@streamdown/math'
 import { mermaid } from '@streamdown/mermaid'
+import { streamdownComponents } from './streamdown-components'
 import type {
   AssistantPartRenderContext,
   AssistantPartRenderer,
@@ -27,6 +28,7 @@ function renderTextPart({
       animated={isMessageStreaming ? streamdownAnimated : false}
       isAnimating={isMessageStreaming}
       mode={isMessageStreaming ? 'streaming' : 'static'}
+      components={streamdownComponents}
       className="chat-streamdown min-w-0 max-w-full break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
     >
       {part.text || '\u00a0'}
