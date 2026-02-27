@@ -6,11 +6,8 @@ import { toReadableErrorMessage } from '../domain/error-formatting'
 import type { IncomingUserMessage } from '../domain/schemas'
 import type { IncomingAttachment } from '../domain/schemas'
 import { getUserMessageText } from '../domain/schemas'
-import {
-  emitWideErrorEvent,
-  getErrorTag,
-} from '../observability/wide-event'
-import { canUseReasoningControls } from '@/lib/app-feature-flags'
+import { emitWideErrorEvent, getErrorTag } from '../observability/wide-event'
+import { canUseReasoningControls } from '@/utils/app-feature-flags'
 import type { OrgAiPolicy } from '@/lib/model-policy/types'
 import { MessageStoreService } from './message-store.service'
 import { ModelGatewayService } from './model-gateway.service'
@@ -247,7 +244,10 @@ export const ChatOrchestratorLive = Layer.effect(
           )
         }
 
-        const finalizeAssistant = (input: { ok: boolean; errorMessage?: string }) => {
+        const finalizeAssistant = (input: {
+          ok: boolean
+          errorMessage?: string
+        }) => {
           if (assistantFinalized) return
           assistantFinalized = true
 
@@ -284,7 +284,9 @@ export const ChatOrchestratorLive = Layer.effect(
                     errorTag: error._tag,
                     message: error.message,
                     latencyMs: Date.now() - startedAt,
-                    cause: input.ok ? 'assistant_finalize_success' : 'assistant_finalize_error',
+                    cause: input.ok
+                      ? 'assistant_finalize_success'
+                      : 'assistant_finalize_error',
                   }),
                 ),
               ),
@@ -298,19 +300,21 @@ export const ChatOrchestratorLive = Layer.effect(
           requestId,
           tools: toolRegistry.tools,
           activeTools: toolRegistry.activeTools,
-          providerOptions:
-            modelResolution.reasoningEffort
-              ? toolRegistry.providerOptionsByReasoning[
-                  modelResolution.reasoningEffort
-                ]
-              : toolRegistry.defaultProviderOptions,
+          providerOptions: modelResolution.reasoningEffort
+            ? toolRegistry.providerOptionsByReasoning[
+                modelResolution.reasoningEffort
+              ]
+            : toolRegistry.defaultProviderOptions,
           reasoningEffort: modelResolution.reasoningEffort,
           abortSignal: streamAbortController.signal,
           onChunk: (chunk: unknown) => {
             if (!chunk || typeof chunk !== 'object') return
             const candidate = chunk as { type?: unknown; text?: unknown }
             // Persisted assistant content is reconstructed from deltas as they arrive.
-            if (candidate.type === 'text-delta' && typeof candidate.text === 'string') {
+            if (
+              candidate.type === 'text-delta' &&
+              typeof candidate.text === 'string'
+            ) {
               bufferedAssistantText += candidate.text
               return
             }
@@ -429,8 +433,12 @@ export const ChatOrchestratorLive = Layer.effect(
                 .filter(
                   (
                     part,
-                  ): part is Extract<typeof part, { type: 'text'; text: string }> =>
-                    part.type === 'text' && typeof (part as { text?: unknown }).text === 'string',
+                  ): part is Extract<
+                    typeof part,
+                    { type: 'text'; text: string }
+                  > =>
+                    part.type === 'text' &&
+                    typeof (part as { text?: unknown }).text === 'string',
                 )
                 .map((part) => part.text)
                 .join('')
@@ -442,7 +450,10 @@ export const ChatOrchestratorLive = Layer.effect(
                 .filter(
                   (
                     part,
-                  ): part is Extract<typeof part, { type: 'reasoning'; text: string }> =>
+                  ): part is Extract<
+                    typeof part,
+                    { type: 'reasoning'; text: string }
+                  > =>
                     part.type === 'reasoning' &&
                     typeof (part as { text?: unknown }).text === 'string',
                 )

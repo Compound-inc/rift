@@ -6,7 +6,7 @@ import {
   createAttachedFile,
   getFileValidationError,
   uploadFileToServer,
-} from '../../../utils/chat/upload'
+} from '../../../lib/chat/upload'
 
 export type UseFileAttachmentsOptions = {
   /** Maximum number of files allowed (default 10). */
@@ -32,11 +32,11 @@ export function useFileAttachments(options: UseFileAttachmentsOptions = {}) {
         prev.map((item) =>
           item.id === id
             ? { ...item, isUploading: false, uploadError: undefined, uploaded }
-            : item
-        )
+            : item,
+        ),
       )
     },
-    []
+    [],
   )
 
   const markUploadFailure = useCallback((id: string, message: string) => {
@@ -44,8 +44,8 @@ export function useFileAttachments(options: UseFileAttachmentsOptions = {}) {
       prev.map((item) =>
         item.id === id
           ? { ...item, isUploading: false, uploadError: message }
-          : item
-      )
+          : item,
+      ),
     )
   }, [])
 
@@ -60,7 +60,7 @@ export function useFileAttachments(options: UseFileAttachmentsOptions = {}) {
         markUploadFailure(id, message)
       }
     },
-    [markUploadFailure, markUploadSuccess]
+    [markUploadFailure, markUploadSuccess],
   )
 
   const handleFileSelect = useCallback(
@@ -106,7 +106,7 @@ export function useFileAttachments(options: UseFileAttachmentsOptions = {}) {
 
       e.target.value = ''
     },
-    [maxFiles, uploadAttachment]
+    [maxFiles, uploadAttachment],
   )
 
   const handleRemoveFile = useCallback((id: string) => {

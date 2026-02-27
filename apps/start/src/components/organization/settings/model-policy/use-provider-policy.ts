@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useQuery, useZero } from '@rocicorp/zero/react'
 import { AI_CATALOG, AI_MODELS_BY_PROVIDER } from '@/lib/ai-catalog'
 import { evaluateModelAvailability } from '@/lib/model-policy/policy-engine'
@@ -17,15 +17,6 @@ function buildPolicyPayload(input: {
     complianceFlags?: Record<string, boolean>
     updatedAt?: number
   } | null
-  byokState: {
-    featureFlags: {
-      enableOrganizationProviderKeys: boolean
-    }
-    providerApiKeys: {
-      openai: boolean
-      anthropic: boolean
-    }
-  }
 }): PolicyPayload {
   const policy = {
     disabledProviderIds: [...(input.policyRow?.disabledProviderIds ?? [])],
@@ -36,8 +27,6 @@ function buildPolicyPayload(input: {
 
   return {
     policy,
-    featureFlags: input.byokState.featureFlags,
-    providerApiKeys: input.byokState.providerApiKeys,
     providers: [...AI_MODELS_BY_PROVIDER.keys()].map((providerId) => ({
       id: providerId,
       disabled: policy.disabledProviderIds.includes(providerId),
@@ -72,58 +61,8 @@ export function useProviderPolicy() {
   const [policyRow, policyResult] = useQuery(queries.orgPolicy.current())
   const [error, setError] = useState<string | null>(null)
   const [updating, setUpdating] = useState(false)
-  const [byokState, setByokState] = useState<{
-    featureFlags: {
-      enableOrganizationProviderKeys: boolean
-    }
-    providerApiKeys: {
-      openai: boolean
-      anthropic: boolean
-    }
-  }>({
-    featureFlags: { enableOrganizationProviderKeys: false },
-    providerApiKeys: { openai: false, anthropic: false },
-  })
 
-  const refreshByokState = useCallback(async () => {
-    const response = await fetch('/api/org/model-policy', { method: 'GET' })
-    if (!response.ok) {
-      const fallbackError = await response.text().catch(() => 'Failed to load model policy state')
-      throw new Error(fallbackError || 'Failed to load model policy state')
-    }
-
-    const payload = (await response.json()) as {
-      featureFlags?: { enableOrganizationProviderKeys?: boolean }
-      providerApiKeys?: { openai?: boolean; anthropic?: boolean }
-    }
-
-    setByokState({
-      featureFlags: {
-        enableOrganizationProviderKeys: Boolean(
-          payload.featureFlags?.enableOrganizationProviderKeys,
-        ),
-      },
-      providerApiKeys: {
-        openai: Boolean(payload.providerApiKeys?.openai),
-        anthropic: Boolean(payload.providerApiKeys?.anthropic),
-      },
-    })
-  }, [])
-
-  useEffect(() => {
-    void refreshByokState().catch((e) => {
-      setError(e instanceof Error ? e.message : 'Failed to load provider keys')
-    })
-  }, [refreshByokState])
-
-  const payload = useMemo(
-    () =>
-      buildPolicyPayload({
-        policyRow,
-        byokState,
-      }),
-    [byokState, policyRow],
-  )
+  const payload = useMemo(() => buildPolicyPayload({ policyRow }), [policyRow])
 
   const update = useCallback(
     async (body: ProviderPolicyUpdateAction) => {
@@ -154,37 +93,13 @@ export function useProviderPolicy() {
             }),
           ).client
         }
-        if (body.action === 'set_provider_api_key') {
-          const response = await fetch('/api/org/model-policy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          })
-          if (!response.ok) {
-            const message = await response.text().catch(() => 'Failed to set provider key')
-            throw new Error(message || 'Failed to set provider key')
-          }
-          await refreshByokState()
-        }
-        if (body.action === 'remove_provider_api_key') {
-          const response = await fetch('/api/org/model-policy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          })
-          if (!response.ok) {
-            const message = await response.text().catch(() => 'Failed to remove provider key')
-            throw new Error(message || 'Failed to remove provider key')
-          }
-          await refreshByokState()
-        }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to update policy')
       } finally {
         setUpdating(false)
       }
     },
-    [refreshByokState, z],
+    [z],
   )
 
   return {

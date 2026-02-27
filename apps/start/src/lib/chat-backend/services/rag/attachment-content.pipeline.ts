@@ -1,5 +1,5 @@
 import { embed, embedMany } from 'ai'
-import { isEmbeddingFeatureEnabled } from '@/lib/app-feature-flags'
+import { isEmbeddingFeatureEnabled } from '@/utils/app-feature-flags'
 import { getAttachmentRagPipelineConfig } from './pipeline-config'
 
 const ATTACHMENT_PIPELINE_CONFIG = getAttachmentRagPipelineConfig()
@@ -39,7 +39,10 @@ function isEmbeddingsEnabled(): boolean {
 }
 
 function normalizeWhitespace(input: string): string {
-  return input.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
+  return input
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 /**
@@ -77,7 +80,8 @@ function splitIntoParagraphAwareChunks(input: string): readonly string[] {
 
   for (const paragraph of paragraphs) {
     if (chunks.length >= maxChunks) break
-    const candidate = current.length > 0 ? `${current}\n\n${paragraph}` : paragraph
+    const candidate =
+      current.length > 0 ? `${current}\n\n${paragraph}` : paragraph
     if (candidate.length <= targetChars) {
       current = candidate
       continue

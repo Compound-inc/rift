@@ -192,7 +192,9 @@ export function ChatSidebarContent({ pathname }: { pathname: string }) {
         if (previous.some((thread) => thread.threadId === payload.threadId)) {
           return previous
         }
-        return [payload, ...previous].toSorted((a, b) => b.createdAt - a.createdAt)
+        return [payload, ...previous].toSorted(
+          (a, b) => b.createdAt - a.createdAt,
+        )
       })
     }
 
@@ -240,10 +242,13 @@ export function ChatSidebarContent({ pathname }: { pathname: string }) {
     return pathname.slice(`${CHAT_HREF}/`.length).split('/')[0] ?? null
   }, [pathname])
 
-  const startEditingThread = useCallback((threadId: string, currentTitle: string) => {
-    setEditingThreadId(threadId)
-    setEditingTitle(currentTitle || 'Untitled')
-  }, [])
+  const startEditingThread = useCallback(
+    (threadId: string, currentTitle: string) => {
+      setEditingThreadId(threadId)
+      setEditingTitle(currentTitle || 'Untitled')
+    },
+    [],
+  )
 
   const cancelEditingThread = useCallback(() => {
     setEditingThreadId(null)
@@ -264,7 +269,8 @@ export function ChatSidebarContent({ pathname }: { pathname: string }) {
       }
 
       try {
-        await z.mutate(mutators.threads.rename({ threadId, title: trimmed })).client
+        await z.mutate(mutators.threads.rename({ threadId, title: trimmed }))
+          .client
         toast.success('Thread renamed')
         cancelEditingThread()
       } catch (error) {
@@ -301,102 +307,103 @@ export function ChatSidebarContent({ pathname }: { pathname: string }) {
     await copyToClipboard(`${origin}${CHAT_HREF}/${threadId}`)
   }, [])
 
-  const threadItems: NavItemType[] = mergedThreads.map((thread) => {
-    const status = thread.generationStatus
-    const showSpinner =
-      status === 'pending' || status === 'generation' || status === undefined
-    const showError = status === 'failed'
-    const trailing = showSpinner ? (
-      <SidebarGroupTooltip
-        name={status === 'pending' ? 'Pending' : 'Generating'}
-        description={
-          status === 'pending'
-            ? 'This chat is queued; a response will be generated shortly.'
-            : 'The AI has started generating the response.'
-        }
-      >
-        <span className="inline-flex shrink-0">
-          <Loader2
-            className="size-4 animate-spin text-content-muted"
-            aria-hidden
-          />
-        </span>
-      </SidebarGroupTooltip>
-    ) : showError ? (
-      <SidebarGroupTooltip
-        name="Error"
-        description="Something went wrong and the response could not be generated."
-      >
-        <span className="inline-flex shrink-0">
-          <AlertTriangle
-            className="size-4 text-content-error"
-            aria-hidden
-          />
-        </span>
-      </SidebarGroupTooltip>
-    ) : undefined
+  const threadItems: NavItemType[] = mergedThreads.map(
+    (thread) => {
+      const status = thread.generationStatus
+      const showSpinner =
+        status === 'pending' || status === 'generation' || status === undefined
+      const showError = status === 'failed'
+      const trailing = showSpinner ? (
+        <SidebarGroupTooltip
+          name={status === 'pending' ? 'Pending' : 'Generating'}
+          description={
+            status === 'pending'
+              ? 'This chat is queued; a response will be generated shortly.'
+              : 'The AI has started generating the response.'
+          }
+        >
+          <span className="inline-flex shrink-0">
+            <Loader2
+              className="size-4 animate-spin text-content-muted"
+              aria-hidden
+            />
+          </span>
+        </SidebarGroupTooltip>
+      ) : showError ? (
+        <SidebarGroupTooltip
+          name="Error"
+          description="Something went wrong and the response could not be generated."
+        >
+          <span className="inline-flex shrink-0">
+            <AlertTriangle className="size-4 text-content-error" aria-hidden />
+          </span>
+        </SidebarGroupTooltip>
+      ) : undefined
 
-    const isEditing = editingThreadId === thread.threadId
-    const currentTitle = thread.title || 'Untitled'
+      const isEditing = editingThreadId === thread.threadId
+      const currentTitle = thread.title || 'Untitled'
 
-    return {
-      name: currentTitle,
-      href: `${CHAT_HREF}/${thread.threadId}`,
-      trailing: isEditing ? undefined : trailing,
-      disableLink: isEditing,
-      ...(isEditing && {
-        label: (
-          <ThreadRenameInput
-            threadId={thread.threadId}
-            currentTitle={currentTitle}
-            value={editingTitle}
-            onChange={setEditingTitle}
-            onSubmit={submitRenameThread}
-            onCancel={cancelEditingThread}
-            inputRef={editingInputRef}
-          />
-        ),
-      }),
-      contextMenuContent: thread.isPersisted && !isEditing ? (
-        <>
-          <ContextMenuItem
-            onClick={() => {
-              startEditingThread(thread.threadId, currentTitle)
-            }}
-          >
-            <Pencil />
-            Rename
-          </ContextMenuItem>
-          <ContextMenuItem
-            onClick={() => {
-              void handleCopyThreadLink(thread.threadId)
-            }}
-          >
-            <Copy />
-            Copy link
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            variant="destructive"
-            onClick={() => {
-              void handleDeleteThread(thread.threadId)
-            }}
-          >
-            <Trash2 />
-            Delete
-          </ContextMenuItem>
-        </>
-      ) : undefined,
-    }
-  }, [
-    editingThreadId,
-    editingTitle,
-    handleCopyThreadLink,
-    handleDeleteThread,
-    startEditingThread,
-    submitRenameThread,
-    cancelEditingThread,
-  ])
+      return {
+        name: currentTitle,
+        href: `${CHAT_HREF}/${thread.threadId}`,
+        trailing: isEditing ? undefined : trailing,
+        disableLink: isEditing,
+        ...(isEditing && {
+          label: (
+            <ThreadRenameInput
+              threadId={thread.threadId}
+              currentTitle={currentTitle}
+              value={editingTitle}
+              onChange={setEditingTitle}
+              onSubmit={submitRenameThread}
+              onCancel={cancelEditingThread}
+              inputRef={editingInputRef}
+            />
+          ),
+        }),
+        contextMenuContent:
+          thread.isPersisted && !isEditing ? (
+            <>
+              <ContextMenuItem
+                onClick={() => {
+                  startEditingThread(thread.threadId, currentTitle)
+                }}
+              >
+                <Pencil />
+                Rename
+              </ContextMenuItem>
+              <ContextMenuItem
+                onClick={() => {
+                  void handleCopyThreadLink(thread.threadId)
+                }}
+              >
+                <Copy />
+                Copy link
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                variant="destructive"
+                onClick={() => {
+                  void handleDeleteThread(thread.threadId)
+                }}
+              >
+                <Trash2 />
+                Delete
+              </ContextMenuItem>
+            </>
+          ) : undefined,
+      }
+    },
+    [
+      editingThreadId,
+      editingTitle,
+      handleCopyThreadLink,
+      handleDeleteThread,
+      startEditingThread,
+      submitRenameThread,
+      cancelEditingThread,
+    ],
+  )
 
   const historySection: NavSection = {
     name: CHAT_HISTORY_SECTION_NAME,

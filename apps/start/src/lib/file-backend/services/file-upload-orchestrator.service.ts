@@ -1,5 +1,5 @@
 import { Effect, Layer, ServiceMap } from 'effect'
-import { isEmbeddingFeatureEnabled } from '@/lib/app-feature-flags'
+import { isEmbeddingFeatureEnabled } from '@/utils/app-feature-flags'
 import { emitWideErrorEvent } from '@/lib/chat-backend/observability/wide-event'
 import { getZeroDatabase } from '@/lib/chat-backend/infra/zero/db'
 import { AttachmentRagService } from '@/lib/chat-backend/services/rag'
@@ -7,7 +7,10 @@ import {
   buildAttachmentChunkRows,
   normalizeMarkdownForStorage,
 } from '@/lib/chat-backend/services/rag/attachment-content.pipeline'
-import { R2UploadServiceError, r2UploadService } from '@/lib/upload/upload.service'
+import {
+  R2UploadServiceError,
+  r2UploadService,
+} from '@/lib/upload/upload.service'
 import {
   FileConversionError,
   FilePersistenceError,
@@ -94,9 +97,10 @@ async function convertToMarkdown(input: {
   }
   clearTimeout(timeoutId)
 
-  const workerPayload = (await convertResponse
-    .json()
-    .catch(() => null)) as { markdown?: unknown; error?: unknown } | null
+  const workerPayload = (await convertResponse.json().catch(() => null)) as {
+    markdown?: unknown
+    error?: unknown
+  } | null
 
   if (!convertResponse.ok) {
     const message =

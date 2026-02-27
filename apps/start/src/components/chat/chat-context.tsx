@@ -25,7 +25,7 @@ import { getProviderToolDefinition } from '@/lib/ai-catalog/provider-tools'
 import {
   canUseAdvancedProviderTools,
   canUseReasoningControls,
-} from '@/lib/app-feature-flags'
+} from '@/utils/app-feature-flags'
 import { evaluateModelAvailability } from '@/lib/model-policy/policy-engine'
 import type {
   ChatAttachment,
@@ -95,7 +95,9 @@ function toUIMessageFromStoredMessage(message: {
   const attachments = Array.isArray(message.sources)
     ? message.sources
         .filter(
-          (source): source is { sourceId: string; url: string; title?: string } =>
+          (
+            source,
+          ): source is { sourceId: string; url: string; title?: string } =>
             !!source &&
             typeof source.sourceId === 'string' &&
             typeof source.url === 'string',
@@ -165,10 +167,14 @@ function mergeStoredMessagesWithLocal(
 
     const storedText = textFromUIMessage(storedMessage)
     const localText = textFromUIMessage(localMessage)
-    const storedAttachmentCount = Array.isArray(storedMessage.metadata?.attachments)
+    const storedAttachmentCount = Array.isArray(
+      storedMessage.metadata?.attachments,
+    )
       ? storedMessage.metadata!.attachments!.length
       : 0
-    const localAttachmentCount = Array.isArray(localMessage.metadata?.attachments)
+    const localAttachmentCount = Array.isArray(
+      localMessage.metadata?.attachments,
+    )
       ? localMessage.metadata!.attachments!.length
       : 0
 
@@ -306,12 +312,16 @@ export function ChatProvider({
                       ? orgPolicyRow.providerKeyStatus.syncedAt
                       : 0,
                   providers: {
-                    openai: Boolean(orgPolicyRow.providerKeyStatus.providers.openai),
-                    anthropic: Boolean(orgPolicyRow.providerKeyStatus.providers.anthropic),
+                    openai: Boolean(
+                      orgPolicyRow.providerKeyStatus.providers.openai,
+                    ),
+                    anthropic: Boolean(
+                      orgPolicyRow.providerKeyStatus.providers.anthropic,
+                    ),
                   },
                   hasAnyProviderKey:
-                    Boolean(orgPolicyRow.providerKeyStatus.providers.openai)
-                    || Boolean(orgPolicyRow.providerKeyStatus.providers.anthropic),
+                    Boolean(orgPolicyRow.providerKeyStatus.providers.openai) ||
+                    Boolean(orgPolicyRow.providerKeyStatus.providers.anthropic),
                 }
               : undefined,
           updatedAt:
@@ -322,13 +332,13 @@ export function ChatProvider({
         }
       : undefined
 
-    return AI_CATALOG
-      .filter((model) =>
+    return AI_CATALOG.filter(
+      (model) =>
         evaluateModelAvailability({
           model,
           policy,
         }).allowed,
-      )
+    )
       .filter((model) => {
         if (!policy?.complianceFlags?.require_org_provider_key) return true
         return hasActiveOrgKeyForModel({
@@ -348,9 +358,7 @@ export function ChatProvider({
         visibleTools: model.providerToolIds
           .map((toolId) => getProviderToolDefinition(model.providerId, toolId))
           .filter((tool) =>
-            tool
-              ? canUseAdvancedProviderTools() || !tool.advanced
-              : false,
+            tool ? canUseAdvancedProviderTools() || !tool.advanced : false,
           )
           .map((tool) => tool!.name),
       }))
@@ -363,9 +371,9 @@ export function ChatProvider({
   >(undefined)
   const selectedModelIdRef = useRef(selectedModelId)
   const selectedReasoningEffortRef = useRef(selectedReasoningEffort)
-  const pendingAttachmentsRef = useRef<readonly ChatAttachmentInput[] | undefined>(
-    undefined,
-  )
+  const pendingAttachmentsRef = useRef<
+    readonly ChatAttachmentInput[] | undefined
+  >(undefined)
   // Tracks attachment pills that should be rendered on the optimistic user row
   // immediately after send (before server persistence snapshots catch up).
   const pendingOptimisticAttachmentManifestsRef = useRef<
@@ -697,7 +705,10 @@ export function ChatProvider({
           pendingOptimisticAttachmentManifestsRef.current =
             pendingOptimisticAttachmentManifestsRef.current.filter(
               (entry) =>
-                !(entry.text === text && entry.attachments === attachmentManifest),
+                !(
+                  entry.text === text &&
+                  entry.attachments === attachmentManifest
+                ),
             )
         }
         pendingAttachmentsRef.current = undefined
@@ -713,22 +724,30 @@ export function ChatProvider({
   )
 
   const clear = useCallback(() => setMessages([]), [setMessages])
-  const setModelSelection = useCallback((modelId: string) => {
-    const nextModel = selectableModels.find((model) => model.id === modelId)
-    if (!nextModel) return
-    setSelectedModelId(nextModel.id)
-    setSelectedReasoningEffort(nextModel.defaultReasoningEffort)
-  }, [selectableModels])
-  const setReasoningSelection = useCallback((reasoningEffort?: AiReasoningEffort) => {
-    const model = selectableModels.find((entry) => entry.id === selectedModelId)
-    if (!model) return
-    if (!reasoningEffort) {
-      setSelectedReasoningEffort(undefined)
-      return
-    }
-    if (!model.reasoningEfforts.includes(reasoningEffort)) return
-    setSelectedReasoningEffort(reasoningEffort)
-  }, [selectableModels, selectedModelId])
+  const setModelSelection = useCallback(
+    (modelId: string) => {
+      const nextModel = selectableModels.find((model) => model.id === modelId)
+      if (!nextModel) return
+      setSelectedModelId(nextModel.id)
+      setSelectedReasoningEffort(nextModel.defaultReasoningEffort)
+    },
+    [selectableModels],
+  )
+  const setReasoningSelection = useCallback(
+    (reasoningEffort?: AiReasoningEffort) => {
+      const model = selectableModels.find(
+        (entry) => entry.id === selectedModelId,
+      )
+      if (!model) return
+      if (!reasoningEffort) {
+        setSelectedReasoningEffort(undefined)
+        return
+      }
+      if (!model.reasoningEfforts.includes(reasoningEffort)) return
+      setSelectedReasoningEffort(reasoningEffort)
+    },
+    [selectableModels, selectedModelId],
+  )
 
   const messagesValue = useMemo<ChatMessagesContextValue>(
     () => ({

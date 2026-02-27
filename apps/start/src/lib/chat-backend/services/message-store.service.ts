@@ -2,7 +2,7 @@ import type { UIMessage } from 'ai'
 import { Effect, Layer, ServiceMap } from 'effect'
 import { getCatalogModel } from '@/lib/ai-catalog'
 import type { AiReasoningEffort } from '@/lib/ai-catalog/types'
-import { isEmbeddingFeatureEnabled } from '@/lib/app-feature-flags'
+import { isEmbeddingFeatureEnabled } from '@/utils/app-feature-flags'
 import type {
   ChatAttachment,
   ChatAttachmentInput,
@@ -137,456 +137,483 @@ export const MessageStoreZero = Layer.effect(
     const attachmentRag = yield* AttachmentRagService
 
     return {
-  loadThreadMessages: ({ threadId, model, requestId }) =>
-    Effect.gen(function* () {
-      const db = getZeroDatabase()
-      if (!db) {
-        return yield* Effect.fail(
-          new MessagePersistenceError({
-            message: 'Failed to load messages',
-            requestId,
-            threadId,
-            cause: 'ZERO_UPSTREAM_DB is not configured',
-          }),
-        )
-      }
-
-      const messageRows = yield* Effect.tryPromise({
-        try: () =>
-          db.run(zql.message.where('threadId', threadId).orderBy('created_at', 'asc')),
-        catch: (error) =>
-          new MessagePersistenceError({
-            message: 'Failed to load messages',
-            requestId,
-            threadId,
-            cause: String(error),
-          }),
-      })
-      const attachmentRows = yield* Effect.tryPromise({
-        try: () =>
-          db.run(zql.attachment.where('threadId', threadId).orderBy('createdAt', 'asc')),
-        catch: (error) =>
-          new MessagePersistenceError({
-            message: 'Failed to load messages',
-            requestId,
-            threadId,
-            cause: String(error),
-          }),
-      })
-
-      const attachmentsById = new Map(
-        attachmentRows.map((attachment) => [attachment.id, attachment]),
-      )
-      const modelCapabilities = getCatalogModel(model)?.capabilities
-      const latestUserMessageRow = [...messageRows]
-        .reverse()
-        .find((row) => row.role === 'user')
-      const latestUserText = latestUserMessageRow?.content ?? ''
-      const fallbackAttachmentById = new Map(
-        attachmentRows
-          .filter((attachment) =>
-            modelCapabilities
-              ? !supportsNativeAttachment({
-                  mimeType: attachment.mimeType,
-                  capabilities: modelCapabilities,
-                })
-              : true,
-          )
-          .map((attachment) => [attachment.id, attachment]),
-      )
-
-      let fallbackContextBlock = ''
-      if (latestUserText.trim().length > 0 && fallbackAttachmentById.size > 0) {
-        const retrievalLimits = getRetrievalLimits()
-        const queryEmbedding = yield* Effect.tryPromise({
-          try: () => buildQueryEmbedding(latestUserText),
-          catch: (error): QueryEmbeddingFallbackError => ({
-            _tag: 'QueryEmbeddingFallbackError',
-            cause: String(error),
-          }),
-        }).pipe(
-          Effect.catchTag('QueryEmbeddingFallbackError', (error) =>
-            isEmbeddingFeatureEnabled()
-              ? Effect.logError('Embedding query generation failed, using fallback excerpts', {
-                  requestId,
-                  threadId,
-                  cause: error.cause,
-                }).pipe(Effect.as(null))
-              : Effect.succeed(null),
-          ),
-        )
-        const rankedChunks = queryEmbedding
-          ? yield* attachmentRag
-              .searchThreadAttachments({
-                request: {
-                  scopeType: 'attachment',
-                  threadId,
-                  userId: latestUserMessageRow?.userId ?? '',
-                  sourceIds: [...fallbackAttachmentById.keys()],
-                  queryEmbedding: queryEmbedding.embedding,
-                  limit: retrievalLimits.maxChunks * 3,
-                },
-              })
-              .pipe(
-                Effect.mapError(
-                  (error): VectorRetrievalFallbackError => ({
-                    _tag: 'VectorRetrievalFallbackError',
-                    cause: String(error),
-                  }),
-                ),
-                Effect.catchTag('VectorRetrievalFallbackError', (error) =>
-                  isEmbeddingFeatureEnabled()
-                    ? Effect.logError('Vector retrieval failed, using fallback excerpts', {
-                        requestId,
-                        threadId,
-                        cause: error.cause,
-                      }).pipe(Effect.as([]))
-                    : Effect.succeed([]),
-                ),
-              )
-          : []
-
-        if (rankedChunks.length > 0) {
-          const selectedChunks: Array<(typeof rankedChunks)[number]> = []
-          let usedChars = 0
-          for (const chunk of rankedChunks) {
-            if (selectedChunks.length >= retrievalLimits.maxChunks) break
-            if (usedChars + chunk.content.length > retrievalLimits.maxChars) continue
-            selectedChunks.push(chunk)
-            usedChars += chunk.content.length
+      loadThreadMessages: ({ threadId, model, requestId }) =>
+        Effect.gen(function* () {
+          const db = getZeroDatabase()
+          if (!db) {
+            return yield* Effect.fail(
+              new MessagePersistenceError({
+                message: 'Failed to load messages',
+                requestId,
+                threadId,
+                cause: 'ZERO_UPSTREAM_DB is not configured',
+              }),
+            )
           }
 
-          fallbackContextBlock = buildRetrievedChunksContextBlock(
-            selectedChunks
-              .map((chunk) => {
-                const attachment = fallbackAttachmentById.get(chunk.sourceId)
-                if (!attachment) return null
-                return {
-                  attachmentName: attachment.fileName,
-                  mimeType: attachment.mimeType,
-                  content: chunk.content,
-                }
-              })
-              .filter(
-                (
-                  chunk,
-                ): chunk is {
-                  attachmentName: string
-                  mimeType: string
-                  content: string
-                } => !!chunk,
+          const messageRows = yield* Effect.tryPromise({
+            try: () =>
+              db.run(
+                zql.message
+                  .where('threadId', threadId)
+                  .orderBy('created_at', 'asc'),
               ),
-          )
-        } else {
-          fallbackContextBlock = buildAttachmentExcerptFallback([
-            ...fallbackAttachmentById.values(),
-          ])
-        }
-      }
+            catch: (error) =>
+              new MessagePersistenceError({
+                message: 'Failed to load messages',
+                requestId,
+                threadId,
+                cause: String(error),
+              }),
+          })
+          const attachmentRows = yield* Effect.tryPromise({
+            try: () =>
+              db.run(
+                zql.attachment
+                  .where('threadId', threadId)
+                  .orderBy('createdAt', 'asc'),
+              ),
+            catch: (error) =>
+              new MessagePersistenceError({
+                message: 'Failed to load messages',
+                requestId,
+                threadId,
+                cause: String(error),
+              }),
+          })
 
-      return messageRows.map((message) => {
-        const attachmentIds = Array.isArray(message.attachmentsIds)
-          ? message.attachmentsIds
-          : []
-        const linkedAttachments = attachmentIds
-          .map((id) => attachmentsById.get(id))
-          .filter((attachment) => !!attachment)
-        const attachmentMetadata: ChatAttachment[] = linkedAttachments.map(
-          (attachment) => ({
-            id: attachment.id,
-            key: attachment.fileKey,
-            url: attachment.attachmentUrl,
-            name: attachment.fileName,
-            size: attachment.fileSize,
-            contentType: attachment.mimeType,
-          }),
-        )
-        const nativeAttachments =
-          message.role === 'user'
-            ? linkedAttachments.filter((attachment) =>
+          const attachmentsById = new Map(
+            attachmentRows.map((attachment) => [attachment.id, attachment]),
+          )
+          const modelCapabilities = getCatalogModel(model)?.capabilities
+          const latestUserMessageRow = [...messageRows]
+            .reverse()
+            .find((row) => row.role === 'user')
+          const latestUserText = latestUserMessageRow?.content ?? ''
+          const fallbackAttachmentById = new Map(
+            attachmentRows
+              .filter((attachment) =>
                 modelCapabilities
-                  ? supportsNativeAttachment({
+                  ? !supportsNativeAttachment({
                       mimeType: attachment.mimeType,
                       capabilities: modelCapabilities,
                     })
-                  : false,
+                  : true,
               )
-            : []
-        const modelText =
-          message.role === 'user' &&
-          latestUserMessageRow?.messageId === message.messageId &&
-          fallbackContextBlock.length > 0
-            ? `${message.content}\n\n${fallbackContextBlock}`
-            : message.content
-        const messageParts: UIMessage['parts'] = [
-          { type: 'text', text: modelText },
-          ...nativeAttachments.map((attachment) => ({
-            type: 'file' as const,
-            mediaType: attachment.mimeType,
-            filename: attachment.fileName,
-            url: attachment.attachmentUrl,
-          })),
-        ]
-
-        return {
-          id: message.messageId,
-          role: message.role,
-          parts: messageParts,
-          metadata: {
-            ...(message.role === 'assistant' ? { model: message.model } : {}),
-            ...(attachmentMetadata.length > 0
-              ? { attachments: attachmentMetadata }
-              : {}),
-          },
-        }
-      })
-    }),
-  appendUserMessage: ({
-    threadDbId,
-    threadId,
-    message,
-    attachments,
-    userId,
-    model,
-    reasoningEffort,
-    modelParams,
-    requestId,
-  }) =>
-    Effect.gen(function* () {
-      const db = getZeroDatabase()
-      if (!db) {
-        return yield* Effect.fail(
-          new MessagePersistenceError({
-            message: 'Failed to append user message',
-            requestId,
-            threadId,
-            cause: 'ZERO_UPSTREAM_DB is not configured',
-          }),
-        )
-      }
-
-      const now = Date.now()
-      const linkedAttachmentsForReturn: ChatAttachment[] = []
-      const vectorLinks: Array<{
-        attachmentId: string
-        userId: string
-        threadId: string
-        messageId: string
-        updatedAt: number
-      }> = []
-
-      yield* Effect.tryPromise({
-        try: () =>
-          db.transaction(async (tx) => {
-            try {
-              const existing = await tx.run(
-                zql.message.where('id', message.id).where('userId', userId).one(),
-              )
-              if (existing) return
-
-              const attachmentIds = (attachments ?? [])
-                .map((attachment) => attachment.id)
-                .filter((id) => id.trim().length > 0)
-              const linkedAttachments: ChatAttachment[] = []
-              for (const attachmentId of attachmentIds) {
-                const existingAttachment = await tx.run(
-                  zql.attachment
-                    .where('id', attachmentId)
-                    .where('userId', userId)
-                    .one(),
-                )
-                if (!existingAttachment) continue
-
-                linkedAttachments.push({
-                  id: existingAttachment.id,
-                  key: existingAttachment.fileKey,
-                  url: existingAttachment.attachmentUrl,
-                  name: existingAttachment.fileName,
-                  size: existingAttachment.fileSize,
-                  contentType: existingAttachment.mimeType,
-                })
-
-                await tx.mutate.attachment.update({
-                  id: existingAttachment.id,
-                  messageId: message.id,
-                  threadId,
-                  updatedAt: now,
-                })
-                vectorLinks.push({
-                  attachmentId: existingAttachment.id,
-                  userId,
-                  threadId,
-                  messageId: message.id,
-                  updatedAt: now,
-                })
-              }
-              linkedAttachmentsForReturn.push(...linkedAttachments)
-
-              await tx.mutate.message.insert({
-                // Deterministic key makes retries naturally idempotent.
-                id: message.id,
-                messageId: message.id,
-                threadId,
-                userId,
-                content: getUserMessageText(message),
-                status: 'done',
-                role: 'user',
-                created_at: now,
-                updated_at: now,
-                model,
-                modelParams,
-                sources: linkedAttachments.map((attachment) => ({
-                  sourceId: attachment.id,
-                  url: attachment.url,
-                  title: attachment.name,
-                })),
-                attachmentsIds: linkedAttachments.map((attachment) => attachment.id),
-              })
-            } catch {
-              // Duplicate insert on retry; row already exists.
-              return
-            }
-
-            await tx.mutate.thread.update({
-              id: threadDbId,
-              model,
-              reasoningEffort,
-              generationStatus: 'generation',
-              updatedAt: now,
-              lastMessageAt: now,
-            })
-          }),
-        catch: (error) =>
-          new MessagePersistenceError({
-            message: 'Failed to append user message',
-            requestId,
-            threadId,
-            cause: String(error),
-          }),
-      })
-
-      for (const link of vectorLinks) {
-        yield* attachmentRag
-          .linkAttachmentToThread(link)
-          .pipe(Effect.catch(() => Effect.void))
-      }
-
-      return toUserMessage(message, linkedAttachmentsForReturn)
-    }),
-  finalizeAssistantMessage: ({
-    threadDbId,
-    threadModel,
-    threadId,
-    userId,
-    assistantMessageId,
-    ok,
-    finalContent,
-    reasoning,
-    errorMessage,
-    modelParams,
-    requestId,
-  }) =>
-    Effect.tryPromise({
-      try: async () => {
-        const db = getZeroDatabase()
-        if (!db) {
-          throw new Error('ZERO_UPSTREAM_DB is not configured')
-        }
-
-        const now = Date.now()
-        await db.transaction(async (tx) => {
-          const existing = await tx.run(
-            zql.message
-              .where('id', assistantMessageId)
-              .where('userId', userId)
-              .one(),
+              .map((attachment) => [attachment.id, attachment]),
           )
 
-          if (existing) {
-            // Update path is idempotent: retries finalize the same assistant row.
-            const update: {
-              id: string
-              content: string
-              reasoning?: string
-              status: 'done' | 'error'
-              updated_at: number
-              modelParams?: { readonly reasoningEffort?: AiReasoningEffort }
-              serverError?: { type: string; message: string }
-            } = {
-              id: existing.id,
-              content: finalContent,
-              reasoning,
-              status: ok ? 'done' : 'error',
-              updated_at: now,
-              modelParams,
-            }
+          let fallbackContextBlock = ''
+          if (
+            latestUserText.trim().length > 0 &&
+            fallbackAttachmentById.size > 0
+          ) {
+            const retrievalLimits = getRetrievalLimits()
+            const queryEmbedding = yield* Effect.tryPromise({
+              try: () => buildQueryEmbedding(latestUserText),
+              catch: (error): QueryEmbeddingFallbackError => ({
+                _tag: 'QueryEmbeddingFallbackError',
+                cause: String(error),
+              }),
+            }).pipe(
+              Effect.catchTag('QueryEmbeddingFallbackError', (error) =>
+                isEmbeddingFeatureEnabled()
+                  ? Effect.logError(
+                      'Embedding query generation failed, using fallback excerpts',
+                      {
+                        requestId,
+                        threadId,
+                        cause: error.cause,
+                      },
+                    ).pipe(Effect.as(null))
+                  : Effect.succeed(null),
+              ),
+            )
+            const rankedChunks = queryEmbedding
+              ? yield* attachmentRag
+                  .searchThreadAttachments({
+                    request: {
+                      scopeType: 'attachment',
+                      threadId,
+                      userId: latestUserMessageRow?.userId ?? '',
+                      sourceIds: [...fallbackAttachmentById.keys()],
+                      queryEmbedding: queryEmbedding.embedding,
+                      limit: retrievalLimits.maxChunks * 3,
+                    },
+                  })
+                  .pipe(
+                    Effect.mapError(
+                      (error): VectorRetrievalFallbackError => ({
+                        _tag: 'VectorRetrievalFallbackError',
+                        cause: String(error),
+                      }),
+                    ),
+                    Effect.catchTag('VectorRetrievalFallbackError', (error) =>
+                      isEmbeddingFeatureEnabled()
+                        ? Effect.logError(
+                            'Vector retrieval failed, using fallback excerpts',
+                            {
+                              requestId,
+                              threadId,
+                              cause: error.cause,
+                            },
+                          ).pipe(Effect.as([]))
+                        : Effect.succeed([]),
+                    ),
+                  )
+              : []
 
-            if (!ok) {
-              update.serverError = {
-                type: 'stream_error',
-                message: errorMessage ?? 'Assistant stream failed',
+            if (rankedChunks.length > 0) {
+              const selectedChunks: Array<(typeof rankedChunks)[number]> = []
+              let usedChars = 0
+              for (const chunk of rankedChunks) {
+                if (selectedChunks.length >= retrievalLimits.maxChunks) break
+                if (usedChars + chunk.content.length > retrievalLimits.maxChars)
+                  continue
+                selectedChunks.push(chunk)
+                usedChars += chunk.content.length
               }
-            }
 
-            await tx.mutate.message.update(update)
-          } else {
-            // Insert path handles first successful finalize for this assistant message.
-            const insert: {
-              id: string
-              messageId: string
-              threadId: string
-              userId: string
-              content: string
-              reasoning?: string
-              status: 'done' | 'error'
-              role: 'assistant'
-              created_at: number
-              updated_at: number
-              model: string
-              modelParams?: { readonly reasoningEffort?: AiReasoningEffort }
-              attachmentsIds: readonly string[]
-              serverError?: { type: string; message: string }
-            } = {
-              id: assistantMessageId,
-              messageId: assistantMessageId,
-              threadId,
-              userId,
-              content: finalContent,
-              reasoning,
-              status: ok ? 'done' : 'error',
-              role: 'assistant',
-              created_at: now,
-              updated_at: now,
-              model: threadModel,
-              modelParams,
-              attachmentsIds: [],
+              fallbackContextBlock = buildRetrievedChunksContextBlock(
+                selectedChunks
+                  .map((chunk) => {
+                    const attachment = fallbackAttachmentById.get(
+                      chunk.sourceId,
+                    )
+                    if (!attachment) return null
+                    return {
+                      attachmentName: attachment.fileName,
+                      mimeType: attachment.mimeType,
+                      content: chunk.content,
+                    }
+                  })
+                  .filter(
+                    (
+                      chunk,
+                    ): chunk is {
+                      attachmentName: string
+                      mimeType: string
+                      content: string
+                    } => !!chunk,
+                  ),
+              )
+            } else {
+              fallbackContextBlock = buildAttachmentExcerptFallback([
+                ...fallbackAttachmentById.values(),
+              ])
             }
-            if (!ok) {
-              insert.serverError = {
-                type: 'stream_error',
-                message: errorMessage ?? 'Assistant stream failed',
-              }
-            }
-            await tx.mutate.message.insert(insert)
           }
 
-          await tx.mutate.thread.update({
-            id: threadDbId,
-            generationStatus: ok ? 'completed' : 'failed',
-            updatedAt: now,
-            lastMessageAt: now,
+          return messageRows.map((message) => {
+            const attachmentIds = Array.isArray(message.attachmentsIds)
+              ? message.attachmentsIds
+              : []
+            const linkedAttachments = attachmentIds
+              .map((id) => attachmentsById.get(id))
+              .filter((attachment) => !!attachment)
+            const attachmentMetadata: ChatAttachment[] = linkedAttachments.map(
+              (attachment) => ({
+                id: attachment.id,
+                key: attachment.fileKey,
+                url: attachment.attachmentUrl,
+                name: attachment.fileName,
+                size: attachment.fileSize,
+                contentType: attachment.mimeType,
+              }),
+            )
+            const nativeAttachments =
+              message.role === 'user'
+                ? linkedAttachments.filter((attachment) =>
+                    modelCapabilities
+                      ? supportsNativeAttachment({
+                          mimeType: attachment.mimeType,
+                          capabilities: modelCapabilities,
+                        })
+                      : false,
+                  )
+                : []
+            const modelText =
+              message.role === 'user' &&
+              latestUserMessageRow?.messageId === message.messageId &&
+              fallbackContextBlock.length > 0
+                ? `${message.content}\n\n${fallbackContextBlock}`
+                : message.content
+            const messageParts: UIMessage['parts'] = [
+              { type: 'text', text: modelText },
+              ...nativeAttachments.map((attachment) => ({
+                type: 'file' as const,
+                mediaType: attachment.mimeType,
+                filename: attachment.fileName,
+                url: attachment.attachmentUrl,
+              })),
+            ]
+
+            return {
+              id: message.messageId,
+              role: message.role,
+              parts: messageParts,
+              metadata: {
+                ...(message.role === 'assistant'
+                  ? { model: message.model }
+                  : {}),
+                ...(attachmentMetadata.length > 0
+                  ? { attachments: attachmentMetadata }
+                  : {}),
+              },
+            }
           })
-        })
-      },
-      catch: (error) =>
-        new MessagePersistenceError({
-          message: 'Failed to finalize assistant message',
-          requestId,
-          threadId,
-          cause: String(error),
         }),
-    }),
-}
+      appendUserMessage: ({
+        threadDbId,
+        threadId,
+        message,
+        attachments,
+        userId,
+        model,
+        reasoningEffort,
+        modelParams,
+        requestId,
+      }) =>
+        Effect.gen(function* () {
+          const db = getZeroDatabase()
+          if (!db) {
+            return yield* Effect.fail(
+              new MessagePersistenceError({
+                message: 'Failed to append user message',
+                requestId,
+                threadId,
+                cause: 'ZERO_UPSTREAM_DB is not configured',
+              }),
+            )
+          }
+
+          const now = Date.now()
+          const linkedAttachmentsForReturn: ChatAttachment[] = []
+          const vectorLinks: Array<{
+            attachmentId: string
+            userId: string
+            threadId: string
+            messageId: string
+            updatedAt: number
+          }> = []
+
+          yield* Effect.tryPromise({
+            try: () =>
+              db.transaction(async (tx) => {
+                try {
+                  const existing = await tx.run(
+                    zql.message
+                      .where('id', message.id)
+                      .where('userId', userId)
+                      .one(),
+                  )
+                  if (existing) return
+
+                  const attachmentIds = (attachments ?? [])
+                    .map((attachment) => attachment.id)
+                    .filter((id) => id.trim().length > 0)
+                  const linkedAttachments: ChatAttachment[] = []
+                  for (const attachmentId of attachmentIds) {
+                    const existingAttachment = await tx.run(
+                      zql.attachment
+                        .where('id', attachmentId)
+                        .where('userId', userId)
+                        .one(),
+                    )
+                    if (!existingAttachment) continue
+
+                    linkedAttachments.push({
+                      id: existingAttachment.id,
+                      key: existingAttachment.fileKey,
+                      url: existingAttachment.attachmentUrl,
+                      name: existingAttachment.fileName,
+                      size: existingAttachment.fileSize,
+                      contentType: existingAttachment.mimeType,
+                    })
+
+                    await tx.mutate.attachment.update({
+                      id: existingAttachment.id,
+                      messageId: message.id,
+                      threadId,
+                      updatedAt: now,
+                    })
+                    vectorLinks.push({
+                      attachmentId: existingAttachment.id,
+                      userId,
+                      threadId,
+                      messageId: message.id,
+                      updatedAt: now,
+                    })
+                  }
+                  linkedAttachmentsForReturn.push(...linkedAttachments)
+
+                  await tx.mutate.message.insert({
+                    // Deterministic key makes retries naturally idempotent.
+                    id: message.id,
+                    messageId: message.id,
+                    threadId,
+                    userId,
+                    content: getUserMessageText(message),
+                    status: 'done',
+                    role: 'user',
+                    created_at: now,
+                    updated_at: now,
+                    model,
+                    modelParams,
+                    sources: linkedAttachments.map((attachment) => ({
+                      sourceId: attachment.id,
+                      url: attachment.url,
+                      title: attachment.name,
+                    })),
+                    attachmentsIds: linkedAttachments.map(
+                      (attachment) => attachment.id,
+                    ),
+                  })
+                } catch {
+                  // Duplicate insert on retry; row already exists.
+                  return
+                }
+
+                await tx.mutate.thread.update({
+                  id: threadDbId,
+                  model,
+                  reasoningEffort,
+                  generationStatus: 'generation',
+                  updatedAt: now,
+                  lastMessageAt: now,
+                })
+              }),
+            catch: (error) =>
+              new MessagePersistenceError({
+                message: 'Failed to append user message',
+                requestId,
+                threadId,
+                cause: String(error),
+              }),
+          })
+
+          for (const link of vectorLinks) {
+            yield* attachmentRag
+              .linkAttachmentToThread(link)
+              .pipe(Effect.catch(() => Effect.void))
+          }
+
+          return toUserMessage(message, linkedAttachmentsForReturn)
+        }),
+      finalizeAssistantMessage: ({
+        threadDbId,
+        threadModel,
+        threadId,
+        userId,
+        assistantMessageId,
+        ok,
+        finalContent,
+        reasoning,
+        errorMessage,
+        modelParams,
+        requestId,
+      }) =>
+        Effect.tryPromise({
+          try: async () => {
+            const db = getZeroDatabase()
+            if (!db) {
+              throw new Error('ZERO_UPSTREAM_DB is not configured')
+            }
+
+            const now = Date.now()
+            await db.transaction(async (tx) => {
+              const existing = await tx.run(
+                zql.message
+                  .where('id', assistantMessageId)
+                  .where('userId', userId)
+                  .one(),
+              )
+
+              if (existing) {
+                // Update path is idempotent: retries finalize the same assistant row.
+                const update: {
+                  id: string
+                  content: string
+                  reasoning?: string
+                  status: 'done' | 'error'
+                  updated_at: number
+                  modelParams?: { readonly reasoningEffort?: AiReasoningEffort }
+                  serverError?: { type: string; message: string }
+                } = {
+                  id: existing.id,
+                  content: finalContent,
+                  reasoning,
+                  status: ok ? 'done' : 'error',
+                  updated_at: now,
+                  modelParams,
+                }
+
+                if (!ok) {
+                  update.serverError = {
+                    type: 'stream_error',
+                    message: errorMessage ?? 'Assistant stream failed',
+                  }
+                }
+
+                await tx.mutate.message.update(update)
+              } else {
+                // Insert path handles first successful finalize for this assistant message.
+                const insert: {
+                  id: string
+                  messageId: string
+                  threadId: string
+                  userId: string
+                  content: string
+                  reasoning?: string
+                  status: 'done' | 'error'
+                  role: 'assistant'
+                  created_at: number
+                  updated_at: number
+                  model: string
+                  modelParams?: { readonly reasoningEffort?: AiReasoningEffort }
+                  attachmentsIds: readonly string[]
+                  serverError?: { type: string; message: string }
+                } = {
+                  id: assistantMessageId,
+                  messageId: assistantMessageId,
+                  threadId,
+                  userId,
+                  content: finalContent,
+                  reasoning,
+                  status: ok ? 'done' : 'error',
+                  role: 'assistant',
+                  created_at: now,
+                  updated_at: now,
+                  model: threadModel,
+                  modelParams,
+                  attachmentsIds: [],
+                }
+                if (!ok) {
+                  insert.serverError = {
+                    type: 'stream_error',
+                    message: errorMessage ?? 'Assistant stream failed',
+                  }
+                }
+                await tx.mutate.message.insert(insert)
+              }
+
+              await tx.mutate.thread.update({
+                id: threadDbId,
+                generationStatus: ok ? 'completed' : 'failed',
+                updatedAt: now,
+                lastMessageAt: now,
+              })
+            })
+          },
+          catch: (error) =>
+            new MessagePersistenceError({
+              message: 'Failed to finalize assistant message',
+              requestId,
+              threadId,
+              cause: String(error),
+            }),
+        }),
+    }
   }),
 )
 
@@ -644,7 +671,9 @@ export const MessageStoreMemory = Layer.succeed(MessageStoreService, {
       if (!existing) {
         throw new Error('missing thread message store')
       }
-      const target = existing.find((message) => message.id === assistantMessageId)
+      const target = existing.find(
+        (message) => message.id === assistantMessageId,
+      )
       if (!target) {
         const parts: UIMessage['parts'] = []
         if (reasoning && reasoning.trim().length > 0) {

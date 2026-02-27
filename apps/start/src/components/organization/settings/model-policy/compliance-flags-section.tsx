@@ -1,6 +1,7 @@
 'use client'
 
 import { Form } from '@rift/ui/form'
+import { canUseOrganizationProviderKeys } from '@/utils/app-feature-flags'
 import type { PolicyPayload } from './types'
 import type { useProviderPolicy } from './use-provider-policy'
 
@@ -19,6 +20,8 @@ export function ComplianceFlagsSection({
   updating,
   update,
 }: ComplianceFlagsSectionProps) {
+  const byokEnabled = canUseOrganizationProviderKeys()
+
   return (
     <Form
       title="Compliance Flags"
@@ -45,15 +48,16 @@ export function ComplianceFlagsSection({
             title: 'Require organization provider key',
             description:
               'Only allow models from providers that have an active org API key configured.',
-            checked: Boolean(payload.policy.complianceFlags.require_org_provider_key),
+            checked: Boolean(
+              payload.policy.complianceFlags.require_org_provider_key,
+            ),
             onCheckedChange: (enabled) =>
               void update({
                 action: 'toggle_compliance_flag',
                 flag: 'require_org_provider_key',
                 enabled,
               }),
-            disabled:
-              updating || !payload.featureFlags.enableOrganizationProviderKeys,
+            disabled: updating || !byokEnabled,
           },
         ],
       }}

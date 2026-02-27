@@ -68,11 +68,7 @@ export function SidebarNavItem({
       </span>
     </div>
   ) : (
-    <Button
-      asChild
-      variant="sidebarNavItem"
-      size="sidebarNavItem"
-    >
+    <Button asChild variant="sidebarNavItem" size="sidebarNavItem">
       <Link
         to={href}
         data-active={isActive}

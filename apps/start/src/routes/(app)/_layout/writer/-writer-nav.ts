@@ -1,10 +1,16 @@
 import { isAreaPath } from '@/utils/nav-utils'
-import { DollarSign, FileText, LayoutDashboard, MessageSquare } from 'lucide-react'
+import {
+  DollarSign,
+  FileText,
+  LayoutDashboard,
+  MessageSquare,
+} from 'lucide-react'
 
 export const WRITER_HREF = '/writer'
 export const WRITER_AREA_KEY = 'writer' as const
 
-export const isWriterPath = (pathname: string) => isAreaPath(pathname, WRITER_HREF)
+export const isWriterPath = (pathname: string) =>
+  isAreaPath(pathname, WRITER_HREF)
 
 export const writerNavArea = () => ({
   title: 'Writer',

@@ -30,6 +30,7 @@ import { Route as appLayoutOrganizationSettingsRouteRouteImport } from './routes
 import { Route as appLayoutChatThreadIdRouteRouteImport } from './routes/(app)/_layout/chat/$threadId/route'
 import { Route as appLayoutOrganizationSettingsIndexRouteImport } from './routes/(app)/_layout/organization/settings/index'
 import { Route as appLayoutOrganizationSettingsProviderPolicyRouteRouteImport } from './routes/(app)/_layout/organization/settings/provider-policy/route'
+import { Route as appLayoutOrganizationSettingsByokRouteRouteImport } from './routes/(app)/_layout/organization/settings/byok/route'
 
 const ApiChatRouteRoute = ApiChatRouteRouteImport.update({
   id: '/api/chat',
@@ -141,6 +142,12 @@ const appLayoutOrganizationSettingsProviderPolicyRouteRoute =
     path: '/provider-policy',
     getParentRoute: () => appLayoutOrganizationSettingsRouteRoute,
   } as any)
+const appLayoutOrganizationSettingsByokRouteRoute =
+  appLayoutOrganizationSettingsByokRouteRouteImport.update({
+    id: '/byok',
+    path: '/byok',
+    getParentRoute: () => appLayoutOrganizationSettingsRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRouteRoute
@@ -161,6 +168,7 @@ export interface FileRoutesByFullPath {
   '/settings/debug-auth': typeof appLayoutSettingsDebugAuthRouteRoute
   '/chat/': typeof appLayoutChatIndexRoute
   '/settings/': typeof appLayoutSettingsIndexRoute
+  '/organization/settings/byok': typeof appLayoutOrganizationSettingsByokRouteRoute
   '/organization/settings/provider-policy': typeof appLayoutOrganizationSettingsProviderPolicyRouteRoute
   '/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
 }
@@ -180,6 +188,7 @@ export interface FileRoutesByTo {
   '/settings/debug-auth': typeof appLayoutSettingsDebugAuthRouteRoute
   '/chat': typeof appLayoutChatIndexRoute
   '/settings': typeof appLayoutSettingsIndexRoute
+  '/organization/settings/byok': typeof appLayoutOrganizationSettingsByokRouteRoute
   '/organization/settings/provider-policy': typeof appLayoutOrganizationSettingsProviderPolicyRouteRoute
   '/organization/settings': typeof appLayoutOrganizationSettingsIndexRoute
 }
@@ -204,6 +213,7 @@ export interface FileRoutesById {
   '/(app)/_layout/settings/debug-auth': typeof appLayoutSettingsDebugAuthRouteRoute
   '/(app)/_layout/chat/': typeof appLayoutChatIndexRoute
   '/(app)/_layout/settings/': typeof appLayoutSettingsIndexRoute
+  '/(app)/_layout/organization/settings/byok': typeof appLayoutOrganizationSettingsByokRouteRoute
   '/(app)/_layout/organization/settings/provider-policy': typeof appLayoutOrganizationSettingsProviderPolicyRouteRoute
   '/(app)/_layout/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
 }
@@ -228,6 +238,7 @@ export interface FileRouteTypes {
     | '/settings/debug-auth'
     | '/chat/'
     | '/settings/'
+    | '/organization/settings/byok'
     | '/organization/settings/provider-policy'
     | '/organization/settings/'
   fileRoutesByTo: FileRoutesByTo
@@ -247,6 +258,7 @@ export interface FileRouteTypes {
     | '/settings/debug-auth'
     | '/chat'
     | '/settings'
+    | '/organization/settings/byok'
     | '/organization/settings/provider-policy'
     | '/organization/settings'
   id:
@@ -270,6 +282,7 @@ export interface FileRouteTypes {
     | '/(app)/_layout/settings/debug-auth'
     | '/(app)/_layout/chat/'
     | '/(app)/_layout/settings/'
+    | '/(app)/_layout/organization/settings/byok'
     | '/(app)/_layout/organization/settings/provider-policy'
     | '/(app)/_layout/organization/settings/'
   fileRoutesById: FileRoutesById
@@ -434,6 +447,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appLayoutOrganizationSettingsProviderPolicyRouteRouteImport
       parentRoute: typeof appLayoutOrganizationSettingsRouteRoute
     }
+    '/(app)/_layout/organization/settings/byok': {
+      id: '/(app)/_layout/organization/settings/byok'
+      path: '/byok'
+      fullPath: '/organization/settings/byok'
+      preLoaderRoute: typeof appLayoutOrganizationSettingsByokRouteRouteImport
+      parentRoute: typeof appLayoutOrganizationSettingsRouteRoute
+    }
   }
 }
 
@@ -451,12 +471,15 @@ const appLayoutChatRouteRouteWithChildren =
   appLayoutChatRouteRoute._addFileChildren(appLayoutChatRouteRouteChildren)
 
 interface appLayoutOrganizationSettingsRouteRouteChildren {
+  appLayoutOrganizationSettingsByokRouteRoute: typeof appLayoutOrganizationSettingsByokRouteRoute
   appLayoutOrganizationSettingsProviderPolicyRouteRoute: typeof appLayoutOrganizationSettingsProviderPolicyRouteRoute
   appLayoutOrganizationSettingsIndexRoute: typeof appLayoutOrganizationSettingsIndexRoute
 }
 
 const appLayoutOrganizationSettingsRouteRouteChildren: appLayoutOrganizationSettingsRouteRouteChildren =
   {
+    appLayoutOrganizationSettingsByokRouteRoute:
+      appLayoutOrganizationSettingsByokRouteRoute,
     appLayoutOrganizationSettingsProviderPolicyRouteRoute:
       appLayoutOrganizationSettingsProviderPolicyRouteRoute,
     appLayoutOrganizationSettingsIndexRoute:

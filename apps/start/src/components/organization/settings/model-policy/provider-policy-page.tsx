@@ -3,7 +3,6 @@
 import { ContentPage } from '@/components/layout'
 import { ComplianceFlagsSection } from './compliance-flags-section'
 import { ModelControlsSection } from './model-controls-section'
-import { ProviderApiKeysSection } from './provider-api-keys-section'
 import { ProviderControlsSection } from './provider-controls-section'
 import { useProviderPolicy } from './use-provider-policy'
 
@@ -33,9 +32,16 @@ export function ProviderPolicyPage() {
         </div>
       )}
 
-      <ProviderApiKeysSection payload={payload} updating={busy} update={update} />
-      <ComplianceFlagsSection payload={payload} updating={busy} update={update} />
-      <ProviderControlsSection payload={payload} updating={busy} update={update} />
+      <ComplianceFlagsSection
+        payload={payload}
+        updating={busy}
+        update={update}
+      />
+      <ProviderControlsSection
+        payload={payload}
+        updating={busy}
+        update={update}
+      />
       <ModelControlsSection payload={payload} updating={busy} update={update} />
     </ContentPage>
   )

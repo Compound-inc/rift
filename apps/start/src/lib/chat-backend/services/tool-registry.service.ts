@@ -2,7 +2,7 @@ import type { ToolSet } from 'ai'
 import { Effect, Layer, ServiceMap } from 'effect'
 import { AI_CATALOG_BY_ID } from '@/lib/ai-catalog'
 import { getProviderToolDefinition } from '@/lib/ai-catalog/provider-tools'
-import { canUseAdvancedProviderTools } from '@/lib/app-feature-flags'
+import { canUseAdvancedProviderTools } from '@/utils/app-feature-flags'
 import type { AiReasoningEffort } from '@/lib/ai-catalog/types'
 import { resolveProviderToolSet } from '../provider-tools'
 

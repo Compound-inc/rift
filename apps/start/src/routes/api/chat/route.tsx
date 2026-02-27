@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { getAuth } from '@workos/authkit-tanstack-react-start'
 import { UI_MESSAGE_STREAM_HEADERS } from 'ai'
 import { Effect, Schema } from 'effect'
-import { canUseOrganizationProviderKeys } from '@/lib/app-feature-flags'
+import { canUseOrganizationProviderKeys } from '@/utils/app-feature-flags'
 import {
   ChatOrchestratorService,
   ChatStreamRequest,
@@ -65,7 +65,9 @@ export const Route = createFileRoute('/api/chat')({
         try {
           return await runChatEffect(program)
         } catch (error) {
-          const userId = await authPromise.then(({ user }) => user?.id).catch(() => undefined)
+          const userId = await authPromise
+            .then(({ user }) => user?.id)
+            .catch(() => undefined)
           return handleRouteFailure({
             error,
             requestId,
@@ -122,11 +124,11 @@ export const Route = createFileRoute('/api/chat')({
             ? yield* Effect.promise(() => getOrgAiPolicy(orgWorkosId))
             : undefined
           const skipProviderKeyResolution = Boolean(
-            canUseOrganizationProviderKeys()
-              && orgPolicy?.providerKeyStatus
-              && orgPolicy.providerKeyStatus.syncedAt > 0
-              && !orgPolicy.providerKeyStatus.hasAnyProviderKey
-              && !orgPolicy.complianceFlags.require_org_provider_key,
+            canUseOrganizationProviderKeys() &&
+            orgPolicy?.providerKeyStatus &&
+            orgPolicy.providerKeyStatus.syncedAt > 0 &&
+            !orgPolicy.providerKeyStatus.hasAnyProviderKey &&
+            !orgPolicy.complianceFlags.require_org_provider_key,
           )
           const response = yield* orchestrator.streamChat({
             userId: user.id,
@@ -148,7 +150,9 @@ export const Route = createFileRoute('/api/chat')({
         try {
           return await runChatEffect(program)
         } catch (error) {
-          const userId = await authPromise.then(({ user }) => user?.id).catch(() => undefined)
+          const userId = await authPromise
+            .then(({ user }) => user?.id)
+            .catch(() => undefined)
           return handleRouteFailure({
             error,
             requestId,

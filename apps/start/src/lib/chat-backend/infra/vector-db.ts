@@ -1,4 +1,4 @@
-import { isEmbeddingFeatureEnabled } from '@/lib/app-feature-flags'
+import { isEmbeddingFeatureEnabled } from '@/utils/app-feature-flags'
 
 type VectorChunkInsert = {
   readonly id: string
@@ -73,11 +73,17 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
 }
 
 function getQdrantTimeoutMs(): number {
-  return parsePositiveInt(process.env.QDRANT_TIMEOUT_MS, DEFAULT_QDRANT_TIMEOUT_MS)
+  return parsePositiveInt(
+    process.env.QDRANT_TIMEOUT_MS,
+    DEFAULT_QDRANT_TIMEOUT_MS,
+  )
 }
 
 function getQdrantBatchSize(): number {
-  return parsePositiveInt(process.env.QDRANT_UPSERT_BATCH_SIZE, DEFAULT_QDRANT_BATCH_SIZE)
+  return parsePositiveInt(
+    process.env.QDRANT_UPSERT_BATCH_SIZE,
+    DEFAULT_QDRANT_BATCH_SIZE,
+  )
 }
 
 function buildHeaders(): HeadersInit {
@@ -108,9 +114,11 @@ async function qdrantRequest<T>(
       signal: controller.signal,
     })
 
-    const payload = (await response
-      .json()
-      .catch(() => null)) as { result?: T; status?: string; error?: string } | null
+    const payload = (await response.json().catch(() => null)) as {
+      result?: T
+      status?: string
+      error?: string
+    } | null
     if (!response.ok) {
       throw new Error(
         payload?.error ??
@@ -129,14 +137,10 @@ async function createPayloadIndex(
   fieldSchema: 'keyword',
 ): Promise<void> {
   try {
-    await qdrantRequest(
-      'PUT',
-      `/collections/${collection}/index`,
-      {
-        field_name: fieldName,
-        field_schema: fieldSchema,
-      },
-    )
+    await qdrantRequest('PUT', `/collections/${collection}/index`, {
+      field_name: fieldName,
+      field_schema: fieldSchema,
+    })
   } catch {
     // Index creation is best effort because repeated startup calls are expected.
   }
@@ -168,9 +172,13 @@ async function ensureCollection(vectorSize: number): Promise<void> {
   return ensureReadyPromise
 }
 
-function toPoints(chunks: readonly VectorChunkInsert[]): readonly QdrantPoint[] {
+function toPoints(
+  chunks: readonly VectorChunkInsert[],
+): readonly QdrantPoint[] {
   return chunks
-    .filter((chunk) => Array.isArray(chunk.embedding) && chunk.embedding.length > 0)
+    .filter(
+      (chunk) => Array.isArray(chunk.embedding) && chunk.embedding.length > 0,
+    )
     .map((chunk) => ({
       id: chunk.id,
       vector: chunk.embedding as readonly number[],

@@ -15,8 +15,11 @@ import type {
   EffectiveModelResolution,
   OrgAiPolicy,
 } from '@/lib/model-policy/types'
-import { canUseOrganizationProviderKeys } from '@/lib/app-feature-flags'
-import { MessagePersistenceError, ModelPolicyDeniedError } from '../domain/errors'
+import { canUseOrganizationProviderKeys } from '@/utils/app-feature-flags'
+import {
+  MessagePersistenceError,
+  ModelPolicyDeniedError,
+} from '../domain/errors'
 
 /** Maps policy/runtime selection failures into a chat-domain denied error. */
 function toPolicyDenied(input: {
@@ -53,7 +56,10 @@ export type ModelPolicyServiceShape = {
     readonly requestedReasoningEffort?: string
     readonly skipProviderKeyResolution?: boolean
     readonly requestId: string
-  }) => Effect.Effect<EffectiveModelResolution, ModelPolicyDeniedError | MessagePersistenceError>
+  }) => Effect.Effect<
+    EffectiveModelResolution,
+    ModelPolicyDeniedError | MessagePersistenceError
+  >
 }
 
 /** Dependency-injected model policy service used by chat orchestration. */
@@ -96,8 +102,9 @@ export const ModelPolicyLive = Layer.succeed(ModelPolicyService, {
     requestId,
   }) =>
     Effect.gen(function* () {
-      const policy = orgPolicy
-        ?? (yield* Effect.tryPromise({
+      const policy =
+        orgPolicy ??
+        (yield* Effect.tryPromise({
           try: async () => {
             if (!orgWorkosId) return undefined
             return getOrgAiPolicy(orgWorkosId)
@@ -142,7 +149,9 @@ export const ModelPolicyLive = Layer.succeed(ModelPolicyService, {
       }
 
       const requestedEffort =
-        requestedReasoningEffort ?? threadReasoningEffort ?? selectedModel.defaultReasoningEffort
+        requestedReasoningEffort ??
+        threadReasoningEffort ??
+        selectedModel.defaultReasoningEffort
       const reasoningEffort =
         requestedEffort === 'none'
           ? undefined
@@ -173,11 +182,17 @@ export const ModelPolicyLive = Layer.succeed(ModelPolicyService, {
             )
           }
         } else {
-          if (!strictProviderKeyPolicyEnabled && hasAnyPersistedProviderKey === false) {
+          if (
+            !strictProviderKeyPolicyEnabled &&
+            hasAnyPersistedProviderKey === false
+          ) {
             return {
               modelId: selectedModel.id,
               reasoningEffort,
-              source: requestedModelId || requestedReasoningEffort ? 'request' : 'thread',
+              source:
+                requestedModelId || requestedReasoningEffort
+                  ? 'request'
+                  : 'thread',
             } satisfies EffectiveModelResolution
           }
 
@@ -188,8 +203,8 @@ export const ModelPolicyLive = Layer.succeed(ModelPolicyService, {
            * - evaluate keys in declared order so behavior stays deterministic.
            */
           const declaredProviders = selectedModel.providers
-          const byokCandidateProviders = declaredProviders.filter((providerId) =>
-            isByokSupportedProviderId(providerId),
+          const byokCandidateProviders = declaredProviders.filter(
+            (providerId) => isByokSupportedProviderId(providerId),
           )
 
           if (byokCandidateProviders.length === 0) {
@@ -208,7 +223,8 @@ export const ModelPolicyLive = Layer.succeed(ModelPolicyService, {
 
             for (const providerId of byokCandidateProviders) {
               const providerMarkedAsConfigured =
-                policy?.providerKeyStatus && policy.providerKeyStatus.syncedAt > 0
+                policy?.providerKeyStatus &&
+                policy.providerKeyStatus.syncedAt > 0
                   ? policy.providerKeyStatus.providers[providerId]
                   : undefined
               if (providerMarkedAsConfigured === false) {
@@ -246,7 +262,10 @@ export const ModelPolicyLive = Layer.succeed(ModelPolicyService, {
               return {
                 modelId: selectedModel.id,
                 reasoningEffort,
-                source: requestedModelId || requestedReasoningEffort ? 'request' : 'thread',
+                source:
+                  requestedModelId || requestedReasoningEffort
+                    ? 'request'
+                    : 'thread',
                 providerApiKeyOverride: {
                   providerId,
                   apiKey: providerApiKey,
@@ -271,7 +290,8 @@ export const ModelPolicyLive = Layer.succeed(ModelPolicyService, {
       return {
         modelId: selectedModel.id,
         reasoningEffort,
-        source: requestedModelId || requestedReasoningEffort ? 'request' : 'thread',
+        source:
+          requestedModelId || requestedReasoningEffort ? 'request' : 'thread',
       } satisfies EffectiveModelResolution
     }),
 })
@@ -286,6 +306,7 @@ export const ModelPolicyMemory = Layer.succeed(ModelPolicyService, {
         requestedReasoningEffort && requestedReasoningEffort !== 'none'
           ? (requestedReasoningEffort as AiReasoningEffort)
           : undefined,
-      source: requestedModelId || requestedReasoningEffort ? 'request' : 'thread',
+      source:
+        requestedModelId || requestedReasoningEffort ? 'request' : 'thread',
     } satisfies EffectiveModelResolution),
 })

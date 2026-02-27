@@ -2,22 +2,12 @@ import { createFileRoute } from '@tanstack/react-router'
 import { getAuth } from '@workos/authkit-tanstack-react-start'
 import { z } from 'zod'
 import { AI_CATALOG, AI_MODELS_BY_PROVIDER } from '@/lib/ai-catalog'
-import { canUseOrganizationProviderKeys } from '@/lib/app-feature-flags'
+import { evaluateModelAvailability } from '@/lib/model-policy/policy-engine'
 import {
-  BYOK_SUPPORTED_PROVIDERS,
-  deleteOrgProviderApiKey,
-  readOrgProviderApiKeyStatus,
-  upsertOrgProviderApiKey,
-} from '@/lib/model-policy/provider-keys'
-import {
-  evaluateModelAvailability,
-} from '@/lib/model-policy/policy-engine'
-import { getOrgAiPolicy, upsertOrgAiPolicy } from '@/lib/model-policy/repository'
-import {
-  EMPTY_ORG_PROVIDER_KEY_STATUS,
-  toOrgProviderKeyStatusSnapshot,
-  type OrgProviderKeyStatusSnapshot,
-} from '@/lib/model-policy/types'
+  getOrgAiPolicy,
+  upsertOrgAiPolicy,
+} from '@/lib/model-policy/repository'
+import { EMPTY_ORG_PROVIDER_KEY_STATUS } from '@/lib/model-policy/types'
 
 /** Request shape for provider-level policy updates. */
 const ToggleProviderBody = z.object({
@@ -40,24 +30,11 @@ const ToggleComplianceFlagBody = z.object({
   enabled: z.boolean(),
 })
 
-const SetProviderApiKeyBody = z.object({
-  action: z.literal('set_provider_api_key'),
-  providerId: z.enum(BYOK_SUPPORTED_PROVIDERS),
-  apiKey: z.string().min(1),
-})
-
-const RemoveProviderApiKeyBody = z.object({
-  action: z.literal('remove_provider_api_key'),
-  providerId: z.enum(BYOK_SUPPORTED_PROVIDERS),
-})
-
 /** Union for supported update actions handled by POST /api/org/model-policy. */
 const UpdatePolicyBody = z.discriminatedUnion('action', [
   ToggleProviderBody,
   ToggleModelBody,
   ToggleComplianceFlagBody,
-  SetProviderApiKeyBody,
-  RemoveProviderApiKeyBody,
 ])
 
 /** Deduplicates values while preserving first-seen order. */
@@ -98,7 +75,9 @@ async function getOrgIdOrResponse() {
   if (!orgWorkosId) {
     return {
       response: new Response(
-        JSON.stringify({ error: 'Organization context is required for org settings.' }),
+        JSON.stringify({
+          error: 'Organization context is required for org settings.',
+        }),
         {
           status: 400,
           headers: { 'Content-Type': 'application/json' },
@@ -134,29 +113,6 @@ function toModelPayload(input: {
 /** Builds full admin payload (policy + providers + model decisions) for one org. */
 async function buildResponsePayload(orgWorkosId: string) {
   const policy = await getOrgAiPolicy(orgWorkosId)
-  const organizationProviderKeysEnabled = canUseOrganizationProviderKeys()
-  let providerApiKeys = {
-    openai: false,
-    anthropic: false,
-  }
-
-  if (organizationProviderKeysEnabled) {
-    if (policy?.providerKeyStatus && policy.providerKeyStatus.syncedAt > 0) {
-      providerApiKeys = policy.providerKeyStatus.providers
-    } else {
-      providerApiKeys = await readOrgProviderApiKeyStatus(orgWorkosId)
-
-      if (policy) {
-        await upsertOrgAiPolicy({
-          orgWorkosId,
-          disabledProviderIds: policy.disabledProviderIds,
-          disabledModelIds: policy.disabledModelIds,
-          complianceFlags: policy.complianceFlags,
-          providerKeyStatus: toOrgProviderKeyStatusSnapshot(providerApiKeys),
-        })
-      }
-    }
-  }
 
   const models = AI_CATALOG.map((model) => {
     const decision = evaluateModelAvailability({ model, policy })
@@ -183,12 +139,7 @@ async function buildResponsePayload(orgWorkosId: string) {
       disabledModelIds: policy?.disabledModelIds ?? [],
       complianceFlags: policy?.complianceFlags ?? {},
       updatedAt: policy?.updatedAt,
-      providerKeyStatus: policy?.providerKeyStatus,
     },
-    featureFlags: {
-      enableOrganizationProviderKeys: organizationProviderKeysEnabled,
-    },
-    providerApiKeys,
     providers,
     models,
   }
@@ -237,8 +188,6 @@ export const Route = createFileRoute('/api/org/model-policy')({
         let complianceFlags: Record<string, boolean> = {
           ...(existing?.complianceFlags ?? {}),
         }
-        let providerKeyStatus: OrgProviderKeyStatusSnapshot =
-          existing?.providerKeyStatus ?? EMPTY_ORG_PROVIDER_KEY_STATUS
 
         const body = parsed.data
 
@@ -261,67 +210,13 @@ export const Route = createFileRoute('/api/org/model-policy')({
           }
         }
 
-        if (body.action === 'set_provider_api_key') {
-          if (!canUseOrganizationProviderKeys()) {
-            return new Response(
-              JSON.stringify({
-                error: 'Organization provider keys feature is disabled.',
-              }),
-              {
-                status: 403,
-                headers: { 'Content-Type': 'application/json' },
-              },
-            )
-          }
-
-          await upsertOrgProviderApiKey({
-            orgWorkosId,
-            providerId: body.providerId,
-            apiKey: body.apiKey,
-          })
-
-          const baseline =
-            existing?.providerKeyStatus == null || existing.providerKeyStatus.syncedAt <= 0
-              ? await readOrgProviderApiKeyStatus(orgWorkosId)
-              : providerKeyStatus.providers
-          providerKeyStatus = toOrgProviderKeyStatusSnapshot({
-            ...baseline,
-            [body.providerId]: true,
-          })
-        } else if (body.action === 'remove_provider_api_key') {
-          if (!canUseOrganizationProviderKeys()) {
-            return new Response(
-              JSON.stringify({
-                error: 'Organization provider keys feature is disabled.',
-              }),
-              {
-                status: 403,
-                headers: { 'Content-Type': 'application/json' },
-              },
-            )
-          }
-
-          await deleteOrgProviderApiKey({
-            orgWorkosId,
-            providerId: body.providerId,
-          })
-
-          const baseline =
-            existing?.providerKeyStatus == null || existing.providerKeyStatus.syncedAt <= 0
-              ? await readOrgProviderApiKeyStatus(orgWorkosId)
-              : providerKeyStatus.providers
-          providerKeyStatus = toOrgProviderKeyStatusSnapshot({
-            ...baseline,
-            [body.providerId]: false,
-          })
-        }
-
         await upsertOrgAiPolicy({
           orgWorkosId,
           disabledProviderIds,
           disabledModelIds,
           complianceFlags,
-          providerKeyStatus,
+          providerKeyStatus:
+            existing?.providerKeyStatus ?? EMPTY_ORG_PROVIDER_KEY_STATUS,
         })
 
         const payload = await buildResponsePayload(orgWorkosId)
