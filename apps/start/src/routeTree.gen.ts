@@ -30,7 +30,11 @@ import { Route as appLayoutOrganizationSettingsRouteRouteImport } from './routes
 import { Route as appLayoutChatThreadIdRouteRouteImport } from './routes/(app)/_layout/chat/$threadId/route'
 import { Route as appLayoutOrganizationSettingsIndexRouteImport } from './routes/(app)/_layout/organization/settings/index'
 import { Route as appLayoutOrganizationSettingsProviderPolicyRouteRouteImport } from './routes/(app)/_layout/organization/settings/provider-policy/route'
+import { Route as appLayoutOrganizationSettingsModelsRouteRouteImport } from './routes/(app)/_layout/organization/settings/models/route'
+import { Route as appLayoutOrganizationSettingsCompliancePolicyRouteRouteImport } from './routes/(app)/_layout/organization/settings/compliance-policy/route'
 import { Route as appLayoutOrganizationSettingsByokRouteRouteImport } from './routes/(app)/_layout/organization/settings/byok/route'
+import { Route as appLayoutOrganizationSettingsModelsIndexRouteImport } from './routes/(app)/_layout/organization/settings/models/index'
+import { Route as appLayoutOrganizationSettingsModelsProviderIdRouteRouteImport } from './routes/(app)/_layout/organization/settings/models/$providerId/route'
 
 const ApiChatRouteRoute = ApiChatRouteRouteImport.update({
   id: '/api/chat',
@@ -142,11 +146,35 @@ const appLayoutOrganizationSettingsProviderPolicyRouteRoute =
     path: '/provider-policy',
     getParentRoute: () => appLayoutOrganizationSettingsRouteRoute,
   } as any)
+const appLayoutOrganizationSettingsModelsRouteRoute =
+  appLayoutOrganizationSettingsModelsRouteRouteImport.update({
+    id: '/models',
+    path: '/models',
+    getParentRoute: () => appLayoutOrganizationSettingsRouteRoute,
+  } as any)
+const appLayoutOrganizationSettingsCompliancePolicyRouteRoute =
+  appLayoutOrganizationSettingsCompliancePolicyRouteRouteImport.update({
+    id: '/compliance-policy',
+    path: '/compliance-policy',
+    getParentRoute: () => appLayoutOrganizationSettingsRouteRoute,
+  } as any)
 const appLayoutOrganizationSettingsByokRouteRoute =
   appLayoutOrganizationSettingsByokRouteRouteImport.update({
     id: '/byok',
     path: '/byok',
     getParentRoute: () => appLayoutOrganizationSettingsRouteRoute,
+  } as any)
+const appLayoutOrganizationSettingsModelsIndexRoute =
+  appLayoutOrganizationSettingsModelsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => appLayoutOrganizationSettingsModelsRouteRoute,
+  } as any)
+const appLayoutOrganizationSettingsModelsProviderIdRouteRoute =
+  appLayoutOrganizationSettingsModelsProviderIdRouteRouteImport.update({
+    id: '/$providerId',
+    path: '/$providerId',
+    getParentRoute: () => appLayoutOrganizationSettingsModelsRouteRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -169,8 +197,12 @@ export interface FileRoutesByFullPath {
   '/chat/': typeof appLayoutChatIndexRoute
   '/settings/': typeof appLayoutSettingsIndexRoute
   '/organization/settings/byok': typeof appLayoutOrganizationSettingsByokRouteRoute
+  '/organization/settings/compliance-policy': typeof appLayoutOrganizationSettingsCompliancePolicyRouteRoute
+  '/organization/settings/models': typeof appLayoutOrganizationSettingsModelsRouteRouteWithChildren
   '/organization/settings/provider-policy': typeof appLayoutOrganizationSettingsProviderPolicyRouteRoute
   '/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
+  '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
+  '/organization/settings/models/': typeof appLayoutOrganizationSettingsModelsIndexRoute
 }
 export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRouteRoute
@@ -189,8 +221,11 @@ export interface FileRoutesByTo {
   '/chat': typeof appLayoutChatIndexRoute
   '/settings': typeof appLayoutSettingsIndexRoute
   '/organization/settings/byok': typeof appLayoutOrganizationSettingsByokRouteRoute
+  '/organization/settings/compliance-policy': typeof appLayoutOrganizationSettingsCompliancePolicyRouteRoute
   '/organization/settings/provider-policy': typeof appLayoutOrganizationSettingsProviderPolicyRouteRoute
   '/organization/settings': typeof appLayoutOrganizationSettingsIndexRoute
+  '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
+  '/organization/settings/models': typeof appLayoutOrganizationSettingsModelsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -214,8 +249,12 @@ export interface FileRoutesById {
   '/(app)/_layout/chat/': typeof appLayoutChatIndexRoute
   '/(app)/_layout/settings/': typeof appLayoutSettingsIndexRoute
   '/(app)/_layout/organization/settings/byok': typeof appLayoutOrganizationSettingsByokRouteRoute
+  '/(app)/_layout/organization/settings/compliance-policy': typeof appLayoutOrganizationSettingsCompliancePolicyRouteRoute
+  '/(app)/_layout/organization/settings/models': typeof appLayoutOrganizationSettingsModelsRouteRouteWithChildren
   '/(app)/_layout/organization/settings/provider-policy': typeof appLayoutOrganizationSettingsProviderPolicyRouteRoute
   '/(app)/_layout/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
+  '/(app)/_layout/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
+  '/(app)/_layout/organization/settings/models/': typeof appLayoutOrganizationSettingsModelsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -239,8 +278,12 @@ export interface FileRouteTypes {
     | '/chat/'
     | '/settings/'
     | '/organization/settings/byok'
+    | '/organization/settings/compliance-policy'
+    | '/organization/settings/models'
     | '/organization/settings/provider-policy'
     | '/organization/settings/'
+    | '/organization/settings/models/$providerId'
+    | '/organization/settings/models/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/api/chat'
@@ -259,8 +302,11 @@ export interface FileRouteTypes {
     | '/chat'
     | '/settings'
     | '/organization/settings/byok'
+    | '/organization/settings/compliance-policy'
     | '/organization/settings/provider-policy'
     | '/organization/settings'
+    | '/organization/settings/models/$providerId'
+    | '/organization/settings/models'
   id:
     | '__root__'
     | '/(app)/_layout'
@@ -283,8 +329,12 @@ export interface FileRouteTypes {
     | '/(app)/_layout/chat/'
     | '/(app)/_layout/settings/'
     | '/(app)/_layout/organization/settings/byok'
+    | '/(app)/_layout/organization/settings/compliance-policy'
+    | '/(app)/_layout/organization/settings/models'
     | '/(app)/_layout/organization/settings/provider-policy'
     | '/(app)/_layout/organization/settings/'
+    | '/(app)/_layout/organization/settings/models/$providerId'
+    | '/(app)/_layout/organization/settings/models/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -447,12 +497,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appLayoutOrganizationSettingsProviderPolicyRouteRouteImport
       parentRoute: typeof appLayoutOrganizationSettingsRouteRoute
     }
+    '/(app)/_layout/organization/settings/models': {
+      id: '/(app)/_layout/organization/settings/models'
+      path: '/models'
+      fullPath: '/organization/settings/models'
+      preLoaderRoute: typeof appLayoutOrganizationSettingsModelsRouteRouteImport
+      parentRoute: typeof appLayoutOrganizationSettingsRouteRoute
+    }
+    '/(app)/_layout/organization/settings/compliance-policy': {
+      id: '/(app)/_layout/organization/settings/compliance-policy'
+      path: '/compliance-policy'
+      fullPath: '/organization/settings/compliance-policy'
+      preLoaderRoute: typeof appLayoutOrganizationSettingsCompliancePolicyRouteRouteImport
+      parentRoute: typeof appLayoutOrganizationSettingsRouteRoute
+    }
     '/(app)/_layout/organization/settings/byok': {
       id: '/(app)/_layout/organization/settings/byok'
       path: '/byok'
       fullPath: '/organization/settings/byok'
       preLoaderRoute: typeof appLayoutOrganizationSettingsByokRouteRouteImport
       parentRoute: typeof appLayoutOrganizationSettingsRouteRoute
+    }
+    '/(app)/_layout/organization/settings/models/': {
+      id: '/(app)/_layout/organization/settings/models/'
+      path: '/'
+      fullPath: '/organization/settings/models/'
+      preLoaderRoute: typeof appLayoutOrganizationSettingsModelsIndexRouteImport
+      parentRoute: typeof appLayoutOrganizationSettingsModelsRouteRoute
+    }
+    '/(app)/_layout/organization/settings/models/$providerId': {
+      id: '/(app)/_layout/organization/settings/models/$providerId'
+      path: '/$providerId'
+      fullPath: '/organization/settings/models/$providerId'
+      preLoaderRoute: typeof appLayoutOrganizationSettingsModelsProviderIdRouteRouteImport
+      parentRoute: typeof appLayoutOrganizationSettingsModelsRouteRoute
     }
   }
 }
@@ -470,8 +548,28 @@ const appLayoutChatRouteRouteChildren: appLayoutChatRouteRouteChildren = {
 const appLayoutChatRouteRouteWithChildren =
   appLayoutChatRouteRoute._addFileChildren(appLayoutChatRouteRouteChildren)
 
+interface appLayoutOrganizationSettingsModelsRouteRouteChildren {
+  appLayoutOrganizationSettingsModelsProviderIdRouteRoute: typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
+  appLayoutOrganizationSettingsModelsIndexRoute: typeof appLayoutOrganizationSettingsModelsIndexRoute
+}
+
+const appLayoutOrganizationSettingsModelsRouteRouteChildren: appLayoutOrganizationSettingsModelsRouteRouteChildren =
+  {
+    appLayoutOrganizationSettingsModelsProviderIdRouteRoute:
+      appLayoutOrganizationSettingsModelsProviderIdRouteRoute,
+    appLayoutOrganizationSettingsModelsIndexRoute:
+      appLayoutOrganizationSettingsModelsIndexRoute,
+  }
+
+const appLayoutOrganizationSettingsModelsRouteRouteWithChildren =
+  appLayoutOrganizationSettingsModelsRouteRoute._addFileChildren(
+    appLayoutOrganizationSettingsModelsRouteRouteChildren,
+  )
+
 interface appLayoutOrganizationSettingsRouteRouteChildren {
   appLayoutOrganizationSettingsByokRouteRoute: typeof appLayoutOrganizationSettingsByokRouteRoute
+  appLayoutOrganizationSettingsCompliancePolicyRouteRoute: typeof appLayoutOrganizationSettingsCompliancePolicyRouteRoute
+  appLayoutOrganizationSettingsModelsRouteRoute: typeof appLayoutOrganizationSettingsModelsRouteRouteWithChildren
   appLayoutOrganizationSettingsProviderPolicyRouteRoute: typeof appLayoutOrganizationSettingsProviderPolicyRouteRoute
   appLayoutOrganizationSettingsIndexRoute: typeof appLayoutOrganizationSettingsIndexRoute
 }
@@ -480,6 +578,10 @@ const appLayoutOrganizationSettingsRouteRouteChildren: appLayoutOrganizationSett
   {
     appLayoutOrganizationSettingsByokRouteRoute:
       appLayoutOrganizationSettingsByokRouteRoute,
+    appLayoutOrganizationSettingsCompliancePolicyRouteRoute:
+      appLayoutOrganizationSettingsCompliancePolicyRouteRoute,
+    appLayoutOrganizationSettingsModelsRouteRoute:
+      appLayoutOrganizationSettingsModelsRouteRouteWithChildren,
     appLayoutOrganizationSettingsProviderPolicyRouteRoute:
       appLayoutOrganizationSettingsProviderPolicyRouteRoute,
     appLayoutOrganizationSettingsIndexRoute:

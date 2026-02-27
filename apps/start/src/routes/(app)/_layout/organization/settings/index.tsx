@@ -5,5 +5,5 @@ export const Route = createFileRoute('/(app)/_layout/organization/settings/')({
 })
 
 function OrganizationSettingsIndexPage() {
-  return <Navigate to="/organization/settings/provider-policy" />
+  return <Navigate to="/organization/settings/models" />
 }

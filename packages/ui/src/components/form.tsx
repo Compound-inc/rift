@@ -2,11 +2,12 @@
 
 import {
   type InputHTMLAttributes,
+  Fragment,
   type ReactNode,
   useId,
   useState,
 } from "react";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 
 import { cn } from "@rift/utils";
 
@@ -28,9 +29,14 @@ import { Switch } from "./switch";
 export interface FormToggleItem {
   id: string;
   title: string;
-  description: string;
+  /** Optional icon or other content rendered before the title (e.g. provider icon) */
+  icon?: ReactNode;
+  /** Optional description; when omitted or empty, only title (and icon) are shown */
+  description?: string;
   /** Optional "Learn more" link URL; shows link with external icon when set */
   learnMoreHref?: string;
+  /** Optional slot for a per-row action (e.g. "View all models" link) rendered below description */
+  actionSlot?: ReactNode;
   /** Optional main price line (e.g. "$10 / month") */
   price?: string;
   /** Optional secondary price line (e.g. "+ $1.20/1M events") */
@@ -46,6 +52,8 @@ export interface FormToggleItem {
 export interface FormToggleSection {
   /** Optional heading above the toggle rows (e.g. "Add-Ons") */
   sectionTitle?: string;
+  /** When true, each toggle row gets a full-width hover background from content edge to edge (border to border). */
+  rowHover?: boolean;
   items: FormToggleItem[];
 }
 
@@ -105,6 +113,8 @@ export interface FormProps extends Omit<
   onSecondaryClick?: () => void;
   /** Optional. Disables the submit and secondary buttons */
   buttonDisabled?: boolean;
+  /** Optional variant for the submit button (e.g., "danger" for destructive actions) */
+  buttonVariant?: "default" | "danger" | "ghost" | "dangerLight";
   /** Called on submit when a main field (input or select) is provided; optional when form is toggle-only */
   handleSubmit?: (data: Record<string, string>) => Promise<unknown>;
   /**
@@ -140,6 +150,7 @@ export function Form({
   secondaryButtonText,
   onSecondaryClick,
   buttonDisabled,
+  buttonVariant = "default",
   handleSubmit,
   value: controlledValue,
   onValueChange,
@@ -205,19 +216,12 @@ export function Form({
   const submitButton = (
     <Button
       type="submit"
-      variant="default"
+      variant={buttonVariant}
       size="large"
       disabled={saving || buttonDisabled}
       aria-busy={saving}
     >
-      {saving ? (
-        <>
-          <Loader2 className="size-4 animate-spin" aria-hidden />
-          <span>Saving...</span>
-        </>
-      ) : (
-        buttonText
-      )}
+      {buttonText}
     </Button>
   );
 
@@ -226,7 +230,7 @@ export function Form({
       {...rest}
       onSubmit={handleFormSubmit}
       className={cn(
-        "rounded-xl border border-border-subtle bg-bg-default",
+        "rounded-xl border border-bg-emphasis bg-bg-default",
         className,
       )}
       aria-labelledby={sectionTitleId}
@@ -285,7 +289,10 @@ export function Form({
               required
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              className="max-w-md rounded-md border-border-default text-content-emphasis placeholder:text-content-muted focus-visible:border-content-subtle focus-visible:ring-content-subtle/50 sm:text-sm"
+              className={cn(
+                "max-w-md rounded-md border-border-default text-content-emphasis placeholder:text-content-muted focus-visible:border-content-subtle focus-visible:ring-content-subtle/50 sm:text-sm",
+                inputAttrs!.className,
+              )}
             />
           )
         ) : null}
@@ -297,58 +304,97 @@ export function Form({
                 {toggleSection.sectionTitle}
               </h3>
             )}
-            <div className="divide-y divide-border-default">
-              {toggleSection.items.map((item) => (
-                <div
-                  key={item.id}
-                  className="grid grid-cols-[40%_1fr_1fr] items-center gap-4 py-4 first:pt-0"
-                >
-                  <div className="min-w-0 space-y-1">
-                    <p className="font-medium text-content-emphasis">
-                      {item.title}
-                    </p>
-                    <p className="text-sm text-content-subtle">
-                      {item.description}
-                      {item.learnMoreHref != null && (
-                        <>
-                          {" "}
-                          <a
-                            href={item.learnMoreHref}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 font-medium text-accent-default underline underline-offset-2 hover:text-accent-default/80"
-                          >
-                            Learn more
-                            <ExternalLink className="size-3.5" aria-hidden />
-                          </a>
-                        </>
-                      )}
-                    </p>
-                  </div>
-                  <div className="min-w-0 text-center">
-                    {item.price != null ? (
-                      <>
-                        <p className="font-medium text-content-emphasis">
-                          {item.price}
-                        </p>
-                        {item.priceSub != null && (
-                          <p className="text-sm text-content-subtle">
-                            {item.priceSub}
-                          </p>
-                        )}
-                      </>
+            <div
+              className={cn(
+                !toggleSection.rowHover && "divide-y divide-border-default",
+              )}
+            >
+              {toggleSection.items.map((item, index) => {
+                const rowHover = toggleSection.rowHover === true;
+                return (
+                  <Fragment key={item.id}>
+                    {rowHover && index > 0 ? (
+                      <div
+                        className="border-t border-border-default"
+                        aria-hidden
+                      />
                     ) : null}
-                  </div>
-                  <div className="flex justify-end">
-                    <Switch
-                      checked={item.checked}
-                      onCheckedChange={item.onCheckedChange}
-                      disabled={item.disabled}
-                      aria-label={`Toggle ${item.title}`}
-                    />
-                  </div>
-                </div>
-              ))}
+                    <div
+                      className={cn(
+                        rowHover && "-mx-6 px-6 py-4 hover:bg-bg-inverted/5",
+                        !rowHover && "py-4",
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "grid grid-cols-[40%_1fr_1fr] items-center gap-4",
+                          rowHover && "py-0",
+                        )}
+                      >
+                        <div className="min-w-0 space-y-1">
+                          <p className="flex items-center gap-2 font-medium text-content-emphasis">
+                            {item.icon != null ? (
+                              <span className="flex shrink-0" aria-hidden>
+                                {item.icon}
+                              </span>
+                            ) : null}
+                            {item.title}
+                          </p>
+                          {(item.description != null &&
+                            item.description !== "") ||
+                          item.learnMoreHref != null ? (
+                            <p className="text-sm text-content-subtle">
+                              {item.description}
+                              {item.learnMoreHref != null ? (
+                                <>
+                                  {" "}
+                                  <a
+                                    href={item.learnMoreHref}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 font-medium text-accent-default underline underline-offset-2 hover:text-accent-default/80"
+                                  >
+                                    Learn more
+                                    <ExternalLink
+                                      className="size-3.5"
+                                      aria-hidden
+                                    />
+                                  </a>
+                                </>
+                              ) : null}
+                            </p>
+                          ) : null}
+                          {item.actionSlot != null ? (
+                            <div className="pt-1">{item.actionSlot}</div>
+                          ) : null}
+                        </div>
+                        <div className="min-w-0 text-center">
+                          {item.price != null ? (
+                            <>
+                              <p className="font-medium text-content-emphasis">
+                                {item.price}
+                              </p>
+                              {item.priceSub != null && (
+                                <p className="text-sm text-content-subtle">
+                                  {item.priceSub}
+                                </p>
+                              )}
+                            </>
+                          ) : null}
+                        </div>
+                        <div className="flex justify-end">
+                          <Switch
+                            checked={item.checked}
+                            onCheckedChange={item.onCheckedChange}
+                            disabled={item.disabled}
+                            aria-label={`Toggle ${item.title}`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </Fragment>
+                );
+              })}
             </div>
           </div>
         )}

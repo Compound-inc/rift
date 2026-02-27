@@ -1,16 +1,14 @@
 import { isAreaPath } from '@/utils/nav-utils'
 import {
   Building2,
+  Cpu,
   CreditCard,
   Database,
-  FileCheck,
-  FileText,
-  Globe,
   Key,
   Layout,
   Lock,
+  Scale,
   Settings,
-  ShieldCheck,
   TrendingUp,
   Users,
 } from 'lucide-react'
@@ -80,9 +78,15 @@ export const orgSettingsNavArea = () => ({
       name: 'AI & Data',
       items: [
         {
-          name: 'Model Policy',
-          icon: ShieldCheck,
-          href: `${ORG_SETTINGS_HREF}/provider-policy`,
+          name: 'Compliance & Policy',
+          icon: Scale,
+          href: `${ORG_SETTINGS_HREF}/compliance-policy`,
+          exact: true,
+        },
+        {
+          name: 'Models',
+          icon: Cpu,
+          href: `${ORG_SETTINGS_HREF}/models`,
           exact: true,
         },
         {

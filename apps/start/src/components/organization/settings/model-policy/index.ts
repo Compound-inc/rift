@@ -1,6 +1,3 @@
-export { ComplianceFlagsSection } from './compliance-flags-section'
-export { ModelControlsSection } from './model-controls-section'
-export { ProviderControlsSection } from './provider-controls-section'
-export { ProviderPolicyPage } from './provider-policy-page'
-export { useProviderPolicy } from './use-provider-policy'
-export type { PolicyPayload, ProviderPolicyUpdateAction } from './types'
+import { ModelsPage } from './models-page'
+
+export { ModelsPage }
