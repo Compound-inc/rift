@@ -4,6 +4,7 @@ dist/
 .turbo/
 **/.turbo/
 *.tsbuildinfo
+.env
 .env.local
 lib/local/
 .cursor/rules/effect.mdc

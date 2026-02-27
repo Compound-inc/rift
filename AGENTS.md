@@ -49,14 +49,17 @@ The primary app is `apps/start` (TanStack Start). The `apps/next` app is a secon
 
 ### Running the primary app (`apps/start`)
 
-- `bun --bun vite dev --port 3000` from `apps/start`, or `bun run dev` from root (also starts `zero-cache`).
-- The app boots without external services. The `ZeroProvider` gracefully falls back when `VITE_ZERO_CACHE_URL` is empty.
+- **Always start from the repo root** with `bun run dev`. This runs Turbo which starts both the Vite dev server (port 3000) and `zero-cache-dev` together.
+- Zero requires a separate `apps/start/.env` file (not `.env.local`) with `ZERO_UPSTREAM_DB`, `VITE_ZERO_CACHE_URL`, `ZERO_QUERY_URL`, `ZERO_MUTATE_URL`, and cookie-forwarding flags. See `apps/start/.env.example` for the full template.
 - Sending chat messages requires auth (WorkOS) and AI provider keys. Without them you'll see "Please sign in and try again."
-- See `apps/start/.env.example` for all env vars. At minimum, create `apps/start/.env.local` with placeholder `WORKOS_*` values.
+- Additional app-specific overrides go in `apps/start/.env.local` (e.g. `WORKOS_*` placeholders).
 
 ### Non-obvious caveats
 
 - **Bun must be installed** (`curl -fsSL https://bun.sh/install | bash`). The repo specifies `packageManager: "bun@1.2.23"` but current Bun v1.3.x works fine.
+- **`@rocicorp/zero-sqlite3` native binary**: After `bun install`, the `zero-cache-dev` process needs the native `better_sqlite3.node` binary. Run `cd node_modules/@rocicorp/zero-sqlite3 && npm run install` to download the prebuilt binary via `prebuild-install`. Without this, `zero-cache` will crash with "Could not locate the bindings file."
+- **Zero needs a separate `.env` file** (not `.env.local`) at `apps/start/.env` with `ZERO_UPSTREAM_DB`, `VITE_ZERO_CACHE_URL`, `ZERO_QUERY_URL`, `ZERO_MUTATE_URL`, and cookie-forwarding flags.
+- **Always start via `bun run dev` from the repo root** so Turbo runs both the Vite dev server (port 3000) and `zero-cache-dev` (port 4848) together.
 - **Turbo `envMode: strict`** means env vars must be listed in `turbo.json` `globalPassThroughEnv` to be visible inside Turbo tasks.
 - **Lint only runs for `web` (Next.js app)**. The `tanstack` app does not have a lint script. Pre-existing lint errors (22 errors, 15 warnings) exist in `apps/next`.
 - **Tests**: `cd apps/start && bun run test` runs Vitest (8 tests currently). No test suite in `apps/next`.
