@@ -16,7 +16,7 @@ export type UsePinToLastUserMessageOptions = {
   bottomPaddingPx?: number;
 };
 
-const DEFAULT_BOTTOM_PADDING_PX = 164;
+const DEFAULT_BOTTOM_PADDING_PX = 120;
 
 export function usePinToLastUserMessage(
   options: UsePinToLastUserMessageOptions
