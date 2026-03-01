@@ -32,43 +32,47 @@ export type ToolRegistryServiceShape = {
 export class ToolRegistryService extends ServiceMap.Service<
   ToolRegistryService,
   ToolRegistryServiceShape
->()('chat-backend/ToolRegistryService') {}
+>()('chat-backend/ToolRegistryService') {
+  /** Live tool registry resolving provider-specific tool capabilities. */
+  static readonly layer = Layer.succeed(this, {
+    resolveForThread: Effect.fn('ToolRegistryService.resolveForThread')(
+      ({ modelId }: { readonly modelId: string }) => {
+        const model = AI_CATALOG_BY_ID.get(modelId)
+        const enabledProviderTools =
+          model?.providerToolIds.filter((toolId) => {
+            const definition = getProviderToolDefinition(model.providerId, toolId)
+            if (!definition) return false
+            return canUseAdvancedProviderTools() || !definition.advanced
+          }) ?? []
+        const tools =
+          model && enabledProviderTools.length > 0
+            ? resolveProviderToolSet({
+                providerId: model.providerId,
+                providerToolIds: enabledProviderTools,
+                context: { modelId: model.id },
+              })
+            : {}
+        const activeTools = Object.keys(tools)
 
-/** Live tool registry resolving provider-specific tool capabilities. */
-export const ToolRegistryLive = Layer.succeed(ToolRegistryService, {
-  resolveForThread: ({ modelId }) => {
-    const model = AI_CATALOG_BY_ID.get(modelId)
-    const enabledProviderTools =
-      model?.providerToolIds.filter((toolId) => {
-        const definition = getProviderToolDefinition(model.providerId, toolId)
-        if (!definition) return false
-        return canUseAdvancedProviderTools() || !definition.advanced
-      }) ?? []
-    const tools =
-      model && enabledProviderTools.length > 0
-        ? resolveProviderToolSet({
-            providerId: model.providerId,
-            providerToolIds: enabledProviderTools,
-            context: { modelId: model.id },
-          })
-        : {}
-    const activeTools = Object.keys(tools)
+        return Effect.succeed({
+          tools,
+          activeTools,
+          defaultProviderOptions: model?.defaultProviderOptions,
+          providerOptionsByReasoning: model?.providerOptionsByReasoning ?? {},
+        })
+      },
+    ),
+  })
 
-    return Effect.succeed({
-      tools,
-      activeTools,
-      defaultProviderOptions: model?.defaultProviderOptions,
-      providerOptionsByReasoning: model?.providerOptionsByReasoning ?? {},
-    })
-  },
-})
-
-/** Memory adapter for tests/local runs. */
-export const ToolRegistryMemory = Layer.succeed(ToolRegistryService, {
-  resolveForThread: () =>
-    Effect.succeed({
-      tools: {},
-      activeTools: [],
-      providerOptionsByReasoning: {},
-    }),
-})
+  /** Memory adapter for tests/local runs. */
+  static readonly layerMemory = Layer.succeed(this, {
+    resolveForThread: Effect.fn('ToolRegistryService.resolveForThreadMemory')(
+      () =>
+        Effect.succeed({
+          tools: {},
+          activeTools: [],
+          providerOptionsByReasoning: {},
+        }),
+    ),
+  })
+}

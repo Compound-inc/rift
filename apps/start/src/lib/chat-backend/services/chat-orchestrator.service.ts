@@ -8,9 +8,12 @@ import type { IncomingUserMessage } from '../domain/schemas'
 import type { IncomingAttachment } from '../domain/schemas'
 import { getUserMessageText } from '../domain/schemas'
 import { emitWideErrorEvent, getErrorTag } from '../observability/wide-event'
-import { ChatErrorCode } from '@/lib/chat-contracts/error-codes'
 import { canUseReasoningControls } from '@/utils/app-feature-flags'
 import type { OrgAiPolicy } from '@/lib/model-policy/types'
+import {
+  runDetachedObserved,
+  runDetachedUnsafe,
+} from '@/lib/server-effect/runtime/detached'
 import { MessageStoreService } from './message-store.service'
 import { ModelGatewayService } from './model-gateway.service'
 import { ModelPolicyService } from './model-policy.service'
@@ -18,6 +21,16 @@ import { RateLimitService } from './rate-limit.service'
 import { StreamResumeService } from './stream-resume.service'
 import { ThreadService } from './thread.service'
 import { ToolRegistryService } from './tool-registry.service'
+import {
+  applyAssistantChunkDelta,
+  hydrateAssistantBufferFromResponse,
+  type AssistantDeltaBuffer,
+} from './chat-orchestrator/assistant-buffer'
+import {
+  emitBranchVersionConflictTelemetry,
+  emitInvalidEditTargetTelemetry,
+} from './chat-orchestrator/failure-telemetry'
+import { normalizeStreamCommand } from './chat-orchestrator/command'
 
 /**
  * High-level chat orchestration boundary.
@@ -56,7 +69,8 @@ export class ChatOrchestratorService extends ServiceMap.Service<
 >()('chat-backend/ChatOrchestratorService') {}
 
 /** Live orchestration implementation used by API routes. */
-export const ChatOrchestratorLive = Layer.effect(
+export namespace ChatOrchestratorService {
+export const layer = Layer.effect(
   ChatOrchestratorService,
   Effect.gen(function* () {
     const threads = yield* ThreadService
@@ -67,15 +81,17 @@ export const ChatOrchestratorLive = Layer.effect(
     const streamResume = yield* StreamResumeService
     const tools = yield* ToolRegistryService
 
-    const createThread: ChatOrchestratorServiceShape['createThread'] = ({
-      userId,
-      requestId,
-    }) =>
+    const createThread: ChatOrchestratorServiceShape['createThread'] = Effect.fn(
+      'ChatOrchestratorService.createThread',
+    )(({ userId, requestId }) =>
       threads
         .createThread({ userId, requestId })
-        .pipe(Effect.map((created) => ({ threadId: created.threadId })))
+        .pipe(Effect.map((created) => ({ threadId: created.threadId }))),
+    )
 
-    const streamChat: ChatOrchestratorServiceShape['streamChat'] = ({
+    const streamChat: ChatOrchestratorServiceShape['streamChat'] = Effect.fn(
+      'ChatOrchestratorService.streamChat',
+    )(({
       userId,
       threadId,
       orgWorkosId,
@@ -95,62 +111,18 @@ export const ChatOrchestratorLive = Layer.effect(
     }) => {
       const startedAt = Date.now()
       let currentStreamId: string | undefined
-      const requestTrigger = trigger ?? 'submit-message'
+      let requestTrigger: 'submit-message' | 'regenerate-message' | 'edit-message' =
+        trigger ?? 'submit-message'
       return Effect.gen(function* () {
-        if (typeof expectedBranchVersion !== 'number') {
-          return yield* Effect.fail(
-            new InvalidRequestError({
-              message: 'Missing expectedBranchVersion',
-              requestId,
-              issue: 'expectedBranchVersion is required',
-            }),
-          )
-        }
-        if (requestTrigger === 'submit-message' && !message) {
-          return yield* Effect.fail(
-            new InvalidRequestError({
-              message: 'Missing user message',
-              requestId,
-              issue: 'message is required for submit-message',
-            }),
-          )
-        }
-        if (
-          requestTrigger === 'regenerate-message' &&
-          (!messageId || messageId.trim().length === 0)
-        ) {
-          return yield* Effect.fail(
-            new InvalidRequestError({
-              message: 'Missing regenerate target message',
-              requestId,
-              issue: 'messageId is required for regenerate-message',
-            }),
-          )
-        }
-        if (
-          requestTrigger === 'edit-message' &&
-          (!messageId || messageId.trim().length === 0)
-        ) {
-          return yield* Effect.fail(
-            new InvalidRequestError({
-              message: 'Missing edit target message',
-              requestId,
-              issue: 'messageId is required for edit-message',
-            }),
-          )
-        }
-        if (
-          requestTrigger === 'edit-message' &&
-          (!editedText || editedText.trim().length === 0)
-        ) {
-          return yield* Effect.fail(
-            new InvalidRequestError({
-              message: 'Missing edited text',
-              requestId,
-              issue: 'editedText is required for edit-message',
-            }),
-          )
-        }
+        const command = yield* normalizeStreamCommand({
+          trigger,
+          expectedBranchVersion,
+          message,
+          messageId,
+          editedText,
+          requestId,
+        })
+        requestTrigger = command.trigger
 
         yield* rateLimit.assertAllowed({ userId, requestId })
 
@@ -162,10 +134,11 @@ export const ChatOrchestratorLive = Layer.effect(
         })
 
         // Fire-and-forget title generation after the first message bootstrap path.
-        if (createIfMissing && message) {
-          const userMessage = getUserMessageText(message)
+        if (createIfMissing && command.message) {
+          const userMessage = getUserMessageText(command.message)
           if (userMessage) {
-            void Effect.runPromise(
+            yield* runDetachedObserved({
+              effect:
               threads
                 .autoGenerateTitle({
                   userId,
@@ -188,7 +161,8 @@ export const ChatOrchestratorLive = Layer.effect(
                     }),
                   ),
                 ),
-            )
+              onFailure: () => Effect.void,
+            })
           }
         }
 
@@ -268,8 +242,8 @@ export const ChatOrchestratorLive = Layer.effect(
             threadDbId: threadAccess.dbId,
             threadId,
             userId,
-            targetMessageId: messageId!,
-            expectedBranchVersion,
+            targetMessageId: command.messageId!,
+            expectedBranchVersion: command.expectedBranchVersion,
             requestId,
           })
           assistantParentMessageId = regeneration.anchorMessageId
@@ -292,11 +266,11 @@ export const ChatOrchestratorLive = Layer.effect(
             threadDbId: threadAccess.dbId,
             threadId,
             userId,
-            targetMessageId: messageId!,
-            editedText: editedText!,
+            targetMessageId: command.messageId!,
+            editedText: command.editedText!,
             model: modelResolution.modelId,
             reasoningEffort: modelResolution.reasoningEffort,
-            expectedBranchVersion,
+            expectedBranchVersion: command.expectedBranchVersion,
             requestId,
           })
           assistantParentMessageId = edited.editedMessageId
@@ -317,7 +291,7 @@ export const ChatOrchestratorLive = Layer.effect(
           yield* messageStore.appendUserMessage({
             threadDbId: threadAccess.dbId,
             threadId,
-            message: message!,
+            message: command.message!,
             attachments,
             userId,
             model: modelResolution.modelId,
@@ -325,7 +299,7 @@ export const ChatOrchestratorLive = Layer.effect(
             modelParams: {
               reasoningEffort: modelResolution.reasoningEffort,
             },
-            expectedBranchVersion,
+            expectedBranchVersion: command.expectedBranchVersion,
             requestId,
           })
 
@@ -334,7 +308,7 @@ export const ChatOrchestratorLive = Layer.effect(
             model: modelResolution.modelId,
             requestId,
           })
-          assistantParentMessageId = message!.id
+          assistantParentMessageId = command.message!.id
         }
 
         // This ID is generated server-side so start/finalize writes are deterministic
@@ -342,8 +316,10 @@ export const ChatOrchestratorLive = Layer.effect(
         const assistantMessageId = crypto.randomUUID()
         let assistantFinalized = false
         let streamCleanedUp = false
-        let bufferedAssistantText = ''
-        let bufferedAssistantReasoning = ''
+        const assistantBuffer: AssistantDeltaBuffer = {
+          text: '',
+          reasoning: '',
+        }
         let transportErrorHandled = false
         const defaultStreamFailureMessage =
           'The assistant response failed while streaming. Please retry.'
@@ -352,7 +328,7 @@ export const ChatOrchestratorLive = Layer.effect(
           if (streamCleanedUp) return
           streamCleanedUp = true
 
-          void Effect.runPromise(
+          runDetachedUnsafe(
             Effect.gen(function* () {
               yield* streamResume.clearActiveStream({
                 userId,
@@ -380,6 +356,7 @@ export const ChatOrchestratorLive = Layer.effect(
                 }),
               ),
             ),
+            () => Effect.void,
           )
         }
 
@@ -390,7 +367,7 @@ export const ChatOrchestratorLive = Layer.effect(
           if (assistantFinalized) return
           assistantFinalized = true
 
-          void Effect.runPromise(
+          runDetachedUnsafe(
             messageStore
               .finalizeAssistantMessage({
                 threadDbId: threadAccess.dbId,
@@ -402,10 +379,10 @@ export const ChatOrchestratorLive = Layer.effect(
                 branchAnchorMessageId: assistantParentMessageId,
                 regenSourceMessageId,
                 ok: input.ok,
-                finalContent: bufferedAssistantText,
+                finalContent: assistantBuffer.text,
                 reasoning:
-                  bufferedAssistantReasoning.trim().length > 0
-                    ? bufferedAssistantReasoning
+                  assistantBuffer.reasoning.trim().length > 0
+                    ? assistantBuffer.reasoning
                     : undefined,
                 errorMessage: input.errorMessage,
                 modelParams: {
@@ -429,9 +406,10 @@ export const ChatOrchestratorLive = Layer.effect(
                     cause: input.ok
                       ? 'assistant_finalize_success'
                       : 'assistant_finalize_error',
-                  }),
+                    }),
                 ),
               ),
+            () => Effect.void,
           )
         }
 
@@ -450,23 +428,8 @@ export const ChatOrchestratorLive = Layer.effect(
           reasoningEffort: modelResolution.reasoningEffort,
           abortSignal: streamAbortController.signal,
           onChunk: (chunk: unknown) => {
-            if (!chunk || typeof chunk !== 'object') return
-            const candidate = chunk as { type?: unknown; text?: unknown }
             // Persisted assistant content is reconstructed from deltas as they arrive.
-            if (
-              candidate.type === 'text-delta' &&
-              typeof candidate.text === 'string'
-            ) {
-              bufferedAssistantText += candidate.text
-              return
-            }
-            // Reasoning deltas are streamed independently from text deltas by AI SDK.
-            if (
-              candidate.type === 'reasoning-delta' &&
-              typeof candidate.text === 'string'
-            ) {
-              bufferedAssistantReasoning += candidate.text
-            }
+            applyAssistantChunkDelta(assistantBuffer, chunk)
           },
         })
 
@@ -477,7 +440,7 @@ export const ChatOrchestratorLive = Layer.effect(
             'Cache-Control': 'no-cache, no-transform',
           },
           consumeSseStream: ({ stream }) => {
-            void Effect.runPromise(
+            runDetachedUnsafe(
               streamResume
                 .persistSseStream({
                   streamId,
@@ -500,6 +463,7 @@ export const ChatOrchestratorLive = Layer.effect(
                     }),
                   ),
                 ),
+              () => Effect.void,
             )
           },
           onError: (error: unknown) => {
@@ -521,7 +485,7 @@ export const ChatOrchestratorLive = Layer.effect(
             cleanupActiveStream()
 
             // Fire-and-forget observability; do not block the stream response.
-            void Effect.runPromise(
+            runDetachedUnsafe(
               emitWideErrorEvent({
                 eventName: 'chat.stream.transport.failed',
                 route,
@@ -535,6 +499,7 @@ export const ChatOrchestratorLive = Layer.effect(
                 latencyMs: Date.now() - startedAt,
                 retryable: true,
               }),
+              () => Effect.void,
             )
 
             return readableMessage
@@ -569,41 +534,10 @@ export const ChatOrchestratorLive = Layer.effect(
             isAborted: boolean
             responseMessage: UIMessage
           }) => {
-            // If we missed some content in chunk callbacks, use the response payload as fallback.
-            if (!bufferedAssistantText) {
-              bufferedAssistantText = responseMessage.parts
-                .filter(
-                  (
-                    part,
-                  ): part is Extract<
-                    typeof part,
-                    { type: 'text'; text: string }
-                  > =>
-                    part.type === 'text' &&
-                    typeof (part as { text?: unknown }).text === 'string',
-                )
-                .map((part) => part.text)
-                .join('')
-            }
+            // If chunk-level callbacks missed content, hydrate from final payload.
+            hydrateAssistantBufferFromResponse(assistantBuffer, responseMessage)
 
-            // Fallback to finalized response payload if chunk-level reasoning events were missed.
-            if (!bufferedAssistantReasoning) {
-              bufferedAssistantReasoning = responseMessage.parts
-                .filter(
-                  (
-                    part,
-                  ): part is Extract<
-                    typeof part,
-                    { type: 'reasoning'; text: string }
-                  > =>
-                    part.type === 'reasoning' &&
-                    typeof (part as { text?: unknown }).text === 'string',
-                )
-                .map((part) => part.text)
-                .join('\n\n')
-            }
-
-            const ok = bufferedAssistantText.length > 0
+            const ok = assistantBuffer.text.length > 0
             finalizeAssistant({
               ok,
               // Explicit failure reasons improve support/debugging and future analytics.
@@ -636,36 +570,17 @@ export const ChatOrchestratorLive = Layer.effect(
                 typeof conflict.actualBranchVersion === 'number'
                   ? conflict.actualBranchVersion
                   : undefined
-              const conflictCause =
-                typeof expected === 'number' && typeof actual === 'number'
-                  ? `expected=${expected},actual=${actual},trigger=${requestTrigger}`
-                  : `trigger=${requestTrigger}`
-
-              yield* Effect.annotateLogs(
-                Effect.logWarning('chat_branch_version_conflict'),
-                {
-                  route,
-                  request_id: requestId,
-                  user_id: userId,
-                  thread_id: threadId,
-                  trigger: requestTrigger,
-                  expected_branch_version: expected,
-                  actual_branch_version: actual,
-                },
-              )
-              yield* emitWideErrorEvent({
-                eventName: 'chat.branch.version.conflict',
+              yield* emitBranchVersionConflictTelemetry({
                 route,
                 requestId,
                 userId,
                 threadId,
                 model: modelId,
-                errorCode: ChatErrorCode.BranchVersionConflict,
-                errorTag,
-                message: error.message,
                 latencyMs: Date.now() - startedAt,
-                retryable: true,
-                cause: conflictCause,
+                message: error.message,
+                trigger: requestTrigger,
+                expectedBranchVersion: expected,
+                actualBranchVersion: actual,
               })
             }
             if (errorTag === 'InvalidEditTargetError') {
@@ -673,19 +588,16 @@ export const ChatOrchestratorLive = Layer.effect(
                 typeof error === 'object' && error !== null
                   ? (error as { targetMessageId?: string; issue?: string })
                   : {}
-              yield* emitWideErrorEvent({
-                eventName: 'chat.edit.rejected_invalid_target',
+              yield* emitInvalidEditTargetTelemetry({
                 route,
                 requestId,
                 userId,
                 threadId,
                 model: modelId,
-                errorCode: ChatErrorCode.InvalidEditTarget,
-                errorTag,
-                message: error.message,
                 latencyMs: Date.now() - startedAt,
-                retryable: false,
-                cause: `target=${editError.targetMessageId ?? 'unknown'}:${editError.issue ?? 'unknown'}`,
+                message: error.message,
+                targetMessageId: editError.targetMessageId,
+                issue: editError.issue,
               })
             }
             // Ensures threads do not stay in "pending/generation" after early
@@ -740,7 +652,7 @@ export const ChatOrchestratorLive = Layer.effect(
         ),
         Effect.catch((error) => Effect.fail(error)),
       )
-    }
+    })
 
     return {
       createThread,
@@ -748,3 +660,4 @@ export const ChatOrchestratorLive = Layer.effect(
     }
   }),
 )
+}

@@ -26,10 +26,13 @@ export type OrgKnowledgeRagServiceShape = {
 export class OrgKnowledgeRagService extends ServiceMap.Service<
   OrgKnowledgeRagService,
   OrgKnowledgeRagServiceShape
->()('chat-backend/rag/OrgKnowledgeRagService') {}
-
-export const OrgKnowledgeRagNoop = Layer.succeed(OrgKnowledgeRagService, {
-  indexOrgKnowledgeChunks: () => Effect.void,
-  searchOrgKnowledge: () => Effect.succeed([]),
-})
-
+>()('chat-backend/rag/OrgKnowledgeRagService') {
+  static readonly layerNoop = Layer.succeed(this, {
+    indexOrgKnowledgeChunks: Effect.fn(
+      'OrgKnowledgeRagService.indexOrgKnowledgeChunks',
+    )(() => Effect.void),
+    searchOrgKnowledge: Effect.fn('OrgKnowledgeRagService.searchOrgKnowledge')(
+      () => Effect.succeed([]),
+    ),
+  })
+}

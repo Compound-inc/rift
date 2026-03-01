@@ -10,15 +10,15 @@ import { ChatErrorCode } from '@/lib/chat-backend/domain/error-codes'
 import { toReadableErrorMessage } from '@/lib/chat-backend/domain/error-formatting'
 import { getMemoryState } from '@/lib/chat-backend/infra/memory/state'
 import { toErrorResponse } from '@/lib/chat-backend/http/error-response'
-import { ChatOrchestratorLive, ChatOrchestratorService } from '@/lib/chat-backend/services/chat-orchestrator.service'
-import { MessageStoreMemory } from '@/lib/chat-backend/services/message-store.service'
+import { ChatOrchestratorService } from '@/lib/chat-backend/services/chat-orchestrator.service'
+import { MessageStoreService } from '@/lib/chat-backend/services/message-store.service'
 import type { ModelStreamResult } from '@/lib/chat-backend/services/model-gateway.service'
 import { ModelGatewayService } from '@/lib/chat-backend/services/model-gateway.service'
-import { ModelPolicyMemory } from '@/lib/chat-backend/services/model-policy.service'
-import { RateLimitMemory, RateLimitService } from '@/lib/chat-backend/services/rate-limit.service'
-import { StreamResumeMemory } from '@/lib/chat-backend/services/stream-resume.service'
-import { ThreadServiceMemory } from '@/lib/chat-backend/services/thread.service'
-import { ToolRegistryMemory } from '@/lib/chat-backend/services/tool-registry.service'
+import { ModelPolicyService } from '@/lib/chat-backend/services/model-policy.service'
+import { RateLimitService } from '@/lib/chat-backend/services/rate-limit.service'
+import { StreamResumeService } from '@/lib/chat-backend/services/stream-resume.service'
+import { ThreadService } from '@/lib/chat-backend/services/thread.service'
+import { ToolRegistryService } from '@/lib/chat-backend/services/tool-registry.service'
 
 const TestModelGatewayLive = Layer.succeed(ModelGatewayService, {
   streamResponse: ({ messages }) =>
@@ -49,14 +49,14 @@ const TestModelGatewayLive = Layer.succeed(ModelGatewayService, {
     }),
 })
 
-const TestChatLayer = ChatOrchestratorLive.pipe(
-  Layer.provideMerge(ThreadServiceMemory),
-  Layer.provideMerge(MessageStoreMemory),
-  Layer.provideMerge(RateLimitMemory),
-  Layer.provideMerge(ModelPolicyMemory),
-  Layer.provideMerge(ToolRegistryMemory),
+const TestChatLayer = ChatOrchestratorService.layer.pipe(
+  Layer.provideMerge(ThreadService.layerMemory),
+  Layer.provideMerge(MessageStoreService.layerMemory),
+  Layer.provideMerge(RateLimitService.layerMemory),
+  Layer.provideMerge(ModelPolicyService.layerMemory),
+  Layer.provideMerge(ToolRegistryService.layerMemory),
   Layer.provideMerge(TestModelGatewayLive),
-  Layer.provideMerge(StreamResumeMemory),
+  Layer.provideMerge(StreamResumeService.layerMemory),
 )
 
 beforeEach(() => {
@@ -262,7 +262,7 @@ describe('chat-backend scaffold', () => {
         requestId: 'req-31',
       })
     }).pipe(
-      Effect.provide(RateLimitMemory),
+      Effect.provide(RateLimitService.layerMemory),
       Effect.flip,
     )
 

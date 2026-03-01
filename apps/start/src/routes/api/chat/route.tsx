@@ -2,14 +2,15 @@ import { createFileRoute } from '@tanstack/react-router'
 import { getAuth } from '@workos/authkit-tanstack-react-start'
 import { UI_MESSAGE_STREAM_HEADERS } from 'ai'
 import { Effect, Schema } from 'effect'
+import { extractServerAuthContext } from '@/lib/server-effect/http/auth-context'
 import { canUseOrganizationProviderKeys } from '@/utils/app-feature-flags'
 import {
   ChatOrchestratorService,
+  ChatRuntime,
   ChatStreamRequest,
   InvalidRequestError,
   StreamResumeService,
   UnauthorizedError,
-  runChatEffect,
 } from '@/lib/chat-backend'
 import { handleRouteFailure } from '@/lib/chat-backend/http/route-failure'
 import { getOrgAiPolicy } from '@/lib/model-policy/repository'
@@ -24,8 +25,8 @@ export const Route = createFileRoute('/api/chat')({
 
         const program = Effect.gen(function* () {
           const auth = yield* Effect.promise(() => authPromise)
-          const { user } = auth
-          if (!user) {
+          const authContext = extractServerAuthContext(auth)
+          if (!authContext.userId) {
             return yield* Effect.fail(
               new UnauthorizedError({
                 message: 'Unauthorized',
@@ -48,7 +49,7 @@ export const Route = createFileRoute('/api/chat')({
 
           const streamResume = yield* StreamResumeService
           const stream = yield* streamResume.resumeStream({
-            userId: user.id,
+            userId: authContext.userId,
             threadId,
             requestId,
           })
@@ -63,10 +64,10 @@ export const Route = createFileRoute('/api/chat')({
         })
 
         try {
-          return await runChatEffect(program)
+          return await ChatRuntime.run(program)
         } catch (error) {
           const userId = await authPromise
-            .then(({ user }) => user?.id)
+            .then((auth) => extractServerAuthContext(auth).userId)
             .catch(() => undefined)
           return handleRouteFailure({
             error,
@@ -85,8 +86,8 @@ export const Route = createFileRoute('/api/chat')({
         // Build one Effect program so auth/validation/orchestration share the same error model.
         const program = Effect.gen(function* () {
           const auth = yield* Effect.promise(() => authPromise)
-          const { user } = auth
-          if (!user) {
+          const authContext = extractServerAuthContext(auth)
+          if (!authContext.userId) {
             return yield* Effect.fail(
               new UnauthorizedError({
                 message: 'Unauthorized',
@@ -116,10 +117,7 @@ export const Route = createFileRoute('/api/chat')({
 
           const orchestrator = yield* ChatOrchestratorService
           // Org is resolved server-side and passed to model policy resolution.
-          const orgWorkosId =
-            'organizationId' in auth && typeof auth.organizationId === 'string'
-              ? auth.organizationId
-              : undefined
+          const orgWorkosId = authContext.orgWorkosId
           const orgPolicy = orgWorkosId
             ? yield* Effect.promise(() => getOrgAiPolicy(orgWorkosId))
             : undefined
@@ -131,7 +129,7 @@ export const Route = createFileRoute('/api/chat')({
             !orgPolicy.complianceFlags.require_org_provider_key,
           )
           const response = yield* orchestrator.streamChat({
-            userId: user.id,
+            userId: authContext.userId,
             threadId: body.threadId,
             orgWorkosId,
             orgPolicy,
@@ -152,10 +150,10 @@ export const Route = createFileRoute('/api/chat')({
         })
 
         try {
-          return await runChatEffect(program)
+          return await ChatRuntime.run(program)
         } catch (error) {
           const userId = await authPromise
-            .then(({ user }) => user?.id)
+            .then((auth) => extractServerAuthContext(auth).userId)
             .catch(() => undefined)
           return handleRouteFailure({
             error,

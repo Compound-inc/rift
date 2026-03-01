@@ -1,33 +1,23 @@
 import type { UIMessage } from 'ai'
 import { Effect, Layer, ServiceMap } from 'effect'
-import { getCatalogModel } from '@/lib/ai-catalog'
 import type { AiReasoningEffort } from '@/lib/ai-catalog/types'
-import { isEmbeddingFeatureEnabled } from '@/utils/app-feature-flags'
-import type {
-  ChatAttachment,
-  ChatAttachmentInput,
-} from '@/lib/chat-contracts/attachments'
+import type { ChatAttachmentInput } from '@/lib/chat-contracts/attachments'
 import {
   BranchVersionConflictError,
   InvalidEditTargetError,
   InvalidRequestError,
   MessagePersistenceError,
-} from '../domain/errors'
-import type { IncomingUserMessage } from '../domain/schemas'
-import { getUserMessageText } from '../domain/schemas'
-import { getMemoryState } from '../infra/memory/state'
-import { getZeroDatabase, zql } from '../infra/zero/db'
-import {
-  resolveEditableUserTarget,
-  resolveCanonicalBranch,
-  resolveRegenerationAnchor,
-} from '@/lib/chat-branching/branch-resolver'
+} from '@/lib/chat-backend/domain/errors'
+import type { IncomingUserMessage } from '@/lib/chat-backend/domain/schemas'
+import { getMemoryState } from '@/lib/chat-backend/infra/memory/state'
+import { ZeroDatabaseService } from '@/lib/server-effect/services/zero-database.service'
 import { AttachmentRagService } from './rag'
-import {
-  buildQueryEmbedding,
-  buildAttachmentExcerptFallback,
-  getRetrievalLimits,
-} from './rag/attachment-content.pipeline'
+import { toUserMessage } from './message-store/helpers'
+import { makeAppendUserMessageOperation } from './message-store/operations/append-user-message'
+import { makeFinalizeAssistantMessageOperation } from './message-store/operations/finalize-assistant-message'
+import { makeLoadThreadMessagesOperation } from './message-store/operations/load-thread-messages'
+import { makePrepareEditOperation } from './message-store/operations/prepare-edit'
+import { makePrepareRegenerationOperation } from './message-store/operations/prepare-regeneration'
 
 /**
  * Message persistence adapter backed by Zero + upstream Postgres.
@@ -116,971 +106,34 @@ export class MessageStoreService extends ServiceMap.Service<
   MessageStoreServiceShape
 >()('chat-backend/MessageStoreService') {}
 
-type QueryEmbeddingFallbackError = {
-  readonly _tag: 'QueryEmbeddingFallbackError'
-  readonly cause: string
-}
-
-type VectorRetrievalFallbackError = {
-  readonly _tag: 'VectorRetrievalFallbackError'
-  readonly cause: string
-}
-
-/** Converts validated inbound payload into UIMessage shape expected by AI SDK. */
-const toUserMessage = (
-  message: IncomingUserMessage,
-  attachments: readonly ChatAttachment[] = [],
-): UIMessage => ({
-  id: message.id,
-  role: 'user',
-  parts: [{ type: 'text', text: getUserMessageText(message) }],
-  metadata: attachments.length > 0 ? { attachments } : undefined,
-})
-
-function isImageMimeType(mimeType: string): boolean {
-  return mimeType.toLowerCase().startsWith('image/')
-}
-
-function isPdfMimeType(mimeType: string): boolean {
-  const normalized = mimeType.toLowerCase()
-  return normalized === 'application/pdf' || normalized === 'application/x-pdf'
-}
-
-function supportsNativeAttachment(input: {
-  readonly mimeType: string
-  readonly capabilities: {
-    readonly supportsImageInput: boolean
-    readonly supportsPdfInput: boolean
-    readonly supportsFileInput: boolean
-  }
-}): boolean {
-  const { mimeType, capabilities } = input
-  if (isImageMimeType(mimeType)) return capabilities.supportsImageInput
-  if (isPdfMimeType(mimeType)) return capabilities.supportsPdfInput
-  // Generic file support is intentionally ignored here:
-  // non-image/PDF files should always use markdown fallback context.
-  return false
-}
-
-function buildRetrievedChunksContextBlock(
-  chunks: readonly {
-    attachmentName: string
-    mimeType: string
-    content: string
-  }[],
-): string {
-  if (chunks.length === 0) return ''
-  const sections = chunks.map(
-    (chunk, index) =>
-      `## Source ${index + 1}: ${chunk.attachmentName} (${chunk.mimeType})\n\n${chunk.content}`,
-  )
-  return [
-    'Use the following extracted file excerpts as supporting context for the next user request.',
-    'If the user question is unrelated, ignore this context.',
-    '',
-    ...sections,
-  ].join('\n\n')
-}
-
-function normalizeThreadActiveChildMap(input: unknown): Record<string, string> {
-  if (!input || typeof input !== 'object') return {}
-
-  return Object.fromEntries(
-    Object.entries(input as Record<string, unknown>).filter(
-      ([parentId, childId]) =>
-        parentId.trim().length > 0 &&
-        typeof childId === 'string' &&
-        childId.trim().length > 0,
-    ),
-  ) as Record<string, string>
-}
-
-function nextBranchIndexForParent(input: {
-  readonly messages: readonly {
-    readonly parentMessageId?: string | null
-    readonly branchIndex?: number | null
-  }[]
-  readonly parentMessageId?: string
-}): number {
-  const parentMessageId = input.parentMessageId
-  const siblingIndexes = input.messages
-    .filter((message) => {
-      const candidateParentId =
-        typeof message.parentMessageId === 'string' &&
-        message.parentMessageId.trim().length > 0
-          ? message.parentMessageId
-          : undefined
-      return candidateParentId === parentMessageId
-    })
-    .map((message) => message.branchIndex ?? 1)
-  const currentMax = siblingIndexes.length > 0 ? Math.max(...siblingIndexes) : 0
-  return currentMax + 1
-}
-
+export namespace MessageStoreService {
 /** Production message store implementation. */
-export const MessageStoreZero = Layer.effect(
+export const layer = Layer.effect(
   MessageStoreService,
   Effect.gen(function* () {
     const attachmentRag = yield* AttachmentRagService
+    const zeroDatabase = yield* ZeroDatabaseService
 
     return {
-      loadThreadMessages: ({ threadId, model, untilMessageId, requestId }) =>
-        Effect.gen(function* () {
-          const db = getZeroDatabase()
-          if (!db) {
-            return yield* Effect.fail(
-              new MessagePersistenceError({
-                message: 'Failed to load messages',
-                requestId,
-                threadId,
-                cause: 'ZERO_UPSTREAM_DB is not configured',
-              }),
-            )
-          }
-
-          const messageRows = yield* Effect.tryPromise({
-            try: () =>
-              db.run(
-                zql.message
-                  .where('threadId', threadId)
-                  .orderBy('created_at', 'asc'),
-              ),
-            catch: (error) =>
-              new MessagePersistenceError({
-                message: 'Failed to load messages',
-                requestId,
-                threadId,
-                cause: String(error),
-              }),
-          })
-          const threadRow = yield* Effect.tryPromise({
-            try: () => db.run(zql.thread.where('threadId', threadId).one()),
-            catch: (error) =>
-              new MessagePersistenceError({
-                message: 'Failed to load messages',
-                requestId,
-                threadId,
-                cause: String(error),
-              }),
-          })
-          const attachmentRows = yield* Effect.tryPromise({
-            try: () =>
-              db.run(
-                zql.attachment
-                  .where('threadId', threadId)
-                  .orderBy('createdAt', 'asc'),
-              ),
-            catch: (error) =>
-              new MessagePersistenceError({
-                message: 'Failed to load messages',
-                requestId,
-                threadId,
-                cause: String(error),
-              }),
-          })
-
-          const attachmentsById = new Map(
-            attachmentRows.map((attachment) => [attachment.id, attachment]),
-          )
-          const { canonicalMessages: canonicalMessageRows } =
-            resolveCanonicalBranch(
-              messageRows.map((message) => ({
-                messageId: message.messageId,
-                role: message.role,
-                parentMessageId: message.parentMessageId ?? undefined,
-                branchIndex: message.branchIndex ?? 1,
-                createdAt: message.created_at,
-              })),
-              normalizeThreadActiveChildMap(threadRow?.activeChildByParent),
-            )
-          const canonicalMessageIdSet = new Set(
-            canonicalMessageRows.map((message) => message.messageId),
-          )
-          const messageById = new Map(
-            messageRows.map((message) => [message.messageId, message]),
-          )
-          const canonicalOrderedRows = canonicalMessageRows
-            .map((message) => messageById.get(message.messageId))
-            .filter((message): message is NonNullable<typeof message> => !!message)
-          const canonicalRows =
-            untilMessageId && untilMessageId.trim().length > 0
-              ? (() => {
-                  const endIndex = canonicalOrderedRows.findIndex(
-                    (row) => row.messageId === untilMessageId,
-                  )
-                  return endIndex >= 0
-                    ? canonicalOrderedRows.slice(0, endIndex + 1)
-                    : canonicalOrderedRows
-                })()
-              : canonicalOrderedRows
-          const canonicalRowIdSet = new Set(
-            canonicalRows.map((row) => row.messageId),
-          )
-          const modelCapabilities = getCatalogModel(model)?.capabilities
-          const latestUserMessageRow = [...canonicalRows]
-            .reverse()
-            .find((row) => row.role === 'user')
-          const latestUserText = latestUserMessageRow?.content ?? ''
-          const fallbackAttachmentById = new Map(
-            attachmentRows
-              .filter((attachment) =>
-                modelCapabilities
-                  ? !supportsNativeAttachment({
-                      mimeType: attachment.mimeType,
-                      capabilities: modelCapabilities,
-                    })
-                  : true,
-              )
-              .map((attachment) => [attachment.id, attachment]),
-          )
-
-          let fallbackContextBlock = ''
-          if (
-            latestUserText.trim().length > 0 &&
-            fallbackAttachmentById.size > 0
-          ) {
-            const retrievalLimits = getRetrievalLimits()
-            const queryEmbedding = yield* Effect.tryPromise({
-              try: () => buildQueryEmbedding(latestUserText),
-              catch: (error): QueryEmbeddingFallbackError => ({
-                _tag: 'QueryEmbeddingFallbackError',
-                cause: String(error),
-              }),
-            }).pipe(
-              Effect.catchTag('QueryEmbeddingFallbackError', (error) =>
-                isEmbeddingFeatureEnabled()
-                  ? Effect.logError(
-                      'Embedding query generation failed, using fallback excerpts',
-                      {
-                        requestId,
-                        threadId,
-                        cause: error.cause,
-                      },
-                    ).pipe(Effect.as(null))
-                  : Effect.succeed(null),
-              ),
-            )
-            const rankedChunks = queryEmbedding
-              ? yield* attachmentRag
-                  .searchThreadAttachments({
-                    request: {
-                      scopeType: 'attachment',
-                      threadId,
-                      userId: latestUserMessageRow?.userId ?? '',
-                      sourceIds: [...fallbackAttachmentById.keys()],
-                      queryEmbedding: queryEmbedding.embedding,
-                      limit: retrievalLimits.maxChunks * 3,
-                    },
-                  })
-                  .pipe(
-                    Effect.mapError(
-                      (error): VectorRetrievalFallbackError => ({
-                        _tag: 'VectorRetrievalFallbackError',
-                        cause: String(error),
-                      }),
-                    ),
-                    Effect.catchTag('VectorRetrievalFallbackError', (error) =>
-                      isEmbeddingFeatureEnabled()
-                        ? Effect.logError(
-                            'Vector retrieval failed, using fallback excerpts',
-                            {
-                              requestId,
-                              threadId,
-                              cause: error.cause,
-                            },
-                          ).pipe(Effect.as([]))
-                        : Effect.succeed([]),
-                    ),
-                  )
-              : []
-
-            if (rankedChunks.length > 0) {
-              const selectedChunks: Array<(typeof rankedChunks)[number]> = []
-              let usedChars = 0
-              for (const chunk of rankedChunks) {
-                if (selectedChunks.length >= retrievalLimits.maxChunks) break
-                if (usedChars + chunk.content.length > retrievalLimits.maxChars)
-                  continue
-                selectedChunks.push(chunk)
-                usedChars += chunk.content.length
-              }
-
-              fallbackContextBlock = buildRetrievedChunksContextBlock(
-                selectedChunks
-                  .map((chunk) => {
-                    const attachment = fallbackAttachmentById.get(
-                      chunk.sourceId,
-                    )
-                    if (!attachment) return null
-                    return {
-                      attachmentName: attachment.fileName,
-                      mimeType: attachment.mimeType,
-                      content: chunk.content,
-                    }
-                  })
-                  .filter(
-                    (
-                      chunk,
-                    ): chunk is {
-                      attachmentName: string
-                      mimeType: string
-                      content: string
-                    } => !!chunk,
-                  ),
-              )
-            } else {
-              fallbackContextBlock = buildAttachmentExcerptFallback([
-                ...fallbackAttachmentById.values(),
-              ])
-            }
-          }
-
-          return canonicalRows.map((message) => {
-            const attachmentIds = Array.isArray(message.attachmentsIds)
-              ? message.attachmentsIds
-              : []
-            const linkedAttachments = attachmentIds
-              .map((id) => attachmentsById.get(id))
-              .filter((attachment) => !!attachment)
-            const attachmentMetadata: ChatAttachment[] = linkedAttachments.map(
-              (attachment) => ({
-                id: attachment.id,
-                key: attachment.fileKey,
-                url: attachment.attachmentUrl,
-                name: attachment.fileName,
-                size: attachment.fileSize,
-                contentType: attachment.mimeType,
-              }),
-            )
-            const nativeAttachments =
-              message.role === 'user'
-                ? linkedAttachments.filter((attachment) =>
-                    modelCapabilities
-                      ? supportsNativeAttachment({
-                          mimeType: attachment.mimeType,
-                          capabilities: modelCapabilities,
-                        })
-                      : false,
-                  )
-                : []
-            const modelText =
-              message.role === 'user' &&
-              latestUserMessageRow?.messageId === message.messageId &&
-              canonicalMessageIdSet.has(message.messageId) &&
-              canonicalRowIdSet.has(message.messageId) &&
-              fallbackContextBlock.length > 0
-                ? `${message.content}\n\n${fallbackContextBlock}`
-                : message.content
-            const messageParts: UIMessage['parts'] = [
-              { type: 'text', text: modelText },
-              ...nativeAttachments.map((attachment) => ({
-                type: 'file' as const,
-                mediaType: attachment.mimeType,
-                filename: attachment.fileName,
-                url: attachment.attachmentUrl,
-              })),
-            ]
-
-            return {
-              id: message.messageId,
-              role: message.role,
-              parts: messageParts,
-              metadata: {
-                ...(message.role === 'assistant'
-                  ? { model: message.model }
-                  : {}),
-                ...(attachmentMetadata.length > 0
-                  ? { attachments: attachmentMetadata }
-                  : {}),
-              },
-            }
-          })
-        }),
-      appendUserMessage: ({
-        threadDbId,
-        threadId,
-        message,
-        attachments,
-        userId,
-        model,
-        reasoningEffort,
-        modelParams,
-        expectedBranchVersion,
-        requestId,
-      }) =>
-        Effect.gen(function* () {
-          const db = getZeroDatabase()
-          if (!db) {
-            return yield* Effect.fail(
-              new MessagePersistenceError({
-                message: 'Failed to append user message',
-                requestId,
-                threadId,
-                cause: 'ZERO_UPSTREAM_DB is not configured',
-              }),
-            )
-          }
-
-          const now = Date.now()
-          const linkedAttachmentsForReturn: ChatAttachment[] = []
-          let insertedParentMessageId: string | undefined
-          const vectorLinks: Array<{
-            attachmentId: string
-            userId: string
-            threadId: string
-            messageId: string
-            updatedAt: number
-          }> = []
-
-          yield* Effect.tryPromise({
-            try: () =>
-              db.transaction(async (tx) => {
-                const thread = await tx.run(
-                  zql.thread.where('id', threadDbId).where('userId', userId).one(),
-                )
-                if (!thread) {
-                  throw new Error('thread not found')
-                }
-                if (thread.branchVersion !== expectedBranchVersion) {
-                  throw new BranchVersionConflictError({
-                    message: 'Branch version mismatch while appending user message',
-                    requestId,
-                    threadId,
-                    expectedBranchVersion,
-                    actualBranchVersion: thread.branchVersion,
-                  })
-                }
-
-                try {
-                  const existing = await tx.run(
-                    zql.message
-                      .where('id', message.id)
-                      .where('userId', userId)
-                      .one(),
-                  )
-                  if (existing) return
-
-                  const attachmentIds = (attachments ?? [])
-                    .map((attachment) => attachment.id)
-                    .filter((id) => id.trim().length > 0)
-                  const linkedAttachments: ChatAttachment[] = []
-                  for (const attachmentId of attachmentIds) {
-                    const existingAttachment = await tx.run(
-                      zql.attachment
-                        .where('id', attachmentId)
-                        .where('userId', userId)
-                        .one(),
-                    )
-                    if (!existingAttachment) continue
-
-                    linkedAttachments.push({
-                      id: existingAttachment.id,
-                      key: existingAttachment.fileKey,
-                      url: existingAttachment.attachmentUrl,
-                      name: existingAttachment.fileName,
-                      size: existingAttachment.fileSize,
-                      contentType: existingAttachment.mimeType,
-                    })
-
-                    await tx.mutate.attachment.update({
-                      id: existingAttachment.id,
-                      messageId: message.id,
-                      threadId,
-                      updatedAt: now,
-                    })
-                    vectorLinks.push({
-                      attachmentId: existingAttachment.id,
-                      userId,
-                      threadId,
-                      messageId: message.id,
-                      updatedAt: now,
-                    })
-                  }
-                  linkedAttachmentsForReturn.push(...linkedAttachments)
-
-                  const threadMessages = await tx.run(
-                    zql.message
-                      .where('threadId', threadId)
-                      .where('userId', userId)
-                      .orderBy('created_at', 'asc'),
-                  )
-                  const { canonicalMessages } = resolveCanonicalBranch(
-                    threadMessages.map((row) => ({
-                      messageId: row.messageId,
-                      role: row.role,
-                      parentMessageId: row.parentMessageId ?? undefined,
-                      branchIndex: row.branchIndex ?? 1,
-                      createdAt: row.created_at,
-                    })),
-                    normalizeThreadActiveChildMap(thread.activeChildByParent),
-                  )
-                  const parentMessageId =
-                    canonicalMessages.length > 0
-                      ? canonicalMessages[canonicalMessages.length - 1]!.messageId
-                      : undefined
-                  insertedParentMessageId = parentMessageId
-                  const branchIndex = nextBranchIndexForParent({
-                    messages: threadMessages,
-                    parentMessageId,
-                  })
-
-                  await tx.mutate.message.insert({
-                    // Deterministic key makes retries naturally idempotent.
-                    id: message.id,
-                    messageId: message.id,
-                    threadId,
-                    userId,
-                    content: getUserMessageText(message),
-                    status: 'done',
-                    role: 'user',
-                    created_at: now,
-                    updated_at: now,
-                    parentMessageId,
-                    branchIndex,
-                    branchAnchorMessageId: undefined,
-                    regenSourceMessageId: undefined,
-                    model,
-                    modelParams,
-                    sources: linkedAttachments.map((attachment) => ({
-                      sourceId: attachment.id,
-                      url: attachment.url,
-                      title: attachment.name,
-                    })),
-                    attachmentsIds: linkedAttachments.map(
-                      (attachment) => attachment.id,
-                    ),
-                  })
-                } catch {
-                  // Duplicate insert on retry; row already exists.
-                  return
-                }
-
-                const activeChildByParent = normalizeThreadActiveChildMap(
-                  thread.activeChildByParent,
-                )
-                if (insertedParentMessageId) {
-                  activeChildByParent[insertedParentMessageId] = message.id
-                }
-                await tx.mutate.thread.update({
-                  id: threadDbId,
-                  model,
-                  reasoningEffort,
-                  activeChildByParent,
-                  branchVersion: thread.branchVersion + 1,
-                  generationStatus: 'generation',
-                  updatedAt: now,
-                  lastMessageAt: now,
-                })
-              }),
-            catch: (error) => {
-              if (error instanceof BranchVersionConflictError) {
-                return error
-              }
-              return new MessagePersistenceError({
-                message: 'Failed to append user message',
-                requestId,
-                threadId,
-                cause: String(error),
-              })
-            },
-          })
-
-          for (const link of vectorLinks) {
-            yield* attachmentRag
-              .linkAttachmentToThread(link)
-              .pipe(Effect.catch(() => Effect.void))
-          }
-
-          return toUserMessage(message, linkedAttachmentsForReturn)
-        }),
-      prepareRegeneration: ({
-        threadDbId,
-        threadId,
-        userId,
-        targetMessageId,
-        expectedBranchVersion,
-        requestId,
-      }) =>
-        Effect.tryPromise({
-          try: async () => {
-            const db = getZeroDatabase()
-            if (!db) {
-              throw new Error('ZERO_UPSTREAM_DB is not configured')
-            }
-
-            return await db.transaction(async (tx) => {
-              const thread = await tx.run(
-                zql.thread.where('id', threadDbId).where('userId', userId).one(),
-              )
-              if (!thread) {
-                throw new Error('thread not found')
-              }
-
-              if (thread.branchVersion !== expectedBranchVersion) {
-                throw new BranchVersionConflictError({
-                  message: 'Branch version mismatch while preparing regeneration',
-                  requestId,
-                  threadId,
-                  expectedBranchVersion,
-                  actualBranchVersion: thread.branchVersion,
-                })
-              }
-
-              const threadMessages = await tx.run(
-                zql.message
-                  .where('threadId', threadId)
-                  .where('userId', userId)
-                  .orderBy('created_at', 'asc'),
-              )
-              const anchor = resolveRegenerationAnchor(
-                threadMessages.map((message) => ({
-                  messageId: message.messageId,
-                  role: message.role,
-                  parentMessageId: message.parentMessageId ?? undefined,
-                  branchIndex: message.branchIndex ?? 1,
-                  createdAt: message.created_at,
-                })),
-                targetMessageId,
-              )
-              if (!anchor) {
-                throw new InvalidRequestError({
-                  message: 'Invalid regenerate target',
-                  requestId,
-                  issue: 'target message is not regeneratable',
-                })
-              }
-
-              await tx.mutate.thread.update({
-                id: threadDbId,
-                activeChildByParent: (() => {
-                  const activeChildByParent = normalizeThreadActiveChildMap(
-                    thread.activeChildByParent,
-                  )
-                  // Regenerate must truncate canonical path at the anchor until
-                  // the new assistant branch is finalized.
-                  delete activeChildByParent[anchor.anchorMessageId]
-                  return activeChildByParent
-                })(),
-                branchVersion: thread.branchVersion + 1,
-                generationStatus: 'generation',
-                updatedAt: Date.now(),
-              })
-
-              return {
-                anchorMessageId: anchor.anchorMessageId,
-                regenSourceMessageId: anchor.targetMessageId,
-              }
-            })
-          },
-          catch: (error) => {
-            if (
-              error instanceof BranchVersionConflictError ||
-              error instanceof InvalidRequestError
-            ) {
-              return error
-            }
-            return new MessagePersistenceError({
-              message: 'Failed to prepare regeneration',
-              requestId,
-              threadId,
-              cause: String(error),
-            })
-          },
-        }),
-      prepareEdit: ({
-        threadDbId,
-        threadId,
-        userId,
-        targetMessageId,
-        editedText,
-        model,
-        reasoningEffort,
-        expectedBranchVersion,
-        requestId,
-      }) =>
-        Effect.tryPromise({
-          try: async () => {
-            const db = getZeroDatabase()
-            if (!db) {
-              throw new Error('ZERO_UPSTREAM_DB is not configured')
-            }
-
-            const normalizedEditedText = editedText.trim()
-            if (normalizedEditedText.length === 0) {
-              throw new InvalidRequestError({
-                message: 'Edited message text cannot be empty',
-                requestId,
-                issue: 'editedText must contain non-whitespace text',
-              })
-            }
-
-            return await db.transaction(async (tx) => {
-              const thread = await tx.run(
-                zql.thread.where('id', threadDbId).where('userId', userId).one(),
-              )
-              if (!thread) {
-                throw new Error('thread not found')
-              }
-
-              if (thread.branchVersion !== expectedBranchVersion) {
-                throw new BranchVersionConflictError({
-                  message: 'Branch version mismatch while preparing edit',
-                  requestId,
-                  threadId,
-                  expectedBranchVersion,
-                  actualBranchVersion: thread.branchVersion,
-                })
-              }
-
-              const threadMessages = await tx.run(
-                zql.message
-                  .where('threadId', threadId)
-                  .where('userId', userId)
-                  .orderBy('created_at', 'asc'),
-              )
-              const editableTarget = resolveEditableUserTarget(
-                threadMessages.map((message) => ({
-                  messageId: message.messageId,
-                  role: message.role,
-                  parentMessageId: message.parentMessageId ?? undefined,
-                  branchIndex: message.branchIndex ?? 1,
-                  createdAt: message.created_at,
-                })),
-                normalizeThreadActiveChildMap(thread.activeChildByParent),
-                targetMessageId,
-              )
-              if (!editableTarget) {
-                throw new InvalidEditTargetError({
-                  message: 'Invalid edit target',
-                  requestId,
-                  threadId,
-                  targetMessageId,
-                  issue: 'target message must be a canonical-path user message',
-                })
-              }
-
-              const nextMessageId = crypto.randomUUID()
-              const now = Date.now()
-              const branchIndex = nextBranchIndexForParent({
-                messages: threadMessages,
-                parentMessageId: editableTarget.parentMessageId,
-              })
-
-              await tx.mutate.message.insert({
-                id: nextMessageId,
-                messageId: nextMessageId,
-                threadId,
-                userId,
-                content: normalizedEditedText,
-                status: 'done',
-                role: 'user',
-                created_at: now,
-                updated_at: now,
-                parentMessageId: editableTarget.parentMessageId,
-                branchIndex,
-                branchAnchorMessageId:
-                  editableTarget.parentMessageId ?? targetMessageId,
-                regenSourceMessageId: targetMessageId,
-                model,
-                modelParams: {
-                  reasoningEffort,
-                },
-                attachmentsIds: [],
-              })
-
-              const activeChildByParent = normalizeThreadActiveChildMap(
-                thread.activeChildByParent,
-              )
-              activeChildByParent[editableTarget.parentSelectionKey] = nextMessageId
-
-              await tx.mutate.thread.update({
-                id: threadDbId,
-                model,
-                reasoningEffort,
-                activeChildByParent,
-                branchVersion: thread.branchVersion + 1,
-                generationStatus: 'generation',
-                updatedAt: now,
-                lastMessageAt: now,
-              })
-
-              return {
-                editedMessageId: nextMessageId,
-                regenSourceMessageId: nextMessageId,
-              }
-            })
-          },
-          catch: (error) => {
-            if (
-              error instanceof BranchVersionConflictError ||
-              error instanceof InvalidRequestError ||
-              error instanceof InvalidEditTargetError
-            ) {
-              return error
-            }
-            return new MessagePersistenceError({
-              message: 'Failed to prepare edit',
-              requestId,
-              threadId,
-              cause: String(error),
-            })
-          },
-        }),
-      finalizeAssistantMessage: ({
-        threadDbId,
-        threadModel,
-        threadId,
-        userId,
-        assistantMessageId,
-        parentMessageId,
-        branchAnchorMessageId,
-        regenSourceMessageId,
-        ok,
-        finalContent,
-        reasoning,
-        errorMessage,
-        modelParams,
-        requestId,
-      }) =>
-        Effect.tryPromise({
-          try: async () => {
-            const db = getZeroDatabase()
-            if (!db) {
-              throw new Error('ZERO_UPSTREAM_DB is not configured')
-            }
-
-            const now = Date.now()
-            await db.transaction(async (tx) => {
-              const thread = await tx.run(
-                zql.thread.where('id', threadDbId).where('userId', userId).one(),
-              )
-              if (!thread) {
-                throw new Error('thread not found')
-              }
-
-              const existing = await tx.run(
-                zql.message
-                  .where('id', assistantMessageId)
-                  .where('userId', userId)
-                  .one(),
-              )
-
-              if (existing) {
-                // Update path is idempotent: retries finalize the same assistant row.
-                const update: {
-                  id: string
-                  content: string
-                  reasoning?: string
-                  status: 'done' | 'error'
-                  updated_at: number
-                  modelParams?: { readonly reasoningEffort?: AiReasoningEffort }
-                  serverError?: { type: string; message: string }
-                } = {
-                  id: existing.id,
-                  content: finalContent,
-                  reasoning,
-                  status: ok ? 'done' : 'error',
-                  updated_at: now,
-                  modelParams,
-                }
-
-                if (!ok) {
-                  update.serverError = {
-                    type: 'stream_error',
-                    message: errorMessage ?? 'Assistant stream failed',
-                  }
-                }
-
-                await tx.mutate.message.update(update)
-              } else {
-                const threadMessages = await tx.run(
-                  zql.message
-                    .where('threadId', threadId)
-                    .where('userId', userId)
-                    .orderBy('created_at', 'asc'),
-                )
-                const branchIndex = nextBranchIndexForParent({
-                  messages: threadMessages,
-                  parentMessageId,
-                })
-
-                // Insert path handles first successful finalize for this assistant message.
-                const insert: {
-                  id: string
-                  messageId: string
-                  threadId: string
-                  userId: string
-                  content: string
-                  reasoning?: string
-                  status: 'done' | 'error'
-                  role: 'assistant'
-                  parentMessageId?: string
-                  branchIndex: number
-                  branchAnchorMessageId?: string
-                  regenSourceMessageId?: string
-                  created_at: number
-                  updated_at: number
-                  model: string
-                  modelParams?: { readonly reasoningEffort?: AiReasoningEffort }
-                  attachmentsIds: readonly string[]
-                  serverError?: { type: string; message: string }
-                } = {
-                  id: assistantMessageId,
-                  messageId: assistantMessageId,
-                  threadId,
-                  userId,
-                  content: finalContent,
-                  reasoning,
-                  status: ok ? 'done' : 'error',
-                  role: 'assistant',
-                  parentMessageId,
-                  branchIndex,
-                  branchAnchorMessageId,
-                  regenSourceMessageId,
-                  created_at: now,
-                  updated_at: now,
-                  model: threadModel,
-                  modelParams,
-                  attachmentsIds: [],
-                }
-                if (!ok) {
-                  insert.serverError = {
-                    type: 'stream_error',
-                    message: errorMessage ?? 'Assistant stream failed',
-                  }
-                }
-                await tx.mutate.message.insert(insert)
-              }
-
-              const activeChildByParent = normalizeThreadActiveChildMap(
-                thread.activeChildByParent,
-              )
-              if (parentMessageId) {
-                activeChildByParent[parentMessageId] = assistantMessageId
-              }
-              await tx.mutate.thread.update({
-                id: threadDbId,
-                activeChildByParent,
-                generationStatus: ok ? 'completed' : 'failed',
-                updatedAt: now,
-                lastMessageAt: now,
-              })
-            })
-          },
-          catch: (error) =>
-            new MessagePersistenceError({
-              message: 'Failed to finalize assistant message',
-              requestId,
-              threadId,
-              cause: String(error),
-            }),
-        }),
+      loadThreadMessages: makeLoadThreadMessagesOperation({
+        zeroDatabase,
+        attachmentRag,
+      }),
+      appendUserMessage: makeAppendUserMessageOperation({
+        zeroDatabase,
+        attachmentRag,
+      }),
+      prepareRegeneration: makePrepareRegenerationOperation({ zeroDatabase }),
+      prepareEdit: makePrepareEditOperation({ zeroDatabase }),
+      finalizeAssistantMessage: makeFinalizeAssistantMessageOperation({
+        zeroDatabase,
+      }),
     }
   }),
 )
 
 /** Test-only adapter retained for deterministic unit tests. */
-export const MessageStoreMemory = Layer.succeed(MessageStoreService, {
+export const layerMemory = Layer.succeed(MessageStoreService, {
   loadThreadMessages: ({ threadId, model: _model, untilMessageId, requestId }) =>
     Effect.sync(() => {
       const existing = getMemoryState().messages.get(threadId)
@@ -1102,6 +155,7 @@ export const MessageStoreMemory = Layer.succeed(MessageStoreService, {
         ),
       ),
     ),
+
   appendUserMessage: ({ threadId, message, requestId }) =>
     Effect.sync(() => {
       const existing = getMemoryState().messages.get(threadId)
@@ -1123,11 +177,8 @@ export const MessageStoreMemory = Layer.succeed(MessageStoreService, {
         ),
       ),
     ),
-  prepareRegeneration: ({
-    threadId,
-    targetMessageId,
-    requestId,
-  }) =>
+
+  prepareRegeneration: ({ threadId, targetMessageId, requestId }) =>
     Effect.sync(() => {
       const existing = getMemoryState().messages.get(threadId)
       if (!existing) {
@@ -1146,10 +197,12 @@ export const MessageStoreMemory = Layer.succeed(MessageStoreService, {
           regenSourceMessageId: target.id,
         }
       }
+
       const previous = targetIndex > 0 ? existing[targetIndex - 1] : undefined
       if (!previous || previous.role !== 'user') {
         throw new Error('assistant regenerate requires parent user')
       }
+
       return {
         anchorMessageId: previous.id,
         regenSourceMessageId: target.id,
@@ -1164,14 +217,10 @@ export const MessageStoreMemory = Layer.succeed(MessageStoreService, {
             cause: String(error),
           }),
         ),
-        ),
       ),
-  prepareEdit: ({
-    threadId,
-    targetMessageId,
-    editedText,
-    requestId,
-  }) =>
+    ),
+
+  prepareEdit: ({ threadId, targetMessageId, editedText, requestId }) =>
     Effect.sync(() => {
       const existing = getMemoryState().messages.get(threadId)
       if (!existing) {
@@ -1220,6 +269,7 @@ export const MessageStoreMemory = Layer.succeed(MessageStoreService, {
         ),
       ),
     ),
+
   finalizeAssistantMessage: ({
     threadId,
     assistantMessageId,
@@ -1232,9 +282,7 @@ export const MessageStoreMemory = Layer.succeed(MessageStoreService, {
       if (!existing) {
         throw new Error('missing thread message store')
       }
-      const target = existing.find(
-        (message) => message.id === assistantMessageId,
-      )
+      const target = existing.find((message) => message.id === assistantMessageId)
       if (!target) {
         const parts: UIMessage['parts'] = []
         if (reasoning && reasoning.trim().length > 0) {
@@ -1248,6 +296,7 @@ export const MessageStoreMemory = Layer.succeed(MessageStoreService, {
         })
         return
       }
+
       const parts: UIMessage['parts'] = []
       if (reasoning && reasoning.trim().length > 0) {
         parts.push({ type: 'reasoning', text: reasoning, state: 'done' })
@@ -1267,3 +316,4 @@ export const MessageStoreMemory = Layer.succeed(MessageStoreService, {
       ),
     ),
 })
+}

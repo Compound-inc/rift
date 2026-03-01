@@ -88,65 +88,78 @@ export type ModelGatewayServiceShape = {
 export class ModelGatewayService extends ServiceMap.Service<
   ModelGatewayService,
   ModelGatewayServiceShape
->()('chat-backend/ModelGatewayService') {}
+>()('chat-backend/ModelGatewayService') {
+  /** Live OpenAI-backed gateway implementation. */
+  static readonly layer = Layer.succeed(this, {
+    streamResponse: Effect.fn('ModelGatewayService.streamResponse')(
+      ({
+        messages,
+        model,
+        providerApiKeyOverride,
+        requestId,
+        tools,
+        activeTools,
+        providerOptions,
+        reasoningEffort,
+        onChunk,
+        abortSignal,
+      }: {
+        readonly messages: UIMessage[]
+        readonly model: string
+        readonly providerApiKeyOverride?: ProviderApiKeyOverride
+        readonly requestId: string
+        readonly tools: ToolSet
+        readonly activeTools?: readonly string[]
+        readonly providerOptions?: Record<string, unknown>
+        readonly reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
+        readonly onChunk?: (chunk: unknown) => void
+        readonly abortSignal?: AbortSignal
+      }) =>
+        Effect.tryPromise({
+          try: async () => {
+            const modelMessages = await convertToModelMessages(messages)
+            const runtimeModel = resolveRuntimeModel({
+              modelId: model,
+              providerApiKeyOverride,
+            })
 
-/** Live OpenAI-backed gateway implementation. */
-export const ModelGatewayLive = Layer.succeed(ModelGatewayService, {
-  streamResponse: ({
-    messages,
-    model,
-    providerApiKeyOverride,
-    requestId,
-    tools,
-    activeTools,
-    providerOptions,
-    reasoningEffort,
-    onChunk,
-    abortSignal,
-  }) =>
-    Effect.tryPromise({
-      try: async () => {
-        const modelMessages = await convertToModelMessages(messages)
-        const runtimeModel = resolveRuntimeModel({
-          modelId: model,
-          providerApiKeyOverride,
-        })
-
-        return streamText({
-          model: runtimeModel,
-          system: SYSTEM_PROMPT,
-          messages: modelMessages,
-          tools,
-          activeTools: activeTools ? [...activeTools] : undefined,
-          providerOptions: providerOptions as any,
-          maxOutputTokens: reasoningEffort === 'high' || reasoningEffort === 'xhigh'
-            ? 12_000
-            : 8_000,
-          abortSignal,
-          experimental_transform: smoothStream({
-            delayInMs: 15,
-            chunking: 'word',
-          }),
-          onChunk: onChunk
-            ? ({ chunk }) => {
-                onChunk(chunk)
-              }
-            : undefined,
-          // AI SDK defaults to `console.error` for stream errors; we disable that
-          // because chat-orchestrator emits structured, normalized wide events.
-          onError: () => {},
-        }) as unknown as ModelStreamResult
-      },
-      catch: (error) => {
-        const message = toReadableErrorMessage(
-          error,
-          'Model provider failed to start stream',
-        )
-        return new ModelProviderError({
-          message,
-          requestId,
-          cause: toReadableErrorCause(error),
-        })
-      },
-    }),
-})
+            return streamText({
+              model: runtimeModel,
+              system: SYSTEM_PROMPT,
+              messages: modelMessages,
+              tools,
+              activeTools: activeTools ? [...activeTools] : undefined,
+              providerOptions: providerOptions as any,
+              maxOutputTokens: reasoningEffort === 'high' || reasoningEffort === 'xhigh'
+                ? 12_000
+                : 8_000,
+              abortSignal,
+              experimental_transform: smoothStream({
+                delayInMs: 15,
+                chunking: 'word',
+              }),
+              onChunk: onChunk
+                ? ({ chunk }) => {
+                    onChunk(chunk)
+                  }
+                : undefined,
+              // AI SDK defaults to `console.error` for stream errors; we disable that
+              // because chat-orchestrator emits structured, normalized wide events.
+              onError: () => {},
+            }) as unknown as ModelStreamResult
+          },
+          catch: (error) => {
+            const message = toReadableErrorMessage(
+              error,
+              'Model provider failed to start stream',
+            )
+            return new ModelProviderError({
+              message,
+              requestId,
+              cause: toReadableErrorCause(error),
+            })
+          },
+        }),
+    ),
+  })
+}
