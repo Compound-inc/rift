@@ -10,6 +10,7 @@ import {
 import { getMemoryState } from '../infra/memory/state'
 import { zql } from '../infra/zero/db'
 import { ZeroDatabaseService } from '@/lib/server-effect/services/zero-database.service'
+import { requireMessagePersistenceDb } from './message-persistence-db'
 
 /**
  * Thread lifecycle and authorization checks.
@@ -74,17 +75,12 @@ export class ThreadService extends ServiceMap.Service<
         readonly requestId: string
         readonly threadId: string
       }) {
-        return yield* zeroDatabase.getOrFail.pipe(
-          Effect.mapError(
-            () =>
-              new MessagePersistenceError({
-                message: 'Thread storage is unavailable',
-                requestId,
-                threadId,
-                cause: 'ZERO_UPSTREAM_DB is not configured',
-              }),
-          ),
-        )
+        return yield* requireMessagePersistenceDb({
+          zeroDatabase,
+          message: 'Thread storage is unavailable',
+          requestId,
+          threadId,
+        })
       })
 
       const createThread = Effect.fn('ThreadService.createThread')(

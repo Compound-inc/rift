@@ -1,8 +1,8 @@
 import { Effect, Layer, ServiceMap } from 'effect'
 import { isEmbeddingFeatureEnabled } from '@/utils/app-feature-flags'
 import { emitWideErrorEvent } from '@/lib/chat-backend/observability/wide-event'
-import { getZeroDatabase } from '@/lib/chat-backend/infra/zero/db'
 import { AttachmentRagService } from '@/lib/chat-backend/services/rag'
+import { ZeroDatabaseService } from '@/lib/server-effect/services/zero-database.service'
 import {
   buildAttachmentChunkRows,
   normalizeMarkdownForStorage,
@@ -16,6 +16,7 @@ import {
   FilePersistenceError,
   FileUploadStorageError,
 } from '../domain/errors'
+import { requireFilePersistenceDb } from './file-persistence-db'
 
 type UploadedFileResult = {
   readonly id: string
@@ -153,6 +154,7 @@ export const FileUploadOrchestratorLive = Layer.effect(
   FileUploadOrchestratorService,
   Effect.gen(function* () {
     const attachmentRag = yield* AttachmentRagService
+    const zeroDatabase = yield* ZeroDatabaseService
 
     return {
       upload: ({
@@ -247,15 +249,11 @@ export const FileUploadOrchestratorLive = Layer.effect(
             )
           }
 
-          const db = getZeroDatabase()
-          if (!db) {
-            return yield* Effect.fail(
-              new FilePersistenceError({
-                message: 'ZERO_UPSTREAM_DB is not configured',
-                requestId,
-              }),
-            )
-          }
+          const db = yield* requireFilePersistenceDb({
+            zeroDatabase,
+            message: 'File storage is unavailable',
+            requestId,
+          })
 
           yield* Effect.tryPromise({
             try: () =>

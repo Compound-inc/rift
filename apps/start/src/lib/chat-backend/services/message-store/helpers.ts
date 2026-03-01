@@ -33,12 +33,12 @@ export function normalizeThreadActiveChildMap(input: unknown): Record<string, st
 
 /**
  * Computes the next sibling branch index for a parent node in a thread branch tree.
- * Defaults null/undefined branch indexes to 1 to preserve legacy data semantics.
+ * Branch indexes are required at storage level and validated in Zero schema.
  */
 export function nextBranchIndexForParent(input: {
   readonly messages: readonly {
     readonly parentMessageId?: string | null
-    readonly branchIndex?: number | null
+    readonly branchIndex: number
   }[]
   readonly parentMessageId?: string
 }): number {
@@ -52,7 +52,7 @@ export function nextBranchIndexForParent(input: {
           : undefined
       return candidateParentId === parentMessageId
     })
-    .map((message) => message.branchIndex ?? 1)
+    .map((message) => message.branchIndex)
 
   const currentMax = siblingIndexes.length > 0 ? Math.max(...siblingIndexes) : 0
   return currentMax + 1

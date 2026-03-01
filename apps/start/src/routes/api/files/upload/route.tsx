@@ -1,6 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { getAuth } from '@workos/authkit-tanstack-react-start'
 import { Effect } from 'effect'
+import {
+  requireAuthenticatedServerAuthContext,
+} from '@/lib/server-effect/http/auth-context'
 import { MAX_UPLOAD_SIZE_BYTES } from '@/lib/upload/upload.model'
 import {
   FileInvalidRequestError,
@@ -19,15 +22,14 @@ export const Route = createFileRoute('/api/files/upload')({
         const route = '/api/files/upload'
         const program = Effect.gen(function* () {
           const auth = yield* Effect.promise(() => authPromise)
-          const { user } = auth
-          if (!user) {
-            return yield* Effect.fail(
+          const authContext = yield* requireAuthenticatedServerAuthContext({
+            auth,
+            onUnauthorized: () =>
               new FileUnauthorizedError({
                 message: 'Unauthorized',
                 requestId,
               }),
-            )
-          }
+          })
 
           const formData = yield* Effect.tryPromise({
             try: () => request.formData(),
@@ -59,13 +61,9 @@ export const Route = createFileRoute('/api/files/upload')({
           }
 
           const orchestrator = yield* FileUploadOrchestratorService
-          const ownerOrgId =
-            'organizationId' in auth && typeof auth.organizationId === 'string'
-              ? auth.organizationId.trim()
-              : undefined
           const uploaded = yield* orchestrator.upload({
-            userId: user.id,
-            ownerOrgId: ownerOrgId && ownerOrgId.length > 0 ? ownerOrgId : undefined,
+            userId: authContext.userId,
+            ownerOrgId: authContext.orgWorkosId,
             accessScope: 'user',
             file: input,
             requestId,

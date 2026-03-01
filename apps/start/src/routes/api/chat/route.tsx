@@ -2,7 +2,10 @@ import { createFileRoute } from '@tanstack/react-router'
 import { getAuth } from '@workos/authkit-tanstack-react-start'
 import { UI_MESSAGE_STREAM_HEADERS } from 'ai'
 import { Effect, Schema } from 'effect'
-import { extractServerAuthContext } from '@/lib/server-effect/http/auth-context'
+import {
+  extractServerAuthContext,
+  requireAuthenticatedServerAuthContext,
+} from '@/lib/server-effect/http/auth-context'
 import { canUseOrganizationProviderKeys } from '@/utils/app-feature-flags'
 import {
   ChatOrchestratorService,
@@ -25,15 +28,14 @@ export const Route = createFileRoute('/api/chat')({
 
         const program = Effect.gen(function* () {
           const auth = yield* Effect.promise(() => authPromise)
-          const authContext = extractServerAuthContext(auth)
-          if (!authContext.userId) {
-            return yield* Effect.fail(
+          const authContext = yield* requireAuthenticatedServerAuthContext({
+            auth,
+            onUnauthorized: () =>
               new UnauthorizedError({
                 message: 'Unauthorized',
                 requestId,
               }),
-            )
-          }
+          })
 
           const url = new URL(request.url)
           const threadId = url.searchParams.get('threadId')
@@ -86,15 +88,14 @@ export const Route = createFileRoute('/api/chat')({
         // Build one Effect program so auth/validation/orchestration share the same error model.
         const program = Effect.gen(function* () {
           const auth = yield* Effect.promise(() => authPromise)
-          const authContext = extractServerAuthContext(auth)
-          if (!authContext.userId) {
-            return yield* Effect.fail(
+          const authContext = yield* requireAuthenticatedServerAuthContext({
+            auth,
+            onUnauthorized: () =>
               new UnauthorizedError({
                 message: 'Unauthorized',
                 requestId,
               }),
-            )
-          }
+          })
 
           const rawBody = yield* Effect.tryPromise({
             try: () => request.json(),

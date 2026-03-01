@@ -9,6 +9,7 @@ import { zql } from '@/lib/chat-backend/infra/zero/db'
 import type { ZeroDatabaseService } from '@/lib/server-effect/services/zero-database.service'
 import type { AttachmentRagService } from '@/lib/chat-backend/services/rag'
 import { resolveCanonicalBranch } from '@/lib/chat-branching/branch-resolver'
+import { requireMessagePersistenceDb } from '../../message-persistence-db'
 import {
   nextBranchIndexForParent,
   normalizeThreadActiveChildMap,
@@ -40,17 +41,12 @@ export const makeAppendUserMessageOperation = (dependencies: {
       requestId,
     }) =>
       Effect.gen(function* () {
-        const db = yield* zeroDatabase.getOrFail.pipe(
-          Effect.mapError(
-            () =>
-              new MessagePersistenceError({
-                message: 'Failed to append user message',
-                requestId,
-                threadId,
-                cause: 'ZERO_UPSTREAM_DB is not configured',
-              }),
-          ),
-        )
+        const db = yield* requireMessagePersistenceDb({
+          zeroDatabase,
+          message: 'Failed to append user message',
+          requestId,
+          threadId,
+        })
 
         const now = Date.now()
         const linkedAttachmentsForReturn: ChatAttachment[] = []

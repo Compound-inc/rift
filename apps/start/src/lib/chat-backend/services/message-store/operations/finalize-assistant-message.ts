@@ -3,6 +3,7 @@ import type { AiReasoningEffort } from '@/lib/ai-catalog/types'
 import { MessagePersistenceError } from '@/lib/chat-backend/domain/errors'
 import { zql } from '@/lib/chat-backend/infra/zero/db'
 import type { ZeroDatabaseService } from '@/lib/server-effect/services/zero-database.service'
+import { requireMessagePersistenceDb } from '../../message-persistence-db'
 import {
   nextBranchIndexForParent,
   normalizeThreadActiveChildMap,
@@ -36,17 +37,12 @@ export const makeFinalizeAssistantMessageOperation = (dependencies: {
       requestId,
     }) =>
       Effect.gen(function* () {
-        const db = yield* zeroDatabase.getOrFail.pipe(
-          Effect.mapError(
-            () =>
-              new MessagePersistenceError({
-                message: 'Failed to finalize assistant message',
-                requestId,
-                threadId,
-                cause: 'ZERO_UPSTREAM_DB is not configured',
-              }),
-          ),
-        )
+        const db = yield* requireMessagePersistenceDb({
+          zeroDatabase,
+          message: 'Failed to finalize assistant message',
+          requestId,
+          threadId,
+        })
 
         yield* Effect.tryPromise({
           try: async () => {

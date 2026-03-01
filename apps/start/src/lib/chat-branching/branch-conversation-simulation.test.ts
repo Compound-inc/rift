@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
+import type { BranchableMessage } from './branch-resolver'
 import {
   resolveCanonicalBranch,
   resolveRegenerationAnchor,
-  type BranchableMessage,
 } from './branch-resolver'
 
 type SimMessage = BranchableMessage & {
   readonly content: string
+  regenSourceMessageId?: string
+  branchAnchorMessageId?: string
 }
 
 type SimState = {
@@ -44,8 +46,8 @@ function siblingsForParent(state: SimState, parentMessageId: string): SimMessage
   return state.messages
     .filter((message) => message.parentMessageId === parentMessageId)
     .toSorted((left, right) => {
-      const leftBranch = left.branchIndex ?? 1
-      const rightBranch = right.branchIndex ?? 1
+      const leftBranch = left.branchIndex
+      const rightBranch = right.branchIndex
       if (leftBranch !== rightBranch) return leftBranch - rightBranch
       return left.messageId.localeCompare(right.messageId)
     })
@@ -100,7 +102,7 @@ function regenerate(state: SimState, targetMessageId: string, content: string): 
   const regenerated = appendAssistantForUser(state, anchor.anchorMessageId, content)
   const message = state.messages.find((entry) => entry.messageId === regenerated)
   if (!message) throw new Error('regenerated message missing')
-  ;(message as SimMessage).regenSourceMessageId = targetMessageId
+  message.regenSourceMessageId = targetMessageId
   return regenerated
 }
 
@@ -194,4 +196,3 @@ describe('branch conversation simulation', () => {
     assertCanonical(state, [u1, a1, u2, a2v2, u3v2, a3v2b])
   })
 })
-

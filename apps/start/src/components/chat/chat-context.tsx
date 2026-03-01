@@ -358,7 +358,7 @@ export function ChatProvider({
           messageId: message.messageId,
           role: message.role,
           parentMessageId: message.parentMessageId ?? undefined,
-          branchIndex: message.branchIndex ?? 1,
+          branchIndex: message.branchIndex,
           createdAt: message.created_at,
         })),
         threadRow?.activeChildByParent,
@@ -1018,8 +1018,8 @@ export function ChatProvider({
             message.parentMessageId === anchorMessageId,
         )
         .toSorted((left, right) => {
-          const leftBranch = left.branchIndex ?? 1
-          const rightBranch = right.branchIndex ?? 1
+          const leftBranch = left.branchIndex
+          const rightBranch = right.branchIndex
           if (leftBranch !== rightBranch) return leftBranch - rightBranch
           return left.messageId.localeCompare(right.messageId)
         })
@@ -1114,8 +1114,8 @@ export function ChatProvider({
           return candidateParentId === parentMessageId
         })
         .toSorted((left, right) => {
-          const leftBranch = left.branchIndex ?? 1
-          const rightBranch = right.branchIndex ?? 1
+          const leftBranch = left.branchIndex
+          const rightBranch = right.branchIndex
           if (leftBranch !== rightBranch) return leftBranch - rightBranch
           return left.messageId.localeCompare(right.messageId)
         })

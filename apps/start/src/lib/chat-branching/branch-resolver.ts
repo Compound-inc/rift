@@ -10,7 +10,7 @@ export type BranchableMessage = {
   readonly messageId: string
   readonly role: 'user' | 'assistant' | 'system'
   readonly parentMessageId?: string | null
-  readonly branchIndex?: number | null
+  readonly branchIndex: number
   readonly createdAt?: number | null
 }
 
@@ -44,8 +44,8 @@ function sortBranchSiblings<TMessage extends BranchableMessage>(
   messages: readonly TMessage[],
 ): TMessage[] {
   return [...messages].sort((left, right) => {
-    const leftBranch = left.branchIndex ?? 1
-    const rightBranch = right.branchIndex ?? 1
+    const leftBranch = left.branchIndex
+    const rightBranch = right.branchIndex
     if (leftBranch !== rightBranch) {
       return leftBranch - rightBranch
     }

@@ -10,17 +10,17 @@ type TestMessage = {
   messageId: string
   role: 'user' | 'assistant' | 'system'
   parentMessageId?: string
-  branchIndex?: number
+  branchIndex: number
   createdAt?: number
 }
 
 describe('branch-resolver', () => {
   it('resolves a linear canonical path', () => {
     const messages: TestMessage[] = [
-      { messageId: 'u1', role: 'user', createdAt: 1 },
-      { messageId: 'a1', role: 'assistant', parentMessageId: 'u1', createdAt: 2 },
-      { messageId: 'u2', role: 'user', parentMessageId: 'a1', createdAt: 3 },
-      { messageId: 'a2', role: 'assistant', parentMessageId: 'u2', createdAt: 4 },
+      { messageId: 'u1', role: 'user', branchIndex: 1, createdAt: 1 },
+      { messageId: 'a1', role: 'assistant', parentMessageId: 'u1', branchIndex: 1, createdAt: 2 },
+      { messageId: 'u2', role: 'user', parentMessageId: 'a1', branchIndex: 1, createdAt: 3 },
+      { messageId: 'a2', role: 'assistant', parentMessageId: 'u2', branchIndex: 1, createdAt: 4 },
     ]
 
     const resolution = resolveCanonicalBranch(messages, {
@@ -34,7 +34,7 @@ describe('branch-resolver', () => {
 
   it('chooses selected assistant branch under a user anchor', () => {
     const messages: TestMessage[] = [
-      { messageId: 'u1', role: 'user', createdAt: 1 },
+      { messageId: 'u1', role: 'user', branchIndex: 1, createdAt: 1 },
       {
         messageId: 'a1-v1',
         role: 'assistant',
@@ -59,7 +59,7 @@ describe('branch-resolver', () => {
 
   it('handles nested branch selections deterministically', () => {
     const messages: TestMessage[] = [
-      { messageId: 'u1', role: 'user', createdAt: 1 },
+      { messageId: 'u1', role: 'user', branchIndex: 1, createdAt: 1 },
       { messageId: 'a1-v1', role: 'assistant', parentMessageId: 'u1', branchIndex: 1, createdAt: 2 },
       { messageId: 'a1-v2', role: 'assistant', parentMessageId: 'u1', branchIndex: 2, createdAt: 3 },
       { messageId: 'u2-v2', role: 'user', parentMessageId: 'a1-v2', branchIndex: 1, createdAt: 4 },
@@ -80,7 +80,7 @@ describe('branch-resolver', () => {
 
   it('truncates canonical path when anchor child selection is removed', () => {
     const messages: TestMessage[] = [
-      { messageId: 'u1', role: 'user', createdAt: 1 },
+      { messageId: 'u1', role: 'user', branchIndex: 1, createdAt: 1 },
       { messageId: 'a1', role: 'assistant', parentMessageId: 'u1', branchIndex: 1, createdAt: 2 },
       { messageId: 'u2', role: 'user', parentMessageId: 'a1', branchIndex: 1, createdAt: 3 },
       { messageId: 'a2', role: 'assistant', parentMessageId: 'u2', branchIndex: 1, createdAt: 4 },
@@ -102,8 +102,8 @@ describe('branch-resolver', () => {
 
   it('resolves regenerate anchor from user and assistant targets', () => {
     const messages: TestMessage[] = [
-      { messageId: 'u1', role: 'user', createdAt: 1 },
-      { messageId: 'a1', role: 'assistant', parentMessageId: 'u1', createdAt: 2 },
+      { messageId: 'u1', role: 'user', branchIndex: 1, createdAt: 1 },
+      { messageId: 'a1', role: 'assistant', parentMessageId: 'u1', branchIndex: 1, createdAt: 2 },
     ]
 
     const userTarget = resolveRegenerationAnchor(messages, 'u1')
@@ -125,7 +125,7 @@ describe('branch-resolver', () => {
     const messages: TestMessage[] = [
       { messageId: 'u1-v1', role: 'user', branchIndex: 1, createdAt: 1 },
       { messageId: 'u1-v2', role: 'user', branchIndex: 2, createdAt: 2 },
-      { messageId: 'a1-v2', role: 'assistant', parentMessageId: 'u1-v2', createdAt: 3 },
+      { messageId: 'a1-v2', role: 'assistant', parentMessageId: 'u1-v2', branchIndex: 1, createdAt: 3 },
     ]
 
     const defaultResolution = resolveCanonicalBranch(messages, {})
@@ -144,8 +144,8 @@ describe('branch-resolver', () => {
 
   it('resolves editable target only for canonical user messages', () => {
     const messages: TestMessage[] = [
-      { messageId: 'u1', role: 'user', createdAt: 1 },
-      { messageId: 'a1', role: 'assistant', parentMessageId: 'u1', createdAt: 2 },
+      { messageId: 'u1', role: 'user', branchIndex: 1, createdAt: 1 },
+      { messageId: 'a1', role: 'assistant', parentMessageId: 'u1', branchIndex: 1, createdAt: 2 },
       { messageId: 'u2-v1', role: 'user', parentMessageId: 'a1', branchIndex: 1, createdAt: 3 },
       { messageId: 'u2-v2', role: 'user', parentMessageId: 'a1', branchIndex: 2, createdAt: 4 },
     ]

@@ -13,6 +13,7 @@ import {
   getRetrievalLimits,
 } from '@/lib/chat-backend/services/rag/attachment-content.pipeline'
 import { resolveCanonicalBranch } from '@/lib/chat-branching/branch-resolver'
+import { requireMessagePersistenceDb } from '../../message-persistence-db'
 import { normalizeThreadActiveChildMap } from '../helpers'
 import type { MessageStoreServiceShape } from '../../message-store.service'
 
@@ -85,17 +86,12 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
   return Effect.fn('MessageStoreService.loadThreadMessages')(
     ({ threadId, model, untilMessageId, requestId }) =>
       Effect.gen(function* () {
-        const db = yield* zeroDatabase.getOrFail.pipe(
-          Effect.mapError(
-            () =>
-              new MessagePersistenceError({
-                message: 'Failed to load messages',
-                requestId,
-                threadId,
-                cause: 'ZERO_UPSTREAM_DB is not configured',
-              }),
-          ),
-        )
+        const db = yield* requireMessagePersistenceDb({
+          zeroDatabase,
+          message: 'Failed to load messages',
+          requestId,
+          threadId,
+        })
 
         const messageRows = yield* Effect.tryPromise({
           try: () =>

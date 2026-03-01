@@ -87,6 +87,14 @@ ALTER TABLE messages
 ADD COLUMN IF NOT EXISTS parent_message_id TEXT;
 ALTER TABLE messages
 ADD COLUMN IF NOT EXISTS branch_index INTEGER NOT NULL DEFAULT 1;
+DO $$
+BEGIN
+  ALTER TABLE messages
+  ADD CONSTRAINT messages_branch_index_positive CHECK (branch_index >= 1);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END
+$$;
 ALTER TABLE messages
 ADD COLUMN IF NOT EXISTS branch_anchor_message_id TEXT;
 ALTER TABLE messages

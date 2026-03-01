@@ -7,6 +7,7 @@ import {
 import { zql } from '@/lib/chat-backend/infra/zero/db'
 import type { ZeroDatabaseService } from '@/lib/server-effect/services/zero-database.service'
 import { resolveRegenerationAnchor } from '@/lib/chat-branching/branch-resolver'
+import { requireMessagePersistenceDb } from '../../message-persistence-db'
 import { normalizeThreadActiveChildMap } from '../helpers'
 import type { MessageStoreServiceShape } from '../../message-store.service'
 
@@ -29,17 +30,12 @@ export const makePrepareRegenerationOperation = (dependencies: {
       requestId,
     }) =>
       Effect.gen(function* () {
-        const db = yield* zeroDatabase.getOrFail.pipe(
-          Effect.mapError(
-            () =>
-              new MessagePersistenceError({
-                message: 'Failed to prepare regeneration',
-                requestId,
-                threadId,
-                cause: 'ZERO_UPSTREAM_DB is not configured',
-              }),
-          ),
-        )
+        const db = yield* requireMessagePersistenceDb({
+          zeroDatabase,
+          message: 'Failed to prepare regeneration',
+          requestId,
+          threadId,
+        })
 
         return yield* Effect.tryPromise({
           try: async () => {
