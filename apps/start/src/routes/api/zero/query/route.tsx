@@ -10,15 +10,6 @@ import { queries } from '@/integrations/zero/queries'
 import { requireUserAuth } from '@/lib/server-effect/http/server-auth.server'
 import { ServerRuntime } from '@/lib/server-effect'
 
-/**
- * Temporary non-production auth bypass for Zero query/mutate traffic.
- * Enable only in isolated environments while debugging deployment/auth issues.
- */
-const zeroAuthBypassEnabled = process.env.ZERO_AUTH_BYPASS === 'true'
-const zeroAuthBypassUserId = process.env.ZERO_AUTH_BYPASS_USER_ID ?? 'dev-user'
-const zeroAuthBypassOrgId =
-  process.env.ZERO_AUTH_BYPASS_ORG_ID?.trim() || undefined
-
 class ZeroQueryUnauthorizedError extends Schema.TaggedErrorClass<ZeroQueryUnauthorizedError>()(
   'ZeroQueryUnauthorizedError',
   {
@@ -42,21 +33,15 @@ export const Route = createFileRoute('/api/zero/query')({
     handlers: {
       POST: async ({ request }) => {
         const program = Effect.gen(function* () {
-          const context: ZeroContext = zeroAuthBypassEnabled
-            ? {
-                userID: zeroAuthBypassUserId,
-                orgWorkosId: zeroAuthBypassOrgId,
-              }
-            : yield* requireUserAuth({
-                onUnauthorized: () =>
-                  new ZeroQueryUnauthorizedError({ message: 'Unauthorized' }),
-              }).pipe(
-                Effect.map((authContext) => ({
-                  userID: authContext.userId,
-                  orgWorkosId: authContext.orgWorkosId,
-                })),
-              )
+          const authContext = yield* requireUserAuth({
+            onUnauthorized: () =>
+              new ZeroQueryUnauthorizedError({ message: 'Unauthorized' }),
+          })
 
+          const context: ZeroContext = {
+            userID: authContext.userId,
+            orgWorkosId: authContext.orgWorkosId,
+          }
           const transformQuery = (name: string, args: unknown) => {
             const query = mustGetQuery(queries, name)(
               args as ReadonlyJSONValue | undefined,
