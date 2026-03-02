@@ -25,8 +25,9 @@ const dbProvider = pool ? zeroNodePg(schema, pool) : null
  * Enable only in isolated environments while debugging deployment/auth issues.
  */
 const zeroAuthBypassEnabled = process.env.ZERO_AUTH_BYPASS === 'true'
-const zeroAuthBypassUserId = 'user_01KFXMPJAYZ3SNXTRJVMZ4T5JZ'
-const zeroAuthBypassOrgId = 'org_01KFXQZ63QJ5B4RB4GZ7DHA0AE'
+const zeroAuthBypassUserId = process.env.ZERO_AUTH_BYPASS_USER_ID ?? 'dev-user'
+const zeroAuthBypassOrgId =
+  process.env.ZERO_AUTH_BYPASS_ORG_ID?.trim() || undefined
 
 class ZeroMutateUnauthorizedError extends Schema.TaggedErrorClass<ZeroMutateUnauthorizedError>()(
   'ZeroMutateUnauthorizedError',
