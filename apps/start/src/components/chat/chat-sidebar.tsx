@@ -43,7 +43,7 @@ export const CHAT_AREA_KEY = 'default' as const
 export const isChatPath = (pathname: string) =>
   isAreaPath(pathname, ['/', CHAT_HREF])
 
-const CHAT_SIDEBAR_TITLE = 'AI Chat'
+const CHAT_SIDEBAR_TITLE = 'Rift AI'
 const CHAT_HISTORY_SECTION_NAME = 'Chat History'
 const OPTIMISTIC_THREAD_CREATED_EVENT = 'chat:thread-created'
 const MAX_PRELOADED_THREADS = 100

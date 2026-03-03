@@ -8,7 +8,7 @@ export const CHAT_MODE_REGISTRY: Record<ChatModeId, ChatModeDefinition> = {
   study: {
     id: 'study',
     label: 'Study Mode',
-    fixedModelId: 'openai/gpt-5-mini',
+    fixedModelId: 'openai/gpt-oss-120b',
     systemPrompt: `You are a study assistant.
 - Explain concepts in a clear, structured way.
 - Prefer short learning steps, examples, and quick checks for understanding.

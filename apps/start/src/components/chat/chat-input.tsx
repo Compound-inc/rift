@@ -2,6 +2,7 @@
 'use client'
 
 import { memo, useCallback, useEffect, useState } from 'react'
+import { BookOpen } from 'lucide-react'
 import { useChatActions } from './chat-context'
 import {
   PromptInputRoot,
@@ -152,7 +153,7 @@ export function ChatInput() {
     : selectedModelId
   const modeLockedModelName =
     selectableModels.find((model) => model.id === studyModeDefinition.fixedModelId)
-      ?.name ?? 'GPT-5 mini'
+      ?.name ?? 'GPT OSS 120B'
   const reasoningOptions = selectedModel?.reasoningEfforts ?? []
 
   const hasReasoningOptions = !isStudyModeEnabled && reasoningOptions.length > 0
@@ -161,15 +162,21 @@ export function ChatInput() {
 
   const modelAndReasoningSelectors = (
     <div className="flex items-center gap-1">
-      <ModelSelectorPanel
-        value={modeLockedModelId}
-        onValueChange={setSelectedModelId}
-        options={selectableModels.map((m) => ({ id: m.id, name: m.name }))}
-        disabled={isBusy || isStudyModeEnabled}
-        className={selectorTriggerClassName}
-      />
-      {isStudyModeEnabled && (
-        <span className="text-xs text-content-muted">{`Locked to ${modeLockedModelName}`}</span>
+      {isStudyModeEnabled ? (
+        <div
+          className={`${selectorTriggerClassName} inline-flex items-center gap-1.5 pr-3`}
+        >
+          <BookOpen className="size-4 text-blue-500" aria-hidden />
+          <span className="pointer-events-none">Study Mode</span>
+        </div>
+      ) : (
+        <ModelSelectorPanel
+          value={modeLockedModelId}
+          onValueChange={setSelectedModelId}
+          options={selectableModels.map((m) => ({ id: m.id, name: m.name }))}
+          disabled={isBusy}
+          className={selectorTriggerClassName}
+        />
       )}
       {hasReasoningOptions && (
         <ReasoningSelectorPanel
