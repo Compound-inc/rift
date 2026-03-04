@@ -3,6 +3,7 @@ import { anonymous } from 'better-auth/plugins/anonymous'
 import { organization } from 'better-auth/plugins/organization'
 import { tanstackStartCookies } from 'better-auth/tanstack-start'
 import { Pool } from 'pg'
+import { sendAuthEmail } from './auth-email.server'
 
 const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim()
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim()
@@ -47,6 +48,18 @@ export const auth = betterAuth({
   },
   emailAndPassword: {
     enabled: true,
+    requireEmailVerification: true,
+  },
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url }) => {
+      void sendAuthEmail({
+        to: user.email,
+        subject: 'Verify your email address',
+        text: `Click the link to verify your email: ${url}`,
+      }).catch((error) => {
+        console.error('Failed to send verification email', error)
+      })
+    },
   },
   ...(googleClientId && googleClientSecret
     ? {

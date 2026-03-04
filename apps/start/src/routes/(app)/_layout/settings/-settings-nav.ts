@@ -1,5 +1,5 @@
 import { isAreaPath } from '@/utils/nav-utils'
-import { Bug, Settings, User } from 'lucide-react'
+import { Bug, Lock, Settings, User } from 'lucide-react'
 
 export const SETTINGS_HREF = '/settings'
 export const SETTINGS_AREA_KEY = 'settings' as const
@@ -16,6 +16,7 @@ export const settingsNavArea = () => ({
     {
       items: [
         { name: 'Account', icon: User, href: SETTINGS_HREF, exact: true },
+        { name: 'Security', icon: Lock, href: `${SETTINGS_HREF}/security` },
         { name: 'Debug Auth', icon: Bug, href: `${SETTINGS_HREF}/debug-auth` },
       ],
     },

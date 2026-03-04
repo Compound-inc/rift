@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Badge } from '@rift/ui/badge'
 import { Form } from '@rift/ui/form'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@rift/ui/select'
 import { ContentPage } from '@/components/layout'
@@ -17,6 +18,8 @@ export function AccountPage() {
   const {
     name,
     email,
+    emailVerificationStatus,
+    canResendCurrentEmailVerification,
     language,
     languageOptions,
     languageError,
@@ -32,6 +35,7 @@ export function AccountPage() {
     applyLanguageSelection,
     submitName,
     submitEmail,
+    resendEmailVerification,
     persistAvatar,
     applyAvatarChange,
   } = useAccountPageLogic()
@@ -44,41 +48,14 @@ export function AccountPage() {
       : undefined
   const selectedLanguageLabel =
     languageOptions.find((localeOption) => localeOption.value === language)?.label ?? language
+  const emailVerificationLabel =
+    emailVerificationStatus === 'verified' ? 'Verified' : 'Not verified'
 
   return (
     <ContentPage
       title={m.settings_account_page_title()}
       description={m.settings_account_page_description()}
     >
-      <Form
-        title={m.settings_account_language_title()}
-        description={m.settings_account_language_description()}
-        error={languageError ?? undefined}
-        helpText={<p className="text-sm text-content-subtle">{m.settings_account_language_help()}</p>}
-        contentSlot={(
-          <Select
-            value={language}
-            onValueChange={(next) => {
-              if (!next || next === language) return
-              if (!locales.includes(next as (typeof locales)[number])) return
-              setLanguageInput(next as (typeof locales)[number])
-              void applyLanguageSelection(next as (typeof locales)[number])
-            }}
-          >
-            <SelectTrigger className="w-full max-w-md" aria-label={m.settings_account_language_title()}>
-              <SelectValue>{selectedLanguageLabel}</SelectValue>
-            </SelectTrigger>
-            <SelectContent alignItemWithTrigger={false} align="start">
-              {languageOptions.map((localeOption) => (
-                <SelectItem key={localeOption.value} value={localeOption.value}>
-                  {localeOption.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-      />
-
       <Form
         title={m.settings_account_avatar_title()}
         description={m.settings_account_avatar_description()}
@@ -129,6 +106,20 @@ export function AccountPage() {
       <Form
         title={m.settings_account_email_title()}
         description={m.settings_account_email_description()}
+        descriptionInlineSlot={
+          emailVerificationStatus != null ? (
+            <Badge
+              variant="outline"
+              className={
+                emailVerificationStatus === 'verified'
+                  ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                  : 'border-amber-500/35 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+              }
+            >
+              {emailVerificationLabel}
+            </Badge>
+          ) : null
+        }
         inputAttrs={{
           name: 'email',
           type: 'email',
@@ -149,9 +140,47 @@ export function AccountPage() {
             {m.settings_account_email_help()}
           </p>
         }
-        buttonText={m.settings_account_save_button()}
+        buttonText="Change email"
+        secondaryButtonText={
+          canResendCurrentEmailVerification ? 'Resend verification code' : undefined
+        }
+        onSecondaryClick={
+          canResendCurrentEmailVerification
+            ? () => {
+                void resendEmailVerification()
+              }
+            : undefined
+        }
         buttonDisabled={!canEdit || email.trim().length === 0}
         handleSubmit={submitEmail}
+      />
+      <Form
+        title={m.settings_account_language_title()}
+        description={m.settings_account_language_description()}
+        error={languageError ?? undefined}
+        helpText={<p className="text-sm text-content-subtle">{m.settings_account_language_help()}</p>}
+        contentSlot={(
+          <Select
+            value={language}
+            onValueChange={(next) => {
+              if (!next || next === language) return
+              if (!locales.includes(next as (typeof locales)[number])) return
+              setLanguageInput(next as (typeof locales)[number])
+              void applyLanguageSelection(next as (typeof locales)[number])
+            }}
+          >
+            <SelectTrigger className="w-full max-w-md" aria-label={m.settings_account_language_title()}>
+              <SelectValue>{selectedLanguageLabel}</SelectValue>
+            </SelectTrigger>
+            <SelectContent alignItemWithTrigger={false} align="start">
+              {languageOptions.map((localeOption) => (
+                <SelectItem key={localeOption.value} value={localeOption.value}>
+                  {localeOption.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       />
     </ContentPage>
   )

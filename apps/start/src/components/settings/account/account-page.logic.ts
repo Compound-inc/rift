@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useServerFn } from '@tanstack/react-start'
+import { authClient } from '@/lib/auth/auth-client'
 import { useAppAuth } from '@/lib/auth/use-auth'
 import { requestEmailChange, saveAvatar, updateProfileName } from '@/lib/settings/account'
 import { getLocale, locales, setLocale } from '@/paraglide/runtime.js'
@@ -12,6 +13,8 @@ type SupportedLocale = (typeof locales)[number]
 export type AccountPageLogicResult = {
   name: string
   email: string
+  emailVerificationStatus: 'verified' | 'not-verified' | null
+  canResendCurrentEmailVerification: boolean
   language: SupportedLocale
   languageOptions: Array<{ value: SupportedLocale; label: string }>
   languageError: string | null
@@ -27,6 +30,7 @@ export type AccountPageLogicResult = {
   applyLanguageSelection: (nextLanguage: SupportedLocale) => Promise<void>
   submitName: () => Promise<void>
   submitEmail: () => Promise<void>
+  resendEmailVerification: () => Promise<void>
   persistAvatar: (uploadedUrl: string) => Promise<void>
   applyAvatarChange: (uploadedUrl: string) => void
 }
@@ -72,17 +76,26 @@ function getLocaleLabel(targetLocale: SupportedLocale): string {
   }
 }
 
+function resolveSettingsCallbackURLClient(): string {
+  const raw = import.meta.env.VITE_BETTER_AUTH_URL?.trim()
+  if (!raw) {
+    throw new Error('Missing VITE_BETTER_AUTH_URL.')
+  }
+  return `${raw.replace(/\/+$/, '')}/settings`
+}
+
 /**
  * Centralized logic for user account settings.
  */
 export function useAccountPageLogic(): AccountPageLogicResult {
-  const { loading, user, isAnonymous, refetchSession } = useAppAuth()
+  const { loading, user, isAnonymous, emailVerified, refetchSession } = useAppAuth()
   const saveAvatarFn = useServerFn(saveAvatar)
   const updateProfileNameFn = useServerFn(updateProfileName)
   const requestEmailChangeFn = useServerFn(requestEmailChange)
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [confirmedEmailTarget, setConfirmedEmailTarget] = useState('')
   const [language, setLanguage] = useState(getLocale())
   const [languageError, setLanguageError] = useState<string | null>(null)
   const [avatarImage, setAvatarImage] = useState<string | null>(null)
@@ -95,6 +108,7 @@ export function useAccountPageLogic(): AccountPageLogicResult {
     if (user) {
       setName(user.name ?? '')
       setEmail(user.email ?? '')
+      setConfirmedEmailTarget(user.email ?? '')
       setAvatarImage(user.image ?? null)
       setAvatarMessage(null)
       return
@@ -102,11 +116,24 @@ export function useAccountPageLogic(): AccountPageLogicResult {
 
     setName('')
     setEmail('')
+    setConfirmedEmailTarget('')
     setAvatarImage(null)
     setAvatarMessage(null)
   }, [user?.email, user?.image, user?.name])
   const canEdit = !loading && !!user && !isAnonymous
   const initials = getInitials(name, email)
+  const normalizedCurrentEmail = user?.email?.trim().toLowerCase() ?? ''
+  const normalizedDraftEmail = email.trim().toLowerCase()
+  const normalizedConfirmedEmailTarget = confirmedEmailTarget.trim().toLowerCase()
+  const isEditingCurrentEmail = normalizedDraftEmail === normalizedCurrentEmail
+  const emailVerificationStatus =
+    normalizedConfirmedEmailTarget.length === 0
+      ? null
+      : normalizedConfirmedEmailTarget === normalizedCurrentEmail && emailVerified
+        ? 'verified'
+        : 'not-verified'
+  const canResendCurrentEmailVerification =
+    canEdit && isEditingCurrentEmail && normalizedDraftEmail.length > 0 && !emailVerified
   const languageOptions = locales.map((localeCode) => ({
     value: localeCode,
     label: getLocaleLabel(localeCode),
@@ -193,6 +220,40 @@ export function useAccountPageLogic(): AccountPageLogicResult {
         },
       })
       await refetchSession()
+      setConfirmedEmailTarget(nextEmail)
+      setEmail(nextEmail)
+      setEmailMessage(EMAIL_SUCCESS_MESSAGE())
+    } catch (cause) {
+      setEmailMessage(getErrorMessage(cause, m.settings_account_error_email_change_failed()))
+    }
+  }
+
+  const resendEmailVerification = async () => {
+    const nextEmail = email.trim().toLowerCase()
+    const currentEmail = user?.email?.trim().toLowerCase() ?? ''
+
+    if (!canEdit) {
+      setEmailMessage(m.settings_account_error_sign_in_required_profile())
+      return
+    }
+    if (!nextEmail) {
+      setEmailMessage(m.settings_account_error_email_empty())
+      return
+    }
+    try {
+      if (nextEmail === currentEmail) {
+        await authClient.sendVerificationEmail({
+          email: nextEmail,
+          callbackURL: resolveSettingsCallbackURLClient(),
+        })
+      } else {
+        await requestEmailChangeFn({
+          data: {
+            newEmail: nextEmail,
+          },
+        })
+      }
+      await refetchSession()
       setEmail(nextEmail)
       setEmailMessage(EMAIL_SUCCESS_MESSAGE())
     } catch (cause) {
@@ -227,6 +288,8 @@ export function useAccountPageLogic(): AccountPageLogicResult {
   return {
     name,
     email,
+    emailVerificationStatus,
+    canResendCurrentEmailVerification,
     language,
     languageOptions,
     languageError,
@@ -242,6 +305,7 @@ export function useAccountPageLogic(): AccountPageLogicResult {
     applyLanguageSelection,
     submitName,
     submitEmail,
+    resendEmailVerification,
     persistAvatar,
     applyAvatarChange,
   }

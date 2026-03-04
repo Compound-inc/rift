@@ -34,5 +34,8 @@
     "core-js",
     "esbuild",
     "unrs-resolver"
-  ]
+  ],
+  "dependencies": {
+    "resend": "^6.9.3"
+  }
 }

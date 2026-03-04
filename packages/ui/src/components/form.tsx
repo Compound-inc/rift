@@ -15,6 +15,7 @@ import { cn } from "@rift/utils";
 
 import { Button } from "./button";
 import { Input } from "./input";
+import { Label } from "./label";
 import {
   Select,
   SelectContent,
@@ -71,6 +72,45 @@ export interface FormSelectConfig {
 }
 
 /**
+ * Config for rendering multiple built-in input fields in one form card.
+ * Useful for settings flows that need tightly-styled grouped inputs
+ * (for example password updates or profile bundles).
+ */
+export interface FormInputFieldConfig {
+  /** Required input name used in submit payload */
+  name: string;
+  /** Optional label rendered above the input */
+  label?: string;
+  /** Optional input attributes; name/value/onChange are controlled by this config */
+  inputAttrs?: Omit<InputHTMLAttributes<HTMLInputElement>, "name" | "value" | "onChange">;
+  /** Controlled field value */
+  value: string;
+  /** Controlled field change callback */
+  onValueChange: (value: string) => void;
+  /** Optional fixed prefix shown to the left of this input */
+  inputPrefix?: string | ReactNode;
+  /** Optional right-side slot for this input row */
+  inputRightSlot?: ReactNode;
+  /**
+   * When true, the field is hidden with an animated height+opacity collapse.
+   * The field unmounts from the layout entirely while hidden, so it takes no space.
+   * Defaults to false (always visible).
+   */
+  hidden?: boolean;
+}
+
+type FormTextInputControlProps = {
+  inputId?: string;
+  inputName: string;
+  inputType: string;
+  inputValue: string;
+  inputPrefix?: string | ReactNode;
+  inputClassName?: string;
+  inputAttrs?: Omit<InputHTMLAttributes<HTMLInputElement>, "id" | "name" | "type" | "value" | "onChange">;
+  onValueChange: (nextValue: string) => void;
+};
+
+/**
  * Props for the settings-style Form component.
  * Renders a card with title, description, optional main field (input or select), optional toggle section, help text, and submit button.
  *
@@ -85,6 +125,11 @@ export interface FormProps extends Omit<
   title: string;
   /** Short description below the title */
   description: string;
+  /**
+   * Optional inline element rendered immediately after the description text.
+   * Useful for compact status pills that should stay attached to the sentence.
+   */
+  descriptionInlineSlot?: ReactNode;
   /** Optional. When omitted, no text input is rendered. Ignored if selectConfig is provided. */
   inputAttrs?: InputHTMLAttributes<HTMLInputElement>;
   /**
@@ -92,6 +137,16 @@ export interface FormProps extends Omit<
    * Only used when inputAttrs is used (no selectConfig).
    */
   inputPrefix?: string | ReactNode;
+  /**
+   * Optional element rendered to the right of the input field.
+   * Useful for status indicators (for example a "verified" pill).
+   */
+  inputRightSlot?: ReactNode;
+  /**
+   * Optional set of built-in input fields rendered with native Form styling.
+   * When provided, these fields are submitted as { [field.name]: field.value }.
+   */
+  inputFields?: FormInputFieldConfig[];
   /**
    * Optional. When provided, the main field is a Select (dropdown) instead of an input.
    * Submitted as { [selectConfig.name]: value } on Save.
@@ -128,6 +183,11 @@ export interface FormProps extends Omit<
    * preserving the same settings card structure.
    */
   contentSlot?: ReactNode;
+  /**
+   * Allows rendering submit/secondary actions even when no built-in
+   * input/select main field is used, for fully custom form bodies.
+   */
+  forceActions?: boolean;
   /** Optional additional classes for the form content container (`p-6` section). */
   contentClassName?: string;
   /** Submit button label */
@@ -163,11 +223,64 @@ function getInitialInputValue(
   return defaultValue;
 }
 
+function FormTextInputControl({
+  inputId,
+  inputName,
+  inputType,
+  inputValue,
+  inputPrefix,
+  inputClassName,
+  inputAttrs,
+  onValueChange,
+}: FormTextInputControlProps) {
+  return inputPrefix != null ? (
+    <div className="flex w-full overflow-visible rounded-md border border-border-default bg-bg-default text-content-emphasis sm:text-sm">
+      <span
+        className="flex shrink-0 items-center ltr:border-r rtl:border-l border-border-default bg-bg-subtle px-3 py-2 text-content-muted"
+        aria-hidden
+      >
+        {inputPrefix}
+      </span>
+      <Input
+        {...inputAttrs}
+        id={inputId}
+        name={inputName}
+        type={inputType}
+        required
+        value={inputValue}
+        onChange={(event) => onValueChange(event.target.value)}
+        className={cn(
+          "min-w-0 flex-1 rounded-none ltr:rounded-r-md rtl:rounded-l-md border-0 ltr:border-l-0 rtl:border-r-0 bg-transparent px-3 py-2 placeholder:text-content-muted",
+          "focus-visible:border-content-subtle focus-visible:ring-3 focus-visible:ring-content-subtle/50 focus-visible:ring-offset-0",
+          inputClassName,
+        )}
+      />
+    </div>
+  ) : (
+    <Input
+      {...inputAttrs}
+      id={inputId}
+      name={inputName}
+      type={inputType}
+      required
+      value={inputValue}
+      onChange={(event) => onValueChange(event.target.value)}
+      className={cn(
+        "w-full rounded-md border-border-default text-content-emphasis placeholder:text-content-muted focus-visible:border-content-subtle focus-visible:ring-content-subtle/50 sm:text-sm",
+        inputClassName,
+      )}
+    />
+  );
+}
+
 export function Form({
   title,
   description,
+  descriptionInlineSlot,
   inputAttrs,
   inputPrefix,
+  inputRightSlot,
+  inputFields,
   selectConfig,
   toggleSection,
   error,
@@ -176,6 +289,7 @@ export function Form({
   headerSlot,
   headerClassName,
   contentSlot,
+  forceActions = false,
   contentClassName,
   buttonText = "Save Changes",
   secondaryButtonText,
@@ -189,9 +303,12 @@ export function Form({
   onSubmit: onSubmitProp,
   ...rest
 }: FormProps) {
-  const hasInput = inputAttrs != null;
+  const normalizedInputFields = inputFields ?? [];
+  const hasInputFields = normalizedInputFields.length > 0;
+  const hasInput = inputAttrs != null && !hasInputFields;
   const hasSelect = selectConfig != null;
-  const hasMainField = hasInput || hasSelect;
+  const hasMainField = hasInput || hasInputFields || hasSelect;
+  const hasActions = hasMainField || forceActions;
   const prefixString =
     typeof inputPrefix === "string" ? inputPrefix : undefined;
   const isControlled = controlledValue !== undefined;
@@ -232,14 +349,31 @@ export function Form({
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     onSubmitProp?.(e);
-    if (!hasMainField || handleSubmit == null) return;
+    if (!hasActions || handleSubmit == null) return;
     setSaving(true);
     try {
-      await handleSubmit(
-        hasSelect
-          ? { [selectConfig!.name]: String(value ?? "") }
-          : { [inputAttrs!.name as string]: submittedValue },
-      );
+      if (!hasMainField) {
+        await handleSubmit({});
+      } else {
+        if (hasSelect) {
+          await handleSubmit({ [selectConfig!.name]: String(value ?? "") });
+        } else if (hasInputFields) {
+          const groupedFieldData = normalizedInputFields.reduce<Record<string, string>>(
+            (accumulator, field) => {
+              const normalizedValue =
+                typeof field.inputPrefix === "string"
+                  ? `${field.inputPrefix}${field.value}`
+                  : field.value;
+              accumulator[field.name] = normalizedValue;
+              return accumulator;
+            },
+            {},
+          );
+          await handleSubmit(groupedFieldData);
+        } else {
+          await handleSubmit({ [inputAttrs!.name as string]: submittedValue });
+        }
+      }
     } finally {
       setSaving(false);
     }
@@ -338,7 +472,12 @@ export function Form({
               >
                 {title}
               </h2>
-              <p className="text-sm text-content-subtle">{description}</p>
+              <div className="flex flex-wrap items-center gap-2 text-sm text-content-subtle">
+                <p>{description}</p>
+                {descriptionInlineSlot != null ? (
+                  <div className="inline-flex shrink-0">{descriptionInlineSlot}</div>
+                ) : null}
+              </div>
             </div>
             {headerSlot != null ? <div className="shrink-0">{headerSlot}</div> : null}
           </div>
@@ -358,40 +497,102 @@ export function Form({
                 ))}
               </SelectContent>
             </Select>
+          ) : hasInputFields ? (
+            <div className="w-full max-w-md">
+              {(() => {
+                let animatedFieldCount = 0;
+                return normalizedInputFields.map((field, index) => {
+                  const inputId = field.inputAttrs?.id ?? `${String(field.name)}-${index}`;
+                  const fieldInputType = field.inputAttrs?.type ?? "text";
+                  const fieldPrefix = field.inputPrefix;
+                  const fieldAttrs = field.inputAttrs;
+
+                  const isAnimatedField = field.hidden !== undefined;
+                  const staggerDelay = isAnimatedField ? animatedFieldCount * 0.07 : 0;
+                  if (isAnimatedField) animatedFieldCount++;
+
+                  return (
+                    <AnimatePresence key={String(field.name)} initial={false}>
+                      {!field.hidden ? (
+                        <motion.div
+                          key={`${String(field.name)}-visible`}
+                          initial={{ height: 0, opacity: 0, overflow: "hidden" }}
+                          animate={{
+                            height: "auto",
+                            opacity: 1,
+                            overflow: "hidden",
+                            transitionEnd: { overflow: "visible" },
+                          }}
+                          exit={{
+                            height: 0,
+                            opacity: 0,
+                            overflow: "hidden",
+                            transitionEnd: { overflow: "hidden" },
+                            transition: {
+                              height: {
+                                duration: 0.2,
+                                ease: [0.4, 0, 1, 1],
+                              },
+                              opacity: {
+                                duration: 0.14,
+                                ease: "easeIn",
+                              },
+                            },
+                          }}
+                          transition={{
+                            height: {
+                              duration: 0.26,
+                              ease: [0.22, 1, 0.36, 1],
+                              delay: staggerDelay,
+                            },
+                            opacity: {
+                              duration: 0.2,
+                              ease: "easeOut",
+                              delay: staggerDelay,
+                            },
+                          }}
+                        >
+                          <div className={cn("space-y-2", index > 0 && "mt-4")}>
+                            {field.label != null ? (
+                              <Label htmlFor={inputId}>{field.label}</Label>
+                            ) : null}
+                            <div className="flex w-full items-center gap-2">
+                              <FormTextInputControl
+                                inputId={inputId}
+                                inputName={field.name}
+                                inputType={fieldInputType}
+                                inputValue={field.value}
+                                inputPrefix={fieldPrefix}
+                                inputClassName={fieldAttrs?.className}
+                                inputAttrs={fieldAttrs}
+                                onValueChange={field.onValueChange}
+                              />
+                              {field.inputRightSlot != null ? (
+                                <div className="shrink-0">{field.inputRightSlot}</div>
+                              ) : null}
+                            </div>
+                          </div>
+                        </motion.div>
+                      ) : null}
+                    </AnimatePresence>
+                  );
+                });
+              })()}
+            </div>
           ) : hasInput ? (
-            inputPrefix != null ? (
-              <div className="flex w-full max-w-md overflow-visible rounded-md border border-border-default bg-bg-default text-content-emphasis sm:text-sm">
-                <span
-                  className="flex shrink-0 items-center ltr:border-r rtl:border-l border-border-default bg-bg-subtle px-3 py-2 text-content-muted"
-                  aria-hidden
-                >
-                  {inputPrefix}
-                </span>
-                <Input
-                  {...inputAttrs!}
-                  type={inputAttrs!.type ?? "text"}
-                  required
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                  className={cn(
-                    "min-w-0 flex-1 rounded-none ltr:rounded-r-md rtl:rounded-l-md border-0 ltr:border-l-0 rtl:border-r-0 bg-transparent px-3 py-2 placeholder:text-content-muted",
-                    "focus-visible:border-content-subtle focus-visible:ring-3 focus-visible:ring-content-subtle/50 focus-visible:ring-offset-0",
-                  )}
-                />
-              </div>
-            ) : (
-              <Input
-                {...inputAttrs!}
-                type={inputAttrs!.type ?? "text"}
-                required
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                className={cn(
-                  "max-w-md rounded-md border-border-default text-content-emphasis placeholder:text-content-muted focus-visible:border-content-subtle focus-visible:ring-content-subtle/50 sm:text-sm",
-                  inputAttrs!.className,
-                )}
+            <div className="flex w-full max-w-md items-center gap-2">
+              <FormTextInputControl
+                inputId={inputAttrs!.id}
+                inputName={String(inputAttrs!.name)}
+                inputType={inputAttrs!.type ?? "text"}
+                inputValue={String(value ?? "")}
+                inputPrefix={inputPrefix}
+                inputClassName={inputAttrs!.className}
+                inputAttrs={inputAttrs}
+                onValueChange={setValue}
               />
-            )
+              {inputRightSlot != null ? <div className="shrink-0">{inputRightSlot}</div> : null}
+              </div>
           ) : null}
 
           {toggleSection != null && toggleSection.items.length > 0 && (
@@ -551,7 +752,7 @@ export function Form({
             </AnimatePresence>
           </div>
           <div className="flex h-10 shrink-0 items-center gap-2">
-            {secondaryButtonText && hasMainField && (
+            {secondaryButtonText && hasActions && (
               <Button
                 type="button"
                 variant="ghost"
@@ -562,7 +763,7 @@ export function Form({
                 {secondaryButtonText}
               </Button>
             )}
-            {hasMainField ? submitButton : null}
+            {hasActions ? submitButton : null}
           </div>
           {saving && (
             <span role="status" aria-live="polite" className="sr-only">

@@ -16,6 +16,11 @@ function readIsAnonymous(user: AppSession['user'] | undefined): boolean {
   return typeof value === 'boolean' ? value : false
 }
 
+function readEmailVerified(user: AppSession['user'] | undefined): boolean {
+  const value = (user as { emailVerified?: unknown } | undefined)?.emailVerified
+  return typeof value === 'boolean' ? value : false
+}
+
 /**
  * App-level auth hook backed entirely by Better Auth
  */
@@ -24,6 +29,7 @@ export function useAppAuth() {
   const user = sessionQuery.data?.user ?? null
   const activeOrganizationId = readActiveOrganizationId(sessionQuery.data?.session)
   const isAnonymous = readIsAnonymous(sessionQuery.data?.user)
+  const emailVerified = readEmailVerified(sessionQuery.data?.user)
 
   const signOut = useCallback(async () => {
     await authClient.signOut()
@@ -47,6 +53,7 @@ export function useAppAuth() {
     session: sessionQuery.data?.session,
     activeOrganizationId,
     isAnonymous,
+    emailVerified,
     signOut,
     signInAnonymously,
     refetchSession,
