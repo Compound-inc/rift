@@ -13,6 +13,8 @@ export type AvatarUploadFieldProps = {
   alt: string
   onPersistImage: (uploadedUrl: string) => Promise<void>
   onImageChange?: (uploadedUrl: string) => void
+  /** When provided, upload errors are reported here instead of rendered below the avatar */
+  onUploadError?: (error: string | null) => void
   disabled?: boolean
   className?: string
 }
@@ -29,6 +31,7 @@ export function AvatarUploadField({
   alt,
   onPersistImage,
   onImageChange,
+  onUploadError,
   disabled,
   className,
 }: AvatarUploadFieldProps) {
@@ -43,6 +46,10 @@ export function AvatarUploadField({
     onPersistImage,
     onImageChange,
   })
+
+  useEffect(() => {
+    onUploadError?.(uploadError)
+  }, [uploadError, onUploadError])
 
   const [displayImage, setDisplayImage] = useState<string | null>(image ?? null)
 
@@ -113,7 +120,7 @@ export function AvatarUploadField({
         </Avatar>
       </Button>
 
-      {uploadError ? (
+      {uploadError != null && onUploadError == null ? (
         <p className="max-w-52 text-right text-xs text-content-error" role="alert">
           {uploadError}
         </p>

@@ -40,6 +40,11 @@ export const auth = betterAuth({
   basePath: '/api/auth',
   secret: requireEnv('BETTER_AUTH_SECRET'),
   database: pool,
+  user: {
+    changeEmail: {
+      enabled: true,
+    },
+  },
   emailAndPassword: {
     enabled: true,
   },

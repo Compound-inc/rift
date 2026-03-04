@@ -4,10 +4,12 @@ import {
   type InputHTMLAttributes,
   Fragment,
   type ReactNode,
+  useEffect,
   useId,
   useState,
 } from "react";
 import { ExternalLink } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 
 import { cn } from "@rift/utils";
 
@@ -100,6 +102,17 @@ export interface FormProps extends Omit<
    */
   toggleSection?: FormToggleSection;
   /**
+   * Optional error message shown above helpText in the footer. When set, the footer uses
+   * error styling (red text, red-tinted background) and the error is announced to assistive tech (role="alert").
+   * Use for validation or submit errors so inputs and settings forms can show feedback in one place.
+   */
+  error?: string | ReactNode;
+  /**
+   * Optional success message shown in the footer. When set (and no error exists), the footer
+   * uses a blue info-style treatment to acknowledge a completed mutation.
+   */
+  success?: string | ReactNode;
+  /**
    * Optional help text or custom node below the content.
    * When a string is passed, it is rendered as HTML (dangerouslySetInnerHTML). Only use trusted content to avoid XSS.
    * Prefer passing ReactNode (e.g. JSX) for dynamic or user-derived content.
@@ -157,6 +170,8 @@ export function Form({
   inputPrefix,
   selectConfig,
   toggleSection,
+  error,
+  success,
   helpText,
   headerSlot,
   headerClassName,
@@ -204,6 +219,7 @@ export function Form({
     onValueChange?.(next);
   };
   const [saving, setSaving] = useState(false);
+  const [dismissedFeedbackKey, setDismissedFeedbackKey] = useState<string | null>(null);
 
   const sectionTitleId = useId();
 
@@ -229,6 +245,54 @@ export function Form({
     }
   };
 
+  const rawFeedbackKey =
+    error != null
+      ? `error:${typeof error === "string" ? error : "node"}`
+      : success != null
+        ? `success:${typeof success === "string" ? success : "node"}`
+        : null;
+
+  /**
+   * Auto-dismiss transient footer feedback after a visible period.
+   * When a new message arrives, the timer restarts for the new key.
+   */
+  useEffect(() => {
+    if (rawFeedbackKey == null) {
+      setDismissedFeedbackKey(null);
+      return;
+    }
+
+    if (dismissedFeedbackKey === rawFeedbackKey) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setDismissedFeedbackKey(rawFeedbackKey);
+    }, 10000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [dismissedFeedbackKey, rawFeedbackKey]);
+
+  const isDismissed =
+    rawFeedbackKey != null && dismissedFeedbackKey === rawFeedbackKey;
+  const visibleError = !isDismissed ? error : null;
+  const visibleSuccess = !isDismissed && visibleError == null ? success : null;
+
+  const feedbackTone =
+    visibleError != null
+      ? "error"
+      : visibleSuccess != null
+        ? "info"
+        : "default";
+  const feedbackKey =
+    visibleError != null
+      ? `error:${typeof visibleError === "string" ? visibleError : "node"}`
+      : visibleSuccess != null
+        ? `success:${typeof visibleSuccess === "string" ? visibleSuccess : "node"}`
+        : "help";
+
   const submitButton = (
     <Button
       type="submit"
@@ -246,61 +310,76 @@ export function Form({
       {...rest}
       onSubmit={handleFormSubmit}
       className={cn(
-        "rounded-xl border border-bg-emphasis bg-bg-default",
+        "overflow-hidden rounded-xl border border-bg-emphasis bg-transparent",
         className,
       )}
       aria-labelledby={sectionTitleId}
       aria-busy={saving}
       data-state={saving ? "busy" : "idle"}
     >
-      <div
-        className={cn(
-          "relative flex flex-col space-y-6 p-6",
-          contentClassName,
-        )}
-      >
+      {/* Layer container: emphasis background acts as the visual base. */}
+      <div className="relative bg-emphasis/50">
         <div
           className={cn(
-            "flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between",
-            headerClassName,
+            "relative z-10 flex flex-col space-y-6 rounded-b-2xl bg-bg-muted p-6",
+            contentClassName,
           )}
         >
-          <div className="flex flex-col space-y-1">
-            <h2
-              id={sectionTitleId}
-              className="text-base font-semibold text-content-emphasis text-xl"
-            >
-              {title}
-            </h2>
-            <p className="text-sm text-content-subtle">{description}</p>
-          </div>
-          {headerSlot != null ? <div className="shrink-0">{headerSlot}</div> : null}
-        </div>
-
-        {contentSlot != null ? contentSlot : null}
-
-        {hasSelect ? (
-          <Select value={value} onValueChange={(v) => setValue(v ?? "")}>
-            <SelectTrigger className="w-full max-w-md" aria-label={title}>
-              <SelectValue placeholder="Select…" />
-            </SelectTrigger>
-            <SelectContent alignItemWithTrigger={false} align="start">
-              {selectConfig!.options.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : hasInput ? (
-          inputPrefix != null ? (
-            <div className="flex w-full max-w-md overflow-visible rounded-md border border-border-default bg-bg-default text-content-emphasis sm:text-sm">
-              <span
-                className="flex shrink-0 items-center border-r border-border-default bg-bg-subtle px-3 py-2 text-content-muted"
-                aria-hidden
+          <div
+            className={cn(
+              "flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between",
+              headerClassName,
+            )}
+          >
+            <div className="flex flex-col space-y-1">
+              <h2
+                id={sectionTitleId}
+                className="text-base font-semibold text-content-emphasis text-xl"
               >
-                {inputPrefix}
-              </span>
+                {title}
+              </h2>
+              <p className="text-sm text-content-subtle">{description}</p>
+            </div>
+            {headerSlot != null ? <div className="shrink-0">{headerSlot}</div> : null}
+          </div>
+
+          {contentSlot != null ? contentSlot : null}
+
+          {hasSelect ? (
+            <Select value={value} onValueChange={(v) => setValue(v ?? "")}>
+              <SelectTrigger className="w-full max-w-md" aria-label={title}>
+                <SelectValue placeholder="Select…" />
+              </SelectTrigger>
+              <SelectContent alignItemWithTrigger={false} align="start">
+                {selectConfig!.options.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : hasInput ? (
+            inputPrefix != null ? (
+              <div className="flex w-full max-w-md overflow-visible rounded-md border border-border-default bg-bg-default text-content-emphasis sm:text-sm">
+                <span
+                  className="flex shrink-0 items-center border-r border-border-default bg-bg-subtle px-3 py-2 text-content-muted"
+                  aria-hidden
+                >
+                  {inputPrefix}
+                </span>
+                <Input
+                  {...inputAttrs!}
+                  type={inputAttrs!.type ?? "text"}
+                  required
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  className={cn(
+                    "min-w-0 flex-1 rounded-none rounded-r-md border-0 border-l-0 bg-transparent px-3 py-2 placeholder:text-content-muted",
+                    "focus-visible:border-content-subtle focus-visible:ring-3 focus-visible:ring-content-subtle/50 focus-visible:ring-offset-0",
+                  )}
+                />
+              </div>
+            ) : (
               <Input
                 {...inputAttrs!}
                 type={inputAttrs!.type ?? "text"}
@@ -308,139 +387,169 @@ export function Form({
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
                 className={cn(
-                  "min-w-0 flex-1 rounded-none rounded-r-md border-0 border-l-0 bg-transparent px-3 py-2 placeholder:text-content-muted",
-                  "focus-visible:border-content-subtle focus-visible:ring-3 focus-visible:ring-content-subtle/50 focus-visible:ring-offset-0",
+                  "max-w-md rounded-md border-border-default text-content-emphasis placeholder:text-content-muted focus-visible:border-content-subtle focus-visible:ring-content-subtle/50 sm:text-sm",
+                  inputAttrs!.className,
                 )}
               />
-            </div>
-          ) : (
-            <Input
-              {...inputAttrs!}
-              type={inputAttrs!.type ?? "text"}
-              required
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              className={cn(
-                "max-w-md rounded-md border-border-default text-content-emphasis placeholder:text-content-muted focus-visible:border-content-subtle focus-visible:ring-content-subtle/50 sm:text-sm",
-                inputAttrs!.className,
-              )}
-            />
-          )
-        ) : null}
+            )
+          ) : null}
 
-        {toggleSection != null && toggleSection.items.length > 0 && (
-          <div className="flex flex-col">
-            {toggleSection.sectionTitle != null && (
-              <h3 className="mb-4 text-base font-semibold text-content-emphasis">
-                {toggleSection.sectionTitle}
-              </h3>
-            )}
-            <div
-              className={cn(
-                !toggleSection.rowHover && "divide-y divide-border-default",
+          {toggleSection != null && toggleSection.items.length > 0 && (
+            <div className="flex flex-col">
+              {toggleSection.sectionTitle != null && (
+                <h3 className="mb-4 text-base font-semibold text-content-emphasis">
+                  {toggleSection.sectionTitle}
+                </h3>
               )}
-            >
-              {toggleSection.items.map((item, index) => {
-                const rowHover = toggleSection.rowHover === true;
-                return (
-                  <Fragment key={item.id}>
-                    {rowHover && index > 0 ? (
-                      <div
-                        className="border-t border-border-default"
-                        aria-hidden
-                      />
-                    ) : null}
-                    <div
-                      className={cn(
-                        rowHover && "-mx-6 px-6 py-4 hover:bg-bg-inverted/5",
-                        !rowHover && "py-4",
-                      )}
-                    >
+              <div
+                className={cn(
+                  !toggleSection.rowHover && "divide-y divide-border-default",
+                )}
+              >
+                {toggleSection.items.map((item, index) => {
+                  const rowHover = toggleSection.rowHover === true;
+                  return (
+                    <Fragment key={item.id}>
+                      {rowHover && index > 0 ? (
+                        <div
+                          className="border-t border-border-default"
+                          aria-hidden
+                        />
+                      ) : null}
                       <div
                         className={cn(
-                          "grid grid-cols-[40%_1fr_1fr] items-center gap-4",
-                          rowHover && "py-0",
+                          rowHover && "-mx-6 px-6 py-4 hover:bg-bg-inverted/5",
+                          !rowHover && "py-4",
                         )}
                       >
-                        <div className="min-w-0 space-y-1">
-                          <p className="flex items-center gap-2 font-medium text-content-emphasis">
-                            {item.icon != null ? (
-                              <span className="flex shrink-0" aria-hidden>
-                                {item.icon}
-                              </span>
-                            ) : null}
-                            {item.title}
-                          </p>
-                          {(item.description != null &&
-                            item.description !== "") ||
-                          item.learnMoreHref != null ? (
-                            <p className="text-sm text-content-subtle">
-                              {item.description}
-                              {item.learnMoreHref != null ? (
-                                <>
-                                  {" "}
-                                  <a
-                                    href={item.learnMoreHref}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 font-medium text-accent-default underline underline-offset-2 hover:text-accent-default/80"
-                                  >
-                                    Learn more
-                                    <ExternalLink
-                                      className="size-3.5"
-                                      aria-hidden
-                                    />
-                                  </a>
-                                </>
+                        <div
+                          className={cn(
+                            "grid grid-cols-[40%_1fr_1fr] items-center gap-4",
+                            rowHover && "py-0",
+                          )}
+                        >
+                          <div className="min-w-0 space-y-1">
+                            <p className="flex items-center gap-2 font-medium text-content-emphasis">
+                              {item.icon != null ? (
+                                <span className="flex shrink-0" aria-hidden>
+                                  {item.icon}
+                                </span>
                               ) : null}
+                              {item.title}
                             </p>
-                          ) : null}
-                          {item.actionSlot != null ? (
-                            <div className="pt-1">{item.actionSlot}</div>
-                          ) : null}
-                        </div>
-                        <div className="min-w-0 text-center">
-                          {item.price != null ? (
-                            <>
-                              <p className="font-medium text-content-emphasis">
-                                {item.price}
+                            {(item.description != null &&
+                              item.description !== "") ||
+                            item.learnMoreHref != null ? (
+                              <p className="text-sm text-content-subtle">
+                                {item.description}
+                                {item.learnMoreHref != null ? (
+                                  <>
+                                    {" "}
+                                    <a
+                                      href={item.learnMoreHref}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 font-medium text-accent-default underline underline-offset-2 hover:text-accent-default/80"
+                                    >
+                                      Learn more
+                                      <ExternalLink
+                                        className="size-3.5"
+                                        aria-hidden
+                                      />
+                                    </a>
+                                  </>
+                                ) : null}
                               </p>
-                              {item.priceSub != null && (
-                                <p className="text-sm text-content-subtle">
-                                  {item.priceSub}
+                            ) : null}
+                            {item.actionSlot != null ? (
+                              <div className="pt-1">{item.actionSlot}</div>
+                            ) : null}
+                          </div>
+                          <div className="min-w-0 text-center">
+                            {item.price != null ? (
+                              <>
+                                <p className="font-medium text-content-emphasis">
+                                  {item.price}
                                 </p>
-                              )}
-                            </>
-                          ) : null}
-                        </div>
-                        <div className="flex justify-end">
-                          <Switch
-                            checked={item.checked}
-                            onCheckedChange={item.onCheckedChange}
-                            disabled={item.disabled}
-                            aria-label={`Toggle ${item.title}`}
-                          />
+                                {item.priceSub != null && (
+                                  <p className="text-sm text-content-subtle">
+                                    {item.priceSub}
+                                  </p>
+                                )}
+                              </>
+                            ) : null}
+                          </div>
+                          <div className="flex justify-end">
+                            <Switch
+                              checked={item.checked}
+                              onCheckedChange={item.onCheckedChange}
+                              disabled={item.disabled}
+                              aria-label={`Toggle ${item.title}`}
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </Fragment>
-                );
-              })}
+                    </Fragment>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
-
-      {(helpText != null || hasMainField) && (
-        <div className="flex flex-col items-start justify-between gap-4 rounded-b-xl border-t border-border-subtle bg-bg-muted px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 sm:py-3">
-          {typeof helpText === "string" ? (
-            <p
-              className="text-sm text-content-subtle prose-a:underline prose-a:underline-offset-4 hover:prose-a:text-content-default transition-colors"
-              dangerouslySetInnerHTML={{ __html: helpText }}
-            />
-          ) : (
-            helpText
           )}
+        </div>
+
+        {(helpText != null || error != null || success != null || hasMainField) && (
+          <div
+            className={cn(
+              "relative z-0 -mt-3 flex flex-col items-start justify-between gap-4 rounded-b-xl border-t px-5 pb-4 pt-6 transition-[background-color,border-color] duration-250 ease-out sm:flex-row sm:items-center sm:justify-between sm:space-y-0 sm:pb-3 sm:pt-5",
+              feedbackTone === "error"
+                ? "border-border-subtle bg-bg-error"
+                : feedbackTone === "info"
+                  ? "border-border-subtle bg-bg-info/25"
+                  : "border-border-subtle bg-bg-emphasis/50",
+            )}
+          >
+          <div className="min-h-[1.25rem] min-w-0 flex-1 text-sm">
+            <AnimatePresence initial={false} mode="wait">
+              <motion.div
+                key={feedbackKey}
+                initial={{ opacity: 0, y: 3, filter: "blur(0.5px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={{ opacity: 0, y: -2, filter: "blur(0.5px)" }}
+                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              >
+                {visibleError != null ? (
+                  typeof visibleError === "string" ? (
+                    <p className="text-content-error font-medium" role="alert">
+                      {visibleError}
+                    </p>
+                  ) : (
+                    <div className="text-content-error font-medium" role="alert">
+                      {visibleError}
+                    </div>
+                  )
+                ) : visibleSuccess != null ? (
+                  typeof visibleSuccess === "string" ? (
+                    <p className="text-content-info font-medium" role="status" aria-live="polite">
+                      {visibleSuccess}
+                    </p>
+                  ) : (
+                    <div className="text-content-info font-medium" role="status" aria-live="polite">
+                      {visibleSuccess}
+                    </div>
+                  )
+                ) : helpText != null ? (
+                  typeof helpText === "string" ? (
+                    <p
+                      className="text-content-subtle prose-a:underline prose-a:underline-offset-4 hover:prose-a:text-content-default transition-colors"
+                      dangerouslySetInnerHTML={{ __html: helpText }}
+                    />
+                  ) : (
+                    helpText
+                  )
+                ) : null}
+              </motion.div>
+            </AnimatePresence>
+          </div>
           <div className="flex h-10 shrink-0 items-center gap-2">
             {secondaryButtonText && hasMainField && (
               <Button
@@ -460,8 +569,9 @@ export function Form({
               Saving…
             </span>
           )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </form>
   );
 }

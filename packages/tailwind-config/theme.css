@@ -54,6 +54,7 @@
   --muted-foreground: 0 0% 64%;
   --border: 0 0% 83%;
   --ring: 217 91% 60%;
+  /*Colors for the UI*/
   --bg-default: rgb(252 252 252);
   --bg-muted: rgb(250 250 250);
   --bg-subtle: rgba(247, 247, 247, 1);

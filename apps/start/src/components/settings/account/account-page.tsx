@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Form } from '@rift/ui/form'
 import { ContentPage } from '@/components/layout'
 import { AvatarUploadField } from '@/components/settings/avatar-upload'
@@ -9,10 +10,12 @@ import { useAccountPageLogic } from './account-page.logic'
  * User account settings page for profile information.
  */
 export function AccountPage() {
+  const [avatarError, setAvatarError] = useState<string | null>(null)
   const {
     name,
     email,
     avatarImage,
+    avatarMessage,
     nameMessage,
     emailMessage,
     canEdit,
@@ -24,6 +27,12 @@ export function AccountPage() {
     persistAvatar,
     applyAvatarChange,
   } = useAccountPageLogic()
+
+  const nameSuccessMessage = nameMessage === 'Display name saved.' ? nameMessage : undefined
+  const emailSuccessMessage =
+    emailMessage === 'Email change request submitted. Check your inbox to finish verification.'
+      ? emailMessage
+      : undefined
 
   return (
     <ContentPage title="Account" description="Manage your account details and avatar.">
@@ -38,8 +47,11 @@ export function AccountPage() {
             disabled={!canEdit}
             onPersistImage={persistAvatar}
             onImageChange={applyAvatarChange}
+            onUploadError={setAvatarError}
           />
         }
+        error={avatarError ?? undefined}
+        success={avatarError == null ? avatarMessage ?? undefined : undefined}
         helpText={<p className="text-sm text-content-subtle">An avatar is optional but strongly recommended.</p>}
       />
 
@@ -55,9 +67,15 @@ export function AccountPage() {
         }}
         value={name}
         onValueChange={setNameInput}
+        error={
+          nameMessage != null && nameMessage !== 'Display name saved.'
+            ? nameMessage
+            : undefined
+        }
+        success={nameSuccessMessage}
         helpText={
           <p className="text-sm text-content-subtle">
-            {nameMessage ?? 'Please use 32 characters at maximum.'}
+            Please use 32 characters at maximum.
           </p>
         }
         buttonText="Save"
@@ -72,24 +90,24 @@ export function AccountPage() {
           name: 'email',
           type: 'email',
           placeholder: 'you@example.com',
-          readOnly: true,
           disabled: !canEdit,
         }}
         value={email}
         onValueChange={setEmailInput}
+        error={
+          emailMessage != null &&
+          emailMessage !== 'Email change request submitted. Check your inbox to finish verification.'
+            ? emailMessage
+            : undefined
+        }
+        success={emailSuccessMessage}
         helpText={
-          emailMessage ? (
-            <p className="text-sm text-content-error" role="alert">
-              {emailMessage}
-            </p>
-          ) : (
-            <p className="text-sm text-content-subtle">
-              Email changes are currently managed outside this page.
-            </p>
-          )
+          <p className="text-sm text-content-subtle">
+            Use a valid address you can access to complete secure verification.
+          </p>
         }
         buttonText="Save"
-        buttonDisabled
+        buttonDisabled={!canEdit || email.trim().length === 0}
         handleSubmit={submitEmail}
       />
     </ContentPage>

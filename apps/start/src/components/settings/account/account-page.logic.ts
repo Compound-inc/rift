@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { useServerFn } from '@tanstack/react-start'
-import { authClient } from '@/lib/auth/auth-client'
 import { useAppAuth } from '@/lib/auth/use-auth'
-import { saveAvatar } from '@/lib/settings/account'
+import { requestEmailChange, saveAvatar, updateProfileName } from '@/lib/settings/account'
 
 export type AccountPageLogicResult = {
   name: string
   email: string
   avatarImage: string | null
+  avatarMessage: string | null
   nameMessage: string | null
   emailMessage: string | null
   canEdit: boolean
@@ -20,6 +20,17 @@ export type AccountPageLogicResult = {
   submitEmail: () => Promise<void>
   persistAvatar: (uploadedUrl: string) => Promise<void>
   applyAvatarChange: (uploadedUrl: string) => void
+}
+
+const NAME_SUCCESS_MESSAGE = 'Display name saved.'
+const EMAIL_SUCCESS_MESSAGE = 'Email change request submitted. Check your inbox to finish verification.'
+const AVATAR_SUCCESS_MESSAGE = 'Avatar saved.'
+
+function getErrorMessage(cause: unknown, fallback: string): string {
+  if (cause instanceof Error && cause.message.trim().length > 0) {
+    return cause.message
+  }
+  return fallback
 }
 
 function getInitials(name: string, email: string): string {
@@ -39,12 +50,15 @@ function getInitials(name: string, email: string): string {
  * Centralized logic for user account settings.
  */
 export function useAccountPageLogic(): AccountPageLogicResult {
-  const { loading, user } = useAppAuth()
+  const { loading, user, isAnonymous, refetchSession } = useAppAuth()
   const saveAvatarFn = useServerFn(saveAvatar)
+  const updateProfileNameFn = useServerFn(updateProfileName)
+  const requestEmailChangeFn = useServerFn(requestEmailChange)
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [avatarImage, setAvatarImage] = useState<string | null>(null)
+  const [avatarMessage, setAvatarMessage] = useState<string | null>(null)
   const [nameMessage, setNameMessage] = useState<string | null>(null)
   const [emailMessage, setEmailMessage] = useState<string | null>(null)
 
@@ -54,15 +68,16 @@ export function useAccountPageLogic(): AccountPageLogicResult {
       setName(user.name ?? '')
       setEmail(user.email ?? '')
       setAvatarImage(user.image ?? null)
+      setAvatarMessage(null)
       return
     }
 
     setName('')
     setEmail('')
     setAvatarImage(null)
-  }, [user?.email, user?.image, user?.name, user])
-
-  const canEdit = !loading && !!user
+    setAvatarMessage(null)
+  }, [user?.email, user?.image, user?.name])
+  const canEdit = !loading && !!user && !isAnonymous
   const initials = getInitials(name, email)
 
   const setNameInput = (nextName: string) => {
@@ -87,18 +102,48 @@ export function useAccountPageLogic(): AccountPageLogicResult {
     }
 
     try {
-      await authClient.updateUser({ name: nextName })
+      await updateProfileNameFn({
+        data: {
+          name: nextName,
+        },
+      })
+      await refetchSession()
       setName(nextName)
-      setNameMessage('Display name saved.')
+      setNameMessage(NAME_SUCCESS_MESSAGE)
     } catch (cause) {
-      setNameMessage(
-        cause instanceof Error ? cause.message : 'Unable to save display name.',
-      )
+      setNameMessage(getErrorMessage(cause, 'Unable to save display name.'))
     }
   }
 
   const submitEmail = async () => {
-    setEmailMessage('Email updates are not enabled in this workspace.')
+    const nextEmail = email.trim().toLowerCase()
+    const currentEmail = user?.email?.trim().toLowerCase() ?? ''
+
+    if (!canEdit) {
+      setEmailMessage('You need to sign in to update your profile.')
+      return
+    }
+    if (!nextEmail) {
+      setEmailMessage('Email cannot be empty.')
+      return
+    }
+    if (nextEmail === currentEmail) {
+      setEmailMessage('Please enter a different email address.')
+      return
+    }
+
+    try {
+      await requestEmailChangeFn({
+        data: {
+          newEmail: nextEmail,
+        },
+      })
+      await refetchSession()
+      setEmail(nextEmail)
+      setEmailMessage(EMAIL_SUCCESS_MESSAGE)
+    } catch (cause) {
+      setEmailMessage(getErrorMessage(cause, 'Unable to request email change.'))
+    }
   }
 
   const persistAvatar = async (uploadedUrl: string) => {
@@ -106,14 +151,22 @@ export function useAccountPageLogic(): AccountPageLogicResult {
       throw new Error('You need to sign in to update your avatar.')
     }
 
+    setAvatarMessage(null)
     await saveAvatarFn({
       data: {
         avatarUrl: uploadedUrl,
       },
     })
+    await refetchSession()
+    setAvatarMessage(AVATAR_SUCCESS_MESSAGE)
   }
 
   const applyAvatarChange = (uploadedUrl: string) => {
+    /**
+     * Keep the latest success feedback visible after persistence completes.
+     * `persistAvatar` already clears stale feedback at the start of a new upload attempt,
+     * so resetting it here would immediately hide the fresh success message.
+     */
     setAvatarImage(uploadedUrl)
   }
 
@@ -121,6 +174,7 @@ export function useAccountPageLogic(): AccountPageLogicResult {
     name,
     email,
     avatarImage,
+    avatarMessage,
     nameMessage,
     emailMessage,
     canEdit,

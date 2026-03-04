@@ -37,6 +37,10 @@ export function useAppAuth() {
     await sessionQuery.refetch()
   }, [sessionQuery])
 
+  const refetchSession = useCallback(async () => {
+    await sessionQuery.refetch()
+  }, [sessionQuery])
+
   return {
     user,
     loading: sessionQuery.isPending,
@@ -45,5 +49,6 @@ export function useAppAuth() {
     isAnonymous,
     signOut,
     signInAnonymously,
+    refetchSession,
   }
 }
