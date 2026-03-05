@@ -75,6 +75,9 @@ function normalizeSecurityErrorMessage(message: string, fallback: string): strin
   ) {
     return m.settings_security_error_current_invalid()
   }
+  if (lowerCaseMessage === 'invalid code' || lowerCaseMessage.includes('invalid code')) {
+    return m.settings_security_mfa_error_invalid_code()
+  }
 
   return normalizedMessage.length > 0 ? normalizedMessage : fallback
 }

@@ -149,11 +149,11 @@ export function MfaSection({
   const setupDialogSecondaryButtonText =
     mfaSetupStep === 'backup-codes'
       ? copiedAllCodes
-        ? m.settings_security_mfa_button_copied()
-        : m.chat_code_block_copy_code_aria_label()
+        ? m.common_copied()
+        : m.common_copy()
       : copiedSetupKey
-        ? m.settings_security_mfa_button_copied()
-        : m.chat_code_block_copy_code_aria_label()
+        ? m.common_copied()
+        : m.common_copy()
 
   if (!mfaEnabled || mfaPendingVerification) {
     return (
@@ -320,7 +320,7 @@ export function MfaSection({
           onValueChange: setMfaDisablePasswordInput,
         },
       ]}
-      buttonText={mfaBusy ? m.settings_security_mfa_button_disabling() : m.settings_security_mfa_button_disable()}
+      buttonText={m.settings_security_mfa_button_disable()}
       buttonVariant="dangerLight"
       buttonDisabled={!canEdit || mfaBusy || mfaDisablePassword.trim().length === 0}
       handleSubmit={async () => {

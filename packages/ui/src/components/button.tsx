@@ -12,11 +12,11 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-accent-default text-white hover:bg-accent-default hover:opacity-80",
+          "bg-accent-default text-white hover:bg-accent-default/70 active:bg-accent-default/50",
         ghost:
           "bg-transparent text-content-default",
         danger:
-        "border-red-500 bg-red-500 text-white hover:bg-red-600 hover:ring-red-100",
+        "border-red-500 bg-red-500 text-white hover:bg-red-600/70 active:bg-red-600/50",
         dangerLight:
         "text-content-error hover:bg-content-error/10 hover:text-content-error/80",
         sidebarIcon:

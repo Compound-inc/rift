@@ -104,7 +104,7 @@ const Code: NonNullable<Components['code']> = ({
             variant="ghost"
           />
           <CodeBlockCopyButton
-            aria-label={m.chat_code_block_copy_code_aria_label()}
+            aria-label={m.common_copy()}
             className="h-6 w-6 rounded-md border border-transparent p-0 text-content-subtle transition-colors duration-100 hover:bg-bg-muted hover:text-content-default focus-visible:border-border-default focus-visible:ring-0"
             variant="ghost"
           />
