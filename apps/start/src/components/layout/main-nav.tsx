@@ -106,11 +106,12 @@ export function MainNav({ children, sidebar: Sidebar }: MainNavProps) {
       <div
         className={cn(
           'sticky top-0 hidden h-dvh min-h-0 shrink-0 overflow-hidden bg-bg-emphasis pt-[var(--page-top-margin)] [--page-top-margin:0.5rem] lg:block',
-          directionClass(direction, {
-            ltr: 'pl-0 pr-2',
-            rtl: 'pl-2 pr-0',
-          }),
-          'transition-[width] duration-220 motion-reduce:transition-none',
+          showRightSidebar &&
+            directionClass(direction, {
+              ltr: 'pl-0 pr-2',
+              rtl: 'pl-2 pr-0',
+            }),
+          'transition-[width,padding] duration-220 motion-reduce:transition-none',
           showRightSidebar ? 'ease-out' : 'ease-in',
         )}
         style={{ width: showRightSidebar ? `${RIGHT_SIDEBAR_WIDTH}px` : '0px' }}

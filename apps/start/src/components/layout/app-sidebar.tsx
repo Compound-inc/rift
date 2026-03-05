@@ -28,7 +28,7 @@ const SIDEBAR_WIDTH = SIDEBAR_GROUPS_WIDTH + SIDEBAR_AREAS_WIDTH
 
 export const AppSidebar: ComponentType = () => {
   const { pathname } = useLocation()
-  const { user } = useAppAuth()
+  const { user, loading } = useAppAuth()
   const direction = useDirection()
   const currentArea = getCurrentArea(pathname)
   const showAreaPanel = currentArea !== null
@@ -103,7 +103,7 @@ export const AppSidebar: ComponentType = () => {
         </div>
         <div className="flex flex-col items-center gap-3">
           <ThemeToggle />
-          <UserProfileAvatar user={user ?? undefined} />
+          <UserProfileAvatar user={user ?? undefined} isLoading={loading} />
         </div>
       </nav>
       <div

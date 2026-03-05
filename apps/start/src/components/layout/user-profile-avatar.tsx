@@ -27,16 +27,19 @@ function getInitials(user: UserProfileAvatarUser): string {
 
 export type UserProfileAvatarProps = {
   user?: UserProfileAvatarUser | null
+  isLoading?: boolean
   settingsHref?: string
   size?: 'default' | 'sm' | 'lg' | 'xs'
 }
 
 export function UserProfileAvatar({
   user,
+  isLoading = false,
   settingsHref = SETTINGS_HREF,
   size = 'xs',
 }: UserProfileAvatarProps) {
   const initials = user ? getInitials(user) : '?'
+  const showFallback = !isLoading && !user?.image
 
   return (
     <Button
@@ -53,7 +56,7 @@ export function UserProfileAvatar({
               alt=""
             />
           ) : null}
-          <AvatarFallback>{initials}</AvatarFallback>
+          {showFallback ? <AvatarFallback>{initials}</AvatarFallback> : null}
         </Avatar>
       </Link>
     </Button>

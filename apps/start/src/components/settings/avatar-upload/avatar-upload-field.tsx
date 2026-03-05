@@ -52,15 +52,18 @@ export function AvatarUploadField({
     onUploadError?.(uploadError)
   }, [uploadError, onUploadError])
 
-  const [displayImage, setDisplayImage] = useState<string | null>(image ?? null)
+  const [displayImage, setDisplayImage] = useState<string | null>(null)
+  const [didImageLoadFail, setDidImageLoadFail] = useState(false)
 
   useEffect(() => {
     if (!image) {
       setDisplayImage(null)
+      setDidImageLoadFail(false)
       return
     }
 
     if (image === displayImage) {
+      setDidImageLoadFail(false)
       return
     }
 
@@ -69,12 +72,14 @@ export function AvatarUploadField({
     preloadedImage.onload = () => {
       if (!isCancelled) {
         setDisplayImage(image)
+        setDidImageLoadFail(false)
       }
     }
 
     preloadedImage.onerror = () => {
       if (!isCancelled) {
-        setDisplayImage(image)
+        setDisplayImage(null)
+        setDidImageLoadFail(true)
       }
     }
 
@@ -84,6 +89,12 @@ export function AvatarUploadField({
       isCancelled = true
     }
   }, [displayImage, image])
+
+  /**
+   * Only show fallback when there is no resolvable avatar image.
+   * This avoids the transient "half image / half fallback" split while the image is loading.
+   */
+  const showFallback = !displayImage && (!image || didImageLoadFail)
 
   return (
     <div className={cn('flex flex-col items-end gap-2', className)}>
@@ -109,7 +120,7 @@ export function AvatarUploadField({
       >
         <Avatar className="relative !size-24" size="lg">
           {displayImage ? <AvatarImage src={displayImage} alt={alt} /> : null}
-          <AvatarFallback>{fallbackText}</AvatarFallback>
+          {showFallback ? <AvatarFallback>{fallbackText}</AvatarFallback> : null}
           {isUploading ? (
             <>
               <span className="absolute inset-0 rounded-full bg-black/35 backdrop-blur-[1px]" aria-hidden />
