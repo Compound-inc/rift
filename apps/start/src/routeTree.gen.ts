@@ -35,6 +35,7 @@ import { Route as appLayoutChatThreadIdRouteRouteImport } from './routes/(app)/_
 import { Route as appLayoutOrganizationSettingsIndexRouteImport } from './routes/(app)/_layout/organization/settings/index'
 import { Route as appLayoutOrganizationSettingsProviderPolicyRouteRouteImport } from './routes/(app)/_layout/organization/settings/provider-policy/route'
 import { Route as appLayoutOrganizationSettingsModelsRouteRouteImport } from './routes/(app)/_layout/organization/settings/models/route'
+import { Route as appLayoutOrganizationSettingsMembersRouteRouteImport } from './routes/(app)/_layout/organization/settings/members/route'
 import { Route as appLayoutOrganizationSettingsCompliancePolicyRouteRouteImport } from './routes/(app)/_layout/organization/settings/compliance-policy/route'
 import { Route as appLayoutOrganizationSettingsByokRouteRouteImport } from './routes/(app)/_layout/organization/settings/byok/route'
 import { Route as appLayoutOrganizationSettingsModelsIndexRouteImport } from './routes/(app)/_layout/organization/settings/models/index'
@@ -177,6 +178,12 @@ const appLayoutOrganizationSettingsModelsRouteRoute =
     path: '/models',
     getParentRoute: () => appLayoutOrganizationSettingsRouteRoute,
   } as any)
+const appLayoutOrganizationSettingsMembersRouteRoute =
+  appLayoutOrganizationSettingsMembersRouteRouteImport.update({
+    id: '/members',
+    path: '/members',
+    getParentRoute: () => appLayoutOrganizationSettingsRouteRoute,
+  } as any)
 const appLayoutOrganizationSettingsCompliancePolicyRouteRoute =
   appLayoutOrganizationSettingsCompliancePolicyRouteRouteImport.update({
     id: '/compliance-policy',
@@ -227,6 +234,7 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof appLayoutSettingsIndexRoute
   '/organization/settings/byok': typeof appLayoutOrganizationSettingsByokRouteRoute
   '/organization/settings/compliance-policy': typeof appLayoutOrganizationSettingsCompliancePolicyRouteRoute
+  '/organization/settings/members': typeof appLayoutOrganizationSettingsMembersRouteRoute
   '/organization/settings/models': typeof appLayoutOrganizationSettingsModelsRouteRouteWithChildren
   '/organization/settings/provider-policy': typeof appLayoutOrganizationSettingsProviderPolicyRouteRoute
   '/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
@@ -255,6 +263,7 @@ export interface FileRoutesByTo {
   '/settings': typeof appLayoutSettingsIndexRoute
   '/organization/settings/byok': typeof appLayoutOrganizationSettingsByokRouteRoute
   '/organization/settings/compliance-policy': typeof appLayoutOrganizationSettingsCompliancePolicyRouteRoute
+  '/organization/settings/members': typeof appLayoutOrganizationSettingsMembersRouteRoute
   '/organization/settings/provider-policy': typeof appLayoutOrganizationSettingsProviderPolicyRouteRoute
   '/organization/settings': typeof appLayoutOrganizationSettingsIndexRoute
   '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
@@ -287,6 +296,7 @@ export interface FileRoutesById {
   '/(app)/_layout/settings/': typeof appLayoutSettingsIndexRoute
   '/(app)/_layout/organization/settings/byok': typeof appLayoutOrganizationSettingsByokRouteRoute
   '/(app)/_layout/organization/settings/compliance-policy': typeof appLayoutOrganizationSettingsCompliancePolicyRouteRoute
+  '/(app)/_layout/organization/settings/members': typeof appLayoutOrganizationSettingsMembersRouteRoute
   '/(app)/_layout/organization/settings/models': typeof appLayoutOrganizationSettingsModelsRouteRouteWithChildren
   '/(app)/_layout/organization/settings/provider-policy': typeof appLayoutOrganizationSettingsProviderPolicyRouteRoute
   '/(app)/_layout/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
@@ -320,6 +330,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/organization/settings/byok'
     | '/organization/settings/compliance-policy'
+    | '/organization/settings/members'
     | '/organization/settings/models'
     | '/organization/settings/provider-policy'
     | '/organization/settings/'
@@ -348,6 +359,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/organization/settings/byok'
     | '/organization/settings/compliance-policy'
+    | '/organization/settings/members'
     | '/organization/settings/provider-policy'
     | '/organization/settings'
     | '/organization/settings/models/$providerId'
@@ -379,6 +391,7 @@ export interface FileRouteTypes {
     | '/(app)/_layout/settings/'
     | '/(app)/_layout/organization/settings/byok'
     | '/(app)/_layout/organization/settings/compliance-policy'
+    | '/(app)/_layout/organization/settings/members'
     | '/(app)/_layout/organization/settings/models'
     | '/(app)/_layout/organization/settings/provider-policy'
     | '/(app)/_layout/organization/settings/'
@@ -583,6 +596,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appLayoutOrganizationSettingsModelsRouteRouteImport
       parentRoute: typeof appLayoutOrganizationSettingsRouteRoute
     }
+    '/(app)/_layout/organization/settings/members': {
+      id: '/(app)/_layout/organization/settings/members'
+      path: '/members'
+      fullPath: '/organization/settings/members'
+      preLoaderRoute: typeof appLayoutOrganizationSettingsMembersRouteRouteImport
+      parentRoute: typeof appLayoutOrganizationSettingsRouteRoute
+    }
     '/(app)/_layout/organization/settings/compliance-policy': {
       id: '/(app)/_layout/organization/settings/compliance-policy'
       path: '/compliance-policy'
@@ -648,6 +668,7 @@ const appLayoutOrganizationSettingsModelsRouteRouteWithChildren =
 interface appLayoutOrganizationSettingsRouteRouteChildren {
   appLayoutOrganizationSettingsByokRouteRoute: typeof appLayoutOrganizationSettingsByokRouteRoute
   appLayoutOrganizationSettingsCompliancePolicyRouteRoute: typeof appLayoutOrganizationSettingsCompliancePolicyRouteRoute
+  appLayoutOrganizationSettingsMembersRouteRoute: typeof appLayoutOrganizationSettingsMembersRouteRoute
   appLayoutOrganizationSettingsModelsRouteRoute: typeof appLayoutOrganizationSettingsModelsRouteRouteWithChildren
   appLayoutOrganizationSettingsProviderPolicyRouteRoute: typeof appLayoutOrganizationSettingsProviderPolicyRouteRoute
   appLayoutOrganizationSettingsIndexRoute: typeof appLayoutOrganizationSettingsIndexRoute
@@ -659,6 +680,8 @@ const appLayoutOrganizationSettingsRouteRouteChildren: appLayoutOrganizationSett
       appLayoutOrganizationSettingsByokRouteRoute,
     appLayoutOrganizationSettingsCompliancePolicyRouteRoute:
       appLayoutOrganizationSettingsCompliancePolicyRouteRoute,
+    appLayoutOrganizationSettingsMembersRouteRoute:
+      appLayoutOrganizationSettingsMembersRouteRoute,
     appLayoutOrganizationSettingsModelsRouteRoute:
       appLayoutOrganizationSettingsModelsRouteRouteWithChildren,
     appLayoutOrganizationSettingsProviderPolicyRouteRoute:

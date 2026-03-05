@@ -250,8 +250,7 @@ function FormTextInputControl({
         value={inputValue}
         onChange={(event) => onValueChange(event.target.value)}
         className={cn(
-          "min-w-0 flex-1 rounded-none ltr:rounded-r-md rtl:rounded-l-md border-0 ltr:border-l-0 rtl:border-r-0 bg-transparent px-3 py-2 placeholder:text-content-muted",
-          "focus-visible:border-content-subtle focus-visible:ring-3 focus-visible:ring-content-subtle/50 focus-visible:ring-offset-0",
+          "min-w-0 flex-1 rounded-none ltr:rounded-r-md rtl:rounded-l-md border-0 ltr:border-l-0 rtl:border-r-0 focus-visible:ring-offset-0",
           inputClassName,
         )}
       />
@@ -265,10 +264,7 @@ function FormTextInputControl({
       required
       value={inputValue}
       onChange={(event) => onValueChange(event.target.value)}
-      className={cn(
-        "w-full rounded-md border-border-default text-content-emphasis placeholder:text-content-muted focus-visible:border-content-subtle focus-visible:ring-content-subtle/50 sm:text-sm",
-        inputClassName,
-      )}
+      className={inputClassName}
     />
   );
 }
