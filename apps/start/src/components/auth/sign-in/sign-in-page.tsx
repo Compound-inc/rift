@@ -13,16 +13,23 @@ import { menuCardContainerVariants } from '@/lib/animations'
 export type SignInPageProps = {
   redirectTarget: string
   initialMode?: 'sign-in' | 'sign-up'
+  invitationId?: string
 }
 
 /**
  * Combined auth surface for sign-in, sign-up, account recovery, and
  * verification steps that may happen before a session is fully established.
  */
-export function SignInPage({ redirectTarget, initialMode = 'sign-in' }: SignInPageProps) {
+export function SignInPage({
+  redirectTarget,
+  initialMode = 'sign-in',
+  invitationId,
+}: SignInPageProps) {
   const {
     view,
     isSignUp,
+    invitationEmail,
+    invitationLookupLoading,
     pendingVerificationEmail,
     pendingMfaEmail,
     verificationMessage,
@@ -39,18 +46,10 @@ export function SignInPage({ redirectTarget, initialMode = 'sign-in' }: SignInPa
     handleVerifyMfaTotp,
     handleResendVerificationOtp,
     handleBackFromMfa,
-  } = useSignInPageLogic(redirectTarget, initialMode)
+  } = useSignInPageLogic(redirectTarget, initialMode, invitationId)
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] dark:bg-[#2A2929] flex items-center justify-center px-4 relative overflow-hidden">
-      <img
-        src="/shadowfull.webp"
-        alt=""
-        className="absolute top-0 left-0 w-full h-full z-0 mix-blend-multiply object-cover pointer-events-none dark:hidden"
-        aria-hidden
-      />
-
-      <AnimatePresence>
+    <AnimatePresence>
         {view === 'forgot-password' ? (
           <ForgotPassword
             key="forgot-password"
@@ -106,13 +105,15 @@ export function SignInPage({ redirectTarget, initialMode = 'sign-in' }: SignInPa
               onToggleMode={handleToggleMode}
               onSubmit={handleAuthSubmit}
               isLoading={isLoading}
+              initialEmail={invitationEmail}
+              isInvitationEmailLocked={!!invitationEmail}
+              isInvitationLookupLoading={invitationLookupLoading}
               error={error}
               onForgotPassword={handleShowForgotPassword}
             />
             <LegalLinks isSignUp={isSignUp} />
           </motion.div>
         )}
-      </AnimatePresence>
-    </div>
+    </AnimatePresence>
   )
 }

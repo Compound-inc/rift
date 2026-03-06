@@ -35,6 +35,12 @@ export const orgSettingsQueryDefinitions = {
           }
           return q.related('user')
         })
+        .related('invitations', (invitations) =>
+          invitations
+            .where('status', 'pending')
+            .orderBy('email', 'asc')
+            .limit(MEMBERS_DIRECTORY_PAGE_SIZE),
+        )
         .one()
     }),
   },

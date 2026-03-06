@@ -29,6 +29,27 @@ function getRoleBadgeProps(role: string): {
   }
 }
 
+function getStatusBadgeProps(status: MemberRow['status']): {
+  variant: 'default' | 'secondary' | 'outline'
+  className?: string
+} {
+  switch (status) {
+    case 'pending':
+      return {
+        variant: 'outline',
+        className: 'border-amber-500/50 bg-amber-500/15 text-amber-700 dark:text-amber-400',
+      }
+    case 'active':
+      return {
+        variant: 'outline',
+        className: 'border-emerald-500/50 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+      }
+    case 'inactive':
+    default:
+      return { variant: 'secondary' }
+  }
+}
+
 const MEMBERS_COLUMNS: Array<DataTableColumnDef<MemberRow>> = [
   {
     accessorKey: 'name',
@@ -69,11 +90,18 @@ const MEMBERS_COLUMNS: Array<DataTableColumnDef<MemberRow>> = [
   {
     accessorKey: 'status',
     header: 'Status',
-    cell: ({ row }) => (
-      <Badge variant="secondary" className="rounded-full px-2 py-0.5 capitalize text-content-subtle">
-        {String(row.getValue('status'))}
-      </Badge>
-    ),
+    cell: ({ row }) => {
+      const status = row.getValue('status') as MemberRow['status']
+      const { variant, className } = getStatusBadgeProps(status)
+      return (
+        <Badge
+          variant={variant}
+          className={cn('rounded-full px-2 py-0.5 capitalize', className)}
+        >
+          {status}
+        </Badge>
+      )
+    },
   },
 ]
 
@@ -100,7 +128,7 @@ export function MembersPage() {
   return (
     <ContentPage
       title="Members"
-      description="Manage organization members, permissions, and access status."
+      description="Manage organization members, pending invitations, permissions, and access status."
     >
       <DataTable
         data={data}
@@ -112,8 +140,8 @@ export function MembersPage() {
         filterPlaceholder="Filter members..."
         messages={{
           columns: 'Columns',
-          noResults: 'Unable to load the member directory.',
-          loading: 'Loading members...',
+          noResults: 'No members or pending invitations found.',
+          loading: 'Loading members and invitations...',
           previous: 'Previous',
           next: 'Next',
           rowsSelected: 'row(s) selected.',

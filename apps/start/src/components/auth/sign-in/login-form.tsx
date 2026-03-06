@@ -18,6 +18,12 @@ import { authClient } from '@/lib/auth/auth-client'
 export type LoginFormProps = {
   /** When true, shows sign-up fields (confirm password) and sign-up copy. */
   isSignUp?: boolean
+  /** Pre-filled email to use for invitation-driven auth flows. */
+  initialEmail?: string
+  /** Prevent changing the invited email when the invitation already resolved. */
+  isInvitationEmailLocked?: boolean
+  /** Blocks submission until the invitation lookup finishes. */
+  isInvitationLookupLoading?: boolean
   onToggleMode: () => void
   onSubmit: (email: string, password: string) => Promise<void>
   isLoading: boolean
@@ -27,6 +33,9 @@ export type LoginFormProps = {
 
 export function LoginForm({
   isSignUp = false,
+  initialEmail,
+  isInvitationEmailLocked = false,
+  isInvitationLookupLoading = false,
   onToggleMode,
   onSubmit,
   isLoading: parentIsLoading,
@@ -41,6 +50,7 @@ export function LoginForm({
   const [confirmPasswordError, setConfirmPasswordError] = useState('')
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [isMicrosoftLoading, setIsMicrosoftLoading] = useState(false)
+  const isInteractionDisabled = parentIsLoading || isInvitationLookupLoading
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true)
@@ -121,6 +131,27 @@ export function LoginForm({
     }
   }, [isSignUp, parentError])
 
+  useEffect(() => {
+    if (!initialEmail) return
+
+    /**
+     * Invitation lookups resolve asynchronously after the page loads. Sync the
+     * local form state when the invited address arrives so browser autofill or
+     * optimistic typing cannot drift away from the invitation recipient.
+     */
+    setEmail((currentEmail) => {
+      const normalizedCurrentEmail = normalizeEmailAddress(currentEmail)
+      const normalizedInitialEmail = normalizeEmailAddress(initialEmail)
+
+      if (normalizedCurrentEmail === normalizedInitialEmail) {
+        return currentEmail
+      }
+
+      return initialEmail
+    })
+    setEmailError('')
+  }, [initialEmail])
+
   return (
     <motion.div
       className="overflow-hidden rounded-3xl bg-emphasis/50 shadow-[0_0_1px_rgba(0,0,0,0.40),0_0_2px_rgba(0,0,0,0.05),0_10px_10px_rgba(0,0,0,0.25)] transition-colors duration-200"
@@ -149,11 +180,17 @@ export function LoginForm({
               setEmail(e.target.value)
               if (emailError) setEmailError('')
             }}
-            disabled={parentIsLoading}
+            disabled={isInteractionDisabled}
+            readOnly={isInvitationEmailLocked}
             autoComplete={isSignUp ? 'section-sign-up email' : 'section-sign-in username'}
             aria-invalid={!!emailError}
             required
           />
+          {isInvitationEmailLocked && (
+            <p className="text-xs text-content-muted">
+              {m.auth_invitation_tied_to_email()}
+            </p>
+          )}
           <AnimatePresence>
             {emailError && (
               <motion.p
@@ -185,7 +222,7 @@ export function LoginForm({
               setPassword(e.target.value)
               if (passwordError) setPasswordError('')
             }}
-            disabled={parentIsLoading}
+            disabled={isInteractionDisabled}
             autoComplete={isSignUp ? 'section-sign-up new-password' : 'section-sign-in current-password'}
             aria-invalid={!!passwordError}
             showPasswordToggle
@@ -233,7 +270,7 @@ export function LoginForm({
                     setConfirmPassword(e.target.value)
                     if (confirmPasswordError) setConfirmPasswordError('')
                   }}
-                  disabled={parentIsLoading}
+                  disabled={isInteractionDisabled}
                   autoComplete="section-sign-up new-password"
                   aria-invalid={!!confirmPasswordError}
                   showPasswordToggle
@@ -284,7 +321,7 @@ export function LoginForm({
             type="submit"
             variant="primaryAlt"
             size="big"
-            disabled={parentIsLoading}
+            disabled={isInteractionDisabled}
           >
             {parentIsLoading
               ? m.auth_login_submitting()
@@ -310,7 +347,7 @@ export function LoginForm({
               variant="outline"
               size="big"
               onClick={handleGoogleSignIn}
-              disabled={isGoogleLoading || isMicrosoftLoading || parentIsLoading}
+              disabled={isGoogleLoading || isMicrosoftLoading || isInteractionDisabled}
             >
               <GoogleIcon className="mr-2.5 size-5" />
               {isGoogleLoading
@@ -322,7 +359,7 @@ export function LoginForm({
               variant="outline"
               size="big"
               onClick={handleMicrosoftSignIn}
-              disabled={isMicrosoftLoading || isGoogleLoading || parentIsLoading}
+              disabled={isMicrosoftLoading || isGoogleLoading || isInteractionDisabled}
             >
               <MicrosoftIcon className="mr-2.5 size-5" />
               {isMicrosoftLoading

@@ -46,6 +46,17 @@ const member = table('member')
   })
   .primaryKey('id')
 
+const invitation = table('invitation')
+  .from('invitation')
+  .columns({
+    id: string(),
+    organizationId: string(),
+    email: string(),
+    role: string(),
+    status: string(),
+  })
+  .primaryKey('id')
+
 const orgAiPolicy = table('orgAiPolicy')
   .from('org_ai_policy')
   .columns({
@@ -206,6 +217,11 @@ const organizationRelationships = relationships(organization, ({ many }) => ({
     destSchema: member,
     destField: ['organizationId'],
   }),
+  invitations: many({
+    sourceField: ['id'],
+    destSchema: invitation,
+    destField: ['organizationId'],
+  }),
 }))
 
 const memberRelationships = relationships(member, ({ one }) => ({
@@ -234,7 +250,7 @@ const messageRelationships = relationships(message, ({ one }) => ({
 // ---------------------------------------------------------------------------
 
 export const schema = createSchema({
-  tables: [user, organization, member, orgAiPolicy, thread, message, attachment],
+  tables: [user, organization, member, invitation, orgAiPolicy, thread, message, attachment],
   relationships: [organizationRelationships, memberRelationships, messageRelationships],
 })
 

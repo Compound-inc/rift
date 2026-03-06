@@ -3,7 +3,12 @@
 import * as React from 'react'
 import { useTransition } from 'react'
 import { useQuery } from '@rocicorp/zero/react'
+import {
+  getDefaultAuthDisplayName,
+  normalizeEmailAddress,
+} from '@/components/auth/auth-shared'
 import { queries } from '@/integrations/zero'
+import { MEMBERS_DIRECTORY_PAGE_SIZE } from '@/integrations/zero/queries/org-settings.queries'
 
 export type MemberRow = {
   id: string
@@ -30,6 +35,15 @@ export type OrgMemberDirectoryEntry = {
 export type OrgDirectoryRow = {
   id: string
   members?: Array<OrgMemberDirectoryEntry>
+  invitations?: Array<OrgInvitationDirectoryEntry>
+}
+
+export type OrgInvitationDirectoryEntry = {
+  id: string
+  organizationId: string
+  email: string
+  role: string
+  status: string
 }
 
 const ROLE_PRIORITY: Record<string, number> = {
@@ -50,9 +64,9 @@ function sortMembers(left: MemberRow, right: MemberRow): number {
 }
 
 /**
- * Transforms raw directory entries into table rows and sorts them.
+ * Transforms active organization memberships into stable table rows.
  */
-function toMemberRows(members: Array<OrgMemberDirectoryEntry>): Array<MemberRow> {
+function toActiveMemberRows(members: Array<OrgMemberDirectoryEntry>): Array<MemberRow> {
   return members
     .map((member) => {
       const user = member.user
@@ -71,6 +85,36 @@ function toMemberRows(members: Array<OrgMemberDirectoryEntry>): Array<MemberRow>
     .sort(sortMembers)
 }
 
+/**
+ * Pending invitations do not have a user record yet, so we derive the same row
+ * shape from the invitation payload and keep the email as the primary identity.
+ */
+function toPendingInvitationRows(
+  invitations: Array<OrgInvitationDirectoryEntry>,
+  activeMembers: Array<OrgMemberDirectoryEntry>,
+): Array<MemberRow> {
+  const activeEmails = new Set(
+    activeMembers
+      .map((member) => member.user?.email)
+      .filter((value): value is string => Boolean(value))
+      .map(normalizeEmailAddress),
+  )
+
+  return invitations
+    .map((invitation) => {
+      const email = normalizeEmailAddress(invitation.email)
+      return {
+        id: invitation.id,
+        name: getDefaultAuthDisplayName(email),
+        email,
+        role: invitation.role,
+        status: 'pending' as const,
+      } satisfies MemberRow
+    })
+    .filter((invitation) => !activeEmails.has(invitation.email))
+    .sort(sortMembers)
+}
+
 export type MembersPageLogicResult = {
   data: Array<MemberRow>
   isLoading: boolean
@@ -83,12 +127,11 @@ export type MembersPageLogicResult = {
 export function useMembersPageLogic(): MembersPageLogicResult {
   const [isPending, startTransition] = useTransition()
   const [pageIndex, setPageIndex] = React.useState(0)
-  const [cursors, setCursors] = React.useState<Array<string>>([])
-  const nextCursorRef = React.useRef<string | null>(null)
+  const [cursors, setCursors] = React.useState<Array<string | null>>([])
 
   const queryArgs = React.useMemo(() => {
     if (pageIndex === 0) return {}
-    const cursorId = cursors[pageIndex - 1] ?? nextCursorRef.current
+    const cursorId = cursors[pageIndex - 1]
     return cursorId ? { cursor: { id: cursorId } } : {}
   }, [pageIndex, cursors])
 
@@ -100,26 +143,69 @@ export function useMembersPageLogic(): MembersPageLogicResult {
     () => (directory as OrgDirectoryRow | undefined | null)?.members ?? [],
     [directory],
   )
+  const rawInvitations = React.useMemo(
+    () => (directory as OrgDirectoryRow | undefined | null)?.invitations ?? [],
+    [directory],
+  )
 
-  const data = React.useMemo(() => toMemberRows(rawMembers), [rawMembers])
+  const activeRows = React.useMemo(() => toActiveMemberRows(rawMembers), [rawMembers])
+  const pendingInvitationRows = React.useMemo(
+    () => toPendingInvitationRows(rawInvitations, rawMembers),
+    [rawInvitations, rawMembers],
+  )
+
+  /**
+   * The Zero query still pages the canonical `member` relation. To avoid a
+   * second query while surfacing pending invites, page 1 reserves visible rows
+   * for invitations and advances the member cursor only past the active members
+   * that were actually rendered on that first page.
+   */
+  const visibleActiveRows = React.useMemo(() => {
+    if (pageIndex !== 0) {
+      return activeRows
+    }
+
+    const remainingSlots = Math.max(
+      MEMBERS_DIRECTORY_PAGE_SIZE - pendingInvitationRows.length,
+      0,
+    )
+    return activeRows.slice(0, remainingSlots)
+  }, [activeRows, pageIndex, pendingInvitationRows.length])
+
+  const data = React.useMemo(() => {
+    if (pageIndex !== 0) {
+      return visibleActiveRows
+    }
+
+    return [...pendingInvitationRows, ...visibleActiveRows]
+  }, [pageIndex, pendingInvitationRows, visibleActiveRows])
   const isLoading = directoryResult.type !== 'complete' || isPending
 
-  const hasNextPage = rawMembers.length >= 50
+  const hasNextPage =
+    pageIndex === 0
+      ? rawMembers.length > visibleActiveRows.length
+      : rawMembers.length >= MEMBERS_DIRECTORY_PAGE_SIZE
   const hasPreviousPage = pageIndex > 0
 
-  if (rawMembers.length >= 50) {
-    const lastId = rawMembers[rawMembers.length - 1]?.id ?? null
-    nextCursorRef.current = lastId
-  }
+  const nextCursor = React.useMemo(() => {
+    if (!hasNextPage) {
+      return null
+    }
+
+    return visibleActiveRows[visibleActiveRows.length - 1]?.id ?? null
+  }, [hasNextPage, visibleActiveRows])
 
   React.useEffect(() => {
-    if (rawMembers.length >= 50 && cursors.length === pageIndex) {
-      const lastId = rawMembers[rawMembers.length - 1]?.id
-      if (lastId) {
-        setCursors((c) => [...c, lastId])
+    setCursors((current) => {
+      if (current[pageIndex] === nextCursor) {
+        return current
       }
-    }
-  }, [rawMembers, pageIndex, cursors.length])
+
+      const next = current.slice(0, pageIndex)
+      next[pageIndex] = nextCursor
+      return next
+    })
+  }, [nextCursor, pageIndex])
 
   const nextPage = React.useCallback(() => {
     if (hasNextPage) {

@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AuthRouteRouteImport } from './routes/auth/route'
 import { Route as AuthSignUpRouteRouteImport } from './routes/auth/sign-up/route'
 import { Route as AuthSignInRouteRouteImport } from './routes/auth/sign-in/route'
 import { Route as ApiChatRouteRouteImport } from './routes/api/chat/route'
@@ -16,6 +17,7 @@ import { Route as appLayoutRouteRouteImport } from './routes/(app)/_layout/route
 import { Route as appLayoutIndexRouteImport } from './routes/(app)/_layout/index'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as appLayoutSplatRouteImport } from './routes/(app)/_layout/$'
+import { Route as AuthAcceptInvitationIdRouteRouteImport } from './routes/auth/accept-invitation/$id/route'
 import { Route as ApiZeroQueryRouteRouteImport } from './routes/api/zero/query/route'
 import { Route as ApiZeroMutateRouteRouteImport } from './routes/api/zero/mutate/route'
 import { Route as ApiOrgModelPolicyRouteRouteImport } from './routes/api/org/model-policy/route'
@@ -32,7 +34,6 @@ import { Route as appLayoutSettingsSecurityRouteRouteImport } from './routes/(ap
 import { Route as appLayoutSettingsDebugAuthRouteRouteImport } from './routes/(app)/_layout/settings/debug-auth/route'
 import { Route as appLayoutOrganizationSettingsRouteRouteImport } from './routes/(app)/_layout/organization/settings/route'
 import { Route as appLayoutChatThreadIdRouteRouteImport } from './routes/(app)/_layout/chat/$threadId/route'
-import { Route as appLayoutAcceptInvitationIdRouteRouteImport } from './routes/(app)/_layout/accept-invitation/$id/route'
 import { Route as appLayoutOrganizationSettingsIndexRouteImport } from './routes/(app)/_layout/organization/settings/index'
 import { Route as appLayoutOrganizationSettingsProviderPolicyRouteRouteImport } from './routes/(app)/_layout/organization/settings/provider-policy/route'
 import { Route as appLayoutOrganizationSettingsModelsRouteRouteImport } from './routes/(app)/_layout/organization/settings/models/route'
@@ -42,15 +43,20 @@ import { Route as appLayoutOrganizationSettingsByokRouteRouteImport } from './ro
 import { Route as appLayoutOrganizationSettingsModelsIndexRouteImport } from './routes/(app)/_layout/organization/settings/models/index'
 import { Route as appLayoutOrganizationSettingsModelsProviderIdRouteRouteImport } from './routes/(app)/_layout/organization/settings/models/$providerId/route'
 
-const AuthSignUpRouteRoute = AuthSignUpRouteRouteImport.update({
-  id: '/auth/sign-up',
-  path: '/auth/sign-up',
+const AuthRouteRoute = AuthRouteRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthSignUpRouteRoute = AuthSignUpRouteRouteImport.update({
+  id: '/sign-up',
+  path: '/sign-up',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
 const AuthSignInRouteRoute = AuthSignInRouteRouteImport.update({
-  id: '/auth/sign-in',
-  path: '/auth/sign-in',
-  getParentRoute: () => rootRouteImport,
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => AuthRouteRoute,
 } as any)
 const ApiChatRouteRoute = ApiChatRouteRouteImport.update({
   id: '/api/chat',
@@ -76,6 +82,12 @@ const appLayoutSplatRoute = appLayoutSplatRouteImport.update({
   path: '/$',
   getParentRoute: () => appLayoutRouteRoute,
 } as any)
+const AuthAcceptInvitationIdRouteRoute =
+  AuthAcceptInvitationIdRouteRouteImport.update({
+    id: '/accept-invitation/$id',
+    path: '/accept-invitation/$id',
+    getParentRoute: () => AuthRouteRoute,
+  } as any)
 const ApiZeroQueryRouteRoute = ApiZeroQueryRouteRouteImport.update({
   id: '/api/zero/query',
   path: '/api/zero/query',
@@ -161,12 +173,6 @@ const appLayoutChatThreadIdRouteRoute =
     path: '/$threadId',
     getParentRoute: () => appLayoutChatRouteRoute,
   } as any)
-const appLayoutAcceptInvitationIdRouteRoute =
-  appLayoutAcceptInvitationIdRouteRouteImport.update({
-    id: '/accept-invitation/$id',
-    path: '/accept-invitation/$id',
-    getParentRoute: () => appLayoutRouteRoute,
-  } as any)
 const appLayoutOrganizationSettingsIndexRoute =
   appLayoutOrganizationSettingsIndexRouteImport.update({
     id: '/',
@@ -217,6 +223,7 @@ const appLayoutOrganizationSettingsModelsProviderIdRouteRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/auth': typeof AuthRouteRouteWithChildren
   '/api/chat': typeof ApiChatRouteRoute
   '/auth/sign-in': typeof AuthSignInRouteRoute
   '/auth/sign-up': typeof AuthSignUpRouteRoute
@@ -230,10 +237,10 @@ export interface FileRoutesByFullPath {
   '/api/org/model-policy': typeof ApiOrgModelPolicyRouteRoute
   '/api/zero/mutate': typeof ApiZeroMutateRouteRoute
   '/api/zero/query': typeof ApiZeroQueryRouteRoute
+  '/auth/accept-invitation/$id': typeof AuthAcceptInvitationIdRouteRoute
   '/$': typeof appLayoutSplatRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/': typeof appLayoutIndexRoute
-  '/accept-invitation/$id': typeof appLayoutAcceptInvitationIdRouteRoute
   '/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
   '/organization/settings': typeof appLayoutOrganizationSettingsRouteRouteWithChildren
   '/settings/debug-auth': typeof appLayoutSettingsDebugAuthRouteRoute
@@ -250,6 +257,7 @@ export interface FileRoutesByFullPath {
   '/organization/settings/models/': typeof appLayoutOrganizationSettingsModelsIndexRoute
 }
 export interface FileRoutesByTo {
+  '/auth': typeof AuthRouteRouteWithChildren
   '/api/chat': typeof ApiChatRouteRoute
   '/auth/sign-in': typeof AuthSignInRouteRoute
   '/auth/sign-up': typeof AuthSignUpRouteRoute
@@ -261,10 +269,10 @@ export interface FileRoutesByTo {
   '/api/org/model-policy': typeof ApiOrgModelPolicyRouteRoute
   '/api/zero/mutate': typeof ApiZeroMutateRouteRoute
   '/api/zero/query': typeof ApiZeroQueryRouteRoute
+  '/auth/accept-invitation/$id': typeof AuthAcceptInvitationIdRouteRoute
   '/$': typeof appLayoutSplatRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/': typeof appLayoutIndexRoute
-  '/accept-invitation/$id': typeof appLayoutAcceptInvitationIdRouteRoute
   '/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
   '/settings/debug-auth': typeof appLayoutSettingsDebugAuthRouteRoute
   '/settings/security': typeof appLayoutSettingsSecurityRouteRoute
@@ -280,6 +288,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/auth': typeof AuthRouteRouteWithChildren
   '/(app)/_layout': typeof appLayoutRouteRouteWithChildren
   '/api/chat': typeof ApiChatRouteRoute
   '/auth/sign-in': typeof AuthSignInRouteRoute
@@ -294,10 +303,10 @@ export interface FileRoutesById {
   '/api/org/model-policy': typeof ApiOrgModelPolicyRouteRoute
   '/api/zero/mutate': typeof ApiZeroMutateRouteRoute
   '/api/zero/query': typeof ApiZeroQueryRouteRoute
+  '/auth/accept-invitation/$id': typeof AuthAcceptInvitationIdRouteRoute
   '/(app)/_layout/$': typeof appLayoutSplatRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/(app)/_layout/': typeof appLayoutIndexRoute
-  '/(app)/_layout/accept-invitation/$id': typeof appLayoutAcceptInvitationIdRouteRoute
   '/(app)/_layout/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
   '/(app)/_layout/organization/settings': typeof appLayoutOrganizationSettingsRouteRouteWithChildren
   '/(app)/_layout/settings/debug-auth': typeof appLayoutSettingsDebugAuthRouteRoute
@@ -316,6 +325,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/auth'
     | '/api/chat'
     | '/auth/sign-in'
     | '/auth/sign-up'
@@ -329,10 +339,10 @@ export interface FileRouteTypes {
     | '/api/org/model-policy'
     | '/api/zero/mutate'
     | '/api/zero/query'
+    | '/auth/accept-invitation/$id'
     | '/$'
     | '/api/auth/$'
     | '/'
-    | '/accept-invitation/$id'
     | '/chat/$threadId'
     | '/organization/settings'
     | '/settings/debug-auth'
@@ -349,6 +359,7 @@ export interface FileRouteTypes {
     | '/organization/settings/models/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/auth'
     | '/api/chat'
     | '/auth/sign-in'
     | '/auth/sign-up'
@@ -360,10 +371,10 @@ export interface FileRouteTypes {
     | '/api/org/model-policy'
     | '/api/zero/mutate'
     | '/api/zero/query'
+    | '/auth/accept-invitation/$id'
     | '/$'
     | '/api/auth/$'
     | '/'
-    | '/accept-invitation/$id'
     | '/chat/$threadId'
     | '/settings/debug-auth'
     | '/settings/security'
@@ -378,6 +389,7 @@ export interface FileRouteTypes {
     | '/organization/settings/models'
   id:
     | '__root__'
+    | '/auth'
     | '/(app)/_layout'
     | '/api/chat'
     | '/auth/sign-in'
@@ -392,10 +404,10 @@ export interface FileRouteTypes {
     | '/api/org/model-policy'
     | '/api/zero/mutate'
     | '/api/zero/query'
+    | '/auth/accept-invitation/$id'
     | '/(app)/_layout/$'
     | '/api/auth/$'
     | '/(app)/_layout/'
-    | '/(app)/_layout/accept-invitation/$id'
     | '/(app)/_layout/chat/$threadId'
     | '/(app)/_layout/organization/settings'
     | '/(app)/_layout/settings/debug-auth'
@@ -413,10 +425,9 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  AuthRouteRoute: typeof AuthRouteRouteWithChildren
   appLayoutRouteRoute: typeof appLayoutRouteRouteWithChildren
   ApiChatRouteRoute: typeof ApiChatRouteRoute
-  AuthSignInRouteRoute: typeof AuthSignInRouteRoute
-  AuthSignUpRouteRoute: typeof AuthSignUpRouteRoute
   ApiFilesMarkdownRouteRoute: typeof ApiFilesMarkdownRouteRoute
   ApiFilesUploadRouteRoute: typeof ApiFilesUploadRouteRoute
   ApiOrgModelPolicyRouteRoute: typeof ApiOrgModelPolicyRouteRoute
@@ -427,19 +438,26 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth/sign-up': {
       id: '/auth/sign-up'
-      path: '/auth/sign-up'
+      path: '/sign-up'
       fullPath: '/auth/sign-up'
       preLoaderRoute: typeof AuthSignUpRouteRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthRouteRoute
     }
     '/auth/sign-in': {
       id: '/auth/sign-in'
-      path: '/auth/sign-in'
+      path: '/sign-in'
       fullPath: '/auth/sign-in'
       preLoaderRoute: typeof AuthSignInRouteRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthRouteRoute
     }
     '/api/chat': {
       id: '/api/chat'
@@ -475,6 +493,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/$'
       preLoaderRoute: typeof appLayoutSplatRouteImport
       parentRoute: typeof appLayoutRouteRoute
+    }
+    '/auth/accept-invitation/$id': {
+      id: '/auth/accept-invitation/$id'
+      path: '/accept-invitation/$id'
+      fullPath: '/auth/accept-invitation/$id'
+      preLoaderRoute: typeof AuthAcceptInvitationIdRouteRouteImport
+      parentRoute: typeof AuthRouteRoute
     }
     '/api/zero/query': {
       id: '/api/zero/query'
@@ -588,13 +613,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appLayoutChatThreadIdRouteRouteImport
       parentRoute: typeof appLayoutChatRouteRoute
     }
-    '/(app)/_layout/accept-invitation/$id': {
-      id: '/(app)/_layout/accept-invitation/$id'
-      path: '/accept-invitation/$id'
-      fullPath: '/accept-invitation/$id'
-      preLoaderRoute: typeof appLayoutAcceptInvitationIdRouteRouteImport
-      parentRoute: typeof appLayoutRouteRoute
-    }
     '/(app)/_layout/organization/settings/': {
       id: '/(app)/_layout/organization/settings/'
       path: '/'
@@ -653,6 +671,22 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AuthRouteRouteChildren {
+  AuthSignInRouteRoute: typeof AuthSignInRouteRoute
+  AuthSignUpRouteRoute: typeof AuthSignUpRouteRoute
+  AuthAcceptInvitationIdRouteRoute: typeof AuthAcceptInvitationIdRouteRoute
+}
+
+const AuthRouteRouteChildren: AuthRouteRouteChildren = {
+  AuthSignInRouteRoute: AuthSignInRouteRoute,
+  AuthSignUpRouteRoute: AuthSignUpRouteRoute,
+  AuthAcceptInvitationIdRouteRoute: AuthAcceptInvitationIdRouteRoute,
+}
+
+const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
+  AuthRouteRouteChildren,
+)
 
 interface appLayoutChatRouteRouteChildren {
   appLayoutChatThreadIdRouteRoute: typeof appLayoutChatThreadIdRouteRoute
@@ -756,7 +790,6 @@ interface appLayoutRouteRouteChildren {
   appLayoutWriterRouteRoute: typeof appLayoutWriterRouteRoute
   appLayoutSplatRoute: typeof appLayoutSplatRoute
   appLayoutIndexRoute: typeof appLayoutIndexRoute
-  appLayoutAcceptInvitationIdRouteRoute: typeof appLayoutAcceptInvitationIdRouteRoute
 }
 
 const appLayoutRouteRouteChildren: appLayoutRouteRouteChildren = {
@@ -767,7 +800,6 @@ const appLayoutRouteRouteChildren: appLayoutRouteRouteChildren = {
   appLayoutWriterRouteRoute: appLayoutWriterRouteRoute,
   appLayoutSplatRoute: appLayoutSplatRoute,
   appLayoutIndexRoute: appLayoutIndexRoute,
-  appLayoutAcceptInvitationIdRouteRoute: appLayoutAcceptInvitationIdRouteRoute,
 }
 
 const appLayoutRouteRouteWithChildren = appLayoutRouteRoute._addFileChildren(
@@ -775,10 +807,9 @@ const appLayoutRouteRouteWithChildren = appLayoutRouteRoute._addFileChildren(
 )
 
 const rootRouteChildren: RootRouteChildren = {
+  AuthRouteRoute: AuthRouteRouteWithChildren,
   appLayoutRouteRoute: appLayoutRouteRouteWithChildren,
   ApiChatRouteRoute: ApiChatRouteRoute,
-  AuthSignInRouteRoute: AuthSignInRouteRoute,
-  AuthSignUpRouteRoute: AuthSignUpRouteRoute,
   ApiFilesMarkdownRouteRoute: ApiFilesMarkdownRouteRoute,
   ApiFilesUploadRouteRoute: ApiFilesUploadRouteRoute,
   ApiOrgModelPolicyRouteRoute: ApiOrgModelPolicyRouteRoute,

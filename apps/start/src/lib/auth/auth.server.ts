@@ -32,7 +32,7 @@ function resolveAuthBaseURL(): string {
 }
 
 const connectionString = requireEnv('ZERO_UPSTREAM_DB')
-const pool = new Pool({ connectionString })
+export const authPool = new Pool({ connectionString })
 const authBaseURL = resolveAuthBaseURL()
 
 export const auth = betterAuth({
@@ -40,7 +40,7 @@ export const auth = betterAuth({
   baseURL: authBaseURL,
   basePath: '/api/auth',
   secret: requireEnv('BETTER_AUTH_SECRET'),
-  database: pool,
+  database: authPool,
   trustedOrigins: [authBaseURL],
   user: {
     changeEmail: {
@@ -96,8 +96,9 @@ export const auth = betterAuth({
     }),
     organization({
       allowUserToCreateOrganization: true,
+      requireEmailVerificationOnInvitation: true,
       sendInvitationEmail: async (data) => {
-        const inviteLink = `${authBaseURL}/accept-invitation/${data.id}`
+        const inviteLink = `${authBaseURL}/auth/accept-invitation/${data.id}`
         const inviterName = data.inviter?.user?.name ?? data.inviter?.user?.email ?? 'A team member'
         const orgName = data.organization?.name ?? 'the organization'
         void sendAuthEmail({
@@ -115,7 +116,7 @@ export const auth = betterAuth({
         // Reassign app-owned rows so guest chat history survives account upgrade.
         const fromUserId = anonymousUser.user.id
         const toUserId = newUser.user.id
-        const client = await pool.connect()
+        const client = await authPool.connect()
 
         try {
           await client.query('BEGIN')
