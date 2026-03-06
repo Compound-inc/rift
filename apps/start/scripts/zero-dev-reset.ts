@@ -50,6 +50,19 @@ async function runSql(pool: Pool, sql: string, label: string): Promise<void> {
   console.log(`  ✓ ${label}`)
 }
 
+async function ensureAuthIndexes(pool: Pool): Promise<void> {
+  /**
+   * Better Auth owns the auth schema, so we avoid recreating those tables in our
+   * app migrations. We still add the membership lookup index here because the
+   * Zero-backed members directory filters heavily on active org + current user.
+   */
+  await runSql(
+    pool,
+    'CREATE INDEX IF NOT EXISTS "member_organizationId_userId_idx" ON member ("organizationId", "userId")',
+    'CREATE INDEX member_organizationId_userId_idx',
+  )
+}
+
 async function main(): Promise<void> {
   await loadEnv()
   const connectionString = process.env.ZERO_UPSTREAM_DB
@@ -74,11 +87,12 @@ async function main(): Promise<void> {
     const schemaPath = join(migrationsDir, 'schema.sql')
     const schemaSql = await readFile(schemaPath, 'utf-8')
     await runSql(pool, schemaSql, 'schema.sql')
+    await ensureAuthIndexes(pool)
 
     console.log('  Creating publication for zero-cache replication...')
     await runSql(
       pool,
-      `CREATE PUBLICATION zero_data FOR TABLE users, organizations, threads, messages, org_ai_policy, attachments`,
+      `CREATE PUBLICATION zero_data FOR TABLE "user", organization, member, threads, messages, org_ai_policy, attachments`,
       'CREATE PUBLICATION zero_data',
     )
 

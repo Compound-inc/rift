@@ -8,5 +8,3 @@ DROP TABLE IF EXISTS attachments;
 DROP TABLE IF EXISTS messages;
 DROP TABLE IF EXISTS threads;
 DROP TABLE IF EXISTS org_ai_policy;
-DROP TABLE IF EXISTS organizations;
-DROP TABLE IF EXISTS users;

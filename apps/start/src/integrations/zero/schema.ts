@@ -13,26 +13,36 @@ import {
 // Table definitions
 // ---------------------------------------------------------------------------
 
+/**
+ * Better Auth stores organization membership data in the same Postgres
+ * database as the rest of the app. These table definitions intentionally map
+ * only the fields needed by the members settings page so Zero can serve the
+ * directory locally without duplicating the full auth model.
+ */
 const user = table('user')
-  .from('users')
+  .from('user')
   .columns({
     id: string(),
+    name: string(),
     email: string(),
-    authId: string().from('auth_id'),
-    firstName: string().from('first_name').optional(),
-    lastName: string().from('last_name').optional(),
-    profilePictureUrl: string().from('profile_picture_url').optional(),
+    image: string().optional(),
   })
   .primaryKey('id')
 
 const organization = table('organization')
-  .from('organizations')
+  .from('organization')
   .columns({
     id: string(),
-    authId: string().from('auth_id'),
-    name: string(),
-    plan: string().optional(),
-    productStatus: string().from('product_status').optional(),
+  })
+  .primaryKey('id')
+
+const member = table('member')
+  .from('member')
+  .columns({
+    id: string(),
+    organizationId: string(),
+    userId: string(),
+    role: string(),
   })
   .primaryKey('id')
 
@@ -190,7 +200,20 @@ const attachment = table('attachment')
 // Relationships (optional; use for .related() in ZQL)
 // ---------------------------------------------------------------------------
 
-const threadRelationships = relationships(thread, ({ one }) => ({
+const organizationRelationships = relationships(organization, ({ many }) => ({
+  members: many({
+    sourceField: ['id'],
+    destSchema: member,
+    destField: ['organizationId'],
+  }),
+}))
+
+const memberRelationships = relationships(member, ({ one }) => ({
+  organization: one({
+    sourceField: ['organizationId'],
+    destField: ['id'],
+    destSchema: organization,
+  }),
   user: one({
     sourceField: ['userId'],
     destField: ['id'],
@@ -211,8 +234,8 @@ const messageRelationships = relationships(message, ({ one }) => ({
 // ---------------------------------------------------------------------------
 
 export const schema = createSchema({
-  tables: [user, organization, orgAiPolicy, thread, message, attachment],
-  relationships: [threadRelationships, messageRelationships],
+  tables: [user, organization, member, orgAiPolicy, thread, message, attachment],
+  relationships: [organizationRelationships, memberRelationships, messageRelationships],
 })
 
 export type Schema = typeof schema

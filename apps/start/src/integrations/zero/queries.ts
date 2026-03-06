@@ -1,6 +1,7 @@
 import { defineQueriesWithType } from '@rocicorp/zero'
 import type { Schema } from './schema'
 import { chatQueryDefinitions } from './queries/chat.queries'
+import { orgSettingsQueryDefinitions } from './queries/org-settings.queries'
 import { orgPolicyQueryDefinitions } from './queries/org-policy.queries'
 
 /**
@@ -9,5 +10,6 @@ import { orgPolicyQueryDefinitions } from './queries/org-policy.queries'
  */
 export const queries = defineQueriesWithType<Schema>()({
   ...chatQueryDefinitions,
+  ...orgSettingsQueryDefinitions,
   ...orgPolicyQueryDefinitions,
 })

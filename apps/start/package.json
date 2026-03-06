@@ -16,6 +16,7 @@
     "preview": "vite preview",
     "zero-cache": "zero-cache-dev",
     "zero:reset": "bun run scripts/zero-dev-reset.ts",
+    "postgres:drop-all-tables": "bun run scripts/postgres-drop-all-tables.ts",
     "pretest": "bun run i18n:compile",
     "test": "vitest run"
   },

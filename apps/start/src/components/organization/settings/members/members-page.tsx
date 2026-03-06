@@ -1,6 +1,5 @@
 'use client'
 
-import * as React from 'react'
 import { DataTable, type DataTableColumnDef } from '@rift/ui/data-table'
 import { Avatar, AvatarFallback, AvatarImage } from '@rift/ui/avatar'
 import { Badge } from '@rift/ui/badge'
@@ -8,14 +7,7 @@ import { Button } from '@rift/ui/button'
 import { UserPlus } from 'lucide-react'
 
 import { ContentPage } from '@/components/layout'
-
-type MemberRow = {
-  id: string
-  name: string
-  email: string
-  role: string
-  status: 'active' | 'inactive' | 'pending'
-}
+import { useMembersPageLogic, type MemberRow } from './members-page.logic'
 
 const MEMBERS_COLUMNS: Array<DataTableColumnDef<MemberRow>> = [
   {
@@ -26,7 +18,7 @@ const MEMBERS_COLUMNS: Array<DataTableColumnDef<MemberRow>> = [
       return (
         <div className="flex items-center gap-3">
           <Avatar className="size-8">
-            <AvatarImage src={undefined} alt={member.name} />
+            <AvatarImage src={member.avatarUrl} alt={member.name} />
             <AvatarFallback>{member.name.slice(0, 1)}</AvatarFallback>
           </Avatar>
           <span className="font-medium text-content-default">{member.name}</span>
@@ -61,14 +53,8 @@ const MEMBERS_COLUMNS: Array<DataTableColumnDef<MemberRow>> = [
   },
 ]
 
-/**
- * Members settings page scaffold.
- * The first implementation intentionally renders an empty table while preserving
- * the final structure (toolbar, controls, pagination, and columns) so data can
- * be connected later without replacing UI primitives.
- */
 export function MembersPage() {
-  const data = React.useMemo<Array<MemberRow>>(() => [], [])
+  const { data, isLoading } = useMembersPageLogic()
 
   return (
     <ContentPage
@@ -77,12 +63,13 @@ export function MembersPage() {
     >
       <DataTable
         data={data}
+        isLoading={isLoading}
         columns={MEMBERS_COLUMNS}
         filterColumn="name"
         filterPlaceholder="Filter members..."
         messages={{
           columns: 'Columns',
-          noResults: 'No members found.',
+          noResults: 'Unable to load the member directory.',
           loading: 'Loading members...',
           previous: 'Previous',
           next: 'Next',
@@ -90,7 +77,7 @@ export function MembersPage() {
         }}
         tableWrapperClassName="border-border-default bg-bg-default/95"
         toolbarActionsRight={
-          <Button variant="default">
+          <Button variant="default" disabled>
             <UserPlus aria-hidden />
             Invite members
           </Button>

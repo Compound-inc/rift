@@ -2,27 +2,6 @@
 -- Single source of truth for a fresh DB. zero-cache replicates via publication
 -- zero_data (created by zero-dev-reset after applying this file).
 
--- users
-CREATE TABLE IF NOT EXISTS users (
-  id TEXT PRIMARY KEY,
-  email TEXT NOT NULL,
-  auth_id TEXT NOT NULL,
-  first_name TEXT,
-  last_name TEXT,
-  profile_picture_url TEXT
-);
-CREATE INDEX IF NOT EXISTS users_auth_id ON users (auth_id);
-
--- organizations
-CREATE TABLE IF NOT EXISTS organizations (
-  id TEXT PRIMARY KEY,
-  auth_id TEXT NOT NULL,
-  name TEXT NOT NULL,
-  plan TEXT,
-  product_status TEXT
-);
-CREATE INDEX IF NOT EXISTS organizations_auth_id ON organizations (auth_id);
-
 -- threads
 CREATE TABLE IF NOT EXISTS threads (
   id TEXT PRIMARY KEY,
