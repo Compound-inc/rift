@@ -43,6 +43,24 @@ export const DEFAULT_ANTHROPIC_SETTINGS: AnthropicSettings = {
 // Anthropic model configurations
 export const ANTHROPIC_MODELS: BaseModelConfig[] = [
   {
+    id: "anthropic/claude-sonnet-4.6",
+    name: "Claude Sonnet 4.6",
+    provider: "anthropic",
+    description:
+      "Claude Sonnet 4.6 ofrece mejoras de frontera en código, agentes y trabajo profesional sobre Sonnet 4.5.",
+    contextWindow: 200000,
+    isPremium: true,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsPDFInput: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsObjectGeneration: true,
+      maxTokens: 128000,
+    }),
+  },
+  {
     id: "anthropic/claude-opus-4.6",
     name: "Claude Opus 4.6",
     provider: "anthropic",

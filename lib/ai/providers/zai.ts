@@ -27,6 +27,20 @@ export const DEFAULT_ZAI_SETTINGS: ZAISettings = {
 
 export const ZAI_MODELS: BaseModelConfig[] = [
   {
+    id: "zai/glm-4.7",
+    name: "GLM 4.7",
+    provider: "zai",
+    description:
+      "Modelo insignia de Z.AI con mejoras en programación y ejecución estable de cadenas de razonamiento largas.",
+    contextWindow: 128000,
+    isPremium: false,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsReasoning: true,
+      maxTokens: 120000,
+    }),
+  },
+  {
     id: "zai/glm-5",
     name: "GLM 5",
     provider: "zai",

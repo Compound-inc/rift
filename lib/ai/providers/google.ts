@@ -82,6 +82,40 @@ export const DEFAULT_GOOGLE_SETTINGS: GoogleSettings = {
 // Google model configurations
 export const GOOGLE_MODELS: BaseModelConfig[] = [
   {
+    id: "google/gemini-3.1-flash-lite-preview",
+    name: "Gemini 3.1 Flash Lite",
+    provider: "google",
+    description: "Variante más ligera de Gemini 3.1 enfocada en velocidad y costo, con soporte multimodal y herramientas.",
+    contextWindow: 1000000,
+    isPremium: false,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsPDFInput: true,
+      supportsObjectGeneration: true,
+      maxTokens: 65000,
+    }),
+  },
+  {
+    id: "google/gemini-3.1-pro-preview",
+    name: "Gemini 3.1 Pro",
+    provider: "google",
+    description: "Preview de Gemini 3.1 Pro con mejoras en capacidades agénticas, razonamiento y eficiencia.",
+    contextWindow: 200000,
+    isPremium: true,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsPDFInput: true,
+      supportsObjectGeneration: true,
+      maxTokens: 64000,
+    }),
+  },
+  {
     id: "google/gemini-3-flash",
     name: "Gemini 3 Flash",
     provider: "google",

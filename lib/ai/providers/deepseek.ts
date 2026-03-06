@@ -41,6 +41,35 @@ export const DEFAULT_DEEPSEEK_SETTINGS: DeepSeekSettings = {
 // DeepSeek model configurations
 export const DEEPSEEK_MODELS: BaseModelConfig[] = [
   {
+    id: "deepseek/deepseek-v3.2",
+    name: "DeepSeek V3.2",
+    provider: "deepseek",
+    description: "Sucesor oficial de DeepSeek V3.1 con mejoras de calidad y soporte de herramientas.",
+    contextWindow: 64000,
+    isPremium: false,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsObjectGeneration: true,
+      maxTokens: 8000,
+    }),
+  },
+  {
+    id: "deepseek/deepseek-v3.2-thinking",
+    name: "DeepSeek V3.2 Thinking",
+    provider: "deepseek",
+    description: "Variante con razonamiento extendido de DeepSeek V3.2 para problemas complejos.",
+    contextWindow: 64000,
+    isPremium: false,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsObjectGeneration: true,
+      maxTokens: 64000,
+    }),
+  },
+  {
     id: "deepseek/deepseek-v3.1",
     name: "DeepSeek V3.1",
     provider: "deepseek",

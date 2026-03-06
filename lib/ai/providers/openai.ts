@@ -52,6 +52,24 @@ export const DEFAULT_OPENAI_SETTINGS: OpenAISettings = {
 // OpenAI model configurations
 export const OPENAI_MODELS: BaseModelConfig[] = [
   {
+    id: "openai/gpt-5.4",
+    name: "GPT-5.4",
+    provider: "openai",
+    description:
+      "GPT-5.4 es el modelo generalista más avanzado de OpenAI para tareas conversacionales y agénticas.",
+    contextWindow: 400000,
+    isPremium: true,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsPDFInput: true,
+      supportsObjectGeneration: true,
+      maxTokens: 128000,
+    }),
+  },
+  {
     id: "openai/gpt-5.2",
     name: "GPT-5.2",
     provider: "openai",
