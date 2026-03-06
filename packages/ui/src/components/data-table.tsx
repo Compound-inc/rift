@@ -67,10 +67,17 @@ export type DataTableProps<TData, TValue> = {
   messages?: DataTableMessages
 }
 
+export type DataTableColumnMeta = {
+  headerClassName?: string
+  cellClassName?: string
+}
+
 export type DataTableColumnDef<TData, TValue = unknown> = ColumnDef<
   TData,
   TValue
->
+> & {
+  meta?: DataTableColumnMeta
+}
 
 const defaultMessages: Required<DataTableMessages> = {
   filterPlaceholder: "Filter...",
@@ -196,16 +203,24 @@ export function DataTable<TData, TValue>({
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
+                {headerGroup.headers.map((header) => {
+                  const meta = header.column.columnDef.meta as
+                    | DataTableColumnMeta
+                    | undefined
+                  return (
+                    <TableHead
+                      key={header.id}
+                      className={meta?.headerClassName}
+                    >
+                      {header.isPlaceholder
                       ? null
                       : flexRender(
                           header.column.columnDef.header,
                           header.getContext(),
                         )}
-                  </TableHead>
-                ))}
+                    </TableHead>
+                  )
+                })}
               </TableRow>
             ))}
           </TableHeader>
@@ -222,11 +237,22 @@ export function DataTable<TData, TValue>({
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
+                  {row.getVisibleCells().map((cell) => {
+                    const meta = cell.column.columnDef.meta as
+                      | DataTableColumnMeta
+                      | undefined
+                    return (
+                      <TableCell
+                        key={cell.id}
+                        className={meta?.cellClassName}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </TableCell>
+                    )
+                  })}
                 </TableRow>
               ))
             ) : (

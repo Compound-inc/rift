@@ -3,10 +3,12 @@
 import * as React from 'react'
 import { useTransition } from 'react'
 import { useQuery } from '@rocicorp/zero/react'
+import { toast } from 'sonner'
 import {
   getDefaultAuthDisplayName,
   normalizeEmailAddress,
 } from '@/components/auth/auth-shared'
+import { authClient } from '@/lib/auth/auth-client'
 import { queries } from '@/integrations/zero'
 import { MEMBERS_DIRECTORY_PAGE_SIZE } from '@/integrations/zero/queries/org-settings.queries'
 
@@ -17,6 +19,8 @@ export type MemberRow = {
   role: string
   status: 'active' | 'inactive' | 'pending'
   avatarUrl?: string
+  /** Set only for active members; used for "View profile" link. */
+  userId?: string
 }
 
 export type OrgMemberDirectoryEntry = {
@@ -80,6 +84,7 @@ function toActiveMemberRows(members: Array<OrgMemberDirectoryEntry>): Array<Memb
         role: member.role,
         status: 'active' as const,
         avatarUrl: user?.image ?? undefined,
+        userId: member.userId ?? member.user?.id,
       } satisfies MemberRow
     })
     .sort(sortMembers)
@@ -122,6 +127,10 @@ export type MembersPageLogicResult = {
   hasPreviousPage: boolean
   nextPage: () => void
   previousPage: () => void
+  onUpdateRole: (memberId: string, role: string) => Promise<void>
+  onRemoveMember: (memberId: string) => Promise<void>
+  onCancelInvitation: (invitationId: string) => Promise<void>
+  actionInProgressId: string | null
 }
 
 export function useMembersPageLogic(): MembersPageLogicResult {
@@ -172,13 +181,45 @@ export function useMembersPageLogic(): MembersPageLogicResult {
     return activeRows.slice(0, remainingSlots)
   }, [activeRows, pageIndex, pendingInvitationRows.length])
 
-  const data = React.useMemo(() => {
+  const serverData = React.useMemo(() => {
     if (pageIndex !== 0) {
       return visibleActiveRows
     }
 
     return [...pendingInvitationRows, ...visibleActiveRows]
   }, [pageIndex, pendingInvitationRows, visibleActiveRows])
+
+  const [optimisticRemovedIds, setOptimisticRemovedIds] = React.useState<Set<string>>(
+    () => new Set(),
+  )
+  const [optimisticRoleUpdates, setOptimisticRoleUpdates] = React.useState<Map<string, string>>(
+    () => new Map(),
+  )
+
+  const data = React.useMemo(() => {
+    return serverData
+      .filter((row) => !optimisticRemovedIds.has(row.id))
+      .map((row) => {
+        const overriddenRole = optimisticRoleUpdates.get(row.id)
+        if (overriddenRole == null) return row
+        return { ...row, role: overriddenRole }
+      })
+  }, [serverData, optimisticRemovedIds, optimisticRoleUpdates])
+
+  React.useEffect(() => {
+    setOptimisticRoleUpdates((prev) => {
+      if (prev.size === 0) return prev
+      const next = new Map(prev)
+      for (const [memberId, role] of prev) {
+        const row = serverData.find((r) => r.id === memberId)
+        if (row != null && row.role === role) {
+          next.delete(memberId)
+        }
+      }
+      return next.size === prev.size ? prev : next
+    })
+  }, [serverData])
+
   const isLoading = directoryResult.type !== 'complete' || isPending
 
   const hasNextPage =
@@ -219,6 +260,89 @@ export function useMembersPageLogic(): MembersPageLogicResult {
     }
   }, [hasPreviousPage, startTransition])
 
+  const [actionInProgressId, setActionInProgressId] = React.useState<string | null>(null)
+
+  const onUpdateRole = React.useCallback(async (memberId: string, role: string) => {
+    setActionInProgressId(memberId)
+    setOptimisticRoleUpdates((prev) => new Map(prev).set(memberId, role))
+    try {
+      const { error } = await authClient.organization.updateMemberRole({ memberId, role })
+      if (error) {
+        setOptimisticRoleUpdates((prev) => {
+          const next = new Map(prev)
+          next.delete(memberId)
+          return next
+        })
+        toast.error(error.message ?? 'Failed to update role.')
+        return
+      }
+      toast.success('Role updated.')
+    } catch (err) {
+      setOptimisticRoleUpdates((prev) => {
+        const next = new Map(prev)
+        next.delete(memberId)
+        return next
+      })
+      toast.error(err instanceof Error ? err.message : 'Failed to update role.')
+    } finally {
+      setActionInProgressId(null)
+    }
+  }, [])
+
+  const onRemoveMember = React.useCallback(async (memberId: string) => {
+    setActionInProgressId(memberId)
+    setOptimisticRemovedIds((prev) => new Set(prev).add(memberId))
+    try {
+      const { error } = await authClient.organization.removeMember({ memberIdOrEmail: memberId })
+      if (error) {
+        setOptimisticRemovedIds((prev) => {
+          const next = new Set(prev)
+          next.delete(memberId)
+          return next
+        })
+        toast.error(error.message ?? 'Failed to remove member.')
+        return
+      }
+      toast.success('Member removed.')
+    } catch (err) {
+      setOptimisticRemovedIds((prev) => {
+        const next = new Set(prev)
+        next.delete(memberId)
+        return next
+      })
+      toast.error(err instanceof Error ? err.message : 'Failed to remove member.')
+    } finally {
+      setActionInProgressId(null)
+    }
+  }, [])
+
+  const onCancelInvitation = React.useCallback(async (invitationId: string) => {
+    setActionInProgressId(invitationId)
+    setOptimisticRemovedIds((prev) => new Set(prev).add(invitationId))
+    try {
+      const { error } = await authClient.organization.cancelInvitation({ invitationId })
+      if (error) {
+        setOptimisticRemovedIds((prev) => {
+          const next = new Set(prev)
+          next.delete(invitationId)
+          return next
+        })
+        toast.error(error.message ?? 'Failed to cancel invitation.')
+        return
+      }
+      toast.success('Invitation cancelled.')
+    } catch (err) {
+      setOptimisticRemovedIds((prev) => {
+        const next = new Set(prev)
+        next.delete(invitationId)
+        return next
+      })
+      toast.error(err instanceof Error ? err.message : 'Failed to cancel invitation.')
+    } finally {
+      setActionInProgressId(null)
+    }
+  }, [])
+
   return {
     data,
     isLoading,
@@ -226,5 +350,9 @@ export function useMembersPageLogic(): MembersPageLogicResult {
     hasPreviousPage,
     nextPage,
     previousPage,
+    onUpdateRole,
+    onRemoveMember,
+    onCancelInvitation,
+    actionInProgressId,
   }
 }
