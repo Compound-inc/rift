@@ -2,14 +2,19 @@
 
 import { Form } from '@rift/ui/form'
 import { ContentPage } from '@/components/layout'
+import { getFeatureAccessFormProps } from '@/components/organization/settings/feature-access-form-helpers'
+import { useOrgFeatureAccess } from '@/lib/billing/use-org-billing'
 import { m } from '@/paraglide/messages.js'
 
-const CONTACT_EMAIL_HREF = 'mailto:enterprise@rift.mx'
 const DOMAINS_ACTION_HREF = '#'
 const SSO_ACTION_HREF = '#'
 const DIRECTORY_ACTION_HREF = '#'
 
 export function OrgSecurityPage() {
+  const domainAccess = useOrgFeatureAccess('verifiedDomains')
+  const ssoAccess = useOrgFeatureAccess('singleSignOn')
+  const directoryAccess = useOrgFeatureAccess('directoryProvisioning')
+
   return (
     <ContentPage
       title={m.org_security_page_title()}
@@ -29,9 +34,11 @@ export function OrgSecurityPage() {
         handleSubmit={async () => {
           window.open(DOMAINS_ACTION_HREF, '_blank')
         }}
-        helpText={m.org_security_contact_help()}
-        helpLearnMoreHref={CONTACT_EMAIL_HREF}
-        helpLearnMoreLabel={m.org_analytics_section_contact_link()}
+        {...getFeatureAccessFormProps({
+          enabled: domainAccess.allowed,
+          featureAccess: domainAccess,
+          defaultHelpText: m.org_security_coming_soon_self_serve(),
+        })}
       />
 
       <Form
@@ -48,9 +55,11 @@ export function OrgSecurityPage() {
         handleSubmit={async () => {
           window.open(SSO_ACTION_HREF, '_blank')
         }}
-        helpText={m.org_security_contact_help()}
-        helpLearnMoreHref={CONTACT_EMAIL_HREF}
-        helpLearnMoreLabel={m.org_analytics_section_contact_link()}
+        {...getFeatureAccessFormProps({
+          enabled: ssoAccess.allowed,
+          featureAccess: ssoAccess,
+          defaultHelpText: m.org_security_coming_soon_self_serve(),
+        })}
       />
 
       <Form
@@ -67,9 +76,11 @@ export function OrgSecurityPage() {
         handleSubmit={async () => {
           window.open(DIRECTORY_ACTION_HREF, '_blank')
         }}
-        helpText={m.org_security_contact_help()}
-        helpLearnMoreHref={CONTACT_EMAIL_HREF}
-        helpLearnMoreLabel={m.org_analytics_section_contact_link()}
+        {...getFeatureAccessFormProps({
+          enabled: directoryAccess.allowed,
+          featureAccess: directoryAccess,
+          defaultHelpText: m.org_security_coming_soon_self_serve(),
+        })}
       />
     </ContentPage>
   )

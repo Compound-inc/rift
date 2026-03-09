@@ -4,7 +4,12 @@ import { useQuery } from '@rocicorp/zero/react'
 import { useEffect, useMemo, useState } from 'react'
 import { authClient } from '@/lib/auth/auth-client'
 import { queries } from '@/integrations/zero'
-import type { WorkspaceFeatureId } from './plan-catalog'
+import {
+  coerceWorkspacePlanId,
+  getWorkspaceFeatureAccessState,
+  type WorkspaceFeatureAccessState,
+  type WorkspaceFeatureId,
+} from './plan-catalog'
 
 type BillingSummaryRow = {
   id: string
@@ -93,6 +98,21 @@ export function useOrgTopupGrants() {
   return {
     grants,
     loading,
+  }
+}
+
+export function useOrgFeatureAccess(
+  feature: WorkspaceFeatureId,
+): WorkspaceFeatureAccessState & { loading: boolean } {
+  const { entitlement, loading } = useOrgBillingSummary()
+
+  return {
+    loading,
+    ...getWorkspaceFeatureAccessState({
+      planId: coerceWorkspacePlanId(entitlement?.planId),
+      feature,
+      effectiveFeatures: entitlement?.effectiveFeatures,
+    }),
   }
 }
 

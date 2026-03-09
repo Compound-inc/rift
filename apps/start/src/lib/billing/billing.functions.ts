@@ -5,8 +5,9 @@ import { z } from 'zod'
 import { WorkspaceBillingRuntime } from '@/lib/billing-backend/runtime/workspace-billing-runtime'
 import { WorkspaceBillingService } from '@/lib/billing-backend/services/workspace-billing.service'
 import { getSessionFromHeaders } from '@/lib/auth/server-session.server'
+import type { StripeManagedWorkspacePlanId } from './plan-catalog'
 
-const CheckoutPlanSchema = z.enum(['plus', 'pro'])
+const CheckoutPlanSchema = z.enum(['plus', 'pro', 'scale'])
 
 const StartSubscriptionCheckoutInputSchema = z.object({
   planId: CheckoutPlanSchema,
@@ -41,7 +42,7 @@ export const startWorkspaceSubscriptionCheckout = createServerFn({ method: 'POST
           headers,
           organizationId,
           userId: session.user.id,
-          planId: data.planId,
+          planId: data.planId as StripeManagedWorkspacePlanId,
           seats: data.seats,
         })
       }),

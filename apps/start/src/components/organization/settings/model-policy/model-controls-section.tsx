@@ -1,6 +1,8 @@
 'use client'
 
 import { Form } from '@rift/ui/form'
+import type { WorkspaceFeatureAccessState } from '@/lib/billing/plan-catalog'
+import { getFeatureAccessFormProps } from '@/components/organization/settings/feature-access-form-helpers'
 import { m } from '@/paraglide/messages.js'
 import type { PolicyPayload } from './types'
 import type { useProviderPolicy } from './use-provider-policy'
@@ -9,6 +11,7 @@ type ModelControlsSectionProps = {
   payload: PolicyPayload
   updating: boolean
   update: ReturnType<typeof useProviderPolicy>['update']
+  featureAccess?: WorkspaceFeatureAccessState & { loading: boolean }
 }
 
 /**
@@ -19,12 +22,19 @@ export function ModelControlsSection({
   payload,
   updating,
   update,
+  featureAccess,
 }: ModelControlsSectionProps) {
+  const featureEnabled = featureAccess?.allowed ?? true
+
   return (
     <Form
       title={m.org_model_controls_title()}
       description={m.org_model_controls_description()}
-      helpText={m.org_model_controls_help()}
+      {...getFeatureAccessFormProps({
+        enabled: featureEnabled,
+        featureAccess,
+        defaultHelpText: m.org_model_controls_help(),
+      })}
       toggleSection={{
         sectionTitle: m.org_model_controls_section_title(),
         items: payload.models.map((model) => ({
@@ -45,7 +55,7 @@ export function ModelControlsSection({
               modelId: model.id,
               disabled,
             }),
-          disabled: updating,
+          disabled: updating || !featureEnabled,
         })),
       }}
     />

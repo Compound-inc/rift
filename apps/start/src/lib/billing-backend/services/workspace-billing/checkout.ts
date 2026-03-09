@@ -11,10 +11,11 @@ import {
 } from './persistence'
 import { isScheduledDowngrade, requireStripeClient } from './shared'
 import type { WorkspaceSubscriptionRow } from './types'
+import type { StripeManagedWorkspacePlanId } from '../../../billing/plan-catalog'
 
 async function syncDirectSubscriptionUpdate(input: {
   currentSubscription: WorkspaceSubscriptionRow
-  nextPlanId: 'plus' | 'pro'
+  nextPlanId: StripeManagedWorkspacePlanId
   seats: number
 }): Promise<{ url: string }> {
   const stripeSubscriptionId = input.currentSubscription.stripeSubscriptionId
@@ -85,7 +86,7 @@ async function syncDirectSubscriptionUpdate(input: {
 
 async function scheduleWorkspaceDowngrade(input: {
   currentSubscription: WorkspaceSubscriptionRow
-  nextPlanId: 'plus' | 'pro'
+  nextPlanId: StripeManagedWorkspacePlanId
   seats: number
 }): Promise<{ url: string }> {
   const stripeSubscriptionId = input.currentSubscription.stripeSubscriptionId
@@ -187,7 +188,7 @@ export async function startCheckoutOperation(input: {
   headers: Headers
   organizationId: string
   userId: string
-  planId: 'plus' | 'pro'
+  planId: StripeManagedWorkspacePlanId
   seats: number
 }): Promise<{ url: string }> {
   const role = await readMembershipRole({

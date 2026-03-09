@@ -2,6 +2,8 @@
 
 import * as React from 'react'
 import { Form } from '@rift/ui/form'
+import type { WorkspaceFeatureAccessState } from '@/lib/billing/plan-catalog'
+import { getFeatureAccessFormProps } from '@/components/organization/settings/feature-access-form-helpers'
 import { m } from '@/paraglide/messages.js'
 import type { PolicyPayload } from '@/components/organization/settings/model-policy/types'
 import type { useProviderPolicy } from '@/components/organization/settings/model-policy/use-provider-policy'
@@ -10,6 +12,7 @@ type ToolAccessSectionProps = {
   payload: PolicyPayload
   updating: boolean
   update: ReturnType<typeof useProviderPolicy>['update']
+  featureAccess?: WorkspaceFeatureAccessState & { loading: boolean }
 }
 
 /**
@@ -20,7 +23,9 @@ export function ToolAccessSection({
   payload,
   updating,
   update,
+  featureAccess,
 }: ToolAccessSectionProps) {
+  const featureEnabled = featureAccess?.allowed ?? true
   const handleProviderNative = React.useCallback(
     (enabled: boolean) => {
       void update({
@@ -45,7 +50,11 @@ export function ToolAccessSection({
     <Form
       title={m.org_tool_access_title()}
       description={m.org_tool_access_description()}
-      helpText={m.org_tool_access_help()}
+      {...getFeatureAccessFormProps({
+        enabled: featureEnabled,
+        featureAccess,
+        defaultHelpText: m.org_tool_access_help(),
+      })}
       toggleSection={{
         items: [
           {
@@ -54,7 +63,7 @@ export function ToolAccessSection({
             description: m.org_built_in_tools_toggle_description(),
             checked: payload.policy.toolPolicy.providerNativeToolsEnabled,
             onCheckedChange: handleProviderNative,
-            disabled: updating,
+            disabled: updating || !featureEnabled,
           },
           {
             id: 'external-tools',
@@ -62,7 +71,7 @@ export function ToolAccessSection({
             description: m.org_external_tools_toggle_description(),
             checked: payload.policy.toolPolicy.externalToolsEnabled,
             onCheckedChange: handleExternal,
-            disabled: updating,
+            disabled: updating || !featureEnabled,
           },
         ],
       }}

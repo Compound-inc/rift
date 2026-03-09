@@ -1,5 +1,10 @@
 import Stripe from 'stripe'
 import {
+  coerceWorkspacePlanId,
+  getWorkspacePlanRank,
+  type StripeManagedWorkspacePlanId,
+} from '../../../billing/plan-catalog'
+import {
   WorkspaceBillingConfigurationError,
   WorkspaceBillingPersistenceError,
 } from '../../domain/errors'
@@ -7,10 +12,6 @@ import type { WorkspacePlanId } from '../../../billing/plan-catalog'
 
 export const AUTO_RESTRICTION_STATUS = 'restricted'
 export const AUTO_RESTRICTION_REASON = 'seat_limit_downgrade'
-export const PLAN_PRIORITY: Record<'plus' | 'pro', number> = {
-  plus: 0,
-  pro: 1,
-}
 
 export function toPersistenceError(
   message: string,
@@ -29,11 +30,7 @@ export function toPersistenceError(
 }
 
 export function normalizePlanId(planId: string | null | undefined): WorkspacePlanId {
-  if (planId === 'plus' || planId === 'pro') {
-    return planId
-  }
-
-  return 'free'
+  return coerceWorkspacePlanId(planId)
 }
 
 export function requireStripeClient(): Stripe {
@@ -54,12 +51,12 @@ export function requireStripeClient(): Stripe {
 export function isScheduledDowngrade(input: {
   currentPlan: string
   currentSeats: number | null
-  nextPlanId: 'plus' | 'pro'
+  nextPlanId: StripeManagedWorkspacePlanId
   nextSeats: number
 }): boolean {
-  const currentPlan = input.currentPlan === 'pro' ? 'pro' : 'plus'
-  const currentPriority = PLAN_PRIORITY[currentPlan]
-  const nextPriority = PLAN_PRIORITY[input.nextPlanId]
+  const currentPlan = normalizePlanId(input.currentPlan)
+  const currentPriority = getWorkspacePlanRank(currentPlan)
+  const nextPriority = getWorkspacePlanRank(input.nextPlanId)
   const currentSeats = input.currentSeats ?? 1
 
   return nextPriority < currentPriority

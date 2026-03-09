@@ -5,6 +5,8 @@ import { Link } from '@tanstack/react-router'
 import { Form } from '@rift/ui/form'
 import { getProviderIcon } from '@/lib/ai-catalog'
 import type { CatalogProviderId } from '@/lib/ai-catalog/provider-tools'
+import type { WorkspaceFeatureAccessState } from '@/lib/billing/plan-catalog'
+import { getFeatureAccessFormProps } from '@/components/organization/settings/feature-access-form-helpers'
 import { PROVIDER_META, PROVIDER_NAMES } from './provider-constants'
 import type { PolicyPayload } from './types'
 import type { useProviderPolicy } from './use-provider-policy'
@@ -14,6 +16,7 @@ type ProviderControlsSectionProps = {
   payload: PolicyPayload
   updating: boolean
   update: ReturnType<typeof useProviderPolicy>['update']
+  featureAccess?: WorkspaceFeatureAccessState & { loading: boolean }
 }
 
 /**
@@ -25,7 +28,9 @@ export function ProviderControlsSection({
   payload,
   updating,
   update,
+  featureAccess,
 }: ProviderControlsSectionProps) {
+  const featureEnabled = featureAccess?.allowed ?? true
   const handleToggle = React.useCallback(
     (providerId: string, disabled: boolean) => {
       void update({
@@ -41,7 +46,11 @@ export function ProviderControlsSection({
     <Form
       title={m.org_provider_controls_title()}
       description={m.org_provider_controls_description()}
-      helpText={m.org_provider_controls_help()}
+      {...getFeatureAccessFormProps({
+        enabled: featureEnabled,
+        featureAccess,
+        defaultHelpText: m.org_provider_controls_help(),
+      })}
       toggleSection={{
         rowHover: true,
         items: payload.providers.map((provider) => {
@@ -72,7 +81,7 @@ export function ProviderControlsSection({
             checked: !provider.disabled,
             onCheckedChange: (enabled) =>
               handleToggle(provider.id, !enabled),
-            disabled: updating,
+            disabled: updating || !featureEnabled,
           }
         }),
       }}

@@ -9,7 +9,11 @@ import type {
   WorkspaceBillingPersistenceError,
   WorkspaceBillingSeatLimitExceededError,
 } from '../../domain/errors'
-import type { WorkspaceFeatureId, WorkspacePlanId } from '../../../billing/plan-catalog'
+import type {
+  StripeManagedWorkspacePlanId,
+  WorkspaceFeatureId,
+  WorkspacePlanId,
+} from '../../../billing/plan-catalog'
 
 export type OrgMemberCounts = {
   activeMemberCount: number
@@ -83,7 +87,7 @@ export type WorkspaceBillingServiceShape = {
     headers: Headers
     organizationId: string
     userId: string
-    planId: 'plus' | 'pro'
+    planId: StripeManagedWorkspacePlanId
     seats: number
   }) => Effect.Effect<
     { url: string },

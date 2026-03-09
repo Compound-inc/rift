@@ -3,7 +3,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useQuery } from '@rocicorp/zero/react'
 import { useServerFn } from '@tanstack/react-start'
-import { canUseOrganizationProviderKeys } from '@/utils/app-feature-flags'
 import { queries } from '@/integrations/zero'
 import { updateByok } from './byok.functions'
 import type { ByokPayload, ByokUpdateAction, ByokProvider } from './types'
@@ -42,9 +41,6 @@ function buildByokPayload(input: {
     input.policyRow?.providerKeyStatus?.providers ?? DEFAULT_KEY_STATUS
 
   return {
-    featureFlags: {
-      enableOrganizationProviderKeys: canUseOrganizationProviderKeys(),
-    },
     providerKeyStatus,
   }
 }

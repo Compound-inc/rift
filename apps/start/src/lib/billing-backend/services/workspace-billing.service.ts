@@ -1,6 +1,6 @@
 import { APIError } from '@better-auth/core/error'
 import { Effect, Layer, ServiceMap } from 'effect'
-import type { WorkspaceFeatureId } from '@/lib/billing/plan-catalog'
+import { getWorkspaceFeatureAccessState } from '@/lib/billing/plan-catalog'
 import { isWorkspaceBillingManagerRole } from '../permissions'
 import {
   WorkspaceBillingConfigurationError,
@@ -10,7 +10,12 @@ import {
 } from '../domain/errors'
 import { startCheckoutOperation, openBillingPortalOperation } from './workspace-billing/checkout'
 import { recomputeEntitlementSnapshotRecord } from './workspace-billing/entitlement'
-import { readMembershipRole, readOrganizationMemberCounts, readCurrentOrgSubscription } from './workspace-billing/persistence'
+import {
+  readCurrentOrgSubscription,
+  readEntitlementSnapshot,
+  readMembershipRole,
+  readOrganizationMemberCounts,
+} from './workspace-billing/persistence'
 import { syncWorkspaceSubscriptionRecord, markWorkspaceSubscriptionCanceledRecord } from './workspace-billing/subscription-sync'
 import { toPersistenceError } from './workspace-billing/shared'
 import type {
@@ -105,10 +110,18 @@ export class WorkspaceBillingService extends ServiceMap.Service<
       ({ organizationId, feature }) =>
         Effect.tryPromise({
           try: async (): Promise<OrgSeatAvailability> => {
-            const snapshot = await recomputeEntitlementSnapshotRecord(organizationId)
-            if (!snapshot.effectiveFeatures[feature as WorkspaceFeatureId]) {
+            const snapshot
+              = await readEntitlementSnapshot(organizationId)
+                ?? await recomputeEntitlementSnapshotRecord(organizationId)
+            const access = getWorkspaceFeatureAccessState({
+              planId: snapshot.planId,
+              feature,
+              effectiveFeatures: snapshot.effectiveFeatures,
+            })
+
+            if (!access.allowed) {
               throw new WorkspaceBillingFeatureUnavailableError({
-                message: 'This workspace plan does not include that feature.',
+                message: access.upgradeCallout,
                 organizationId,
                 feature,
                 planId: snapshot.planId,

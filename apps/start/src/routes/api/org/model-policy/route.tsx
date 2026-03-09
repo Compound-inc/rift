@@ -88,12 +88,6 @@ export const Route = createFileRoute('/api/org/model-policy')({
               }),
           })
 
-          const billing = yield* WorkspaceBillingService
-          yield* billing.assertFeatureEnabled({
-            organizationId: authContext.organizationId,
-            feature: 'providerPolicy',
-          })
-
           const policyService = yield* OrgModelPolicyService
           const payload = yield* policyService.getPayload({
             organizationId: authContext.organizationId,

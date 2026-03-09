@@ -4,7 +4,6 @@ export { useByok } from './use-byok'
 export type {
   ByokProvider,
   ByokProviderKeyStatus,
-  ByokFeatureFlags,
   ByokPayload,
   ByokUpdateAction,
 } from './types'

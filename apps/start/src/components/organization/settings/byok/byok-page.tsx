@@ -2,6 +2,7 @@
 
 import { ContentPage } from '@/components/layout'
 import { ByokForm } from '@/components/organization/settings/byok'
+import { useOrgFeatureAccess } from '@/lib/billing/use-org-billing'
 import { useByok } from '@/lib/byok/use-byok'
 import { m } from '@/paraglide/messages.js'
 
@@ -18,6 +19,7 @@ export function ByokPage() {
     setProviderKey,
     removeProviderKey,
   } = useByok()
+  const featureAccess = useOrgFeatureAccess('byok')
   const busy = loading || updating
 
   return (
@@ -41,7 +43,7 @@ export function ByokPage() {
       )}
 
       <ByokForm
-        featureEnabled={payload.featureFlags.enableOrganizationProviderKeys}
+        featureAccess={featureAccess}
         providerKeyStatus={payload.providerKeyStatus}
         updating={busy}
         onSave={setProviderKey}

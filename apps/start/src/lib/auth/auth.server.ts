@@ -9,7 +9,7 @@ import { twoFactor } from 'better-auth/plugins/two-factor'
 import { tanstackStartCookies } from 'better-auth/tanstack-start'
 import Stripe from 'stripe'
 import {
-  isPaidWorkspacePlan,
+  isStripeManagedWorkspacePlan,
   WORKSPACE_PLANS,
   resolveStripePlanPriceId,
 } from '@/lib/billing/plan-catalog'
@@ -117,7 +117,7 @@ const stripePlugin
         subscription: {
           enabled: true,
           plans: WORKSPACE_PLANS
-            .filter(isPaidWorkspacePlan)
+            .filter(isStripeManagedWorkspacePlan)
             .map((plan) => ({
               name: plan.id,
               priceId: resolveStripePlanPriceId(plan.id),

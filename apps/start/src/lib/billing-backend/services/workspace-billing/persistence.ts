@@ -4,6 +4,7 @@ import {
   type SeatReconciliationMember,
 } from '@/lib/billing/member-seat-restrictions'
 import { getPlanEffectiveFeatures } from '@/lib/billing/plan-catalog'
+import type { StripeManagedWorkspacePlanId } from '@/lib/billing/plan-catalog'
 import type {
   CurrentOrgSubscription,
   MembershipRoleRow,
@@ -309,6 +310,53 @@ export async function upsertEntitlementSnapshot(input: {
   }
 }
 
+/**
+ * Reads the last computed snapshot without mutating billing state. Feature
+ * checks use this path so ordinary settings writes do not fan out into extra
+ * entitlement writes when billing itself has not changed.
+ */
+export async function readEntitlementSnapshot(
+  organizationId: string,
+): Promise<OrgSeatAvailability | null> {
+  const result = await authPool.query<{
+    planId: string
+    subscriptionStatus: string
+    seatCount: number
+    activeMemberCount: number
+    pendingInvitationCount: number
+    isOverSeatLimit: boolean
+    effectiveFeatures: Record<string, boolean>
+  }>(
+    `select
+       plan_id as "planId",
+       subscription_status as "subscriptionStatus",
+       seat_count as "seatCount",
+       active_member_count as "activeMemberCount",
+       pending_invitation_count as "pendingInvitationCount",
+       is_over_seat_limit as "isOverSeatLimit",
+       effective_features as "effectiveFeatures"
+     from org_entitlement_snapshot
+     where organization_id = $1
+     limit 1`,
+    [organizationId],
+  )
+
+  const row = result.rows[0]
+  if (!row) {
+    return null
+  }
+
+  return {
+    planId: normalizePlanId(row.planId),
+    subscriptionStatus: row.subscriptionStatus,
+    seatCount: Math.max(1, row.seatCount ?? 1),
+    activeMemberCount: row.activeMemberCount,
+    pendingInvitationCount: row.pendingInvitationCount,
+    isOverSeatLimit: row.isOverSeatLimit,
+    effectiveFeatures: row.effectiveFeatures as ReturnType<typeof getPlanEffectiveFeatures>,
+  }
+}
+
 export async function upsertOrgBillingAccount(input: {
   billingAccountId: string
   organizationId: string
@@ -428,7 +476,7 @@ export async function clearScheduledOrgSubscriptionChange(input: {
 
 export async function recordScheduledOrgSubscriptionChange(input: {
   organizationId: string
-  nextPlanId: 'plus' | 'pro'
+  nextPlanId: StripeManagedWorkspacePlanId
   seats: number
   effectiveAt: number
   now: number
@@ -454,7 +502,7 @@ export async function recordScheduledOrgSubscriptionChange(input: {
 
 export async function updateSubscriptionMirror(input: {
   id: string
-  planId: 'plus' | 'pro'
+  planId: StripeManagedWorkspacePlanId
   seats: number
   status: string
   periodStart: number | null

@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Form } from '@rift/ui/form'
+import type { WorkspaceFeatureAccessState } from '@/lib/billing/plan-catalog'
+import { getFeatureAccessFormProps } from '@/components/organization/settings/feature-access-form-helpers'
 import type { ByokProvider } from '@/lib/byok/types'
 import { m } from '@/paraglide/messages.js'
 
@@ -23,7 +25,7 @@ interface ProviderCard {
 }
 
 interface ByokFormProps {
-  featureEnabled: boolean
+  featureAccess: WorkspaceFeatureAccessState & { loading: boolean }
   providerKeyStatus: {
     openai: boolean
     anthropic: boolean
@@ -41,12 +43,13 @@ interface ByokFormProps {
 const MASKED_KEY_VALUE = '••••••••••••••••••••••••••••••'
 
 export function ByokForm({
-  featureEnabled,
+  featureAccess,
   providerKeyStatus,
   updating,
   onSave,
   onRemove,
 }: ByokFormProps) {
+  const featureEnabled = featureAccess.allowed
   const [openaiInput, setOpenaiInput] = useState(() =>
     providerKeyStatus.openai ? MASKED_KEY_VALUE : '',
   )
@@ -97,10 +100,19 @@ export function ByokForm({
           <Form
             title={card.title}
             description={
-              card.configured
+              !featureEnabled
+                ? featureAccess.upgradeCallout
+                : card.configured
                 ? m.org_byok_provider_configured_description()
                 : m.org_byok_provider_not_configured_description()
             }
+            {...getFeatureAccessFormProps({
+              enabled: featureEnabled,
+              featureAccess,
+              defaultHelpText: m.org_byok_api_key_help_prefix({
+                providerName: getProviderName(card.providerId),
+              }),
+            })}
             inputAttrs={{
               name: `${card.providerId}ApiKey`,
               type: 'password',
@@ -168,17 +180,16 @@ export function ByokForm({
                   }
                 : undefined
             }
-            helpText={
-              !featureEnabled ? (
-                m.org_byok_feature_disabled_help()
-              ) : (
-                m.org_byok_api_key_help_prefix({
-                  providerName: getProviderName(card.providerId),
-                })
-              )
+            helpLearnMoreHref={
+              featureEnabled
+                ? getProviderApiKeyHref(card.providerId)
+                : featureAccess.action.href
             }
-            helpLearnMoreHref={featureEnabled ? getProviderApiKeyHref(card.providerId) : undefined}
-            helpLearnMoreLabel={featureEnabled ? m.org_byok_api_key_help_link_text() : undefined}
+            helpLearnMoreLabel={
+              featureEnabled
+                ? m.org_byok_api_key_help_link_text()
+                : featureAccess.action.label
+            }
           />
         </div>
       ))}

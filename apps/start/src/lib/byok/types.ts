@@ -6,12 +6,7 @@ export type ByokProviderKeyStatus = {
   readonly anthropic: boolean
 }
 
-export type ByokFeatureFlags = {
-  readonly enableOrganizationProviderKeys: boolean
-}
-
 export type ByokPayload = {
-  readonly featureFlags: ByokFeatureFlags
   readonly providerKeyStatus: ByokProviderKeyStatus
 }
 

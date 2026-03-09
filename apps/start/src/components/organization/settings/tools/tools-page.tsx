@@ -3,6 +3,7 @@
 import { ContentPage } from '@/components/layout'
 import { m } from '@/paraglide/messages.js'
 import { useProviderPolicy } from '@/components/organization/settings/model-policy/use-provider-policy'
+import { useOrgFeatureAccess } from '@/lib/billing/use-org-billing'
 import { ToolAccessSection } from './tool-access-section'
 import { ProviderToolsSection } from './provider-tools-section'
 
@@ -13,6 +14,7 @@ import { ProviderToolsSection } from './provider-tools-section'
  */
 export function ToolsPage() {
   const { payload, loading, error, updating, update } = useProviderPolicy()
+  const featureAccess = useOrgFeatureAccess('toolPolicy')
   const busy = loading || updating
 
   return (
@@ -37,8 +39,18 @@ export function ToolsPage() {
 
       {!loading && (
         <>
-          <ToolAccessSection payload={payload} updating={busy} update={update} />
-          <ProviderToolsSection payload={payload} updating={busy} update={update} />
+          <ToolAccessSection
+            payload={payload}
+            updating={busy}
+            update={update}
+            featureAccess={featureAccess}
+          />
+          <ProviderToolsSection
+            payload={payload}
+            updating={busy}
+            update={update}
+            featureAccess={featureAccess}
+          />
         </>
       )}
     </ContentPage>

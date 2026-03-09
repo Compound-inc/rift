@@ -1,7 +1,8 @@
 'use client'
 
 import { Form } from '@rift/ui/form'
-import { canUseOrganizationProviderKeys } from '@/utils/app-feature-flags'
+import type { WorkspaceFeatureAccessState } from '@/lib/billing/plan-catalog'
+import { getFeatureAccessFormProps } from '@/components/organization/settings/feature-access-form-helpers'
 import { m } from '@/paraglide/messages.js'
 import type { PolicyPayload } from './types'
 import type { useProviderPolicy } from './use-provider-policy'
@@ -10,17 +11,26 @@ type ComplianceFlagsSectionProps = {
   payload: PolicyPayload
   updating: boolean
   update: ReturnType<typeof useProviderPolicy>['update']
+  featureAccess?: WorkspaceFeatureAccessState & { loading: boolean }
 }
 
 function ZdrComplianceForm({
   payload,
   updating,
   update,
+  featureAccess,
 }: ComplianceFlagsSectionProps) {
+  const sectionEnabled = featureAccess?.allowed ?? true
+
   return (
     <Form
       title={m.org_compliance_flag_require_zdr_title()}
       description={m.org_compliance_flag_require_zdr_description()}
+      {...getFeatureAccessFormProps({
+        enabled: sectionEnabled,
+        featureAccess,
+        defaultHelpText: m.org_compliance_flags_help(),
+      })}
       headerToggle={{
         checked: Boolean(payload.policy.complianceFlags.require_zdr),
         onCheckedChange: (enabled) =>
@@ -29,9 +39,8 @@ function ZdrComplianceForm({
             flag: 'require_zdr',
             enabled,
           }),
-        disabled: updating,
+        disabled: updating || !sectionEnabled,
       }}
-      helpText={m.org_compliance_flags_help()}
     />
   )
 }
@@ -40,13 +49,19 @@ function RequireOrgProviderKeyForm({
   payload,
   updating,
   update,
+  featureAccess,
 }: ComplianceFlagsSectionProps) {
-  const byokEnabled = canUseOrganizationProviderKeys()
+  const byokEnabled = featureAccess?.allowed ?? false
 
   return (
     <Form
       title={m.org_compliance_flag_require_org_provider_key_title()}
       description={m.org_compliance_flag_require_org_provider_key_description()}
+      {...getFeatureAccessFormProps({
+        enabled: byokEnabled,
+        featureAccess,
+        defaultHelpText: m.org_compliance_flags_help(),
+      })}
       headerToggle={{
         checked: Boolean(
           payload.policy.complianceFlags.require_org_provider_key,
@@ -59,7 +74,6 @@ function RequireOrgProviderKeyForm({
           }),
         disabled: updating || !byokEnabled,
       }}
-      helpText={m.org_compliance_flags_help()}
     />
   )
 }
@@ -68,11 +82,19 @@ function EnforceStudyModeForm({
   payload,
   updating,
   update,
+  featureAccess,
 }: ComplianceFlagsSectionProps) {
+  const sectionEnabled = featureAccess?.allowed ?? true
+
   return (
     <Form
       title={m.org_compliance_flag_enforce_study_mode_title()}
       description={m.org_compliance_flag_enforce_study_mode_description()}
+      {...getFeatureAccessFormProps({
+        enabled: sectionEnabled,
+        featureAccess,
+        defaultHelpText: m.org_compliance_flags_help(),
+      })}
       headerToggle={{
         checked: payload.policy.enforcedModeId === 'study',
         onCheckedChange: (enabled) =>
@@ -80,9 +102,8 @@ function EnforceStudyModeForm({
             action: 'set_enforced_mode',
             modeId: enabled ? 'study' : null,
           }),
-        disabled: updating,
+        disabled: updating || !sectionEnabled,
       }}
-      helpText={m.org_compliance_flags_help()}
     />
   )
 }
@@ -91,19 +112,29 @@ export function ComplianceFlagsSection({
   payload,
   updating,
   update,
+  featureAccess,
 }: ComplianceFlagsSectionProps) {
+  const sectionEnabled = featureAccess?.allowed ?? true
+
   return (
     <div className="space-y-6">
-      <ZdrComplianceForm payload={payload} updating={updating} update={update} />
+      <ZdrComplianceForm
+        payload={payload}
+        updating={updating || !sectionEnabled}
+        update={update}
+        featureAccess={featureAccess}
+      />
       <RequireOrgProviderKeyForm
         payload={payload}
-        updating={updating}
+        updating={updating || !sectionEnabled}
         update={update}
+        featureAccess={featureAccess}
       />
       <EnforceStudyModeForm
         payload={payload}
-        updating={updating}
+        updating={updating || !sectionEnabled}
         update={update}
+        featureAccess={featureAccess}
       />
     </div>
   )

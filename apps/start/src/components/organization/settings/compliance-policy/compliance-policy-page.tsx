@@ -1,6 +1,7 @@
 'use client'
 
 import { ContentPage } from '@/components/layout'
+import { useOrgFeatureAccess } from '@/lib/billing/use-org-billing'
 import { m } from '@/paraglide/messages.js'
 import { ComplianceFlagsSection } from '../model-policy/compliance-flags-section'
 import { useProviderPolicy } from '../model-policy/use-provider-policy'
@@ -11,6 +12,7 @@ import { useProviderPolicy } from '../model-policy/use-provider-policy'
  */
 export function CompliancePolicyPage() {
   const { payload, loading, error, updating, update } = useProviderPolicy()
+  const featureAccess = useOrgFeatureAccess('compliancePolicy')
   const busy = loading || updating
 
   return (
@@ -35,6 +37,7 @@ export function CompliancePolicyPage() {
         payload={payload}
         updating={busy}
         update={update}
+        featureAccess={featureAccess}
       />
     </ContentPage>
   )

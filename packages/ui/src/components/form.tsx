@@ -251,6 +251,12 @@ export interface FormProps extends Omit<
   onSecondaryClick?: () => void;
   /** Optional. Disables the submit and secondary buttons */
   buttonDisabled?: boolean;
+  /**
+   * When true, blocks pointer events on the form content and action buttons while
+   * leaving the upgrade/learn-more link clickable. Use when the feature is gated
+   * and the user must upgrade to interact with the form.
+   */
+  featureDisabled?: boolean;
   /** Optional variant for the submit button (e.g., "danger" for destructive actions) */
   buttonVariant?: "default" | "danger" | "ghost" | "dangerLight";
   /** Called on submit when a main field (input or select) is provided; optional when form is toggle-only */
@@ -348,6 +354,7 @@ export function Form({
   secondaryButtonText,
   onSecondaryClick,
   buttonDisabled,
+  featureDisabled,
   buttonVariant = "default",
   handleSubmit,
   value: controlledValue,
@@ -919,6 +926,12 @@ export function Form({
               )}
             </div>
           )}
+          {featureDisabled && (
+            <div
+              className="absolute inset-0 z-10 cursor-not-allowed rounded-b-2xl"
+              aria-hidden
+            />
+          )}
         </div>
 
         {(helpText != null || helpLearnMoreHref != null || error != null || success != null || hasMainField) && (
@@ -993,7 +1006,13 @@ export function Form({
               </motion.div>
             </AnimatePresence>
           </div>
-          <div className="flex h-10 shrink-0 items-center gap-2">
+          <div className="relative flex h-10 shrink-0 items-center gap-2">
+            {featureDisabled && (
+              <div
+                className="absolute inset-0 z-10 cursor-not-allowed"
+                aria-hidden
+              />
+            )}
             {secondaryButtonText && hasActions && (
               <Button
                 type="button"

@@ -4,7 +4,12 @@ import {
 import { z } from 'zod'
 import { AI_CATALOG_BY_ID, AI_MODELS_BY_PROVIDER } from '@/lib/ai-catalog'
 import { TOOL_CATALOG_BY_KEY } from '@/lib/ai-catalog/tool-catalog'
-import { getPlanEffectiveFeatures, type WorkspaceFeatureId } from '@/lib/billing/plan-catalog'
+import {
+  coerceWorkspacePlanId,
+  getWorkspaceFeatureAccessState,
+  getPlanEffectiveFeatures,
+  type WorkspaceFeatureId,
+} from '@/lib/billing/plan-catalog'
 import { isChatModeId } from '@/lib/chat-modes'
 import { zql } from '../zql'
 
@@ -118,14 +123,16 @@ async function requireOrgFeature(args: {
 
   const effectiveFeatures
     = entitlement?.effectiveFeatures
-      ?? getPlanEffectiveFeatures(
-        entitlement?.planId === 'plus' || entitlement?.planId === 'pro'
-          ? entitlement.planId
-          : 'free',
-      )
+      ?? getPlanEffectiveFeatures(coerceWorkspacePlanId(entitlement?.planId))
 
-  if (!effectiveFeatures[args.feature]) {
-    throw new Error('This workspace plan does not include that feature')
+  const access = getWorkspaceFeatureAccessState({
+    planId: coerceWorkspacePlanId(entitlement?.planId),
+    feature: args.feature,
+    effectiveFeatures,
+  })
+
+  if (!access.allowed) {
+    throw new Error(access.upgradeCallout)
   }
 }
 

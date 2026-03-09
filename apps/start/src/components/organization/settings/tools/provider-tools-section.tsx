@@ -3,6 +3,8 @@
 import * as React from 'react'
 import { Form } from '@rift/ui/form'
 import { getProviderIcon } from '@/lib/ai-catalog'
+import type { WorkspaceFeatureAccessState } from '@/lib/billing/plan-catalog'
+import { getFeatureAccessFormProps } from '@/components/organization/settings/feature-access-form-helpers'
 import {
   getLocalizedToolCopy,
   getToolUiGroupKey,
@@ -17,6 +19,7 @@ type ProviderToolsSectionProps = {
   payload: PolicyPayload
   updating: boolean
   update: ReturnType<typeof useProviderPolicy>['update']
+  featureAccess?: WorkspaceFeatureAccessState & { loading: boolean }
 }
 
 type ToolSettingsGroup = {
@@ -69,7 +72,9 @@ export function ProviderToolsSection({
   payload,
   updating,
   update,
+  featureAccess,
 }: ProviderToolsSectionProps) {
+  const featureEnabled = featureAccess?.allowed ?? true
   const groupedTools = React.useMemo(
     () => [...groupToolsForDisplay(payload.tools).entries()],
     [payload.tools],
@@ -113,7 +118,7 @@ export function ProviderToolsSection({
                     }),
                   ),
                 ),
-              disabled: updating || toggleDisabled,
+              disabled: updating || !featureEnabled || toggleDisabled,
             }
           }),
         }
@@ -131,7 +136,11 @@ export function ProviderToolsSection({
     <Form
       title={m.org_provider_tools_title()}
       description={m.org_provider_tools_description()}
-      helpText={m.org_provider_tools_help()}
+      {...getFeatureAccessFormProps({
+        enabled: featureEnabled,
+        featureAccess,
+        defaultHelpText: m.org_provider_tools_help(),
+      })}
       toggleSection={{
         sectionTitle: m.org_provider_tools_available_tools(),
         rowHover: true,
