@@ -1,6 +1,6 @@
-import { APIError } from '@better-auth/core/error'
 import { Effect, Layer, ServiceMap } from 'effect'
 import { getWorkspaceFeatureAccessState } from '@/lib/billing/plan-catalog'
+import { toInvitationSeatLimitApiError, toWorkspaceFeatureApiError } from '../domain/api-errors'
 import {
   WorkspaceBillingConfigurationError,
   WorkspaceBillingFeatureUnavailableError,
@@ -177,20 +177,5 @@ export class WorkspaceBillingService extends ServiceMap.Service<
   })
 }
 
-export function toInvitationSeatLimitApiError(
-  error: WorkspaceBillingSeatLimitExceededError,
-): APIError {
-  return new APIError('FORBIDDEN', {
-    message: error.message,
-  })
-}
-
-export function toWorkspaceFeatureApiError(
-  error: WorkspaceBillingFeatureUnavailableError,
-): APIError {
-  return new APIError('FORBIDDEN', {
-    message: error.message,
-  })
-}
-
 export type { OrgSeatAvailability }
+export { toInvitationSeatLimitApiError, toWorkspaceFeatureApiError }

@@ -1,4 +1,3 @@
-import { Effect } from 'effect'
 import { betterAuth } from 'better-auth'
 import { stripe } from '@better-auth/stripe'
 import { emailOTP, testUtils } from 'better-auth/plugins'
@@ -13,12 +12,16 @@ import {
   WORKSPACE_PLANS,
   resolveStripePlanPriceId,
 } from '@/lib/billing/plan-catalog'
-import { WorkspaceBillingRuntime } from '@/lib/billing-backend/runtime/workspace-billing-runtime'
 import {
-  type OrgSeatAvailability,
+  assertInvitationCapacity,
+  getOrganizationSeatLimit,
+  markWorkspaceSubscriptionCanceledFromAuth,
+  recomputeOrgEntitlementSnapshot,
+  syncWorkspaceSubscriptionFromAuth,
+} from '@/lib/billing-backend/integrations/auth-billing-hooks'
+import {
   toInvitationSeatLimitApiError,
-  WorkspaceBillingService,
-} from '@/lib/billing-backend/services/workspace-billing.service'
+} from '@/lib/billing-backend/domain/api-errors'
 import { isAdminRole } from './roles'
 import { authPool } from './auth-pool'
 import {
@@ -32,32 +35,12 @@ import {
 import { sendAuthEmail } from './auth-email.server'
 import type { Subscription as BetterAuthStripeSubscription } from '@better-auth/stripe'
 
-async function runWorkspaceBilling<T>(
-  callback: (service: typeof WorkspaceBillingService.Service) => Effect.Effect<T, any, never>,
-): Promise<T> {
-  return WorkspaceBillingRuntime.run(
-    Effect.gen(function* () {
-      const service = yield* WorkspaceBillingService
-      return yield* callback(service)
-    }),
-  )
-}
-
-async function recomputeOrgEntitlementSnapshot(
-  organizationId: string,
-): Promise<OrgSeatAvailability> {
-  return runWorkspaceBilling((service) =>
-    service.recomputeEntitlementSnapshot({
-      organizationId,
-    }))
-}
-
 async function syncWorkspaceSubscription(input: {
   subscription: BetterAuthStripeSubscription
   stripeSubscription?: Stripe.Subscription
   billingProvider?: 'stripe' | 'manual'
 }): Promise<void> {
-  await runWorkspaceBilling((service) => service.syncWorkspaceSubscription(input))
+  await syncWorkspaceSubscriptionFromAuth(input)
 }
 
 async function markWorkspaceSubscriptionCanceled(input: {
@@ -67,10 +50,7 @@ async function markWorkspaceSubscriptionCanceled(input: {
   status: BetterAuthStripeSubscription['status']
   cancelAtPeriodEnd?: boolean
 }): Promise<void> {
-  await runWorkspaceBilling((service) =>
-    service.markWorkspaceSubscriptionCanceled({
-      subscription: input,
-    }))
+  await markWorkspaceSubscriptionCanceledFromAuth(input)
 }
 
 const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim()
@@ -277,12 +257,7 @@ auth = betterAuth({
     organization({
       allowUserToCreateOrganization: async (user) => !user.isAnonymous,
       membershipLimit: async (_user, organization): Promise<number> =>
-        WorkspaceBillingRuntime.run(
-          Effect.gen(function* () {
-            const service = yield* WorkspaceBillingService
-            return yield* service.getSeatLimit({ organizationId: organization.id })
-          }),
-        ),
+        getOrganizationSeatLimit(organization.id),
       requireEmailVerificationOnInvitation: true,
       organizationHooks: {
         afterCreateOrganization: async ({ organization, user }) => {
@@ -303,15 +278,10 @@ auth = betterAuth({
         },
         beforeCreateInvitation: async ({ organization }) => {
           try {
-            await WorkspaceBillingRuntime.run(
-              Effect.gen(function* () {
-                const service = yield* WorkspaceBillingService
-                yield* service.assertInvitationCapacity({
-                  organizationId: organization.id,
-                  inviteCount: 1,
-                })
-              }),
-            )
+            await assertInvitationCapacity({
+              organizationId: organization.id,
+              inviteCount: 1,
+            })
           } catch (error) {
             if (
               error
