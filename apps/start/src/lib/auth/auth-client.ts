@@ -9,15 +9,21 @@ import {
 import { twoFactorClient } from 'better-auth/client/plugins'
 
 function resolveAuthClientBaseURL(): string {
-  const raw = import.meta.env.VITE_BETTER_AUTH_URL?.trim()
-  if (!raw) {
-    throw new Error(
-      'Missing VITE_BETTER_AUTH_URL. Set it to app origin (for example http://localhost:3000).',
-    )
+  const trimTrailingSlash = (s: string) => s.replace(/\/+$/, '')
+
+  if (typeof window === 'undefined') {
+    const raw = process.env.BETTER_AUTH_URL?.trim()
+    if (!raw) {
+      throw new Error(
+        'Missing BETTER_AUTH_URL. Set it to app origin (e.g. https://demo.rift.mx).',
+      )
+    }
+    return `${trimTrailingSlash(raw)}/api/auth`
   }
 
-  const origin = raw.replace(/\/+$/, '')
-  return `${origin}/api/auth`
+  const raw =
+    import.meta.env.VITE_BETTER_AUTH_URL?.trim() || window.location.origin
+  return `${trimTrailingSlash(raw)}/api/auth`
 }
 
 const baseURL = resolveAuthClientBaseURL()
