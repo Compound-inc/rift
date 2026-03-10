@@ -17,7 +17,7 @@ import { SidebarGroupTooltip } from '@rift/ui/tooltip'
 import { cn } from '@rift/utils'
 import { useActiveOrganization } from '@/lib/auth/active-organization'
 import { useAppAuth } from '@/lib/auth/use-auth'
-import { Link, useLocation } from '@tanstack/react-router'
+import { Link, useRouterState } from '@tanstack/react-router'
 import type { ComponentType } from 'react'
 import { useMemo } from 'react'
 import { m } from '@/paraglide/messages.js'
@@ -28,7 +28,15 @@ const SIDEBAR_AREAS_WIDTH = 240
 const SIDEBAR_WIDTH = SIDEBAR_GROUPS_WIDTH + SIDEBAR_AREAS_WIDTH
 
 export const AppSidebar: ComponentType = () => {
-  const { pathname } = useLocation()
+  const pathname = useRouterState({
+    /**
+     * Use the last fully resolved route path instead of the in-flight location.
+     * TanStack Router can update `location` before the new outlet tree commits,
+     * which makes the sidebar highlight jump ahead of the main content.
+     * Reading `resolvedLocation` keeps both regions visually synchronized.
+     */
+    select: (state) => state.resolvedLocation.pathname,
+  })
   const { user, loading, isAnonymous } = useAppAuth()
   const { activeOrganization, loading: activeOrganizationLoading } = useActiveOrganization()
   const direction = useDirection()

@@ -42,12 +42,6 @@
     "XAI_FILE_SEARCH_VECTOR_STORE_IDS",
     "XAI_MCP_SERVER_URL",
     "XAI_MCP_SERVER_LABEL",
-    "CONVEX_DEPLOYMENT",
-    "CONVEX_SITE_URL",
-    "CONVEX_SYNC_SECRET",
-    "CONVEX_SECRET_TOKEN",
-    "CONVEX_ADMIN_TOKEN",
-    "NEXT_PUBLIC_CONVEX_URL",
     "AUTUMN_SECRET_KEY",
     "AUTUMN_WEBHOOK_SECRET",
     "VALYU_API_KEY",
@@ -66,7 +60,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**"],
+      "outputs": ["dist/**"],
       "inputs": [
         "$TURBO_DEFAULT$",
         ".env",
@@ -108,10 +102,6 @@
     "clean": {},
     "prepare": {
       "cache": false
-    },
-    "convex": {
-      "cache": false,
-      "persistent": true
     },
     "zero-cache": {
       "cache": false,

@@ -18,6 +18,8 @@ Rift is built around TanStack Start for full-stack delivery, Rocicorp Zero for s
 
 ![Rift chat app screenshot](https://github.com/user-attachments/assets/e3cd4f56-0e1d-44f1-b815-76192c905bc0)
 
+> **Note:** This repository is a new version of Rift under active development. The live site at [rift.mx](https://rift.mx) runs an older version of Rift.
+
 ## Features
 
 - Nested chat branches system with deterministic branch resolution and conflict handling
@@ -62,9 +64,7 @@ Additional platform technologies:
 
 ## Self-Hosting
 
-Rift is free software under the GNU Affero General Public License v3.0 (AGPL-3.0). You may use, modify, and distribute it for any purpose, including commercial use. If you run a modified version as a network service, you must offer users the corresponding source code.
-
-It can be deployed through the existing Railway template.
+Rift will be deployable via a Railway template.
 
 [![Deploy on Railway](https://railway.com/button.svg)]()
 

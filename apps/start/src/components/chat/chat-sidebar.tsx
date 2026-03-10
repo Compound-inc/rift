@@ -13,10 +13,10 @@ import { useQuery, useZero } from '@rocicorp/zero/react'
 import { useNavigate } from '@tanstack/react-router'
 import {
   AlertTriangle,
-  Compass,
   Copy,
   Globe,
   Link2,
+  MessageCircle,
   Pencil,
   Trash2,
 } from 'lucide-react'
@@ -73,7 +73,7 @@ export function chatNavStaticConfig() {
     title: CHAT_SIDEBAR_TITLE(),
     href: CHAT_HREF,
     description: m.chat_sidebar_description(),
-    icon: Compass,
+    icon: MessageCircle,
     content: getStaticSections(),
   }
 }

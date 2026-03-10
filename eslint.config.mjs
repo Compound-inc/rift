@@ -1,10 +1,15 @@
-import nextConfig from "eslint-config-next";
-
-const config = [
-  ...nextConfig,
+/**
+ * Root ESLint config for the monorepo.
+ * Workspace packages (apps/*, packages/*) define their own configs.
+ */
+export default [
   {
-    ignores: ["**/node_modules/**", "**/dist/**", "**/.next/**", "**/reference/**"],
+    ignores: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.next/**",
+      "**/reference/**",
+      "**/.turbo/**",
+    ],
   },
 ];
-
-export default config;
