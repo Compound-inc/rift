@@ -1,6 +1,9 @@
 -- Zero upstream schema (run against ZERO_UPSTREAM_DB).
 -- Single source of truth for a fresh DB. zero-cache replicates via publication
 -- zero_data (created by zero-dev-reset after applying this file).
+--
+-- Execution order: Run db:reset (Better Auth migrate first, then zero-dev-reset)
+-- so user/organization/member/invitation exist before this schema runs.
 
 -- threads
 CREATE TABLE IF NOT EXISTS threads (
@@ -230,6 +233,8 @@ CREATE TABLE IF NOT EXISTS org_member_access (
 CREATE UNIQUE INDEX IF NOT EXISTS org_member_access_org_user ON org_member_access (organization_id, user_id);
 CREATE INDEX IF NOT EXISTS org_member_access_status ON org_member_access (status);
 
+-- Better Auth owns user/organization; we add app-specific columns. Run db:reset so
+-- auth migrations run first and these tables exist.
 ALTER TABLE "user"
 ADD COLUMN IF NOT EXISTS "stripeCustomerId" TEXT;
 

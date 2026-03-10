@@ -1,5 +1,5 @@
--- Drop Zero publication and all app tables for a full dev reset.
--- Run only via scripts/zero-dev-reset.ts against ZERO_UPSTREAM_DB.
+-- Drop Zero publication and app tables for dev reset.
+-- Run via db:reset or zero:reset (scripts/db-reset.ts, scripts/zero-dev-reset.ts).
 -- Do not use as a forward migration.
 
 DROP PUBLICATION IF EXISTS zero_data;

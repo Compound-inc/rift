@@ -4,7 +4,7 @@
 #   docker compose -f docker-compose.postgres.yml up -d
 # Then set in apps/start/.env.local:
 #   ZERO_UPSTREAM_DB=postgresql://rift:rift@localhost:5432/rift
-# Run schema: cd apps/start && bun run scripts/zero-dev-reset.ts
+# Run schema: cd apps/start && bun run db:reset
 
 services:
   postgres:

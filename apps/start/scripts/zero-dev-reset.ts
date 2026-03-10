@@ -1,18 +1,15 @@
 /**
- * Full dev reset: Postgres (Zero upstream), Zero replica files, and re-apply migrations.
- *
+ * Zero-only reset: drops Zero tables, re-applies schema, removes replica files.
  *
  * What it does:
  * 1. Drops Zero publication and all Zero tables in Postgres.
  * 2. Re-applies the Zero schema (zero/migrations/schema.sql).
- * 3. Deletes Zero replica files (zero.db, zero.db-wal, zero.db-shm) so zero-cache starts fresh.
+ * 3. Deletes Zero replica files (zero.db, zero.db-wal, zero.db-shm).
  *
- * Browser (Zero client): IndexedDB is not cleared by this script. For a full client reset,
- * clear site data for localhost in DevTools (Application → Storage → Clear site data)
- * or use an incognito window.
+ * For a full reset (auth + Zero), use `bun run db:reset` instead. That runs
+ * Better Auth migrations first so user/org/member tables exist before schema.sql.
  *
- * Run from repo root: `cd apps/start && bun run scripts/zero-dev-reset.ts`
- * Or from apps/start: `bun run scripts/zero-dev-reset.ts`
+ * Run from apps/start: `bun run zero:reset`
  */
 
 import { readFile, unlink } from 'node:fs/promises'
@@ -52,9 +49,8 @@ async function runSql(pool: Pool, sql: string, label: string): Promise<void> {
 
 async function ensureAuthIndexes(pool: Pool): Promise<void> {
   /**
-   * Better Auth owns the auth schema, so we avoid recreating those tables in our
-   * app migrations. We still add the membership lookup index here because the
-   * Zero-backed members directory filters heavily on active org + current user.
+   * Better Auth owns the auth schema. We add the membership lookup index because
+   * the Zero-backed members directory filters heavily on active org + current user.
    */
   await runSql(
     pool,
