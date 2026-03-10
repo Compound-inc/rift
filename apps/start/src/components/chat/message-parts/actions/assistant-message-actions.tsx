@@ -60,7 +60,7 @@ const AssistantMessageActionsInner = memo(function AssistantMessageActionsInner(
         </MessageActionButton>
       </MessageActions>
       {modelName ? (
-        <span className="mt-1 text-sm text-content-muted opacity-0 transition-opacity group-hover:opacity-100">
+        <span className="mt-1 text-sm text-foreground-secondary opacity-0 transition-opacity group-hover:opacity-100">
           {modelName}
         </span>
       ) : null}

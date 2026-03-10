@@ -61,7 +61,7 @@ export function MainNav({ children, sidebar: Sidebar }: MainNavProps) {
           'fixed z-50 w-screen transition-[background-color,backdrop-filter] md:sticky md:z-auto md:w-full md:bg-transparent',
           directionClass(direction, { ltr: 'left-0', rtl: 'right-0' }),
           isOpen
-            ? 'bg-bg-inverted/20 backdrop-blur-sm'
+            ? 'bg-surface-inverse/20 backdrop-blur-sm'
             : 'bg-transparent max-md:pointer-events-none',
           'top-0 h-dvh',
         )}
@@ -74,7 +74,7 @@ export function MainNav({ children, sidebar: Sidebar }: MainNavProps) {
       >
         <div
           className={cn(
-            'relative h-full w-min max-w-full bg-bg-emphasis transition-transform md:translate-x-0',
+            'relative h-full w-min max-w-full bg-surface-strong transition-transform md:translate-x-0',
             !isOpen &&
               directionClass(direction, {
                 ltr: '-translate-x-full',
@@ -87,14 +87,14 @@ export function MainNav({ children, sidebar: Sidebar }: MainNavProps) {
       </div>
       <div
         className={cn(
-          'bg-bg-emphasis pb-[var(--page-bottom-margin)] pt-[var(--page-top-margin)] [--page-bottom-margin:0px] [--page-top-margin:0px] h-screen md:[--page-top-margin:0.5rem] min-w-0',
+          'bg-surface-strong pb-[var(--page-bottom-margin)] pt-[var(--page-top-margin)] [--page-bottom-margin:0px] [--page-top-margin:0px] h-screen md:[--page-top-margin:0.5rem] min-w-0',
           directionClass(direction, {
             ltr: 'md:pr-2 md:pl-0',
             rtl: 'md:pl-2 md:pr-0',
           }),
         )}
       >
-        <div className="relative h-full overflow-y-auto border-x border-t border-border-muted pt-px md:rounded-t-xl md:bg-bg-default">
+        <div className="relative h-full overflow-y-auto border-x border-t border-border-light pt-px md:rounded-t-xl md:bg-surface-base">
           <SideNavContext.Provider value={contextValue}>
             {children}
           </SideNavContext.Provider>
@@ -102,7 +102,7 @@ export function MainNav({ children, sidebar: Sidebar }: MainNavProps) {
       </div>
       <div
         className={cn(
-          'sticky top-0 hidden h-dvh min-h-0 shrink-0 overflow-hidden bg-bg-emphasis pt-[var(--page-top-margin)] [--page-top-margin:0.5rem] lg:block',
+          'sticky top-0 hidden h-dvh min-h-0 shrink-0 overflow-hidden bg-surface-strong pt-[var(--page-top-margin)] [--page-top-margin:0.5rem] lg:block',
           showRightSidebar &&
             directionClass(direction, {
               ltr: 'pl-0 pr-2',

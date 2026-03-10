@@ -23,7 +23,7 @@ function CompliancePolicyRoutePage() {
         title={m.org_compliance_page_title()}
         description={m.org_route_select_org_compliance_description()}
       >
-        <p className="text-sm text-content-muted">
+        <p className="text-sm text-foreground-secondary">
           {m.org_route_select_org_body()}
         </p>
       </ContentPage>

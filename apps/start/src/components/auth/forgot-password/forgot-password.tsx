@@ -94,10 +94,10 @@ export function ForgotPassword({ redirectTarget, onBackToLogin }: ForgotPassword
       </motion.div>
 
       <motion.div
-        className="w-full max-w-md overflow-hidden rounded-3xl bg-bg-emphasis/30 dark:bg-bg-emphasis/50 backdrop-blur-xl shadow-[0_0_1px_rgba(0,0,0,0.40),0_0_2px_rgba(0,0,0,0.05),0_10px_10px_rgba(0,0,0,0.25)] transition-colors duration-200"
+        className="w-full max-w-md overflow-hidden rounded-3xl bg-surface-strong/30 dark:bg-surface-strong/50 backdrop-blur-xl shadow-[0_0_1px_rgba(0,0,0,0.40),0_0_2px_rgba(0,0,0,0.05),0_10px_10px_rgba(0,0,0,0.25)] transition-colors duration-200"
         variants={menuCardContentVariants}
       >
-        <div className="rounded-b-3xl bg-bg-muted/70 dark:bg-bg-muted/60 backdrop-blur-sm p-8 shadow-[0_0_1px_rgba(0,0,0,0.3),0_4px_12px_rgba(0,0,0,0.08)] transition-colors duration-200">
+        <div className="rounded-b-3xl bg-surface-raised/70 dark:bg-surface-raised/60 backdrop-blur-sm p-8 shadow-[0_0_1px_rgba(0,0,0,0.3),0_4px_12px_rgba(0,0,0,0.08)] transition-colors duration-200">
           <motion.form
             id="forgot-password-form"
             onSubmit={isRequestStep ? handleEmailSubmit : handlePasswordReset}
@@ -132,7 +132,7 @@ export function ForgotPassword({ redirectTarget, onBackToLogin }: ForgotPassword
             ) : (
               <>
                 <motion.div variants={staggerChildVariants}>
-                  <p className="text-sm text-content-subtle">
+                  <p className="text-sm text-foreground-tertiary">
                     {m.auth_forgot_password_we_will_update({ email })}
                   </p>
                 </motion.div>
@@ -188,7 +188,7 @@ export function ForgotPassword({ redirectTarget, onBackToLogin }: ForgotPassword
             {error ? (
               <motion.p
                 variants={staggerChildVariants}
-                className="rounded-2xl border border-content-error/20 bg-content-error/10 px-4 py-3 text-sm text-content-error"
+                className="rounded-2xl border border-foreground-error/20 bg-foreground-error/10 px-4 py-3 text-sm text-foreground-error"
                 role="alert"
               >
                 {error}
@@ -198,7 +198,7 @@ export function ForgotPassword({ redirectTarget, onBackToLogin }: ForgotPassword
             {successMessage ? (
               <motion.p
                 variants={staggerChildVariants}
-                className="rounded-2xl border border-content-info/20 bg-content-info/10 px-4 py-3 text-sm text-content-info"
+                className="rounded-2xl border border-foreground-info/20 bg-foreground-info/10 px-4 py-3 text-sm text-foreground-info"
                 role="status"
                 aria-live="polite"
               >

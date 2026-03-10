@@ -298,7 +298,7 @@ export function FormDialog({
           className={cn(
             "fixed left-1/2 top-1/2 z-50 w-full max-w-[calc(100%-2rem)] sm:max-w-lg",
             "-translate-x-1/2 -translate-y-1/2 outline-none",
-            "overflow-hidden rounded-xl border border-bg-emphasis bg-transparent",
+            "overflow-hidden rounded-xl border border-surface-strong bg-transparent",
             "data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 duration-100",
           )}
         >
@@ -308,9 +308,9 @@ export function FormDialog({
             data-state={saving ? "busy" : "idle"}
           >
             {/* Emphasis base layer — same layered background as Form */}
-            <div className="relative bg-emphasis/50">
+            <div className="relative bg-surface-strong/50">
               {/* Content card */}
-              <div className="relative z-10 flex flex-col space-y-6 rounded-b-2xl bg-bg-muted p-6">
+              <div className="relative z-10 flex flex-col space-y-6 rounded-b-2xl bg-surface-raised p-6">
                 {/* Close button */}
                 <DialogPrimitive.Close
                   render={
@@ -330,11 +330,11 @@ export function FormDialog({
                 <div className="flex flex-col space-y-1 pr-8">
                   <h2
                     id={sectionTitleId}
-                    className="text-xl font-semibold text-content-emphasis"
+                    className="text-xl font-semibold text-foreground-strong"
                   >
                     {title}
                   </h2>
-                  <p className="text-sm text-content-subtle">{description}</p>
+                  <p className="text-sm text-foreground-tertiary">{description}</p>
                 </div>
 
                 {/* Body */}
@@ -348,10 +348,10 @@ export function FormDialog({
                   "transition-[background-color,border-color] duration-250 ease-out",
                   "sm:flex-row sm:items-center sm:justify-between sm:space-y-0 sm:pb-3 sm:pt-5",
                   feedbackTone === "error"
-                    ? "border-border-subtle bg-bg-error"
+                    ? "border-border-faint bg-surface-error"
                     : feedbackTone === "info"
-                      ? "border-border-subtle bg-bg-info/25"
-                      : "border-border-subtle bg-bg-emphasis",
+                      ? "border-border-faint bg-surface-info/25"
+                      : "border-border-faint bg-surface-strong",
                 )}
               >
                 {/* Feedback area */}
@@ -367,14 +367,14 @@ export function FormDialog({
                       {visibleError != null ? (
                         typeof visibleError === "string" ? (
                           <p
-                            className="font-medium text-content-error"
+                            className="font-medium text-foreground-error"
                             role="alert"
                           >
                             {visibleError}
                           </p>
                         ) : (
                           <div
-                            className="font-medium text-content-error"
+                            className="font-medium text-foreground-error"
                             role="alert"
                           >
                             {visibleError}
@@ -383,7 +383,7 @@ export function FormDialog({
                       ) : visibleSuccess != null ? (
                         typeof visibleSuccess === "string" ? (
                           <p
-                            className="font-medium text-content-info"
+                            className="font-medium text-foreground-info"
                             role="status"
                             aria-live="polite"
                           >
@@ -391,7 +391,7 @@ export function FormDialog({
                           </p>
                         ) : (
                           <div
-                            className="font-medium text-content-info"
+                            className="font-medium text-foreground-info"
                             role="status"
                             aria-live="polite"
                           >
@@ -401,7 +401,7 @@ export function FormDialog({
                       ) : helpText != null ? (
                         typeof helpText === "string" ? (
                           <p
-                            className="text-content-subtle prose-a:underline prose-a:underline-offset-4 hover:prose-a:text-content-default transition-colors"
+                            className="text-foreground-tertiary prose-a:underline prose-a:underline-offset-4 hover:prose-a:text-foreground-primary transition-colors"
                             dangerouslySetInnerHTML={{ __html: helpText }}
                           />
                         ) : (

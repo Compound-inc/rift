@@ -143,7 +143,7 @@ export function ModelSelectorPanel({
       <PopoverTrigger
         tabIndex={-1}
         className={cn(
-          'h-10 rounded-lg border border-transparent bg-transparent px-3 ltr:pr-8 rtl:pl-8 text-sm font-medium text-content-default outline-none focus:!outline-none focus-visible:!outline-none transition-colors hover:bg-bg-inverted/5 active:bg-bg-inverted/10 focus-visible:border-border-emphasis focus-visible:ring-[3px] focus-visible:ring-border-emphasis/50 disabled:pointer-events-none disabled:opacity-50',
+          'h-10 rounded-lg border border-transparent bg-transparent px-3 ltr:pr-8 rtl:pl-8 text-sm font-medium text-foreground-primary outline-none focus:!outline-none focus-visible:!outline-none transition-colors hover:bg-surface-inverse/5 active:bg-surface-inverse/10 focus-visible:border-border-strong focus-visible:ring-[3px] focus-visible:ring-border-strong/50 disabled:pointer-events-none disabled:opacity-50',
           'relative flex items-center gap-2 w-fit group',
           'outline-none rounded-lg [&:focus]:!outline-none [&:focus-visible]:!outline-none',
           className,
@@ -157,7 +157,7 @@ export function ModelSelectorPanel({
               return Icon ? (
                 <Icon
                   className={cn(
-                    'size-4 shrink-0 text-content-default transition-[filter]',
+                    'size-4 shrink-0 text-foreground-primary transition-[filter]',
                     'grayscale group-hover:grayscale-0',
                     'grayscale-0',
                   )}
@@ -168,7 +168,7 @@ export function ModelSelectorPanel({
           : null}
         <span className="truncate">{triggerLabel}</span>
         <ChevronDown
-          className="pointer-events-none absolute ltr:right-2 rtl:left-2 top-1/2 size-4 -translate-y-1/2 text-content-muted shrink-0"
+          className="pointer-events-none absolute ltr:right-2 rtl:left-2 top-1/2 size-4 -translate-y-1/2 text-foreground-secondary shrink-0"
           aria-hidden
         />
       </PopoverTrigger>
@@ -179,7 +179,7 @@ export function ModelSelectorPanel({
         tabIndex={-1}
         className={cn(
           'flex h-[520px] w-[min(88vw,640px)] flex-col p-0 overflow-hidden',
-          'bg-bg-default text-content-default rounded-lg',
+          'bg-surface-base text-foreground-primary rounded-lg',
           'outline-none focus:!outline-none focus-visible:!outline-none',
           'animate-none data-open:animate-none data-closed:animate-none',
         )}
@@ -192,7 +192,7 @@ export function ModelSelectorPanel({
           <aside
             className={cn(
               'w-[64px] py-3 overflow-y-auto shrink-0 flex flex-col items-center gap-1',
-              'ltr:border-r rtl:border-l border-border-muted',
+              'ltr:border-r rtl:border-l border-border-light',
               '[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden',
               'outline-none focus:!outline-none focus-visible:!outline-none',
             )}
@@ -233,7 +233,7 @@ export function ModelSelectorPanel({
                           return Icon ? (
                             <Icon className="size-5 shrink-0" aria-hidden />
                           ) : (
-                            <span className="text-xs font-medium uppercase text-content-default">
+                            <span className="text-xs font-medium uppercase text-foreground-primary">
                               {providerId.slice(0, 2)}
                             </span>
                           )
@@ -251,14 +251,14 @@ export function ModelSelectorPanel({
           <div className="flex flex-1 flex-col min-h-0 min-w-0">
             <div className="flex items-center gap-3 px-4 pt-3 pb-2 shrink-0 h-[60px]">
               <Search
-                className="size-5 text-content-muted shrink-0"
+                className="size-5 text-foreground-secondary shrink-0"
                 aria-hidden
               />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={m.chat_model_search_placeholder()}
-                className="w-full bg-transparent text-sm text-content-default placeholder:text-content-muted outline-none"
+                className="w-full bg-transparent text-sm text-foreground-primary placeholder:text-foreground-secondary outline-none"
                 aria-label={m.chat_model_search_aria_label()}
               />
             </div>
@@ -269,7 +269,7 @@ export function ModelSelectorPanel({
               )}
             >
               {filteredModels.length === 0 ? (
-                <div className="py-10 text-center text-sm text-content-muted">
+                <div className="py-10 text-center text-sm text-foreground-secondary">
                   {m.chat_model_no_search_results()}
                 </div>
               ) : (
@@ -331,11 +331,11 @@ const ModelRow = React.memo(function ModelRow({
       style={style}
       className={cn(
         'w-full rounded-lg border border-transparent px-3 py-3 text-start text-sm leading-none font-normal transition-[background-color,color,font-weight] duration-0 active:duration-75 group',
-        'hover:bg-bg-inverted/5 active:bg-bg-inverted/10',
-        'data-[active=true]:bg-bg-info/25 data-[active=true]:font-medium data-[active=true]:text-content-info',
-        'data-[active=true]:hover:bg-bg-info/45 data-[active=true]:active:bg-bg-info/75',
+        'hover:bg-surface-inverse/5 active:bg-surface-inverse/10',
+        'data-[active=true]:bg-surface-info/25 data-[active=true]:font-medium data-[active=true]:text-foreground-info',
+        'data-[active=true]:hover:bg-surface-info/45 data-[active=true]:active:bg-surface-info/75',
         'outline-none focus:!outline-none focus-visible:!outline-none',
-        'focus-visible:border-border-emphasis focus-visible:ring-[3px] focus-visible:ring-border-emphasis/50',
+        'focus-visible:border-border-strong focus-visible:ring-[3px] focus-visible:ring-border-strong/50',
       )}
     >
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
@@ -347,7 +347,7 @@ const ModelRow = React.memo(function ModelRow({
                 className={cn(
                   'size-4 shrink-0 mt-0.5 grayscale group-hover:grayscale-0',
                   isSelected && 'grayscale-0',
-                  isSelected ? 'text-content-info' : 'text-content-muted',
+                  isSelected ? 'text-foreground-info' : 'text-foreground-secondary',
                 )}
                 aria-hidden
               />
@@ -358,7 +358,7 @@ const ModelRow = React.memo(function ModelRow({
             <div
               className={cn(
                 'text-xs line-clamp-1 mt-0.5',
-                isSelected ? 'text-content-info/80' : 'text-content-muted',
+                isSelected ? 'text-foreground-info/80' : 'text-foreground-secondary',
               )}
             >
               {model.description}
@@ -375,7 +375,7 @@ const ModelRow = React.memo(function ModelRow({
                   <TooltipTrigger
                     render={
                       <span
-                        className="inline-flex size-6 items-center justify-center rounded text-content-muted hover:text-content-default outline-none"
+                        className="inline-flex size-6 items-center justify-center rounded text-foreground-secondary hover:text-foreground-primary outline-none"
                         aria-hidden
                       >
                         <Icon className="size-3.5" aria-hidden />
@@ -413,11 +413,11 @@ const ProviderButton = React.forwardRef<HTMLButtonElement, ProviderButtonProps>(
       data-active={isActive}
       className={cn(
         'flex size-10 items-center justify-center rounded-lg border border-transparent text-sm leading-none font-normal transition-[background-color,color,font-weight] duration-0 active:duration-75 [&_svg]:grayscale [&_svg]:transition-none hover:[&_svg]:grayscale-0',
-        'text-content-muted hover:text-content-default hover:bg-bg-inverted/5 active:bg-bg-inverted/10',
-        'data-[active=true]:bg-bg-info/25 data-[active=true]:font-medium data-[active=true]:text-content-info data-[active=true]:[&_svg]:grayscale-0',
-        'data-[active=true]:hover:bg-bg-info/45 data-[active=true]:active:bg-bg-info/75',
+        'text-foreground-secondary hover:text-foreground-primary hover:bg-surface-inverse/5 active:bg-surface-inverse/10',
+        'data-[active=true]:bg-surface-info/25 data-[active=true]:font-medium data-[active=true]:text-foreground-info data-[active=true]:[&_svg]:grayscale-0',
+        'data-[active=true]:hover:bg-surface-info/45 data-[active=true]:active:bg-surface-info/75',
         'outline-none focus:!outline-none focus-visible:!outline-none',
-        'focus-visible:border-border-emphasis focus-visible:ring-[3px] focus-visible:ring-border-emphasis/50',
+        'focus-visible:border-border-strong focus-visible:ring-[3px] focus-visible:ring-border-strong/50',
         className,
       )}
       {...props}

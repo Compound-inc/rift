@@ -192,11 +192,11 @@ const comparisonSections: ComparisonSection[] = [
 function ComparisonValue({ value }: { value: ComparisonCell }) {
   if (typeof value === 'boolean') {
     if (!value) {
-      return <span className="text-content-subtle">-</span>
+      return <span className="text-foreground-tertiary">-</span>
     }
 
     return (
-      <span className="inline-flex items-center justify-center text-content-emphasis">
+      <span className="inline-flex items-center justify-center text-foreground-strong">
         <Check aria-hidden="true" className="size-4" />
         <span className="sr-only">Included</span>
       </span>
@@ -245,7 +245,7 @@ export function PricingComparisonTable(props: {
           <DashedBorderFrame>
             <div className="relative max-lg:mx-3.5 max-lg:my-3.5">
               <div className="">
-                <table className="w-full min-w-[1120px] table-fixed border-collapse text-center text-sm text-content-default">
+                <table className="w-full min-w-[1120px] table-fixed border-collapse text-center text-sm text-foreground-primary">
                   <colgroup>
                     <col className="w-[280px]" style={{ width: 280 }} />
                     {comparisonPlans.map((plan) => (
@@ -261,9 +261,9 @@ export function PricingComparisonTable(props: {
                     <tr>
                       <th
                         colSpan={comparisonPlans.length + 1}
-                        className="sticky top-16 z-30 bg-bg-default/96 px-0 align-top backdrop-blur-md"
+                        className="sticky top-16 z-30 bg-surface-base/96 px-0 align-top backdrop-blur-md"
                       >
-                        <div className="relative flex min-h-[100px] w-full bg-bg-default">
+                        <div className="relative flex min-h-[100px] w-full bg-surface-base">
                           <CardDashedBorder />
                           <div className="flex w-full">
                             <div className="w-[280px] flex-shrink-0 px-6 pb-3 pt-6">
@@ -293,7 +293,7 @@ export function PricingComparisonTable(props: {
                                     />
 
                                     <div className="relative z-[1] flex h-full flex-col items-center gap-3">
-                                      <span className="text-lg font-medium tracking-tight text-content-emphasis">
+                                      <span className="text-lg font-medium tracking-tight text-foreground-strong">
                                         {plan.name}
                                       </span>
                                       {handleSelect ? (
@@ -358,7 +358,7 @@ export function PricingComparisonTable(props: {
                           <th
                             colSpan={comparisonPlans.length + 1}
                             className={cn(
-                              'px-6 pb-5 text-left text-2xl font-semibold text-content-emphasis',
+                              'px-6 pb-5 text-left text-2xl font-semibold text-foreground-strong',
                               sectionIndex === 0 ? 'pt-2' : 'pt-8',
                             )}
                           >
@@ -370,14 +370,14 @@ export function PricingComparisonTable(props: {
                           <tr key={`${section.title}-${row.label}`}>
                             <th
                               scope="row"
-                              className="w-[280px] max-w-[280px] border-b border-border-default/70 px-6 py-5 text-left align-top font-medium text-content-emphasis break-words whitespace-normal"
+                              className="w-[280px] max-w-[280px] border-b border-border-base/70 px-6 py-5 text-left align-top font-medium text-foreground-strong break-words whitespace-normal"
                             >
                               {row.label}
                             </th>
                             {row.values.map((value, index) => (
                               <td
                                 key={`${row.label}-${comparisonPlans[index]?.name ?? index}`}
-                                className="border-b border-border-default/70 px-5 py-5 align-top break-words"
+                                className="border-b border-border-base/70 px-5 py-5 align-top break-words"
                               >
                                 <ComparisonValue value={value} />
                               </td>

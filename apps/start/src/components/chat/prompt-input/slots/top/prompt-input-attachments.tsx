@@ -65,7 +65,7 @@ export function PromptInputAttachments({
         <div
           key={file.id}
           className={cn(
-            'relative group rounded-lg overflow-hidden border-2 border-border-muted bg-bg-subtle',
+            'relative group rounded-lg overflow-hidden border-2 border-border-light bg-surface-overlay',
             PREVIEW_SIZE_CLASS
           )}
         >
@@ -78,14 +78,14 @@ export function PromptInputAttachments({
             />
           ) : isPdfFile(file) ? (
             <div
-              className="size-full flex items-center justify-center bg-bg-error/15 text-content-error font-semibold text-lg"
+              className="size-full flex items-center justify-center bg-surface-error/15 text-foreground-error font-semibold text-lg"
               aria-hidden
             >
               PDF
             </div>
           ) : (
             <div
-              className="size-full flex items-center justify-center bg-bg-muted text-content-muted"
+              className="size-full flex items-center justify-center bg-surface-raised text-foreground-secondary"
               aria-hidden
             >
               <FileText className="size-6" />
@@ -107,7 +107,7 @@ export function PromptInputAttachments({
           )}
 
           {file.isUploading && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-bg-emphasis/70 text-content-primary">
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface-strong/70 text-foreground-primary">
               <Loader2 className="size-5 animate-spin" aria-hidden />
               <span className="sr-only">{m.chat_prompt_attachment_uploading_sr({ fileName: file.name })}</span>
             </div>
@@ -116,12 +116,12 @@ export function PromptInputAttachments({
           {!file.isUploading && file.uploadError && (
             <button
               type="button"
-              className="absolute inset-0 z-20 flex items-center justify-center bg-bg-error/95 text-content-primary"
+              className="absolute inset-0 z-20 flex items-center justify-center bg-surface-error/95 text-foreground-primary"
               title={m.chat_prompt_attachment_upload_failed_title({ error: file.uploadError })}
               aria-label={m.chat_prompt_attachment_upload_failed_aria_label({ fileName: file.name })}
               onClick={() => onRemove?.(file.id)}
             >
-              <AlertTriangle className="size-5 text-content-error" aria-hidden />
+              <AlertTriangle className="size-5 text-foreground-error" aria-hidden />
               <span className="sr-only">{m.chat_prompt_attachment_upload_failed_sr()}</span>
             </button>
           )}

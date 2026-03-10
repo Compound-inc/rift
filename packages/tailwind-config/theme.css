@@ -7,37 +7,38 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  /* Backgrounds */
-  --color-bg-default: var(--bg-default);
-  --color-bg-muted: var(--bg-muted);
-  --color-bg-subtle: var(--bg-subtle);
-  --color-bg-emphasis: var(--bg-emphasis);
-  --color-bg-inverted: var(--bg-inverted);
-  --color-bg-info: var(--bg-info);
-  --color-bg-success: var(--bg-success);
-  --color-bg-attention: var(--bg-attention);
-  --color-bg-error: var(--bg-error);
-  --color-accent-default: var(--accent-default);
+  /* ─── Surfaces (backgrounds) ─────────────────────────────────────────────── */
+  --color-surface-base: var(--surface-base);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-surface-strong: var(--surface-strong);
+  --color-surface-inverse: var(--surface-inverse);
+  --color-surface-info: var(--surface-info);
+  --color-surface-success: var(--surface-success);
+  --color-surface-warning: var(--surface-warning);
+  --color-surface-error: var(--surface-error);
 
-  --color-secondary-text: var(--secondary-text);
-  /* Borders */
-  --color-border-emphasis: var(--border-emphasis);
-  --color-border-default: var(--border-default);
-  --color-border-muted: var(--border-muted);
-  --color-border-subtle: var(--border-subtle);
+  /* ─── Foreground (text) ─────────────────────────────────────────────────── */
+  --color-foreground-primary: var(--foreground-primary);
+  --color-foreground-secondary: var(--foreground-secondary);
+  --color-foreground-tertiary: var(--foreground-tertiary);
+  --color-foreground-inverse: var(--foreground-inverse);
+  --color-foreground-strong: var(--foreground-strong);
+  --color-foreground-info: var(--foreground-info);
+  --color-foreground-success: var(--foreground-success);
+  --color-foreground-warning: var(--foreground-warning);
+  --color-foreground-error: var(--foreground-error);
 
-  /* Content / text */
-  --color-content-inverted: var(--content-inverted);
-  --color-content-muted: var(--content-muted);
-  --color-content-subtle: var(--content-subtle);
-  --color-content-default: var(--content-default);
-  --color-content-emphasis: var(--content-emphasis);
-  --color-content-info: var(--content-info);
-  --color-content-success: var(--content-success);
-  --color-content-attention: var(--content-attention);
-  --color-content-error: var(--content-error);
+  /* ─── Borders ───────────────────────────────────────────────────────────── */
+  --color-border-faint: var(--border-faint);
+  --color-border-light: var(--border-light);
+  --color-border-base: var(--border-base);
+  --color-border-strong: var(--border-strong);
 
-  /* Radius (base --radius set on :root) */
+  /* ─── Accent ────────────────────────────────────────────────────────────── */
+  --color-accent-primary: var(--accent-primary);
+
+  /* ─── Radius (base --radius set on :root) ───────────────────────────────── */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -47,83 +48,86 @@
 :root,
 .light {
   --radius: 0.5rem;
-  /* Streamdown/shadcn-style tokens */
+
+  /* Streamdown/shadcn-style tokens (external lib compatibility) */
   --primary: 217 91% 60%;
   --primary-foreground: 0 0% 100%;
   --muted: 0 0% 98%;
   --muted-foreground: 0 0% 64%;
   --border: 0 0% 83%;
   --ring: 217 91% 60%;
-  /*Colors for the UI*/
-  --bg-default: rgb(252 252 252);
-  --bg-muted: rgb(250 250 250);
-  --bg-subtle: rgba(247, 247, 247, 1);
-  --bg-emphasis: rgb(229 229 229);
-  --bg-inverted: rgb(23 23 23);
 
-  --bg-info: rgb(191 219 254);
-  --bg-success: rgb(220 252 231);
-  --bg-attention: rgb(255 237 213);
-  --bg-error: rgb(254 226 226);
+  /* Surfaces */
+  --surface-base: rgb(252 252 252);
+  --surface-raised: rgb(250 250 250);
+  --surface-overlay: rgb(247 247 247);
+  --surface-strong: rgb(229 229 229);
+  --surface-inverse: rgb(23 23 23);
+  --surface-info: rgb(191 219 254);
+  --surface-success: rgb(220 252 231);
+  --surface-warning: rgb(255 237 213);
+  --surface-error: rgb(254 226 226);
 
-  --border-emphasis: rgb(163 163 163);
-  --border-default: rgba(5, 5, 5, 0.06);
-  --border-muted: rgb(245 245 245);
-  --border-subtle: rgb(247 247 247);
- 
-  --content-inverted: rgb(255 255 255);
-  --content-muted: rgb(163 163 163);
-  --content-subtle: rgb(115 115 115);
-  --content-default: rgb(64 64 64);
-  --content-emphasis: rgb(23 23 23);
+  /* Foreground (text) */
+  --foreground-primary: rgb(64 64 64);
+  --foreground-secondary: rgb(163 163 163);
+  --foreground-tertiary: rgb(115 115 115);
+  --foreground-inverse: rgb(255 255 255);
+  --foreground-strong: rgb(23 23 23);
+  --foreground-info: rgb(29 78 216);
+  --foreground-success: rgb(21 128 61);
+  --foreground-warning: rgb(194 65 12);
+  --foreground-error: rgb(185 28 28);
 
-  --content-info: rgb(29 78 216);
-  --content-success: rgb(21 128 61);
-  --content-attention: rgb(194 65 12);
-  --content-error: rgb(185 28 28);
+  /* Borders */
+  --border-faint: rgb(247 247 247);
+  --border-light: rgb(245 245 245);
+  --border-base: rgba(5, 5, 5, 0.06);
+  --border-strong: rgb(163 163 163);
 
-  --accent-default: rgb(54 115 252);
-
-  --secondary-text: rgb(64 64 64);
+  /* Accent */
+  --accent-primary: rgb(54 115 252);
 }
 
 .dark {
+  /* Streamdown/shadcn-style tokens */
   --primary: 217 91% 60%;
   --primary-foreground: 0 0% 100%;
   --muted: 0 0% 9%;
   --muted-foreground: 0 0% 64%;
   --border: 0 0% 32%;
   --ring: 217 91% 60%;
-  --bg-default: rgb(22 22 22);
-  --bg-muted: rgb(23 23 23);
-  --bg-subtle: rgb(20 20 20);
-  --bg-emphasis: rgb(17 17 17);
-  --bg-inverted: rgb(250 250 250);
 
-  --bg-info: rgb(29 78 216);
-  --bg-success: rgb(21 128 61);
-  --bg-attention: rgb(194 65 12);
-  --bg-error: rgb(165, 32, 32);
+  /* Surfaces */
+  --surface-base: rgb(22 22 22);
+  --surface-raised: rgb(23 23 23);
+  --surface-overlay: rgb(20 20 20);
+  --surface-strong: rgb(17 17 17);
+  --surface-inverse: rgb(250 250 250);
+  --surface-info: rgb(29 78 216);
+  --surface-success: rgb(21 128 61);
+  --surface-warning: rgb(194 65 12);
+  --surface-error: rgb(165 32 32);
 
-  --border-muted: rgb(38 38 38);
-  --border-subtle: rgba(252, 252, 252, 0.08);
-  --border-default: rgba(252, 252, 252, 0.08);
-  --border-emphasis: rgb(115 115 115);
+  /* Foreground (text) */
+  --foreground-primary: rgb(212 212 212);
+  --foreground-secondary: rgb(163 163 163);
+  --foreground-tertiary: rgb(124 124 124);
+  --foreground-inverse: rgb(0 0 0);
+  --foreground-strong: rgb(250 250 250);
+  --foreground-info: rgb(191 219 254);
+  --foreground-success: rgb(220 252 231);
+  --foreground-warning: rgb(255 237 213);
+  --foreground-error: rgb(254 226 226);
 
-  --content-inverted: rgb(0 0 0);
-  --content-muted: rgb(124 124 124);
-  --content-subtle: rgb(163 163 163);
-  --content-default: rgb(212 212 212);
-  --content-emphasis: rgb(250 250 250);
+  /* Borders */
+  --border-faint: rgba(252, 252, 252, 0.08);
+  --border-light: rgb(38 38 38);
+  --border-base: rgba(252, 252, 252, 0.08);
+  --border-strong: rgb(115 115 115);
 
-  --content-info: rgb(191 219 254);
-  --content-success: rgb(220 252 231);
-  --content-attention: rgb(255 237 213);
-  --content-error: rgb(254 226 226);
-
-  --accent-default: rgb(54 115 252);
-  
-  --secondary-text: rgb(163 163 163);
+  /* Accent */
+  --accent-primary: rgb(54 115 252);
 }
 
 @layer base {

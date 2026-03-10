@@ -30,8 +30,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }}
       style={
         {
-          "--normal-bg": "var(--bg-inverted)",
-          "--normal-text": "var(--content-inverted)",
+          "--normal-bg": "var(--surface-inverse)",
+          "--normal-text": "var(--foreground-inverse)",
           "--border-radius": "var(--radius)",
         } as React.CSSProperties
       }

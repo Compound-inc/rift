@@ -95,7 +95,7 @@ export const TableBlockContainer = forwardRef<
     <div
       ref={ref}
       className={cn(
-        "group relative w-full overflow-visible rounded-lg border border-border-default/80 bg-bg-subtle text-content-emphasis",
+        "group relative w-full overflow-visible rounded-lg border border-border-base/80 bg-surface-overlay text-foreground-strong",
         className
       )}
       style={{
@@ -129,10 +129,10 @@ export const TableBlockTable = ({
           hasFooter
             ? "[&_tbody_tr:last-child_td]:rounded-none"
             : "[&_tbody_tr:last-child_td:first-child]:rounded-bl-md [&_tbody_tr:last-child_td:last-child]:rounded-br-md",
-          "[&_tbody_tr:nth-child(even)]:bg-bg-default/60",
-          "[&_td]:border-border-default/60 [&_td]:border-b [&_td]:px-4 [&_td]:py-3 [&_td]:align-top [&_td]:text-content-default",
-          "[&_th]:border-border-default/70 [&_th]:border-b [&_th]:bg-bg-emphasis/85 [&_th]:px-4 [&_th]:py-3 [&_th]:font-semibold [&_th]:text-content-emphasis",
-          "[&_tfoot_td]:border-t [&_tfoot_td]:border-border-default/80 [&_tfoot_td]:bg-bg-emphasis/85 [&_tfoot_td]:py-1 [&_tfoot_td]:align-middle [&_tfoot_td:first-child]:rounded-bl-md [&_tfoot_td:last-child]:rounded-br-md",
+          "[&_tbody_tr:nth-child(even)]:bg-surface-base/60",
+          "[&_td]:border-border-base/60 [&_td]:border-b [&_td]:px-4 [&_td]:py-3 [&_td]:align-top [&_td]:text-foreground-primary",
+          "[&_th]:border-border-base/70 [&_th]:border-b [&_th]:bg-surface-strong/85 [&_th]:px-4 [&_th]:py-3 [&_th]:font-semibold [&_th]:text-foreground-strong",
+          "[&_tfoot_td]:border-t [&_tfoot_td]:border-border-base/80 [&_tfoot_td]:bg-surface-strong/85 [&_tfoot_td]:py-1 [&_tfoot_td]:align-middle [&_tfoot_td:first-child]:rounded-bl-md [&_tfoot_td:last-child]:rounded-br-md",
           className
         )}
         {...props}
@@ -361,7 +361,7 @@ export const TableBlockCopyButton = ({
   return (
     <Button
       className={cn(
-        "h-7 w-7 shrink-0 rounded-md border border-transparent p-1.5 text-content-subtle transition-colors duration-100 hover:bg-bg-muted hover:text-content-default focus-visible:border-border-default focus-visible:ring-0",
+        "h-7 w-7 shrink-0 rounded-md border border-transparent p-1.5 text-foreground-tertiary transition-colors duration-100 hover:bg-surface-raised hover:text-foreground-primary focus-visible:border-border-base focus-visible:ring-0",
         className
       )}
       onClick={copyToClipboard}
@@ -387,7 +387,7 @@ export const TableBlockFullscreenButton = ({
     <Button
       aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
       className={cn(
-        "h-7 w-7 shrink-0 rounded-md border border-transparent p-1.5 text-content-subtle transition-colors duration-100 hover:bg-bg-muted hover:text-content-default focus-visible:border-border-default focus-visible:ring-0",
+        "h-7 w-7 shrink-0 rounded-md border border-transparent p-1.5 text-foreground-tertiary transition-colors duration-100 hover:bg-surface-raised hover:text-foreground-primary focus-visible:border-border-base focus-visible:ring-0",
         className
       )}
       onClick={toggleFullscreen}
@@ -438,7 +438,7 @@ export const TableBlockDownloadButton = ({
   return (
     <Button
       className={cn(
-        "h-7 w-7 shrink-0 rounded-md border border-transparent p-1.5 text-content-subtle transition-colors duration-100 hover:bg-bg-muted hover:text-content-default focus-visible:border-border-default focus-visible:ring-0",
+        "h-7 w-7 shrink-0 rounded-md border border-transparent p-1.5 text-foreground-tertiary transition-colors duration-100 hover:bg-surface-raised hover:text-foreground-primary focus-visible:border-border-base focus-visible:ring-0",
         className
       )}
       onClick={download}

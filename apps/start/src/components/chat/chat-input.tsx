@@ -183,7 +183,7 @@ export function ChatInput() {
   const maxTokens = catalogModel?.contextWindow ?? 128_000
   const { usedTokens } = useContextUsage(messages)
   const selectorTriggerClassName =
-    'h-8 rounded-full border border-transparent bg-transparent px-3 ltr:pr-7 rtl:pl-7 text-sm leading-[21px] font-medium text-content-emphasis transition-colors hover:bg-bg-inverted/5 active:bg-bg-inverted/10 focus-visible:border-border-emphasis focus-visible:ring-2 focus-visible:ring-border-emphasis/40'
+    'h-8 rounded-full border border-transparent bg-transparent px-3 ltr:pr-7 rtl:pl-7 text-sm leading-[21px] font-medium text-foreground-strong transition-colors hover:bg-surface-inverse/5 active:bg-surface-inverse/10 focus-visible:border-border-strong focus-visible:ring-2 focus-visible:ring-border-strong/40'
 
   const modelAndReasoningSelectors = (
     <div className="flex items-center gap-1">
@@ -294,7 +294,7 @@ const ComposerTextarea = memo(function ComposerTextarea() {
       onChange={(e) => setComposerDraft(e.target.value)}
       aria-label={m.chat_input_message_aria_label()}
       placeholder={m.chat_prompt_placeholder()}
-      className="placeholder:text-content-default/65"
+      className="placeholder:text-foreground-primary/65"
     />
   )
 })

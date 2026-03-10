@@ -154,11 +154,11 @@ export function LoginForm({
 
   return (
     <motion.div
-      className="overflow-hidden rounded-3xl bg-bg-emphasis/30 dark:bg-bg-emphasis/50 backdrop-blur-xl shadow-[0_0_1px_rgba(0,0,0,0.40),0_0_2px_rgba(0,0,0,0.05),0_10px_10px_rgba(0,0,0,0.25)] transition-colors duration-200"
+      className="overflow-hidden rounded-3xl bg-surface-strong/30 dark:bg-surface-strong/50 backdrop-blur-xl shadow-[0_0_1px_rgba(0,0,0,0.40),0_0_2px_rgba(0,0,0,0.05),0_10px_10px_rgba(0,0,0,0.25)] transition-colors duration-200"
       variants={cardVariants}
     >
       <div>
-        <div className="rounded-b-3xl bg-bg-muted/70 dark:bg-bg-muted/60 backdrop-blur-sm p-8 shadow-[0_0_1px_rgba(0,0,0,0.3),0_4px_12px_rgba(0,0,0,0.08)] transition-colors duration-200">
+        <div className="rounded-b-3xl bg-surface-raised/70 dark:bg-surface-raised/60 backdrop-blur-sm p-8 shadow-[0_0_1px_rgba(0,0,0,0.3),0_4px_12px_rgba(0,0,0,0.08)] transition-colors duration-200">
           <form
             onSubmit={handleSubmit}
             className="space-y-8 rounded-3xl"
@@ -187,7 +187,7 @@ export function LoginForm({
             required
           />
           {isInvitationEmailLocked && (
-            <p className="text-xs text-content-muted">
+            <p className="text-xs text-foreground-secondary">
               {m.auth_invitation_tied_to_email()}
             </p>
           )}
@@ -336,9 +336,9 @@ export function LoginForm({
             variants={staggerChildVariants}
             className="my-6 flex items-center gap-3"
           >
-            <div className="h-px flex-1 bg-border-default" />
-            <span className="text-sm text-content-muted">{m.auth_login_divider()}</span>
-            <div className="h-px flex-1 bg-border-default" />
+            <div className="h-px flex-1 bg-border-base" />
+            <span className="text-sm text-foreground-secondary">{m.auth_login_divider()}</span>
+            <div className="h-px flex-1 bg-border-base" />
           </motion.div>
 
           <motion.div variants={staggerChildVariants} className="space-y-3">
@@ -374,7 +374,7 @@ export function LoginForm({
         variants={staggerChildVariants}
         className="flex items-center justify-center px-8 py-4 transition-colors duration-200"
       >
-        <p className="text-center text-sm text-content-subtle">
+        <p className="text-center text-sm text-foreground-tertiary">
           {isSignUp ? (
             <>
               {m.auth_form_already_have_account()}{' '}

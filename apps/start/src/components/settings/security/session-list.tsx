@@ -77,12 +77,12 @@ export function SessionList({
 
   if (activeSessions.length === 0) {
     return (
-      <p className="text-sm text-content-subtle">{m.settings_security_sessions_empty()}</p>
+      <p className="text-sm text-foreground-tertiary">{m.settings_security_sessions_empty()}</p>
     )
   }
 
   return (
-    <ul className="divide-y divide-border-default">
+    <ul className="divide-y divide-border-base">
       {activeSessions.map((session) => {
         const parsedSession = parseSessionDeviceLabel(session.label)
         const DeviceIcon = parsedSession.isMobile ? Smartphone : Laptop
@@ -90,19 +90,19 @@ export function SessionList({
           <li key={session.sessionToken} className="py-3">
             <div className="flex min-w-0 items-center justify-between gap-3">
               <div className="flex min-w-0 flex-1 items-center gap-3">
-                <div className="text-content-subtle">
+                <div className="text-foreground-tertiary">
                   <DeviceIcon className="size-6" aria-hidden />
                 </div>
                 <div className="min-w-0 space-y-1">
-                  <p className="truncate text-sm font-medium text-content-emphasis">
+                  <p className="truncate text-sm font-medium text-foreground-strong">
                     {parsedSession.browser} on {parsedSession.platform}{' '}
                     {session.isCurrent ? (
-                      <span className="text-xs font-normal text-content-subtle">
+                      <span className="text-xs font-normal text-foreground-tertiary">
                         ({m.settings_security_sessions_current_badge()})
                       </span>
                     ) : null}
                   </p>
-                  <p className="text-xs text-content-subtle">
+                  <p className="text-xs text-foreground-tertiary">
                     {m.settings_security_sessions_ip_label()}:{' '}
                     {session.ipAddress ?? m.settings_security_sessions_ip_unknown()}
                   </p>

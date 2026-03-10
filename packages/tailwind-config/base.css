@@ -5,13 +5,13 @@
 
 @layer base {
   * {
-    @apply border-border-default;
+    @apply border-border-base;
   }
   html {
-    background-color: var(--bg-default);
+    background-color: var(--surface-base);
   }
   body {
-    @apply bg-bg-default text-content-default;
+    @apply bg-surface-base text-foreground-primary;
   }
 }
 

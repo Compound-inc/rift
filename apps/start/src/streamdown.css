@@ -16,7 +16,7 @@
   font-weight: 800;
   font-size: 2em;
   line-height: 1.11111;
-  color: var(--content-emphasis);
+  color: var(--foreground-strong);
 }
 
 .chat-streamdown [data-streamdown="heading-2"] {
@@ -25,7 +25,7 @@
   font-weight: 700;
   font-size: 1.5em;
   line-height: 1.33333;
-  color: var(--content-emphasis);
+  color: var(--foreground-strong);
 }
 
 .chat-streamdown [data-streamdown="heading-3"] {
@@ -33,39 +33,39 @@
   font-weight: 600;
   font-size: 1.25em;
   line-height: 1.6;
-  color: var(--content-emphasis);
+  color: var(--foreground-strong);
 }
 
 .chat-streamdown [data-streamdown="heading-4"] {
   margin-bottom: 0.5em;
   font-weight: 600;
   line-height: 1.5;
-  color: var(--content-emphasis);
+  color: var(--foreground-strong);
 }
 
 .chat-streamdown [data-streamdown="heading-5"] {
   margin-bottom: 0.25rem;
   font-weight: 600;
   font-size: 1rem;
-  color: var(--content-emphasis);
+  color: var(--foreground-strong);
 }
 
 .chat-streamdown [data-streamdown="heading-6"] {
   margin-bottom: 0.25rem;
   font-weight: 600;
   font-size: 0.875rem;
-  color: var(--content-emphasis);
+  color: var(--foreground-strong);
 }
 
 /* --- Links --- */
 .chat-streamdown [data-streamdown="link"] {
   font-weight: 500;
-  color: var(--accent-default);
+  color: var(--accent-primary);
   text-decoration: underline;
 }
 
 .chat-streamdown [data-streamdown="link"]:hover {
-  color: var(--content-info);
+  color: var(--foreground-info);
 }
 
 /* --- Strong / bold --- */
@@ -101,8 +101,8 @@
   margin-top: 1rem;
   margin-bottom: 1rem;
   padding-left: 1rem;
-  border-left: 4px solid var(--border-default);
-  color: var(--content-muted);
+  border-left: 4px solid var(--border-base);
+  color: var(--foreground-secondary);
   font-style: italic;
 }
 
@@ -111,7 +111,7 @@
   margin-top: 1.5rem;
   margin-bottom: 1.5rem;
   border: 0;
-  border-top: 1px solid var(--border-default);
+  border-top: 1px solid var(--border-base);
 }
 
 /* --- Tables (Next: wrapper with overflow, rounded border, muted bg) --- */
@@ -123,8 +123,8 @@
   max-width: 100%;
   overflow-x: auto;
   border-radius: var(--radius);
-  border: 1px solid var(--border-default);
-  background-color: var(--bg-muted);
+  border: 1px solid var(--border-base);
+  background-color: var(--surface-raised);
   box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
@@ -141,8 +141,8 @@
 }
 
 .chat-streamdown [data-streamdown="table-header"] {
-  background-color: var(--bg-subtle);
-  border-bottom: 1px solid var(--border-default);
+  background-color: var(--surface-overlay);
+  border-bottom: 1px solid var(--border-base);
 }
 
 .dark .chat-streamdown [data-streamdown="table-header"] {
@@ -154,7 +154,7 @@
 }
 
 .chat-streamdown [data-streamdown="table-row"] {
-  border-bottom: 1px solid var(--border-default);
+  border-bottom: 1px solid var(--border-base);
 }
 
 .chat-streamdown [data-streamdown="table-header-cell"] {
@@ -162,7 +162,7 @@
   text-align: left;
   font-weight: 600;
   font-size: 0.875rem;
-  color: var(--content-emphasis);
+  color: var(--foreground-strong);
   vertical-align: top;
   word-break: break-word;
   white-space: normal;
@@ -179,15 +179,15 @@
 /* --- Code block (Streamdown uses --muted/--border; we reinforce with theme) --- */
 .chat-streamdown [data-streamdown="code-block"] {
   border-radius: var(--radius);
-  border: 1px solid var(--border-default);
+  border: 1px solid var(--border-base);
 }
 
 .chat-streamdown [data-streamdown="inline-code"] {
   border-radius: var(--radius-sm, 0.25rem);
   padding: 0.125em 0.375em;
   font-size: 0.875em;
-  background-color: var(--bg-muted);
-  border: 1px solid var(--border-muted);
+  background-color: var(--surface-raised);
+  border: 1px solid var(--border-light);
 }
 
 /* --- Superscript / subscript --- */

@@ -51,7 +51,7 @@ export const AppSidebar: ComponentType = () => {
   return (
     // Sidebar Page BG
     <div
-      className="h-full w-[var(--sidebar-width)] grid grid-cols-[var(--sidebar-groups-width)_1fr] bg-bg-emphasis transition-[width] duration-300"
+      className="h-full w-[var(--sidebar-width)] grid grid-cols-[var(--sidebar-groups-width)_1fr] bg-surface-strong transition-[width] duration-300"
       style={sidebarStyle}
     >
       <SidebarChatThreadPreloader />
@@ -108,7 +108,7 @@ export const AppSidebar: ComponentType = () => {
                       data-active={currentArea === areaKey}
                     >
                       <Link to={config.href} aria-label={config.title}>
-                        <Icon className="size-5 text-content-default" />
+                        <Icon className="size-5 text-foreground-primary" />
                       </Link>
                     </Button>
                   </SidebarGroupTooltip>
@@ -133,10 +133,10 @@ export const AppSidebar: ComponentType = () => {
           }),
         )}
       >
-        <div className="scrollbar-hide relative flex h-full min-h-0 w-[calc(var(--sidebar-areas-width)-0.5rem)] flex-col overflow-y-auto overflow-x-hidden rounded-t-xl border-x border-t border-border-muted bg-bg-subtle">
+        <div className="scrollbar-hide relative flex h-full min-h-0 w-[calc(var(--sidebar-areas-width)-0.5rem)] flex-col overflow-y-auto overflow-x-hidden rounded-t-xl border-x border-t border-border-light bg-surface-overlay">
             <div
               className={cn(
-                'relative flex min-h-0 flex-1 flex-col overflow-hidden pt-3 pb-3 text-content-muted',
+                'relative flex min-h-0 flex-1 flex-col overflow-hidden pt-3 pb-3 text-foreground-secondary',
                 directionClass(direction, {
                   ltr: 'pl-3 pr-0',
                   rtl: 'pr-3 pl-0',

@@ -85,23 +85,23 @@ const RenderedCodeBlock = memo(function RenderedCodeBlock({
         <CodeBlockActions>
           <CodeBlockCopyButton
             aria-label={m.common_copy()}
-            className="h-7 w-7 rounded-md border border-transparent p-1.5 text-content-subtle transition-colors duration-100 hover:bg-bg-muted hover:text-content-default focus-visible:border-border-default focus-visible:ring-0"
+            className="h-7 w-7 rounded-md border border-transparent p-1.5 text-foreground-tertiary transition-colors duration-100 hover:bg-surface-raised hover:text-foreground-primary focus-visible:border-border-base focus-visible:ring-0"
             variant="ghost"
           />
           <CodeBlockDownloadButton
             aria-label={m.chat_code_block_download_aria_label()}
-            className="h-7 w-7 rounded-md border border-transparent p-1.5 text-content-subtle transition-colors duration-100 hover:bg-bg-muted hover:text-content-default focus-visible:border-border-default focus-visible:ring-0"
+            className="h-7 w-7 rounded-md border border-transparent p-1.5 text-foreground-tertiary transition-colors duration-100 hover:bg-surface-raised hover:text-foreground-primary focus-visible:border-border-base focus-visible:ring-0"
             variant="ghost"
           />
           <CodeBlockLineWrapButton
             aria-label={m.chat_code_block_toggle_line_wrap_aria_label()}
-            className="h-7 w-7 rounded-md border border-transparent p-1.5 text-content-subtle transition-colors duration-100 hover:bg-bg-muted hover:text-content-default focus-visible:border-border-default focus-visible:ring-0"
+            className="h-7 w-7 rounded-md border border-transparent p-1.5 text-foreground-tertiary transition-colors duration-100 hover:bg-surface-raised hover:text-foreground-primary focus-visible:border-border-base focus-visible:ring-0"
             size="icon"
             variant="ghost"
           />
           <CodeBlockFullscreenButton
             aria-label={m.chat_code_block_toggle_fullscreen_aria_label()}
-            className="h-7 w-7 rounded-md border border-transparent p-1.5 text-content-subtle transition-colors duration-100 hover:bg-bg-muted hover:text-content-default focus-visible:border-border-default focus-visible:ring-0"
+            className="h-7 w-7 rounded-md border border-transparent p-1.5 text-foreground-tertiary transition-colors duration-100 hover:bg-surface-raised hover:text-foreground-primary focus-visible:border-border-base focus-visible:ring-0"
             size="icon"
             variant="ghost"
           />

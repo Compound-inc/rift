@@ -23,7 +23,7 @@ function AnalyticsRoutePage() {
         title={m.org_analytics_page_title()}
         description={m.org_route_select_org_analytics_description()}
       >
-        <p className="text-sm text-content-muted">
+        <p className="text-sm text-foreground-secondary">
           {m.org_route_select_org_body()}
         </p>
       </ContentPage>

@@ -8,7 +8,7 @@ import { ActiveOrganizationProvider } from '@/lib/auth/active-organization'
 export function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <>
-      <div className="scrollbar-app min-h-screen w-full bg-bg-default">
+      <div className="scrollbar-app min-h-screen w-full bg-surface-base">
         <ActiveOrganizationProvider>
           <RightSidebarProvider>
             <MainNav sidebar={AppSidebar}>{children}</MainNav>

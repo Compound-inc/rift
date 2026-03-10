@@ -37,7 +37,7 @@ function PopoverContent({
         <PopoverPrimitive.Popup
           data-slot="popover-content"
           className={cn(
-            "bg-bg-default text-content-default border border-border-muted flex flex-col gap-2.5 rounded-lg p-2.5 text-sm z-50 w-72 outline-hidden shadow-md",
+            "bg-surface-base text-foreground-primary border border-border-light flex flex-col gap-2.5 rounded-lg p-2.5 text-sm z-50 w-72 outline-hidden shadow-md",
             className
           )}
           {...props}
@@ -74,7 +74,7 @@ function PopoverDescription({
   return (
     <PopoverPrimitive.Description
       data-slot="popover-description"
-      className={cn("text-content-muted", className)}
+      className={cn("text-foreground-secondary", className)}
       {...props}
     />
   )

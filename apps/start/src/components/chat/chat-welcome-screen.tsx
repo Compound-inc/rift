@@ -59,7 +59,7 @@ export function ChatWelcomeScreen({
       <div className="w-full max-w-2xl text-center">
         <div className="relative">
           <motion.h1
-            className="mb-4 flex items-center justify-center text-4xl font-semibold text-content-emphasis"
+            className="mb-4 flex items-center justify-center text-4xl font-semibold text-foreground-strong"
             layout
           >
             {m.chat_welcome_greeting_prefix()}
@@ -131,7 +131,7 @@ export function ChatWelcomeScreen({
           </motion.h1>
         </div>
 
-        <h2 className="mb-8 text-3xl font-normal text-content-muted">
+        <h2 className="mb-8 text-3xl font-normal text-foreground-secondary">
           {m.chat_welcome_subtitle()}
         </h2>
 
@@ -142,13 +142,13 @@ export function ChatWelcomeScreen({
               type="button"
               onClick={() => onSuggestionClick(item.prompt)}
               disabled={disabled}
-              className="rounded-3xl border border-border-default bg-bg-subtle p-4 text-start cursor-pointer hover:bg-bg-inverted/5 active:bg-bg-inverted/10"
+              className="rounded-3xl border border-border-base bg-surface-overlay p-4 text-start cursor-pointer hover:bg-surface-inverse/5 active:bg-surface-inverse/10"
             >
-              <h3 className="mb-2 flex items-center gap-2 font-medium text-content-default">
+              <h3 className="mb-2 flex items-center gap-2 font-medium text-foreground-primary">
                 {item.icon}
                 {item.title}
               </h3>
-              <p className="text-sm text-content-muted">{item.prompt}</p>
+              <p className="text-sm text-foreground-secondary">{item.prompt}</p>
             </button>
           ))}
         </div>

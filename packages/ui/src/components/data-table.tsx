@@ -147,7 +147,7 @@ export function DataTable<TData, TValue>({
         <div className="flex items-center gap-2">
           {filterColumn && (
             <div className="relative w-full sm:w-72">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-content-subtle" />
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-tertiary" />
               <Input
                 value={
                   (table.getColumn(filterColumn)?.getFilterValue() as string) ??
@@ -197,7 +197,7 @@ export function DataTable<TData, TValue>({
 
       <div
         className={cn(
-          "overflow-hidden rounded-2xl border border-border-muted bg-bg-default",
+          "overflow-hidden rounded-2xl border border-border-light bg-surface-base",
           tableWrapperClassName,
         )}
       >
@@ -269,7 +269,7 @@ export function DataTable<TData, TValue>({
       </div>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="text-sm text-content-muted">
+        <div className="text-sm text-foreground-secondary">
           {table.getFilteredSelectedRowModel().rows.length} {copy.rowsSelected}
         </div>
         <div className="flex items-center gap-2">

@@ -90,13 +90,13 @@ export function PricingSection({
         <div className="mb-8 flex flex-col items-center justify-center space-y-4 px-4 text-center">
           <h2
             id="pricing-heading"
-            className="text-3xl font-bold tracking-tighter text-content-emphasis sm:text-4xl"
+            className="text-3xl font-bold tracking-tighter text-foreground-strong sm:text-4xl"
           >
             {heading}
           </h2>
           <p
             id="pricing-summary"
-            className="max-w-[700px] text-content-muted md:text-xl/relaxed"
+            className="max-w-[700px] text-foreground-secondary md:text-xl/relaxed"
           >
             {summary}
           </p>

@@ -35,7 +35,7 @@ export function SidebarAreaLayout({
     <>
       {title ? (
         <div className="mb-2 flex shrink-0 items-center gap-3 px-3 py-2">
-          <span className="text-lg font-semibold text-content-emphasis">
+          <span className="text-lg font-semibold text-foreground-strong">
             {title}
           </span>
         </div>
@@ -62,7 +62,7 @@ export function SidebarAreaLayout({
               }
             >
               {section.name ? (
-                <div className="mb-2 shrink-0 pl-3 pr-3 text-sm text-content-muted">
+                <div className="mb-2 shrink-0 pl-3 pr-3 text-sm text-foreground-secondary">
                   {section.name}
                 </div>
               ) : null}

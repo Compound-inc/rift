@@ -77,7 +77,7 @@ export function ConnectedLoginMethods({
       providerId: 'github',
       providerLabel: m.settings_security_login_methods_provider_github(),
       connectedMethod: githubMethod,
-      icon: <GitHubIcon className="size-5 text-content-default" />,
+      icon: <GitHubIcon className="size-5 text-foreground-primary" />,
     },
     {
       providerId: 'microsoft',
@@ -88,17 +88,17 @@ export function ConnectedLoginMethods({
   ]
 
   return (
-    <ul className="overflow-hidden rounded-xl border border-border-default divide-y divide-border-default">
+    <ul className="overflow-hidden rounded-xl border border-border-base divide-y divide-border-base">
       <li className="flex items-center justify-between gap-4 px-4 py-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex size-6 shrink-0 items-center justify-center">
-            <Mail className="size-5 text-content-default" aria-hidden />
+            <Mail className="size-5 text-foreground-primary" aria-hidden />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-medium text-content-emphasis">
+            <p className="text-sm font-medium text-foreground-strong">
               {m.settings_security_login_methods_provider_email_password()}
             </p>
-            <p className="truncate text-sm text-content-subtle">
+            <p className="truncate text-sm text-foreground-tertiary">
               {primaryEmail && primaryEmail.trim().length > 0
                 ? primaryEmail
                 : m.settings_security_login_methods_email_description_fallback()}
@@ -149,8 +149,8 @@ export function ConnectedLoginMethods({
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex size-6 shrink-0 items-center justify-center">{row.icon}</div>
             <div className="min-w-0">
-              <p className="text-sm font-medium text-content-emphasis">{row.providerLabel}</p>
-              <p className="truncate text-sm text-content-subtle">
+              <p className="text-sm font-medium text-foreground-strong">{row.providerLabel}</p>
+              <p className="truncate text-sm text-foreground-tertiary">
                 {row.connectedMethod
                   ? m.settings_security_login_methods_connected_provider_help()
                   : m.settings_security_login_methods_connect_provider_help({

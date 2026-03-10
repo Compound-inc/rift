@@ -66,7 +66,7 @@ export function AccountPage() {
         }
         error={avatarError ?? undefined}
         success={avatarError == null ? avatarMessage ?? undefined : undefined}
-        helpText={<p className="text-sm text-content-subtle">{m.settings_account_avatar_help()}</p>}
+        helpText={<p className="text-sm text-foreground-tertiary">{m.settings_account_avatar_help()}</p>}
       />
 
       <Form
@@ -88,7 +88,7 @@ export function AccountPage() {
         }
         success={nameSuccessMessage}
         helpText={
-          <p className="text-sm text-content-subtle">
+          <p className="text-sm text-foreground-tertiary">
             {m.settings_account_name_help()}
           </p>
         }
@@ -116,7 +116,7 @@ export function AccountPage() {
         }
         success={emailSuccessMessage}
         helpText={
-          <p className="text-sm text-content-subtle">
+          <p className="text-sm text-foreground-tertiary">
             {m.settings_account_email_help()}
           </p>
         }
@@ -128,7 +128,7 @@ export function AccountPage() {
         title={m.settings_account_language_title()}
         description={m.settings_account_language_description()}
         error={languageError ?? undefined}
-        helpText={<p className="text-sm text-content-subtle">{m.settings_account_language_help()}</p>}
+        helpText={<p className="text-sm text-foreground-tertiary">{m.settings_account_language_help()}</p>}
         contentSlot={(
           <Select
             value={language}

@@ -38,7 +38,7 @@ function getRoleBadgeProps(role: string): {
     case 'owner':
       return { variant: 'default' }
     case 'admin':
-      return { variant: 'outline', className: 'border-content-info/40 bg-bg-info/25 text-content-info' }
+      return { variant: 'outline', className: 'border-foreground-info/40 bg-surface-info/25 text-foreground-info' }
     case 'member':
       return { variant: 'outline' }
     default:
@@ -213,7 +213,7 @@ const MEMBERS_COLUMNS_BASE: Array<DataTableColumnDef<MemberRow>> = [
             <AvatarImage src={member.avatarUrl} alt={member.name} />
             <AvatarFallback>{member.name.slice(0, 1)}</AvatarFallback>
           </Avatar>
-          <span className="font-medium text-content-default">{member.name}</span>
+          <span className="font-medium text-foreground-primary">{member.name}</span>
         </div>
       )
     },
@@ -222,7 +222,7 @@ const MEMBERS_COLUMNS_BASE: Array<DataTableColumnDef<MemberRow>> = [
     accessorKey: 'email',
     header: 'Email',
     cell: ({ row }) => (
-      <span className="text-content-subtle">{row.getValue('email')}</span>
+      <span className="text-foreground-tertiary">{row.getValue('email')}</span>
     ),
   },
   {
@@ -360,7 +360,7 @@ export function MembersPage() {
           next: 'Next',
           rowsSelected: 'row(s) selected.',
         }}
-        tableWrapperClassName="border-border-default bg-bg-default/95"
+        tableWrapperClassName="border-border-base bg-surface-base/95"
         toolbarActionsRight={<InviteMembersDialog />}
       />
     </ContentPage>

@@ -68,7 +68,7 @@ export function ReasoningSelectorPanel({
         disabled={disabled}
         aria-label={m.chat_reasoning_select_aria_label()}
         className={cn(
-          'h-10 rounded-lg border border-transparent bg-transparent px-3 ltr:pr-8 rtl:pl-8 text-sm font-medium text-content-default outline-none focus:!outline-none focus-visible:!outline-none transition-colors hover:bg-bg-inverted/5 active:bg-bg-inverted/10 focus-visible:border-border-emphasis focus-visible:ring-[3px] focus-visible:ring-border-emphasis/50 disabled:pointer-events-none disabled:opacity-50',
+          'h-10 rounded-lg border border-transparent bg-transparent px-3 ltr:pr-8 rtl:pl-8 text-sm font-medium text-foreground-primary outline-none focus:!outline-none focus-visible:!outline-none transition-colors hover:bg-surface-inverse/5 active:bg-surface-inverse/10 focus-visible:border-border-strong focus-visible:ring-[3px] focus-visible:ring-border-strong/50 disabled:pointer-events-none disabled:opacity-50',
           'relative flex items-center gap-2 w-fit group',
           'outline-none rounded-lg [&:focus]:!outline-none [&:focus-visible]:!outline-none',
           className
@@ -76,7 +76,7 @@ export function ReasoningSelectorPanel({
       >
         <Brain
           className={cn(
-            'size-4 shrink-0 text-content-default transition-[filter]',
+            'size-4 shrink-0 text-foreground-primary transition-[filter]',
             'grayscale group-hover:grayscale-0',
             value ? 'grayscale-0' : ''
           )}
@@ -84,7 +84,7 @@ export function ReasoningSelectorPanel({
         />
         <span className="truncate">{triggerLabel}</span>
         <ChevronDown
-          className="pointer-events-none absolute ltr:right-2 rtl:left-2 top-1/2 size-4 -translate-y-1/2 text-content-muted shrink-0"
+          className="pointer-events-none absolute ltr:right-2 rtl:left-2 top-1/2 size-4 -translate-y-1/2 text-foreground-secondary shrink-0"
           aria-hidden
         />
       </PopoverTrigger>
@@ -95,7 +95,7 @@ export function ReasoningSelectorPanel({
         tabIndex={-1}
         className={cn(
           'flex w-fit min-w-[120px] max-w-[min(88vw,180px)] flex-col p-0 overflow-hidden',
-          'bg-bg-default text-content-default rounded-lg',
+          'bg-surface-base text-foreground-primary rounded-lg',
           'outline-none focus:!outline-none focus-visible:!outline-none',
           'animate-none data-open:animate-none data-closed:animate-none'
         )}
@@ -140,11 +140,11 @@ const ReasoningRow = React.memo(function ReasoningRow({
       data-active={isSelected}
       className={cn(
         'w-full rounded-lg border border-transparent px-2.5 py-2 text-start text-sm leading-none font-normal transition-[background-color,color,font-weight] duration-0 active:duration-75',
-        'hover:bg-bg-inverted/5 active:bg-bg-inverted/10',
-        'data-[active=true]:bg-bg-info/25 data-[active=true]:font-medium data-[active=true]:text-content-info',
-        'data-[active=true]:hover:bg-bg-info/45 data-[active=true]:active:bg-bg-info/75',
+        'hover:bg-surface-inverse/5 active:bg-surface-inverse/10',
+        'data-[active=true]:bg-surface-info/25 data-[active=true]:font-medium data-[active=true]:text-foreground-info',
+        'data-[active=true]:hover:bg-surface-info/45 data-[active=true]:active:bg-surface-info/75',
         'outline-none focus:!outline-none focus-visible:!outline-none',
-        'focus-visible:border-border-emphasis focus-visible:ring-[3px] focus-visible:ring-border-emphasis/50'
+        'focus-visible:border-border-strong focus-visible:ring-[3px] focus-visible:ring-border-strong/50'
       )}
     >
       {label}

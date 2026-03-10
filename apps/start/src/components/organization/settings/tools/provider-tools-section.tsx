@@ -88,9 +88,9 @@ export function ProviderToolsSection({
         return {
           title: providerName,
           titleIcon: ProviderIcon ? (
-            <ProviderIcon className="size-5 text-content-default" />
+            <ProviderIcon className="size-5 text-foreground-primary" />
           ) : (
-            <div className="size-5 rounded-full bg-bg-inverted" />
+            <div className="size-5 rounded-full bg-surface-inverse" />
           ),
           items: tools.map((toolGroup) => {
             const groupEnabled = toolGroup.tools.some((tool) => !tool.disabled)

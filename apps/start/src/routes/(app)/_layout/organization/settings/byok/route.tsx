@@ -18,7 +18,7 @@ function ByokRoutePage() {
         title="Bring Your Own Key"
         description="Select a workspace before managing provider credentials."
       >
-        <p className="text-sm text-content-muted">
+        <p className="text-sm text-foreground-secondary">
           Choose a workspace in the sidebar before opening BYOK settings.
         </p>
       </ContentPage>

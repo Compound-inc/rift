@@ -48,7 +48,7 @@ export function OrgGeneralPage() {
         error={avatarError ?? undefined}
         success={avatarError == null ? avatarMessage ?? undefined : undefined}
         helpText={
-          <p className="text-sm text-content-subtle">
+          <p className="text-sm text-foreground-tertiary">
             {m.org_settings_general_avatar_help()}
           </p>
         }
@@ -74,7 +74,7 @@ export function OrgGeneralPage() {
         }
         success={nameSuccessMessage}
         helpText={
-          <p className="text-sm text-content-subtle">
+          <p className="text-sm text-foreground-tertiary">
             {m.org_settings_general_name_help()}
           </p>
         }

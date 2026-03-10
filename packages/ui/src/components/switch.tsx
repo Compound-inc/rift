@@ -12,16 +12,16 @@ function Switch(
       data-slot="switch"
       className={cn(
         'peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-emphasis focus-visible:ring-offset-2 focus-visible:ring-offset-bg-default',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-strong focus-visible:ring-offset-2 focus-visible:ring-offset-surface-base',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        'data-[checked]:bg-accent-default data-[unchecked]:bg-bg-emphasis',
+        'data-[checked]:bg-accent-primary data-[unchecked]:bg-surface-strong',
         className,
       )}
       {...props}
     >
       <SwitchPrimitive.Thumb
         className={cn(
-          'pointer-events-none block size-5 rounded-full bg-bg-default shadow-sm ring-0 transition-transform',
+          'pointer-events-none block size-5 rounded-full bg-surface-base shadow-sm ring-0 transition-transform',
           'translate-x-0.5 data-[checked]:translate-x-5',
         )}
       />

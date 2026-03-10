@@ -17,7 +17,7 @@ import { m } from '@/paraglide/messages.js'
 
 /** Matches ContentPage title so header block height stays identical when navigating. */
 const PAGE_TITLE_CLASS =
-  'text-2xl font-semibold leading-7 text-content-emphasis'
+  'text-2xl font-semibold leading-7 text-foreground-strong'
 
 type ProviderModelsPageProps = {
   providerId: string
@@ -45,14 +45,14 @@ export function ProviderModelsPage({
 
   const ProviderIcon = getProviderIcon(providerId as CatalogProviderId)
   const providerIcon = ProviderIcon ? (
-    <ProviderIcon className="size-5 text-content-default" aria-hidden />
+    <ProviderIcon className="size-5 text-foreground-primary" aria-hidden />
   ) : (
-    <div className="size-5 rounded-full bg-bg-inverted" aria-hidden />
+    <div className="size-5 rounded-full bg-surface-inverse" aria-hidden />
   )
 
   const formContent =
     modelsForProvider.length === 0 ? (
-      <p className="rounded-xl border border-border-subtle bg-bg-default p-6 text-sm text-content-subtle">
+      <p className="rounded-xl border border-border-faint bg-surface-base p-6 text-sm text-foreground-tertiary">
         {m.org_provider_models_none_available()}
       </p>
     ) : (
@@ -84,7 +84,7 @@ export function ProviderModelsPage({
       title={
         <Link
           to="/organization/settings/models"
-          className={`inline-flex items-center gap-1 ${PAGE_TITLE_CLASS} hover:text-content-default`}
+          className={`inline-flex items-center gap-1 ${PAGE_TITLE_CLASS} hover:text-foreground-primary`}
           aria-label={m.org_provider_models_go_back_aria_label()}
         >
           <ChevronLeft className="size-4 shrink-0" aria-hidden />

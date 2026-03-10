@@ -115,7 +115,7 @@ function SidebarGroupTooltipContent({
           className="overflow-hidden"
         >
           <div className="w-44 py-1 text-xs tracking-tight">
-            <p className="text-content-muted">{description}</p>
+            <p className="text-foreground-secondary">{description}</p>
             {learnMoreHref ? (
               <div className="mt-2.5">
                 <a

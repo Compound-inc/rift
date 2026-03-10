@@ -31,12 +31,12 @@ export function ContentPage({
       {(title != null || description != null) && (
         <div className="mb-6 space-y-1">
           {title != null && (
-            <h1 className="text-2xl font-semibold leading-7 text-content-emphasis">
+            <h1 className="text-2xl font-semibold leading-7 text-foreground-strong">
               {title}
             </h1>
           )}
           {description != null && (
-            <p className="text-sm text-content-subtle">{description}</p>
+            <p className="text-sm text-foreground-tertiary">{description}</p>
           )}
         </div>
       )}

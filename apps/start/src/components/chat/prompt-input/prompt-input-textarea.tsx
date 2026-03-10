@@ -74,7 +74,7 @@ export const PromptInputTextarea = forwardRef<
         'field-sizing-content bg-transparent',
         'overflow-y-hidden data-[overflow=scroll]:overflow-y-auto',
         'text-base leading-6 tracking-[-0.01em] proportional-nums whitespace-pre-wrap',
-        'focus-visible:ring-0 placeholder:text-content-muted text-content-emphasis',
+        'focus-visible:ring-0 placeholder:text-foreground-secondary text-foreground-strong',
         className
       )}
       style={{

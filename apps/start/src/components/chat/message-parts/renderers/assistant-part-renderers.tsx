@@ -43,7 +43,7 @@ function renderStepBoundary({ part, index }: AssistantPartRenderContext) {
 
   return (
     <div className="my-2">
-      <hr className="border-border-subtle/70 border-t" />
+      <hr className="border-border-faint/70 border-t" />
     </div>
   )
 }

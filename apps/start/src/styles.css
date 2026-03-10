@@ -125,7 +125,7 @@ code {
 .scrollbar-sidebar {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--content-muted) 40%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--foreground-secondary) 40%, transparent) transparent;
 }
 
 .scrollbar-app .overflow-y-auto::-webkit-scrollbar,
@@ -144,7 +144,7 @@ code {
 .scrollbar-app .overflow-y-auto::-webkit-scrollbar-thumb,
 .scrollbar-app .overflow-auto::-webkit-scrollbar-thumb,
 .scrollbar-sidebar::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--content-muted) 40%, transparent);
+  background: color-mix(in srgb, var(--foreground-secondary) 40%, transparent);
   border-radius: 3px;
   min-height: 40px;
 }
@@ -152,11 +152,11 @@ code {
 .scrollbar-app .overflow-y-auto::-webkit-scrollbar-thumb:hover,
 .scrollbar-app .overflow-auto::-webkit-scrollbar-thumb:hover,
 .scrollbar-sidebar::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--content-muted) 60%, transparent);
+  background: color-mix(in srgb, var(--foreground-secondary) 60%, transparent);
 }
 
 .scrollbar-app .overflow-y-auto::-webkit-scrollbar-thumb:active,
 .scrollbar-app .overflow-auto::-webkit-scrollbar-thumb:active,
 .scrollbar-sidebar::-webkit-scrollbar-thumb:active {
-  background: color-mix(in srgb, var(--content-muted) 75%, transparent);
+  background: color-mix(in srgb, var(--foreground-secondary) 75%, transparent);
 }

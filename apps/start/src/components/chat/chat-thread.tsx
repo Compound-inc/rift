@@ -304,7 +304,7 @@ export function ChatThread() {
           aria-live="polite"
           aria-busy="true"
         >
-          <div className="flex w-full flex-col gap-3 overflow-hidden text-content-emphasis text-md leading-[21px]">
+          <div className="flex w-full flex-col gap-3 overflow-hidden text-foreground-strong text-md leading-[21px]">
             <div className="w-full">
               <div className="py-1">
                 <ReasoningMotionIcon

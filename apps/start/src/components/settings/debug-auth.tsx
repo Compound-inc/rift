@@ -55,24 +55,24 @@ export function DebugAuth({ signInUrl, signUpUrl }: DebugAuthProps) {
   )
 
   if (loading) {
-    return <p className="text-sm text-content-muted">Loading…</p>
+    return <p className="text-sm text-foreground-secondary">Loading…</p>
   }
 
   if (user) {
     const activeOrg = activeOrganizationId ? orgs.find((o) => o.id === activeOrganizationId) : null
     return (
-      <div className="space-y-4 rounded-lg border border-border-default bg-bg-subtle p-4">
+      <div className="space-y-4 rounded-lg border border-border-base bg-surface-overlay p-4">
         <p className="text-sm">
-          <span className="text-content-muted">Email</span>{' '}
-          <span className="font-medium text-content-emphasis">{user.email}</span>
+          <span className="text-foreground-secondary">Email</span>{' '}
+          <span className="font-medium text-foreground-strong">{user.email}</span>
         </p>
         <p className="text-sm">
-          <span className="text-content-muted">User ID</span>{' '}
-          <code className="rounded bg-bg-muted px-1.5 py-0.5 font-mono text-xs">{user.id}</code>
+          <span className="text-foreground-secondary">User ID</span>{' '}
+          <code className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs">{user.id}</code>
         </p>
         <div className="space-y-2">
-          <p className="text-sm text-content-muted">Active org</p>
-          <p className="text-sm font-medium text-content-emphasis">
+          <p className="text-sm text-foreground-secondary">Active org</p>
+          <p className="text-sm font-medium text-foreground-strong">
             {activeOrg ? `${activeOrg.name} (${activeOrg.slug})` : activeOrganizationId ?? 'None'}
           </p>
           {!orgsLoading && orgs.length > 0 && (
@@ -84,7 +84,7 @@ export function DebugAuth({ signInUrl, signUpUrl }: DebugAuthProps) {
                 id="debug-org-select"
                 value={activeOrganizationId ?? ''}
                 onChange={(e) => setActiveOrg(e.target.value || null)}
-                className="rounded-md border border-border-default bg-bg-default px-3 py-1.5 text-sm text-content-emphasis"
+                className="rounded-md border border-border-base bg-surface-base px-3 py-1.5 text-sm text-foreground-strong"
               >
                 <option value="">None</option>
                 {orgs.map((o) => (
@@ -97,7 +97,7 @@ export function DebugAuth({ signInUrl, signUpUrl }: DebugAuthProps) {
                 type="button"
                 onClick={createOrg}
                 disabled={createPending}
-                className="rounded-md border border-border-default px-3 py-1.5 text-sm text-content-emphasis hover:bg-bg-muted disabled:opacity-50"
+                className="rounded-md border border-border-base px-3 py-1.5 text-sm text-foreground-strong hover:bg-surface-raised disabled:opacity-50"
               >
                 {createPending ? 'Creating…' : 'Create random org'}
               </button>
@@ -108,7 +108,7 @@ export function DebugAuth({ signInUrl, signUpUrl }: DebugAuthProps) {
               type="button"
               onClick={createOrg}
               disabled={createPending}
-              className="rounded-md border border-border-default px-3 py-1.5 text-sm text-content-emphasis hover:bg-bg-muted disabled:opacity-50"
+              className="rounded-md border border-border-base px-3 py-1.5 text-sm text-foreground-strong hover:bg-surface-raised disabled:opacity-50"
             >
               {createPending ? 'Creating…' : 'Create random org'}
             </button>
@@ -117,7 +117,7 @@ export function DebugAuth({ signInUrl, signUpUrl }: DebugAuthProps) {
         <button
           type="button"
           onClick={() => signOut()}
-          className="rounded-md bg-bg-error px-4 py-2 text-sm text-content-error hover:opacity-90"
+          className="rounded-md bg-surface-error px-4 py-2 text-sm text-foreground-error hover:opacity-90"
         >
           Sign out
         </button>
@@ -126,18 +126,18 @@ export function DebugAuth({ signInUrl, signUpUrl }: DebugAuthProps) {
   }
 
   return (
-    <div className="space-y-4 rounded-lg border border-border-default bg-bg-subtle p-4">
-      <p className="text-sm text-content-muted">Not signed in.</p>
+    <div className="space-y-4 rounded-lg border border-border-base bg-surface-overlay p-4">
+      <p className="text-sm text-foreground-secondary">Not signed in.</p>
       <div className="flex gap-3">
         <a
           href={signInUrl}
-          className="rounded-md bg-bg-inverted px-4 py-2 text-sm text-content-inverted hover:opacity-90"
+          className="rounded-md bg-surface-inverse px-4 py-2 text-sm text-foreground-inverse hover:opacity-90"
         >
           Sign in
         </a>
         <a
           href={signUpUrl}
-          className="rounded-md border border-border-default px-4 py-2 text-sm text-content-emphasis hover:bg-bg-subtle"
+          className="rounded-md border border-border-base px-4 py-2 text-sm text-foreground-strong hover:bg-surface-overlay"
         >
           Sign up
         </a>

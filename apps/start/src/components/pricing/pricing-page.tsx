@@ -130,7 +130,7 @@ export function PricingPage() {
   return (
     <div className="w-full max-w-[1400px] mx-auto px-4">
       {billingActionError ? (
-        <div className="mb-4 rounded-lg border border-border-subtle bg-background-secondary px-4 py-3 text-sm text-content-muted">
+        <div className="mb-4 rounded-lg border border-border-faint bg-surface-raised px-4 py-3 text-sm text-foreground-secondary">
           {billingActionError}
         </div>
       ) : null}

@@ -13,7 +13,7 @@ import type { ChatVisibleTool } from '../chat-context'
 
 /** Styling shared with toolbar ghost buttons for visual consistency. */
 const TOOLBAR_SELECT_CLASS =
-  'h-10 rounded-lg border border-transparent bg-transparent px-3 ltr:pr-8 rtl:pl-8 text-sm font-medium text-content-default appearance-none outline-none transition-colors hover:bg-bg-inverted/5 active:bg-bg-inverted/10 focus-visible:border-border-emphasis focus-visible:ring-[3px] focus-visible:ring-border-emphasis/50 disabled:pointer-events-none disabled:opacity-50'
+  'h-10 rounded-lg border border-transparent bg-transparent px-3 ltr:pr-8 rtl:pl-8 text-sm font-medium text-foreground-primary appearance-none outline-none transition-colors hover:bg-surface-inverse/5 active:bg-surface-inverse/10 focus-visible:border-border-strong focus-visible:ring-[3px] focus-visible:ring-border-strong/50 disabled:pointer-events-none disabled:opacity-50'
 
 export type ToolbarSelectOption = {
   value: string
@@ -56,7 +56,7 @@ export function ToolbarSelect({
         ))}
       </select>
       <ChevronDown
-        className="pointer-events-none absolute ltr:right-2 rtl:left-2 top-1/2 size-4 -translate-y-1/2 text-content-muted"
+        className="pointer-events-none absolute ltr:right-2 rtl:left-2 top-1/2 size-4 -translate-y-1/2 text-foreground-secondary"
         aria-hidden
       />
     </div>
@@ -160,8 +160,8 @@ export function PromptInputToolbar({
           className={cn(
             'size-8 rounded-full border border-transparent p-0 transition-[background-color,color,font-weight] duration-0 active:duration-75',
             submitDisabled
-              ? 'bg-transparent text-content-muted hover:bg-transparent active:bg-transparent'
-              : 'bg-bg-info/25 text-content-info hover:bg-bg-info/45 active:bg-bg-info/75'
+              ? 'bg-transparent text-foreground-secondary hover:bg-transparent active:bg-transparent'
+              : 'bg-surface-info/25 text-foreground-info hover:bg-surface-info/45 active:bg-surface-info/75'
           )}
         />
       </div>

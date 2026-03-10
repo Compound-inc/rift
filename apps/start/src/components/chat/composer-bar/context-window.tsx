@@ -122,7 +122,7 @@ export const ContextTrigger = ({ children, ...props }: ContextTriggerProps) => {
   ) : (
     <Button type="button" variant="ghost" {...props}>
       <span className="inline-flex items-center gap-2 text-start">
-        <span className="font-medium text-content-muted">{renderedPercent}</span>
+        <span className="font-medium text-foreground-secondary">{renderedPercent}</span>
         <ContextIcon />
       </span>
     </Button>
@@ -141,7 +141,7 @@ export const ContextContent = ({
 }: ContextContentProps) => (
   <HoverCardContent
     className={cn(
-      'min-w-60 divide-y divide-border-default overflow-hidden p-0 text-start',
+      'min-w-60 divide-y divide-border-base overflow-hidden p-0 text-start',
       className,
     )}
     {...props}
@@ -176,8 +176,8 @@ export const ContextContentHeader = ({
       {children ?? (
         <>
           <div className="flex items-center justify-between gap-3 text-xs">
-            <p className="text-content-emphasis">{displayPct}</p>
-            <p className="font-mono text-content-muted">
+            <p className="text-foreground-strong">{displayPct}</p>
+            <p className="font-mono text-foreground-secondary">
               {used} / {total}
             </p>
           </div>
@@ -219,15 +219,15 @@ export const ContextContentFooter = ({
   return (
     <div
       className={cn(
-        'flex w-full items-center justify-between gap-3 border-t border-border-subtle bg-bg-emphasis/50 ps-4 pe-4 py-3 text-xs text-start',
+        'flex w-full items-center justify-between gap-3 border-t border-border-faint bg-surface-strong/50 ps-4 pe-4 py-3 text-xs text-start',
         className,
       )}
       {...props}
     >
       {children ?? (
         <>
-          <span className="text-content-muted">{m.chat_context_total_cost()}</span>
-          <span className="text-content-emphasis">{formattedTotalCost}</span>
+          <span className="text-foreground-secondary">{m.chat_context_total_cost()}</span>
+          <span className="text-foreground-strong">{formattedTotalCost}</span>
         </>
       )}
     </div>
@@ -260,7 +260,7 @@ export const ContextInputUsage = ({
       )}
       {...props}
     >
-      <span className="text-content-muted">{m.chat_context_input()}</span>
+      <span className="text-foreground-secondary">{m.chat_context_input()}</span>
       <TokensWithCost tokens={inputTokens} />
     </div>
   )
@@ -292,7 +292,7 @@ export const ContextOutputUsage = ({
       )}
       {...props}
     >
-      <span className="text-content-muted">{m.chat_context_output()}</span>
+      <span className="text-foreground-secondary">{m.chat_context_output()}</span>
       <TokensWithCost tokens={outputTokens} />
     </div>
   )
@@ -324,7 +324,7 @@ export const ContextReasoningUsage = ({
       )}
       {...props}
     >
-      <span className="text-content-muted">{m.chat_context_reasoning()}</span>
+      <span className="text-foreground-secondary">{m.chat_context_reasoning()}</span>
       <TokensWithCost tokens={reasoningTokens} />
     </div>
   )
@@ -353,13 +353,13 @@ export const ContextCacheUsage = ({
     <div className={cn('space-y-2 text-start', className)} {...props}>
       {cacheReadTokens > 0 ? (
         <div className="flex items-center justify-between gap-3 text-xs">
-          <span className="text-content-muted">{m.chat_context_cache_read()}</span>
+          <span className="text-foreground-secondary">{m.chat_context_cache_read()}</span>
           <TokensWithCost tokens={cacheReadTokens} />
         </div>
       ) : null}
       {cacheWriteTokens > 0 ? (
         <div className="flex items-center justify-between gap-3 text-xs">
-          <span className="text-content-muted">{m.chat_context_cache_write()}</span>
+          <span className="text-foreground-secondary">{m.chat_context_cache_write()}</span>
           <TokensWithCost tokens={cacheWriteTokens} />
         </div>
       ) : null}
@@ -368,7 +368,7 @@ export const ContextCacheUsage = ({
 }
 
 const TokensWithCost = ({ tokens }: { tokens?: number }) => (
-  <span className="text-content-emphasis">
+  <span className="text-foreground-strong">
     {tokens === undefined
       ? '—'
       : new Intl.NumberFormat('en-US', {

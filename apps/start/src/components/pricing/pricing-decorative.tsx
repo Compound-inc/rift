@@ -13,7 +13,7 @@ const dashedLineProps = {
   strokeOpacity: 0.12,
   strokeDasharray: '4 6',
   vectorEffect: 'non-scaling-stroke' as const,
-  className: 'stroke-content-emphasis',
+  className: 'stroke-foreground-strong',
 }
 
 /**

@@ -142,7 +142,7 @@ export function ChatMessage({
         <div className="flex max-w-[80%] flex-col items-end gap-2">
           <div
             dir={direction}
-            className="relative flex min-h-7 w-fit max-w-full self-end flex-col gap-3 overflow-hidden rounded-3xl ltr:rounded-br-lg rtl:rounded-bl-lg border border-border-default bg-bg-subtle px-4 py-1.5 text-md"
+            className="relative flex min-h-7 w-fit max-w-full self-end flex-col gap-3 overflow-hidden rounded-3xl ltr:rounded-br-lg rtl:rounded-bl-lg border border-border-base bg-surface-overlay px-4 py-1.5 text-md"
           >
             <div className="space-y-4 size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
               <div className="whitespace-pre-wrap break-words text-md leading-7">
@@ -196,12 +196,12 @@ export function ChatMessage({
               {attachmentManifest.map((attachment) => (
                 <div
                   key={attachment.key}
-                  className="inline-flex max-w-full items-center gap-2 rounded-lg border border-border-muted bg-bg-subtle px-2.5 py-1 text-xs"
+                  className="inline-flex max-w-full items-center gap-2 rounded-lg border border-border-light bg-surface-overlay px-2.5 py-1 text-xs"
                 >
-                  <span className="rounded bg-bg-muted px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-content-muted">
+                  <span className="rounded bg-surface-raised px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-foreground-secondary">
                     {getFileTypeIndicator(attachment.name)}
                   </span>
-                  <span className="truncate text-content-muted">
+                  <span className="truncate text-foreground-secondary">
                     {attachment.name}
                   </span>
                 </div>
@@ -256,7 +256,7 @@ export function ChatMessage({
     >
       <div
         dir={direction}
-        className="flex w-full flex-col gap-3 overflow-hidden text-content-emphasis leading-[21px]"
+        className="flex w-full flex-col gap-3 overflow-hidden text-foreground-strong leading-[21px]"
       >
         <AssistantMessageContent parts={message.parts} isAnimating={isAnimating} />
         <AssistantMessageFooter

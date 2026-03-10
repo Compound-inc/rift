@@ -21,7 +21,7 @@ function BillingRoutePage() {
         title="Billing"
         description="Select a workspace to review subscriptions and credits."
       >
-        <p className="text-sm text-content-muted">
+        <p className="text-sm text-foreground-secondary">
           Choose a workspace in the sidebar before managing billing.
         </p>
       </ContentPage>

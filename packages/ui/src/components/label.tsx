@@ -10,7 +10,7 @@ const labelVariants = cva(
   {
     variants: {
       variant: {
-        default: "text-content-default",
+        default: "text-foreground-primary",
         muted: "text-black/70 dark:text-white/70",
       },
     },

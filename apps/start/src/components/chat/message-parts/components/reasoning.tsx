@@ -80,11 +80,11 @@ function ReasoningPanel({
 
   return (
     <>
-      <div className="mb-2 flex shrink-0 items-center justify-between gap-2 border-b border-border-muted px-3 py-2">
+      <div className="mb-2 flex shrink-0 items-center justify-between gap-2 border-b border-border-light px-3 py-2">
         <ThinkingIndicator
           isStreaming={isStreaming}
           finishedLabel={m.chat_reasoning_label()}
-          className="min-w-0 shrink p-0 text-content-emphasis"
+          className="min-w-0 shrink p-0 text-foreground-strong"
         />
         <Button
           variant="ghost"
@@ -97,7 +97,7 @@ function ReasoningPanel({
         </Button>
       </div>
       <div
-        className="mt-3 min-h-0 flex-1 overflow-y-auto text-content-default ltr:-mr-3 rtl:-ml-3"
+        className="mt-3 min-h-0 flex-1 overflow-y-auto text-foreground-primary ltr:-mr-3 rtl:-ml-3"
         aria-live={isStreaming ? 'polite' : 'off'}
       >
         <Streamdown
@@ -196,7 +196,7 @@ const ThinkingIndicatorBase = forwardRef<
               </motion.span>
             </AnimatePresence>
           ) : (
-            <span className="col-start-1 row-start-1 text-content-muted">
+            <span className="col-start-1 row-start-1 text-foreground-secondary">
               {finishedWord}
             </span>
           )}
@@ -286,7 +286,7 @@ export const ReasoningMotionIcon = memo(function ReasoningMotionIcon({
         strokeWidth={1.5}
         strokeLinecap="round"
         strokeLinejoin="round"
-        className={cn('text-content-muted', isAnimating && shimmerClassName && 'invisible')}
+        className={cn('text-foreground-secondary', isAnimating && shimmerClassName && 'invisible')}
       >
         <motion.path
           d={circleA}
@@ -368,7 +368,7 @@ const ReasoningTriggerButton = memo(function ReasoningTriggerButton({
     >
       <ThinkingIndicator
         isStreaming={isStreaming}
-        className="text-secondary-text p-0"
+        className="text-foreground-secondary p-0"
       />
     </button>
   )

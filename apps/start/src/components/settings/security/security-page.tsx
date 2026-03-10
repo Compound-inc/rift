@@ -98,7 +98,7 @@ export function SecurityPage() {
         error={loginMethodsMessage ?? undefined}
         helpText={
           loginMethodsMessage == null ? (
-            <p className="text-sm text-content-subtle">
+            <p className="text-sm text-foreground-tertiary">
               {m.settings_security_login_methods_help_unlink()}
             </p>
           ) : undefined
@@ -176,7 +176,7 @@ export function SecurityPage() {
         }
         success={passwordSuccessMessage}
         helpText={
-          <p className="text-sm text-content-subtle">
+          <p className="text-sm text-foreground-tertiary">
             {isSetPasswordMode
               ? m.settings_security_set_password_help()
               : m.settings_security_help_sessions()}
@@ -235,7 +235,7 @@ export function SecurityPage() {
         error={sessionsMessage ?? undefined}
         helpText={
           sessionsMessage == null ? (
-            <p className="text-sm text-content-subtle">{m.settings_security_sessions_help_revoke()}</p>
+            <p className="text-sm text-foreground-tertiary">{m.settings_security_sessions_help_revoke()}</p>
           ) : undefined
         }
       />

@@ -111,10 +111,10 @@ export function OtpStep({
       </motion.div>
 
       <motion.div
-        className="w-full max-w-md overflow-hidden rounded-3xl bg-bg-emphasis/30 dark:bg-bg-emphasis/50 backdrop-blur-xl shadow-[0_0_1px_rgba(0,0,0,0.40),0_0_2px_rgba(0,0,0,0.05),0_10px_10px_rgba(0,0,0,0.25)] transition-colors duration-200"
+        className="w-full max-w-md overflow-hidden rounded-3xl bg-surface-strong/30 dark:bg-surface-strong/50 backdrop-blur-xl shadow-[0_0_1px_rgba(0,0,0,0.40),0_0_2px_rgba(0,0,0,0.05),0_10px_10px_rgba(0,0,0,0.25)] transition-colors duration-200"
         variants={menuCardContentVariants}
       >
-        <div className="rounded-b-3xl bg-bg-muted/70 dark:bg-bg-muted/60 backdrop-blur-sm p-8 shadow-[0_0_1px_rgba(0,0,0,0.3),0_4px_12px_rgba(0,0,0,0.08)] transition-colors duration-200">
+        <div className="rounded-b-3xl bg-surface-raised/70 dark:bg-surface-raised/60 backdrop-blur-sm p-8 shadow-[0_0_1px_rgba(0,0,0,0.3),0_4px_12px_rgba(0,0,0,0.08)] transition-colors duration-200">
           <motion.form
             id={formId}
             onSubmit={handleSubmit}
@@ -124,12 +124,12 @@ export function OtpStep({
             className="space-y-6"
           >
             <motion.div variants={staggerChildVariants}>
-              <p className="text-sm text-content-subtle">{instruction}</p>
+              <p className="text-sm text-foreground-tertiary">{instruction}</p>
             </motion.div>
 
             {message ? (
               <motion.div variants={staggerChildVariants}>
-                <p className="text-sm text-content-muted">{message}</p>
+                <p className="text-sm text-foreground-secondary">{message}</p>
               </motion.div>
             ) : null}
 
@@ -167,7 +167,7 @@ export function OtpStep({
               </InputOTP>
 
               {remainingSeconds != null ? (
-                <p className="text-center text-sm text-content-muted">
+                <p className="text-center text-sm text-foreground-secondary">
                   {remainingSeconds > 0
                     ? m.auth_otp_expires_in({ time: formatRemaining(remainingSeconds) })
                     : m.auth_otp_expired()}

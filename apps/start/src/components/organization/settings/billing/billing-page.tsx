@@ -96,11 +96,11 @@ function MetricBlock(props: {
   hint?: string | null
 }) {
   return (
-    <div className="rounded-lg border border-border-subtle bg-background-secondary px-3 py-3">
-      <div className="text-xs text-content-muted">{props.label}</div>
+    <div className="rounded-lg border border-border-faint bg-surface-raised px-3 py-3">
+      <div className="text-xs text-foreground-secondary">{props.label}</div>
       <div className="mt-1 text-base font-medium text-content">{props.value}</div>
       {props.hint ? (
-        <div className="mt-1 text-xs text-content-muted">{props.hint}</div>
+        <div className="mt-1 text-xs text-foreground-secondary">{props.hint}</div>
       ) : null}
     </div>
   )
@@ -120,18 +120,18 @@ function BucketBar(props: {
       : 'bg-content'
 
   return (
-    <div className="rounded-lg border border-border-subtle bg-background px-4 py-4">
+    <div className="rounded-lg border border-border-faint bg-surface-base px-4 py-4">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-sm font-medium text-content">{props.title}</div>
-          <div className="mt-1 text-xs text-content-muted">{props.subtitle}</div>
+          <div className="mt-1 text-xs text-foreground-secondary">{props.subtitle}</div>
         </div>
-        <div className="text-right text-xs text-content-muted">
+        <div className="text-right text-xs text-foreground-secondary">
           <div>{props.remainingLabel} left</div>
           <div>{props.totalLabel} total</div>
         </div>
       </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-sm bg-background-tertiary">
+      <div className="mt-3 h-2 overflow-hidden rounded-sm bg-surface-base-tertiary">
         <div
           className={`h-full rounded-sm ${toneClass}`}
           style={{ width: `${props.fillPercent}%` }}
@@ -239,7 +239,7 @@ export function BillingPage() {
               </div>
             ) : null}
             {!loading && currentSeatSlot ? (
-              <div className="rounded-xl border border-border-subtle bg-background-secondary px-4 py-3 text-sm text-content-muted">
+              <div className="rounded-xl border border-border-faint bg-surface-raised px-4 py-3 text-sm text-foreground-secondary">
                 Seat {currentSeatSlot.seatIndex}
                 {seatWindowRemaining ? ` · 4 hour pool ${seatWindowRemaining} left` : ''}
                 {seatOverageRemaining ? ` · monthly overage ${seatOverageRemaining} left` : ''}
@@ -257,10 +257,10 @@ export function BillingPage() {
       />
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.9fr)]">
-        <section className="rounded-xl border border-border-subtle bg-background-secondary">
-          <div className="border-b border-border-subtle px-5 py-4">
+        <section className="rounded-xl border border-border-faint bg-surface-raised">
+          <div className="border-b border-border-faint px-5 py-4">
             <h2 className="text-base font-medium text-content">Quota flow</h2>
-            <p className="mt-1 text-sm text-content-muted">
+            <p className="mt-1 text-sm text-foreground-secondary">
               Each request reserves cost against the current seat first, then the same
               seat&apos;s overage bucket, then blocks until the next refill.
             </p>
@@ -293,7 +293,7 @@ export function BillingPage() {
               fillPercent={seatWindowFillPercent}
             />
 
-            <div className="pl-2 text-xs text-content-muted">
+            <div className="pl-2 text-xs text-foreground-secondary">
               When the 4 hour pool is depleted, the same request falls through to the
               seat overage bucket instead of hard-stopping the user.
             </div>
@@ -307,7 +307,7 @@ export function BillingPage() {
               tone="warning"
             />
 
-            <div className="rounded-lg border border-dashed border-border-subtle px-4 py-3 text-sm text-content-muted">
+            <div className="rounded-lg border border-dashed border-border-faint px-4 py-3 text-sm text-foreground-secondary">
               <span className="font-medium text-content">3. Block only after both buckets are empty.</span>{' '}
               The API returns a quota error with the next retry window instead of removing the
               user from the org.
@@ -315,10 +315,10 @@ export function BillingPage() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-border-subtle bg-background-secondary">
-          <div className="border-b border-border-subtle px-5 py-4">
+        <section className="rounded-xl border border-border-faint bg-surface-raised">
+          <div className="border-b border-border-faint px-5 py-4">
             <h2 className="text-base font-medium text-content">Plan policy</h2>
-            <p className="mt-1 text-sm text-content-muted">
+            <p className="mt-1 text-sm text-foreground-secondary">
               These are the inputs the quota engine uses to derive each seat&apos;s usable budget.
             </p>
           </div>

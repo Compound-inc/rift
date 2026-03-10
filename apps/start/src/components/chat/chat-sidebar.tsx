@@ -329,7 +329,7 @@ export function ChatSidebarContent({ pathname }: { pathname: string }) {
           }
         >
           <span className="inline-flex shrink-0">
-            <Spinner className="size-4 animate-spin text-content-muted" aria-hidden />
+            <Spinner className="size-4 animate-spin text-foreground-secondary" aria-hidden />
           </span>
         </SidebarGroupTooltip>
       ) : showError ? (
@@ -338,7 +338,7 @@ export function ChatSidebarContent({ pathname }: { pathname: string }) {
           description={m.chat_sidebar_status_error_description()}
         >
           <span className="inline-flex shrink-0">
-            <AlertTriangle className="size-4 text-content-error" aria-hidden />
+            <AlertTriangle className="size-4 text-foreground-error" aria-hidden />
           </span>
         </SidebarGroupTooltip>
       ) : undefined

@@ -102,7 +102,7 @@ const LineSpan = ({
       <span className="grid grid-cols-[3rem_minmax(0,1fr)] items-start gap-4">
         <span
           aria-hidden="true"
-          className="select-none text-right font-mono text-content-muted/60"
+          className="select-none text-right font-mono text-foreground-secondary/60"
         >
           {lineNumber}
         </span>
@@ -348,7 +348,7 @@ export const CodeBlockContainer = ({
 }: HTMLAttributes<HTMLDivElement> & { language: string }) => (
   <div
     className={cn(
-      "group relative w-full overflow-hidden rounded-xl border border-border-muted bg-bg-default text-content-emphasis",
+      "group relative w-full overflow-hidden rounded-xl border border-border-light bg-surface-base text-foreground-strong",
       className
     )}
     data-language={language}
@@ -368,7 +368,7 @@ export const CodeBlockHeader = ({
 }: HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "flex items-center justify-between border-border-muted border-b bg-bg-default px-3 py-1.5 text-[13px] leading-[22px] text-content-subtle",
+      "flex items-center justify-between border-border-light border-b bg-surface-base px-3 py-1.5 text-[13px] leading-[22px] text-foreground-tertiary",
       className
     )}
     {...props}
@@ -392,7 +392,7 @@ export const CodeBlockFilename = ({
   className,
   ...props
 }: HTMLAttributes<HTMLSpanElement>) => (
-  <span className={cn("font-mono text-[13px] text-content-subtle", className)} {...props}>
+  <span className={cn("font-mono text-[13px] text-foreground-tertiary", className)} {...props}>
     {children}
   </span>
 );
@@ -448,7 +448,7 @@ export const CodeBlockContent = ({
   return (
     <div
       className={cn(
-        "relative h-full bg-bg-default",
+        "relative h-full bg-surface-base",
         isLineWrapped ? "overflow-y-auto overflow-x-hidden" : "overflow-auto"
       )}
     >

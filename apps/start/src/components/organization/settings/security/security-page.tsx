@@ -24,7 +24,7 @@ export function OrgSecurityPage() {
         title={m.org_security_domains_title()}
         description={m.org_security_domains_description()}
         contentSlot={
-          <p className="text-sm text-content-subtle">
+          <p className="text-sm text-foreground-tertiary">
             {m.org_security_domains_status_empty()}
           </p>
         }
@@ -45,7 +45,7 @@ export function OrgSecurityPage() {
         title={m.org_security_sso_title()}
         description={m.org_security_sso_description()}
         contentSlot={
-          <p className="text-sm text-content-subtle">
+          <p className="text-sm text-foreground-tertiary">
             {m.org_security_sso_status_empty()}
           </p>
         }
@@ -66,7 +66,7 @@ export function OrgSecurityPage() {
         title={m.org_security_directory_title()}
         description={m.org_security_directory_description()}
         contentSlot={
-          <p className="text-sm text-content-subtle">
+          <p className="text-sm text-foreground-tertiary">
             {m.org_security_directory_status_empty()}
           </p>
         }

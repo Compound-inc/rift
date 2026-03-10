@@ -183,7 +183,7 @@ export function MfaSection({
           error={inlineFormErrorMessage}
           success={inlineFormSuccessMessage}
           helpText={
-            <p className="text-sm text-content-subtle">
+            <p className="text-sm text-foreground-tertiary">
               {m.settings_security_mfa_state_disabled()}
             </p>
           }
@@ -247,7 +247,7 @@ export function MfaSection({
                   {mfaBackupCodes.map((code) => (
                     <code
                       key={code}
-                      className="rounded bg-bg-muted px-2 py-1 text-xs text-content-default"
+                      className="rounded bg-surface-raised px-2 py-1 text-xs text-foreground-primary"
                     >
                       {code}
                     </code>
@@ -256,7 +256,7 @@ export function MfaSection({
               ) : (
                 <div className="grid grid-cols-2 gap-2">
                   {Array.from({ length: 8 }).map((_, index) => (
-                    <div key={index} className="h-7 animate-pulse rounded bg-bg-muted/70" />
+                    <div key={index} className="h-7 animate-pulse rounded bg-surface-raised/70" />
                   ))}
                 </div>
               )
@@ -269,7 +269,7 @@ export function MfaSection({
                     className="mx-auto size-48 rounded-md bg-white p-2"
                   />
                 ) : (
-                  <p className="text-sm text-content-subtle">{m.settings_security_mfa_qr_loading()}</p>
+                  <p className="text-sm text-foreground-tertiary">{m.settings_security_mfa_qr_loading()}</p>
                 )}
 
                 <div className="space-y-2">
@@ -328,7 +328,7 @@ export function MfaSection({
       }}
       error={mfaErrorMessage}
       success={mfaSuccessMessage}
-      helpText={<p className="text-sm text-content-subtle">{m.settings_security_mfa_state_enabled()}</p>}
+      helpText={<p className="text-sm text-foreground-tertiary">{m.settings_security_mfa_state_enabled()}</p>}
     />
   )
 }

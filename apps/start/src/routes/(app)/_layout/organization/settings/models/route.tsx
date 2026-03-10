@@ -23,7 +23,7 @@ function ModelsLayoutPage() {
         title={m.org_models_page_title()}
         description={m.org_route_select_org_provider_models_description()}
       >
-        <p className="text-sm text-content-muted">
+        <p className="text-sm text-foreground-secondary">
           {m.org_route_select_org_body()}
         </p>
       </ContentPage>

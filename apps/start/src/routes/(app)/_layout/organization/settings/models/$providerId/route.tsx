@@ -26,7 +26,7 @@ function ProviderModelsRoutePage() {
         title={m.org_models_page_title()}
         description={m.org_route_select_org_provider_models_description()}
       >
-        <p className="text-sm text-content-muted">
+        <p className="text-sm text-foreground-secondary">
           {m.org_route_select_org_body()}
         </p>
       </ContentPage>
@@ -36,7 +36,7 @@ function ProviderModelsRoutePage() {
   if (loading) {
     return (
       <ContentPage title={m.org_models_page_title()}>
-        <p className="text-sm text-content-muted">{m.org_models_loading()}</p>
+        <p className="text-sm text-foreground-secondary">{m.org_models_loading()}</p>
       </ContentPage>
     )
   }
@@ -45,7 +45,7 @@ function ProviderModelsRoutePage() {
     return (
       <ContentPage title={m.org_models_page_title()}>
         <div
-          className="rounded-md border border-border-default bg-bg-subtle px-3 py-2 text-sm text-content-error"
+          className="rounded-md border border-border-base bg-surface-overlay px-3 py-2 text-sm text-foreground-error"
           role="alert"
         >
           {error}

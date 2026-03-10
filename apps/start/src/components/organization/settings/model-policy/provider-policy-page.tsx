@@ -24,12 +24,12 @@ export function ProviderPolicyPage() {
       description={m.org_provider_policy_page_description()}
     >
       {loading && (
-        <p className="text-sm text-content-muted">{m.org_provider_policy_loading()}</p>
+        <p className="text-sm text-foreground-secondary">{m.org_provider_policy_loading()}</p>
       )}
 
       {error && (
         <div
-          className="rounded-md border border-border-default bg-bg-subtle px-3 py-2 text-sm text-content-error"
+          className="rounded-md border border-border-base bg-surface-overlay px-3 py-2 text-sm text-foreground-error"
           role="alert"
         >
           {error}

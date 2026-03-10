@@ -88,7 +88,7 @@ export function InviteMembersDialog() {
           type="button"
           variant="ghost"
           size="default"
-          className="border border-border-default"
+          className="border border-border-base"
           disabled={inviteEntries.length >= INVITE_BATCH_MAX}
           onClick={addInviteEntry}
         >

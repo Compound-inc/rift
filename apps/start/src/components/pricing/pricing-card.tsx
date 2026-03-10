@@ -113,7 +113,7 @@ export function PricingCard({
       className={cn(
         // The pricing section applies scoped hover animations to this class so the
         // decorative SVG can intensify and drift without affecting other cards.
-        'pricing-card group/pricing-card relative z-[2] flex flex-col items-center gap-6 overflow-hidden bg-bg-default px-6 py-12',
+        'pricing-card group/pricing-card relative z-[2] flex flex-col items-center gap-6 overflow-hidden bg-surface-base px-6 py-12',
         fixedWidth ? 'w-[320px] flex-shrink-0' : 'w-full',
       )}
     >
@@ -124,7 +124,7 @@ export function PricingCard({
       />
 
       {plan.popular ? (
-        <div className="absolute top-4 rounded-full bg-content-emphasis px-3 py-1 text-xs font-bold uppercase tracking-wide text-content-inverted dark:bg-content-inverted dark:text-content-emphasis">
+        <div className="absolute top-4 rounded-full bg-foreground-strong px-3 py-1 text-xs font-bold uppercase tracking-wide text-foreground-inverse dark:bg-foreground-inverse dark:text-foreground-strong">
           Most Popular
         </div>
       ) : null}
@@ -132,11 +132,11 @@ export function PricingCard({
       <div className="flex flex-col items-center justify-center gap-2 text-center">
         <h3
           id={`plan-${plan.name.toLowerCase()}-title`}
-          className="text-2xl font-medium leading-6 tracking-tight text-content-emphasis"
+          className="text-2xl font-medium leading-6 tracking-tight text-foreground-strong"
         >
           {plan.name}
         </h3>
-        <div className="flex items-baseline justify-center text-content-emphasis">
+        <div className="flex items-baseline justify-center text-foreground-strong">
           <span className="text-4xl font-bold tracking-tight">
             {formattedPrice}
           </span>
@@ -144,7 +144,7 @@ export function PricingCard({
             <span className="ml-1 text-sm font-medium opacity-60">{period}</span>
           )}
         </div>
-        <p className="max-w-[280px] text-sm leading-6 tracking-tight text-content-muted">
+        <p className="max-w-[280px] text-sm leading-6 tracking-tight text-foreground-secondary">
           {plan.description}
         </p>
       </div>
@@ -154,7 +154,7 @@ export function PricingCard({
         aria-label={`Features of ${plan.name}`}
       >
         {plan.featureIntro ? (
-          <li className="pb-1 text-sm leading-6 text-content-muted">
+          <li className="pb-1 text-sm leading-6 text-foreground-secondary">
             {plan.featureIntro}
           </li>
         ) : null}
@@ -163,11 +163,11 @@ export function PricingCard({
           return (
             <li
               key={feature.text}
-              className="flex items-center text-content-default"
+              className="flex items-center text-foreground-primary"
             >
               <div className="mr-3 shrink-0">
                 <Icon
-                  className={cn('h-5 w-5 text-content-emphasis opacity-80')}
+                  className={cn('h-5 w-5 text-foreground-strong opacity-80')}
                 />
               </div>
               <span className="text-sm">{feature.text}</span>
@@ -213,7 +213,7 @@ export function PricingCard({
           </Button>
         )}
         {helperDescription ? (
-          <p className="mt-2 text-center text-xs text-content-muted">
+          <p className="mt-2 text-center text-xs text-foreground-secondary">
             {helperDescription}
           </p>
         ) : null}

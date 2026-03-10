@@ -293,9 +293,9 @@ function FormTextInputControl({
   onValueChange,
 }: FormTextInputControlProps) {
   return inputPrefix != null ? (
-    <div className="flex w-full overflow-visible rounded-md border border-border-default bg-bg-default text-content-emphasis sm:text-sm">
+    <div className="flex w-full overflow-visible rounded-md border border-border-base bg-surface-base text-foreground-strong sm:text-sm">
       <span
-        className="flex shrink-0 items-center ltr:border-r rtl:border-l border-border-default bg-bg-subtle px-3 py-2 text-content-muted"
+        className="flex shrink-0 items-center ltr:border-r rtl:border-l border-border-base bg-surface-overlay px-3 py-2 text-foreground-secondary"
         aria-hidden
       >
         {inputPrefix}
@@ -504,7 +504,7 @@ export function Form({
       {...rest}
       onSubmit={handleFormSubmit}
       className={cn(
-        "overflow-hidden rounded-xl border border-bg-emphasis bg-transparent",
+        "overflow-hidden rounded-xl border border-surface-strong bg-transparent",
         className,
       )}
       aria-labelledby={sectionTitleId}
@@ -512,10 +512,10 @@ export function Form({
       data-state={saving ? "busy" : "idle"}
     >
       {/* Layer container: emphasis background acts as the visual base. */}
-      <div className="relative bg-emphasis/50">
+      <div className="relative bg-surface-strong/50">
         <div
           className={cn(
-            "relative z-10 flex flex-col space-y-6 rounded-b-2xl bg-bg-muted p-6 shadow-[0_2px_12px_rgb(0,0,0,0.05)]",
+            "relative z-10 flex flex-col space-y-6 rounded-b-2xl bg-surface-raised p-6 shadow-[0_2px_12px_rgb(0,0,0,0.05)]",
             contentClassName,
           )}
         >
@@ -528,13 +528,13 @@ export function Form({
             <div className="flex flex-col space-y-1">
               <h2
                 id={sectionTitleId}
-                className="text-base font-semibold text-content-emphasis text-xl"
+                className="text-base font-semibold text-foreground-strong text-xl"
               >
                 {title}
               </h2>
               {(description != null && description !== "") ||
               descriptionInlineSlot != null ? (
-                <div className="flex flex-wrap items-center gap-2 text-sm text-content-subtle">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-foreground-tertiary">
                   {description != null && description !== "" ? (
                     <p>{description}</p>
                   ) : null}
@@ -559,7 +559,7 @@ export function Form({
                     : (headerToggle.disabledLabel ?? "Disabled")
                 }
               />
-              <span className="text-sm font-medium text-content-emphasis">
+              <span className="text-sm font-medium text-foreground-strong">
                 {headerToggle.checked
                   ? (headerToggle.enabledLabel ?? "Enabled")
                   : (headerToggle.disabledLabel ?? "Disabled")}
@@ -571,10 +571,10 @@ export function Form({
             <div className="w-full max-w-md space-y-2">
               <div className="flex items-center justify-between text-sm">
                 {progressBar.label != null ? (
-                  <span className="text-content-muted">{progressBar.label}</span>
+                  <span className="text-foreground-secondary">{progressBar.label}</span>
                 ) : null}
                 {progressBar.valueLabel != null ? (
-                  <span className="font-medium text-content-default">
+                  <span className="font-medium text-foreground-primary">
                     {progressBar.valueLabel}
                   </span>
                 ) : null}
@@ -702,7 +702,7 @@ export function Form({
                 toggleSection.subsections.length > 0)) && (
             <div className="flex flex-col">
               {toggleSection.sectionTitle != null && (
-                <h3 className="mb-4 text-base font-semibold text-content-emphasis">
+                <h3 className="mb-4 text-base font-semibold text-foreground-strong">
                   {toggleSection.sectionTitle}
                 </h3>
               )}
@@ -713,20 +713,20 @@ export function Form({
                       <div className="mb-3 flex items-center gap-2">
                         {subsection.titleIcon != null ? (
                           <span
-                            className="flex shrink-0 text-content-default"
+                            className="flex shrink-0 text-foreground-primary"
                             aria-hidden
                           >
                             {subsection.titleIcon}
                           </span>
                         ) : null}
-                        <h4 className="text-sm font-semibold text-content-emphasis">
+                        <h4 className="text-sm font-semibold text-foreground-strong">
                           {subsection.title}
                         </h4>
                       </div>
                       <div
                         className={cn(
                           !toggleSection.rowHover &&
-                            "divide-y divide-border-default",
+                            "divide-y divide-border-base",
                         )}
                       >
                         {subsection.items.map((item, index) => {
@@ -735,14 +735,14 @@ export function Form({
                             <Fragment key={item.id}>
                               {rowHover && index > 0 ? (
                                 <div
-                                  className="border-t border-border-default"
+                                  className="border-t border-border-base"
                                   aria-hidden
                                 />
                               ) : null}
                               <div
                                 className={cn(
                                   rowHover &&
-                                    "-mx-6 px-6 py-4 hover:bg-bg-inverted/5",
+                                    "-mx-6 px-6 py-4 hover:bg-surface-inverse/5",
                                   !rowHover && "py-4",
                                 )}
                               >
@@ -753,7 +753,7 @@ export function Form({
                                   )}
                                 >
                                   <div className="min-w-0 space-y-1">
-                                    <p className="flex items-center gap-2 font-medium text-content-emphasis">
+                                    <p className="flex items-center gap-2 font-medium text-foreground-strong">
                                       {item.icon != null ? (
                                         <span
                                           className="flex shrink-0"
@@ -767,7 +767,7 @@ export function Form({
                                     {(item.description != null &&
                                       item.description !== "") ||
                                     item.learnMoreHref != null ? (
-                                      <p className="text-sm text-content-subtle">
+                                      <p className="text-sm text-foreground-tertiary">
                                         {item.description}
                                         {item.learnMoreHref != null ? (
                                           <>
@@ -776,7 +776,7 @@ export function Form({
                                               href={item.learnMoreHref}
                                               target="_blank"
                                               rel="noopener noreferrer"
-                                              className="inline-flex items-center gap-1 font-medium text-accent-default underline underline-offset-2 hover:text-accent-default/80"
+                                              className="inline-flex items-center gap-1 font-medium text-accent-primary underline underline-offset-2 hover:text-accent-primary/80"
                                             >
                                               Learn more
                                               <ExternalLink
@@ -797,11 +797,11 @@ export function Form({
                                   <div className="min-w-0 text-center">
                                     {item.price != null ? (
                                       <>
-                                        <p className="font-medium text-content-emphasis">
+                                        <p className="font-medium text-foreground-strong">
                                           {item.price}
                                         </p>
                                         {item.priceSub != null && (
-                                          <p className="text-sm text-content-subtle">
+                                          <p className="text-sm text-foreground-tertiary">
                                             {item.priceSub}
                                           </p>
                                         )}
@@ -829,7 +829,7 @@ export function Form({
                 <div
                   className={cn(
                     !toggleSection.rowHover &&
-                      "divide-y divide-border-default",
+                      "divide-y divide-border-base",
                   )}
                 >
                   {toggleSection.items!.map((item, index) => {
@@ -838,14 +838,14 @@ export function Form({
                       <Fragment key={item.id}>
                         {rowHover && index > 0 ? (
                           <div
-                            className="border-t border-border-default"
+                            className="border-t border-border-base"
                             aria-hidden
                           />
                         ) : null}
                         <div
                           className={cn(
                             rowHover &&
-                              "-mx-6 px-6 py-4 hover:bg-bg-inverted/5",
+                              "-mx-6 px-6 py-4 hover:bg-surface-inverse/5",
                             !rowHover && "py-4",
                           )}
                         >
@@ -856,7 +856,7 @@ export function Form({
                             )}
                           >
                             <div className="min-w-0 space-y-1">
-                              <p className="flex items-center gap-2 font-medium text-content-emphasis">
+                              <p className="flex items-center gap-2 font-medium text-foreground-strong">
                                 {item.icon != null ? (
                                   <span
                                     className="flex shrink-0"
@@ -870,7 +870,7 @@ export function Form({
                               {(item.description != null &&
                                 item.description !== "") ||
                               item.learnMoreHref != null ? (
-                                <p className="text-sm text-content-subtle">
+                                <p className="text-sm text-foreground-tertiary">
                                   {item.description}
                                   {item.learnMoreHref != null ? (
                                     <>
@@ -879,7 +879,7 @@ export function Form({
                                         href={item.learnMoreHref}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 font-medium text-accent-default underline underline-offset-2 hover:text-accent-default/80"
+                                        className="inline-flex items-center gap-1 font-medium text-accent-primary underline underline-offset-2 hover:text-accent-primary/80"
                                       >
                                         Learn more
                                         <ExternalLink
@@ -898,11 +898,11 @@ export function Form({
                             <div className="min-w-0 text-center">
                               {item.price != null ? (
                                 <>
-                                  <p className="font-medium text-content-emphasis">
+                                  <p className="font-medium text-foreground-strong">
                                     {item.price}
                                   </p>
                                   {item.priceSub != null && (
-                                    <p className="text-sm text-content-subtle">
+                                    <p className="text-sm text-foreground-tertiary">
                                       {item.priceSub}
                                     </p>
                                   )}
@@ -939,10 +939,10 @@ export function Form({
             className={cn(
               "relative z-0 -mt-3 flex flex-col items-start justify-between gap-4 rounded-b-xl border-t px-5 pb-4 pt-6 transition-[background-color,border-color] duration-250 ease-out sm:flex-row sm:items-center sm:justify-between sm:space-y-0 sm:pb-3 sm:pt-5",
               feedbackTone === "error"
-                ? "border-border-subtle bg-bg-error"
+                ? "border-border-faint bg-surface-error"
                 : feedbackTone === "info"
-                  ? "border-border-subtle bg-bg-info/25"
-                  : "border-border-subtle bg-bg-emphasis/50",
+                  ? "border-border-faint bg-surface-info/25"
+                  : "border-border-faint bg-surface-strong/50",
             )}
           >
           <div className="min-h-[1.25rem] min-w-0 flex-1 text-sm">
@@ -956,26 +956,26 @@ export function Form({
               >
                 {visibleError != null ? (
                   typeof visibleError === "string" ? (
-                    <p className="text-content-error font-medium" role="alert">
+                    <p className="text-foreground-error font-medium" role="alert">
                       {visibleError}
                     </p>
                   ) : (
-                    <div className="text-content-error font-medium" role="alert">
+                    <div className="text-foreground-error font-medium" role="alert">
                       {visibleError}
                     </div>
                   )
                 ) : visibleSuccess != null ? (
                   typeof visibleSuccess === "string" ? (
-                    <p className="text-content-info font-medium" role="status" aria-live="polite">
+                    <p className="text-foreground-info font-medium" role="status" aria-live="polite">
                       {visibleSuccess}
                     </p>
                   ) : (
-                    <div className="text-content-info font-medium" role="status" aria-live="polite">
+                    <div className="text-foreground-info font-medium" role="status" aria-live="polite">
                       {visibleSuccess}
                     </div>
                   )
                 ) : helpText != null || helpLearnMoreHref != null ? (
-                  <div className="text-sm text-content-subtle prose-a:underline prose-a:underline-offset-4 hover:prose-a:text-content-default transition-colors">
+                  <div className="text-sm text-foreground-tertiary prose-a:underline prose-a:underline-offset-4 hover:prose-a:text-foreground-primary transition-colors">
                     {helpText != null &&
                       (typeof helpText === "string" ? (
                         <span
@@ -991,7 +991,7 @@ export function Form({
                           href={helpLearnMoreHref}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 font-medium text-accent-default underline underline-offset-2 hover:text-accent-default/80"
+                          className="inline-flex items-center gap-1 font-medium text-accent-primary underline underline-offset-2 hover:text-accent-primary/80"
                         >
                           {helpLearnMoreLabel ?? "Learn more"}
                           <ExternalLink

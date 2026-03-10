@@ -52,7 +52,7 @@ export function PromptInputActionsMenu({
             variant="ghost"
             size="icon"
             aria-label={m.chat_prompt_actions_open_aria_label()}
-            className="self-end size-8 rounded-full border border-transparent bg-transparent p-0 text-content-emphasis hover:bg-bg-inverted/5 active:bg-bg-inverted/10 focus-visible:ring-2 focus-visible:ring-border-emphasis/40"
+            className="self-end size-8 rounded-full border border-transparent bg-transparent p-0 text-foreground-strong hover:bg-surface-inverse/5 active:bg-surface-inverse/10 focus-visible:ring-2 focus-visible:ring-border-strong/40"
           >
             <Plus className="size-[18px]" aria-hidden />
           </Button>
@@ -62,10 +62,10 @@ export function PromptInputActionsMenu({
         align="start"
         side="top"
         sideOffset={8}
-        className="min-w-48 rounded-xl border border-border-muted bg-bg-default p-1 text-content-default shadow-lg ring-border-emphasis/10"
+        className="min-w-48 rounded-xl border border-border-light bg-surface-base p-1 text-foreground-primary shadow-lg ring-border-strong/10"
       >
         <DropdownMenuItem
-          className="h-9 rounded-lg px-2 text-sm font-medium text-content-default focus:bg-bg-inverted/8"
+          className="h-9 rounded-lg px-2 text-sm font-medium text-foreground-primary focus:bg-surface-inverse/8"
           disabled={!canAddMore}
           onClick={onOpenFilePicker}
         >
@@ -74,7 +74,7 @@ export function PromptInputActionsMenu({
             : m.chat_prompt_actions_attach_files_max_reached()}
         </DropdownMenuItem>
         <DropdownMenuCheckboxItem
-          className="h-9 rounded-lg px-2 text-sm font-medium text-content-default focus:bg-bg-inverted/8"
+          className="h-9 rounded-lg px-2 text-sm font-medium text-foreground-primary focus:bg-surface-inverse/8"
           checked={isStudyModeEnabled}
           disabled={isModeEnforced || !activeThreadId}
           onCheckedChange={onToggleStudyMode}
@@ -98,7 +98,7 @@ export function PromptInputActionsMenu({
               {visibleTools.map((tool) => (
                 <DropdownMenuCheckboxItem
                   key={tool.key}
-                  className="min-h-9 rounded-lg px-2 py-2 text-sm font-medium text-content-default focus:bg-bg-inverted/8"
+                  className="min-h-9 rounded-lg px-2 py-2 text-sm font-medium text-foreground-primary focus:bg-surface-inverse/8"
                   checked={!disabledToolKeys.includes(tool.key)}
                   disabled={tool.disabled}
                   onCheckedChange={(checked) => {

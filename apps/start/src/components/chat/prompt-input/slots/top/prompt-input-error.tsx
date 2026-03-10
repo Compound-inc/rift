@@ -48,7 +48,7 @@ export function PromptInputError({
       ref={containerRef}
       className={cn(
         '-mt-1.5 -mx-1.5 rounded-t-2xl',
-        'bg-bg-error text-content-error mb-3',
+        'bg-surface-error text-foreground-error mb-3',
         className
       )}
       role="alert"
@@ -58,7 +58,7 @@ export function PromptInputError({
         className="flex gap-2 px-3 py-2.5 min-h-[2.5rem] text-sm"
         style={{ alignItems: 'center' }}
       >
-        <AlertTriangle className="size-5 shrink-0 text-content-error" aria-hidden />
+        <AlertTriangle className="size-5 shrink-0 text-foreground-error" aria-hidden />
         <div className="flex-1 min-w-0 max-h-[200px] overflow-y-auto leading-snug flex items-center gap-1 flex-wrap">
           {error ?? children}
           {traceId && (
@@ -86,7 +86,7 @@ export function PromptInputError({
         )}
       </div>
       {open && traceId && (
-        <div className="px-3 pb-3 pt-1 border-t border-content-error/20">
+        <div className="px-3 pb-3 pt-1 border-t border-foreground-error/20">
           <div className="text-sm font-medium opacity-90 mb-0.5">{m.chat_prompt_error_trace_id_label()}</div>
           <button
             type="button"

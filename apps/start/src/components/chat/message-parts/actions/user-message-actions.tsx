@@ -182,7 +182,7 @@ export function UserMessageActions({
             >
               <ChevronLeftIcon className="size-4 rtl:scale-x-[-1]" aria-hidden />
             </MessageActionButton>
-            <div className="flex h-8 min-w-10 items-center justify-center rounded-lg px-0.5 text-sm text-content-muted">
+            <div className="flex h-8 min-w-10 items-center justify-center rounded-lg px-0.5 text-sm text-foreground-secondary">
               {selectedDisplayIndex}/{totalOptions}
             </div>
             <MessageActionButton

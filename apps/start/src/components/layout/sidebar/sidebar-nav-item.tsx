@@ -47,7 +47,7 @@ export function SidebarNavItem({
     <div
       className={cn(
         buttonVariants({ variant: 'sidebarNavItem', size: 'sidebarNavItem' }),
-        'group bg-bg-inverted/5',
+        'group bg-surface-inverse/5',
       )}
       role="presentation"
     >
@@ -59,7 +59,7 @@ export function SidebarNavItem({
       >
         {Icon ? (
           <Icon
-            className={cn('size-4', isActive ? 'text-content-info' : '')}
+            className={cn('size-4', isActive ? 'text-foreground-info' : '')}
             data-hovered={hovered}
           />
         ) : null}
@@ -79,7 +79,7 @@ export function SidebarNavItem({
         <span className="flex w-full items-center gap-2.5">
           {Icon ? (
             <Icon
-              className={cn('size-4', isActive ? 'text-content-info' : '')}
+              className={cn('size-4', isActive ? 'text-foreground-info' : '')}
               data-hovered={hovered}
             />
           ) : null}

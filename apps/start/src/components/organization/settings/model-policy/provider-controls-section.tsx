@@ -63,16 +63,16 @@ export function ProviderControlsSection({
             id: provider.id,
             title: name,
             icon: ProviderIcon ? (
-              <ProviderIcon className="size-5 text-content-default" />
+              <ProviderIcon className="size-5 text-foreground-primary" />
             ) : (
-              <div className="size-5 rounded-full bg-bg-inverted" />
+              <div className="size-5 rounded-full bg-surface-inverse" />
             ),
             description: meta?.description ?? '',
             actionSlot: (
               <Link
                 to="/organization/settings/models/$providerId"
                 params={{ providerId: provider.id }}
-                className="inline-flex items-center gap-1 text-sm font-medium text-accent-default underline underline-offset-2 hover:text-accent-default/80"
+                className="inline-flex items-center gap-1 text-sm font-medium text-accent-primary underline underline-offset-2 hover:text-accent-primary/80"
                 aria-label={m.org_provider_controls_view_all_models_for_provider_aria_label({ providerName: name })}
               >
                 {m.org_provider_controls_view_all_models()}
