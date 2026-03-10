@@ -30,6 +30,7 @@ import { useFileAttachments } from '../../hooks/chat/upload'
 import { parseChatApiError } from './chat-error-messages'
 import { getChatModeDefinition } from '@/lib/chat-modes'
 import { m } from '@/paraglide/messages.js'
+import { useContextUsage } from '@/hooks/chat/use-context-usage'
 import {
   clearComposerDraft,
   getComposerDraftValue,
@@ -42,7 +43,7 @@ import type {
 } from '@/lib/chat-contracts/attachments'
 
 export function ChatInput() {
-  const { branchCost, branchUsage, showBranchCost } = useChatMessages()
+  const { branchCost, branchUsage, messages, showBranchCost } = useChatMessages()
   const {
     sendMessage,
     status,
@@ -180,7 +181,7 @@ export function ChatInput() {
     isStudyModeEnabled ? studyModeDefinition.fixedModelId : selectedModelId
   const catalogModel = getCatalogModel(effectiveModelId)
   const maxTokens = catalogModel?.contextWindow ?? 128_000
-  const usedTokens = branchUsage?.totalTokens ?? 0
+  const { usedTokens } = useContextUsage(messages)
   const selectorTriggerClassName =
     'h-8 rounded-full border border-transparent bg-transparent px-3 ltr:pr-7 rtl:pl-7 text-sm leading-[21px] font-medium text-content-emphasis transition-colors hover:bg-bg-inverted/5 active:bg-bg-inverted/10 focus-visible:border-border-emphasis focus-visible:ring-2 focus-visible:ring-border-emphasis/40'
 

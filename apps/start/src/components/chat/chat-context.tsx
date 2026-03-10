@@ -394,54 +394,37 @@ function buildBranchUsage(messages: readonly {
   readonly cacheWriteTokens?: number | null
   readonly noCacheTokens?: number | null
 }[]): LanguageModelUsage | undefined {
-  const assistantMessages = messages.filter((message) => message.role === 'assistant')
-  if (assistantMessages.length === 0) return undefined
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (message?.role !== 'assistant') continue
 
-  let inputTokens = 0
-  let outputTokens = 0
-  let totalTokens = 0
-  let reasoningTokens = 0
-  let textTokens = 0
-  let cacheReadTokens = 0
-  let cacheWriteTokens = 0
-  let noCacheTokens = 0
-  let hasAnyUsage = false
-
-  for (const message of assistantMessages) {
-    inputTokens += message.inputTokens ?? 0
-    outputTokens += message.outputTokens ?? 0
-    totalTokens += message.totalTokens ?? 0
-    reasoningTokens += message.reasoningTokens ?? 0
-    textTokens += message.textTokens ?? 0
-    cacheReadTokens += message.cacheReadTokens ?? 0
-    cacheWriteTokens += message.cacheWriteTokens ?? 0
-    noCacheTokens += message.noCacheTokens ?? 0
-    hasAnyUsage =
-      hasAnyUsage ||
+    const hasAnyUsage =
       message.inputTokens != null ||
       message.outputTokens != null ||
       message.totalTokens != null
+
+    if (!hasAnyUsage) continue
+
+    return {
+      inputTokens: message.inputTokens ?? undefined,
+      inputTokenDetails: {
+        noCacheTokens: message.noCacheTokens ?? undefined,
+        cacheReadTokens: message.cacheReadTokens ?? undefined,
+        cacheWriteTokens: message.cacheWriteTokens ?? undefined,
+      },
+      outputTokens: message.outputTokens ?? undefined,
+      outputTokenDetails: {
+        textTokens: message.textTokens ?? undefined,
+        reasoningTokens: message.reasoningTokens ?? undefined,
+      },
+      totalTokens:
+        message.totalTokens ?? addDefined(message.inputTokens ?? undefined, message.outputTokens ?? undefined),
+      reasoningTokens: message.reasoningTokens ?? undefined,
+      cachedInputTokens: message.cacheReadTokens ?? undefined,
+    }
   }
 
-  if (!hasAnyUsage) return undefined
-
-  return {
-    inputTokens,
-    inputTokenDetails: {
-      noCacheTokens,
-      cacheReadTokens,
-      cacheWriteTokens,
-    },
-    outputTokens,
-    outputTokenDetails: {
-      textTokens,
-      reasoningTokens,
-    },
-    totalTokens:
-      totalTokens > 0 ? totalTokens : addDefined(inputTokens, outputTokens),
-    reasoningTokens,
-    cachedInputTokens: cacheReadTokens,
-  }
+  return undefined
 }
 
 function buildBranchCost(messages: readonly {

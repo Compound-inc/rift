@@ -9,6 +9,7 @@ import {
   toReadableErrorMessage,
 } from '../domain/error-formatting'
 import { ModelProviderError } from '../domain/errors'
+import { sanitizeMessagesForModel } from './model-prompt'
 
 /**
  * Model gateway encapsulates AI SDK provider calls so orchestrator/business
@@ -138,7 +139,8 @@ export class ModelGatewayService extends ServiceMap.Service<
       }) =>
         Effect.tryPromise({
           try: async () => {
-            const modelMessages = await convertToModelMessages(messages)
+            const promptMessages = sanitizeMessagesForModel(messages)
+            const modelMessages = await convertToModelMessages(promptMessages)
             const runtimeModel = resolveRuntimeModel({
               modelId: model,
               providerApiKeyOverride,

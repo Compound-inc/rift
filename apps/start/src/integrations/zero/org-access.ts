@@ -1,5 +1,4 @@
 import { zql } from './zql'
-import { isAdminRole } from '@/lib/auth/roles'
 
 const MISSING_ORGANIZATION_ID = '__missing_org__'
 
@@ -11,7 +10,6 @@ export type ScopedOrgViewerContext = {
 type ZeroViewerContext = {
   readonly organizationId?: string
   readonly userID: string
-  readonly memberRole?: string
   readonly isAnonymous: boolean
 }
 
@@ -49,41 +47,10 @@ export function requireOrgContext(
 }
 
 /**
- * Shared role predicate for org-level management capabilities. The app treats
- * owner/admin as billing and policy managers.
- */
-export function isOrgAdmin(role: string): boolean {
-  return isAdminRole(role)
-}
-
-/**
- * Mutator wrapper that verifies the caller is an owner/admin member of the
- * active organization before allowing privileged writes.
- */
-export function requireOrgAdmin(input: {
-  ctx: ZeroViewerContext
-  unauthorizedMessage?: string
-}): ScopedOrgViewerContext {
-  const scoped = requireOrgContext(
-    input.ctx,
-    'Organization context is required to manage organization settings',
-  )
-  const role = input.ctx.memberRole
-  if (!role || !isOrgAdmin(role)) {
-    throw new Error(
-      input.unauthorizedMessage
-        ?? 'Only workspace owners or admins can manage organization settings.',
-    )
-  }
-
-  return scoped
-}
-
-/**
  * Minimal membership predicate for org-scoped reads that any active member can
  * access, such as billing summaries or grant visibility for their own account.
  */
-export function whereViewerIsMember(userID: string) {
+export function isOrgMember(userID: string) {
   return (members: typeof zql.member) => members.where('userId', userID)
 }
 

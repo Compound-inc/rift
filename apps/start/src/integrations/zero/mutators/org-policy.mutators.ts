@@ -11,7 +11,8 @@ import {
   type WorkspaceFeatureId,
 } from '@/lib/billing/plan-catalog'
 import { isChatModeId } from '@/lib/chat-modes'
-import { requireOrgAdmin } from '../org-access'
+import { isAdminRole } from '@/lib/auth/roles'
+import { requireOrgContext } from '../org-access'
 import { zql } from '../zql'
 
 const toggleProviderPolicyArgs = z.object({
@@ -102,6 +103,64 @@ function remove(values: readonly string[], candidate: string): string[] {
 /** Returns a new list with the target identifier appended if absent. */
 function add(values: readonly string[], candidate: string): string[] {
   return unique([...values, candidate])
+}
+
+type OrgMutatorContext = {
+  readonly organizationId?: string
+  readonly userID: string
+  readonly isAnonymous: boolean
+}
+
+type MemberRoleRow = {
+  role?: string
+}
+
+/**
+ * Server-side org-policy writes must verify the caller against the current
+ * membership row rather than relying solely on Zero context. The client context
+ * can be stale during org switches or subscription redirects, while the
+ * authoritative member row in Postgres reflects the actual owner/admin role.
+ *
+ * Client-side optimistic execution uses the role in context when available so
+ * obvious unauthorized toggles fail immediately. If the client has not synced
+ * the membership row yet, the server pass remains the source of truth.
+ */
+async function requireOrgPolicyAdmin(args: {
+  tx: any
+  ctx: OrgMutatorContext
+}): Promise<{ organizationId: string; userID: string }> {
+  const scoped = requireOrgContext(
+    args.ctx,
+    'Organization context is required to manage organization settings',
+  )
+
+  if (args.tx.location !== 'server') {
+    const cachedMembership = await args.tx.run(
+      zql.member
+        .where('organizationId', scoped.organizationId)
+        .where('userId', scoped.userID)
+        .one(),
+    ) as MemberRoleRow | null | undefined
+
+    if (cachedMembership?.role && isAdminRole(cachedMembership.role)) {
+      return scoped
+    }
+
+    return scoped
+  }
+
+  const membership = await args.tx.run(
+    zql.member
+      .where('organizationId', scoped.organizationId)
+      .where('userId', scoped.userID)
+      .one(),
+  ) as MemberRoleRow | null | undefined
+
+  if (!membership?.role || !isAdminRole(membership.role)) {
+    throw new Error('Only workspace owners or admins can manage organization settings.')
+  }
+
+  return scoped
 }
 
 async function requireOrgFeature(args: {
@@ -246,7 +305,8 @@ async function persistOrgPolicy(args: {
 export const orgPolicyMutatorDefinitions = {
   orgPolicy: {
     toggleProvider: defineMutator(toggleProviderPolicyArgs, async ({ tx, args, ctx }) => {
-      const { organizationId } = requireOrgAdmin({
+      const { organizationId } = await requireOrgPolicyAdmin({
+        tx,
         ctx,
       })
       await requireOrgFeature({
@@ -278,7 +338,8 @@ export const orgPolicyMutatorDefinitions = {
     }),
 
     toggleModel: defineMutator(toggleModelPolicyArgs, async ({ tx, args, ctx }) => {
-      const { organizationId } = requireOrgAdmin({
+      const { organizationId } = await requireOrgPolicyAdmin({
+        tx,
         ctx,
       })
       await requireOrgFeature({
@@ -312,7 +373,8 @@ export const orgPolicyMutatorDefinitions = {
     toggleComplianceFlag: defineMutator(
       toggleComplianceFlagArgs,
       async ({ tx, args, ctx }) => {
-        const { organizationId } = requireOrgAdmin({
+        const { organizationId } = await requireOrgPolicyAdmin({
+          tx,
           ctx,
         })
         await requireOrgFeature({
@@ -342,7 +404,8 @@ export const orgPolicyMutatorDefinitions = {
       },
     ),
     setEnforcedMode: defineMutator(setEnforcedModeArgs, async ({ tx, args, ctx }) => {
-      const { organizationId } = requireOrgAdmin({
+      const { organizationId } = await requireOrgPolicyAdmin({
+        tx,
         ctx,
       })
       await requireOrgFeature({
@@ -373,7 +436,8 @@ export const orgPolicyMutatorDefinitions = {
     toggleProviderNativeTools: defineMutator(
       toggleProviderNativeToolsArgs,
       async ({ tx, args, ctx }) => {
-        const { organizationId } = requireOrgAdmin({
+        const { organizationId } = await requireOrgPolicyAdmin({
+          tx,
           ctx,
         })
         await requireOrgFeature({
@@ -401,7 +465,8 @@ export const orgPolicyMutatorDefinitions = {
     toggleExternalTools: defineMutator(
       toggleExternalToolsArgs,
       async ({ tx, args, ctx }) => {
-        const { organizationId } = requireOrgAdmin({
+        const { organizationId } = await requireOrgPolicyAdmin({
+          tx,
           ctx,
         })
         await requireOrgFeature({
@@ -427,7 +492,8 @@ export const orgPolicyMutatorDefinitions = {
       },
     ),
     toggleTool: defineMutator(toggleToolArgs, async ({ tx, args, ctx }) => {
-      const { organizationId } = requireOrgAdmin({
+      const { organizationId } = await requireOrgPolicyAdmin({
+        tx,
         ctx,
       })
       await requireOrgFeature({

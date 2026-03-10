@@ -35,7 +35,11 @@ export function PricingPage() {
       return
     }
 
-    void authClient.organization.getActiveMemberRole().then(({ data, error }) => {
+    void authClient.organization.getActiveMemberRole({
+      query: {
+        organizationId: activeOrganizationId,
+      },
+    }).then(({ data, error }) => {
       if (cancelled) return
       if (error || !data?.role) {
         setCanManageBilling(false)

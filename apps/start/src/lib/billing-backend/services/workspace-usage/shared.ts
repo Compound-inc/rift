@@ -2,6 +2,7 @@ import type { UIMessage } from 'ai'
 import { getCatalogModel } from '@/lib/ai-catalog'
 import type { WorkspacePlanId } from '@/lib/billing/plan-catalog'
 import { getWorkspacePlan } from '@/lib/billing/plan-catalog'
+import { estimatePromptTokens } from '@/lib/chat-contracts'
 
 export const CHAT_USAGE_FEATURE_KEY = 'chat_message' as const
 export const SEAT_WINDOW_DURATION_MS = 4 * 60 * 60 * 1000
@@ -287,30 +288,6 @@ export function selectSeatSlotCandidate(input: {
   return previouslyUsedVacant[0] ?? null
 }
 
-function textFromMessage(message: UIMessage): string {
-  return message.parts
-    .filter(
-      (part): part is { type: 'text'; text: string } =>
-        part.type === 'text' && typeof (part as { text?: unknown }).text === 'string',
-    )
-    .map((part) => part.text)
-    .join('')
-}
-
-function getMessageTotalTokens(message: UIMessage): number | undefined {
-  const metadata = message.metadata
-  if (!metadata || typeof metadata !== 'object') {
-    return undefined
-  }
-
-  const totalTokens = (metadata as { totalTokens?: unknown }).totalTokens
-  return typeof totalTokens === 'number' ? totalTokens : undefined
-}
-
-export function estimateTokensFromText(text: string): number {
-  return Math.max(1, Math.ceil(text.length / 4))
-}
-
 function applyTierCost(input: {
   readonly tokens: number
   readonly baseCost?: string
@@ -354,13 +331,7 @@ export function estimateReservedCostNanoUsd(input: {
     return input.usagePolicy.minReserveNanoUsd
   }
 
-  let inputTokens = 0
-  for (const message of input.messages) {
-    const totalTokens = getMessageTotalTokens(message)
-    inputTokens += typeof totalTokens === 'number'
-      ? totalTokens
-      : estimateTokensFromText(textFromMessage(message))
-  }
+  const inputTokens = estimatePromptTokens(input.messages)
 
   const estimatedOutputTokens = Math.max(
     96,

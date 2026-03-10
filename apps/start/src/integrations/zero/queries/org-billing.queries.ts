@@ -3,7 +3,7 @@ import { z } from 'zod'
 import {
   missingOrganizationQuery,
   getOrgContext,
-  whereViewerIsMember,
+  isOrgMember,
 } from '../org-access'
 import { zql } from '../zql'
 
@@ -24,7 +24,7 @@ export const orgBillingQueryDefinitions = {
 
       return zql.organization
         .where('id', scoped.organizationId)
-        .whereExists('members', whereViewerIsMember(scoped.userID))
+        .whereExists('members', isOrgMember(scoped.userID))
         .related('subscriptions', (subscriptions) =>
           subscriptions.orderBy('updatedAt', 'desc').limit(1),
         )

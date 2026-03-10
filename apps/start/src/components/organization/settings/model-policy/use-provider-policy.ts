@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useQuery, useZero } from '@rocicorp/zero/react'
+import { toast } from 'sonner'
 import { AI_CATALOG, AI_MODELS_BY_PROVIDER } from '@/lib/ai-catalog'
 import { TOOL_CATALOG } from '@/lib/ai-catalog/tool-catalog'
 import { evaluateModelAvailability } from '@/lib/model-policy/policy-engine'
@@ -148,7 +149,9 @@ export function useProviderPolicy() {
           ).client
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to update policy')
+        const message = e instanceof Error ? e.message : 'Failed to update policy'
+        setError(message)
+        toast.error(message)
       } finally {
         setUpdating(false)
       }

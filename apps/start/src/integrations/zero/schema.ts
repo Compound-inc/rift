@@ -507,7 +507,6 @@ export type Schema = typeof schema
 export type ZeroContext = {
   userID: string
   organizationId?: string
-  memberRole?: string
   isAnonymous: boolean
 }
 

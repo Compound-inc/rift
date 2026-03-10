@@ -5,7 +5,6 @@ import { Effect, Schema } from 'effect'
 import { schema } from '@/integrations/zero/schema'
 import { mutators } from '@/integrations/zero/mutators'
 import type { ZeroContext } from '@/integrations/zero/schema'
-import { auth } from '@/lib/auth/auth.server'
 import { emitWideErrorEvent } from '@/lib/chat-backend/observability/wide-event'
 import { ChatErrorCode } from '@/lib/chat-contracts/error-codes'
 import { getZeroUpstreamPool } from '@/lib/server-effect/infra/zero-upstream-pool'
@@ -72,21 +71,10 @@ export const Route = createFileRoute('/api/zero/mutate')({
             onUnauthorized: () =>
               new ZeroMutateUnauthorizedError({ message: 'Unauthorized' }),
           })
-          const memberRoleResult = yield* Effect.tryPromise({
-            try: () =>
-              auth.api.getActiveMemberRole({
-                headers: request.headers,
-              }),
-            catch: () => null,
-          })
-          const memberRole = (
-            memberRoleResult as { role?: unknown } | null
-          )?.role
 
           const context: ZeroContext = {
             userID: authContext.userId,
             organizationId: authContext.organizationId,
-            memberRole: typeof memberRole === 'string' ? memberRole : undefined,
             isAnonymous: authContext.isAnonymous,
           }
           const requestId =

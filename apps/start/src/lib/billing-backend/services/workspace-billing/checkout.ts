@@ -10,19 +10,19 @@ import {
 import { isScheduledDowngrade, requireStripeClient } from './shared'
 import type { WorkspaceSubscriptionRow } from './types'
 import type { StripeManagedWorkspacePlanId } from '../../../billing/plan-catalog'
-import { isAdminRole } from '@/lib/auth/roles'
+import { isOrgAdmin } from '@/lib/auth/organization-member-role.server'
 
 async function assertActiveOrgAdmin(input: {
   headers: Headers
   organizationId: string
   userId: string
 }): Promise<void> {
-  const authModule: typeof import('@/lib/auth/auth.server') = await import('@/lib/auth/auth.server')
-  const result = await authModule.auth.api.getActiveMemberRole({
+  const allowed = await isOrgAdmin({
     headers: input.headers,
+    organizationId: input.organizationId,
   })
 
-  if (!result?.role || !isAdminRole(result.role)) {
+  if (!allowed) {
     throw new WorkspaceBillingForbiddenError({
       message: 'Only workspace owners or admins can manage billing.',
       organizationId: input.organizationId,

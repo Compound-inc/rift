@@ -128,4 +128,45 @@ describe('estimateReservedCostNanoUsd', () => {
 
     expect(estimate).toBe(usdToNanoUsd(0.005))
   })
+
+  it('ignores historical assistant totalTokens when estimating the next prompt', () => {
+    const usagePolicy = resolveUsagePolicySnapshot(
+      'pro',
+      resolveDefaultUsagePolicyTemplate('pro'),
+    )
+    const baseMessages: UIMessage<ChatMessageMetadata>[] = [
+      {
+        id: 'user-1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Explain what this means.' }],
+      },
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'It means the request is valid.' }],
+      },
+    ]
+
+    const inflatedMetadataMessages: UIMessage<ChatMessageMetadata>[] = [
+      baseMessages[0]!,
+      {
+        ...baseMessages[1]!,
+        metadata: { totalTokens: 48_000 },
+      },
+    ]
+
+    expect(
+      estimateReservedCostNanoUsd({
+        modelId: 'openai/gpt-5-mini',
+        messages: inflatedMetadataMessages,
+        usagePolicy,
+      }),
+    ).toBe(
+      estimateReservedCostNanoUsd({
+        modelId: 'openai/gpt-5-mini',
+        messages: baseMessages,
+        usagePolicy,
+      }),
+    )
+  })
 })
