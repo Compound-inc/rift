@@ -1,7 +1,6 @@
 import { APIError } from '@better-auth/core/error'
 import { Effect, Layer, ServiceMap } from 'effect'
 import { getWorkspaceFeatureAccessState } from '@/lib/billing/plan-catalog'
-import { isWorkspaceBillingManagerRole } from '../permissions'
 import {
   WorkspaceBillingConfigurationError,
   WorkspaceBillingFeatureUnavailableError,
@@ -13,7 +12,6 @@ import { recomputeEntitlementSnapshotRecord } from './workspace-billing/entitlem
 import {
   readCurrentOrgSubscription,
   readEntitlementSnapshot,
-  readMembershipRole,
   readOrganizationMemberCounts,
 } from './workspace-billing/persistence'
 import { syncWorkspaceSubscriptionRecord, markWorkspaceSubscriptionCanceledRecord } from './workspace-billing/subscription-sync'
@@ -76,31 +74,6 @@ export class WorkspaceBillingService extends ServiceMap.Service<
               ? cause
               : toPersistenceError('Failed to verify workspace invitation capacity', {
                   organizationId,
-                  cause,
-                }),
-        }),
-    ),
-
-    assertBillingManagerAccess: Effect.fn('WorkspaceBillingService.assertBillingManagerAccess')(
-      ({ organizationId, userId }) =>
-        Effect.tryPromise({
-          try: async () => {
-            const role = await readMembershipRole({ organizationId, userId })
-
-            if (!role || !isWorkspaceBillingManagerRole(role)) {
-              throw new WorkspaceBillingForbiddenError({
-                message: 'Only workspace owners or admins can manage billing.',
-                organizationId,
-                userId,
-              })
-            }
-          },
-          catch: (cause) =>
-            cause instanceof WorkspaceBillingForbiddenError
-              ? cause
-              : toPersistenceError('Failed to verify workspace billing permissions', {
-                  organizationId,
-                  userId,
                   cause,
                 }),
         }),

@@ -1,5 +1,5 @@
--- Adds organization-owned billing foundations: default workspace mapping,
--- subscriptions, entitlement snapshots, and org-scoped top-up grants.
+-- Adds organization-owned billing foundations: subscriptions,
+-- entitlement snapshots, and seat access controls.
 
 CREATE TABLE IF NOT EXISTS org_billing_account (
   id TEXT PRIMARY KEY,
@@ -275,89 +275,3 @@ LEFT JOIN (
 ) invitation_counts
   ON invitation_counts."organizationId" = organization.id
 ON CONFLICT (organization_id) DO NOTHING;
-
-CREATE TABLE IF NOT EXISTS topup_product (
-  id TEXT PRIMARY KEY,
-  code TEXT NOT NULL UNIQUE,
-  display_name TEXT NOT NULL,
-  currency TEXT NOT NULL,
-  price_minor INTEGER NOT NULL,
-  credit_amount_minor INTEGER NOT NULL,
-  provider TEXT NOT NULL,
-  stripe_price_id TEXT,
-  active BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at BIGINT NOT NULL,
-  updated_at BIGINT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS topup_product_active
-  ON topup_product (active);
-
-CREATE TABLE IF NOT EXISTS org_topup_order (
-  id TEXT PRIMARY KEY,
-  organization_id TEXT NOT NULL,
-  billing_account_id TEXT,
-  provider TEXT NOT NULL,
-  provider_payment_id TEXT,
-  status TEXT NOT NULL,
-  currency TEXT NOT NULL,
-  subtotal_minor INTEGER NOT NULL,
-  total_minor INTEGER NOT NULL,
-  targeting_mode TEXT NOT NULL,
-  purchased_by_user_id TEXT NOT NULL,
-  created_at BIGINT NOT NULL,
-  updated_at BIGINT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS org_topup_order_organization_id
-  ON org_topup_order (organization_id);
-
-CREATE TABLE IF NOT EXISTS org_topup_grant (
-  id TEXT PRIMARY KEY,
-  organization_id TEXT NOT NULL,
-  user_id TEXT NOT NULL,
-  topup_order_id TEXT NOT NULL,
-  topup_product_id TEXT NOT NULL,
-  currency TEXT NOT NULL,
-  granted_amount_minor INTEGER NOT NULL,
-  remaining_amount_minor INTEGER NOT NULL,
-  status TEXT NOT NULL,
-  grant_reason_code TEXT,
-  expires_at BIGINT,
-  created_at BIGINT NOT NULL,
-  updated_at BIGINT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS org_topup_grant_org_user
-  ON org_topup_grant (organization_id, user_id);
-CREATE INDEX IF NOT EXISTS org_topup_grant_status
-  ON org_topup_grant (status);
-
-CREATE TABLE IF NOT EXISTS org_topup_grant_ledger (
-  id TEXT PRIMARY KEY,
-  org_topup_grant_id TEXT NOT NULL,
-  organization_id TEXT NOT NULL,
-  user_id TEXT NOT NULL,
-  entry_type TEXT NOT NULL,
-  amount_minor INTEGER NOT NULL,
-  usage_event_id TEXT,
-  actor_user_id TEXT,
-  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at BIGINT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS org_topup_grant_ledger_grant_id
-  ON org_topup_grant_ledger (org_topup_grant_id);
-
-INSERT INTO topup_product (
-  id,
-  code,
-  display_name,
-  currency,
-  price_minor,
-  credit_amount_minor,
-  provider,
-  active,
-  created_at,
-  updated_at
-)
-VALUES
-  ('topup_10_usd', 'topup-10-usd', '$10 credit top-up', 'USD', 1000, 1000, 'manual', TRUE, 0, 0),
-  ('topup_25_usd', 'topup-25-usd', '$25 credit top-up', 'USD', 2500, 2500, 'manual', TRUE, 0, 0)
-ON CONFLICT (id) DO NOTHING;

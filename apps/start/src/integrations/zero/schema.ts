@@ -164,61 +164,6 @@ const orgMemberAccess = table('orgMemberAccess')
   })
   .primaryKey('id')
 
-const topupProduct = table('topupProduct')
-  .from('topup_product')
-  .columns({
-    id: string(),
-    code: string(),
-    displayName: string().from('display_name'),
-    currency: string(),
-    priceMinor: number().from('price_minor'),
-    creditAmountMinor: number().from('credit_amount_minor'),
-    provider: string(),
-    stripePriceId: string().from('stripe_price_id').optional(),
-    active: boolean(),
-    createdAt: number().from('created_at'),
-    updatedAt: number().from('updated_at'),
-  })
-  .primaryKey('id')
-
-const orgTopupOrder = table('orgTopupOrder')
-  .from('org_topup_order')
-  .columns({
-    id: string(),
-    organizationId: string().from('organization_id'),
-    billingAccountId: string().from('billing_account_id').optional(),
-    provider: string(),
-    providerPaymentId: string().from('provider_payment_id').optional(),
-    status: string(),
-    currency: string(),
-    subtotalMinor: number().from('subtotal_minor'),
-    totalMinor: number().from('total_minor'),
-    targetingMode: string().from('targeting_mode'),
-    purchasedByUserId: string().from('purchased_by_user_id'),
-    createdAt: number().from('created_at'),
-    updatedAt: number().from('updated_at'),
-  })
-  .primaryKey('id')
-
-const orgTopupGrant = table('orgTopupGrant')
-  .from('org_topup_grant')
-  .columns({
-    id: string(),
-    organizationId: string().from('organization_id'),
-    userId: string().from('user_id'),
-    topupOrderId: string().from('topup_order_id'),
-    topupProductId: string().from('topup_product_id'),
-    currency: string(),
-    grantedAmountMinor: number().from('granted_amount_minor'),
-    remainingAmountMinor: number().from('remaining_amount_minor'),
-    status: string(),
-    grantReasonCode: string().from('grant_reason_code').optional(),
-    expiresAt: number().from('expires_at').optional(),
-    createdAt: number().from('created_at'),
-    updatedAt: number().from('updated_at'),
-  })
-  .primaryKey('id')
-
 const orgSeatSlot = table('orgSeatSlot')
   .from('org_seat_slot')
   .columns({
@@ -435,14 +380,14 @@ const organizationRelationships = relationships(organization, ({ many }) => ({
     destSchema: orgEntitlementSnapshot,
     destField: ['organizationId'],
   }),
+  orgAiPolicies: many({
+    sourceField: ['id'],
+    destSchema: orgAiPolicy,
+    destField: ['organizationId'],
+  }),
   memberAccess: many({
     sourceField: ['id'],
     destSchema: orgMemberAccess,
-    destField: ['organizationId'],
-  }),
-  grants: many({
-    sourceField: ['id'],
-    destSchema: orgTopupGrant,
     destField: ['organizationId'],
   }),
   seatSlots: many({
@@ -470,6 +415,14 @@ const memberRelationships = relationships(member, ({ one }) => ({
   }),
 }))
 
+const orgAiPolicyRelationships = relationships(orgAiPolicy, ({ one }) => ({
+  organization: one({
+    sourceField: ['organizationId'],
+    destField: ['id'],
+    destSchema: organization,
+  }),
+}))
+
 const orgSubscriptionRelationships = relationships(orgSubscription, ({ one }) => ({
   organization: one({
     sourceField: ['organizationId'],
@@ -480,19 +433,6 @@ const orgSubscriptionRelationships = relationships(orgSubscription, ({ one }) =>
     sourceField: ['billingAccountId'],
     destField: ['id'],
     destSchema: orgBillingAccount,
-  }),
-}))
-
-const orgTopupGrantRelationships = relationships(orgTopupGrant, ({ one }) => ({
-  organization: one({
-    sourceField: ['organizationId'],
-    destField: ['id'],
-    destSchema: organization,
-  }),
-  product: one({
-    sourceField: ['topupProductId'],
-    destField: ['id'],
-    destSchema: topupProduct,
   }),
 }))
 
@@ -540,9 +480,6 @@ export const schema = createSchema({
     orgSubscription,
     orgEntitlementSnapshot,
     orgMemberAccess,
-    topupProduct,
-    orgTopupOrder,
-    orgTopupGrant,
     orgSeatSlot,
     orgSeatBucketBalance,
     thread,
@@ -552,8 +489,8 @@ export const schema = createSchema({
   relationships: [
     organizationRelationships,
     memberRelationships,
+    orgAiPolicyRelationships,
     orgSubscriptionRelationships,
-    orgTopupGrantRelationships,
     orgSeatSlotRelationships,
     orgSeatBucketBalanceRelationships,
     messageRelationships,
@@ -570,6 +507,7 @@ export type Schema = typeof schema
 export type ZeroContext = {
   userID: string
   organizationId?: string
+  memberRole?: string
   isAnonymous: boolean
 }
 

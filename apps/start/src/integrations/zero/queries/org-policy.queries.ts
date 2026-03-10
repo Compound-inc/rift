@@ -1,4 +1,8 @@
 import { defineQuery } from '@rocicorp/zero'
+import {
+  requireOrgAdmin,
+  getOrgContext,
+} from '../org-access'
 import { zql } from '../zql'
 
 /**
@@ -9,10 +13,26 @@ export const orgPolicyQueryDefinitions = {
   orgPolicy: {
     /**
      * Returns the AI policy row for the authenticated organization.
-     * The org id comes from server-injected Zero context, not user input.
+     * Requires active org context and an owner/admin membership.
      */
-    current: defineQuery(({ ctx }) =>
-      zql.orgAiPolicy.where('organizationId', ctx.organizationId ?? '__missing_org__').one(),
-    ),
+    current: defineQuery(({ ctx }) => {
+      const scoped = getOrgContext(ctx)
+      if (!scoped) {
+        return zql.orgAiPolicy
+          .where('organizationId', '__missing_org__')
+          .one()
+      }
+      try {
+        requireOrgAdmin({ ctx })
+      } catch {
+        return zql.orgAiPolicy
+          .where('organizationId', '__missing_org__')
+          .one()
+      }
+
+      return zql.orgAiPolicy
+        .where('organizationId', scoped.organizationId)
+        .one()
+    }),
   },
 }

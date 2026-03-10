@@ -19,7 +19,7 @@ import {
   toInvitationSeatLimitApiError,
   WorkspaceBillingService,
 } from '@/lib/billing-backend/services/workspace-billing.service'
-import { isWorkspaceBillingManagerRole } from '@/lib/billing-backend/permissions'
+import { isAdminRole } from './roles'
 import { authPool } from './auth-pool'
 import {
   buildDefaultOrganizationName,
@@ -138,10 +138,10 @@ const stripePlugin
             }
 
             if (action === 'list-subscription') {
-              return isWorkspaceBillingManagerRole(role)
+              return isAdminRole(role)
             }
 
-            return isWorkspaceBillingManagerRole(role)
+            return isAdminRole(role)
           },
           onSubscriptionComplete: async ({ subscription, stripeSubscription }) => {
             await syncWorkspaceSubscription({

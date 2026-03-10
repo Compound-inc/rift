@@ -1,10 +1,11 @@
 /**
- * Full dev reset: Better Auth migrations + Zero (Postgres, replica files).
+ * Full dev reset: drops all tables (auth + Zero), then recreates everything.
  *
  * Run this for a clean slate. It:
- * 1. Applies Better Auth schema (user, organization, member, invitation, etc.)
- * 2. Drops Zero publication and tables, re-applies Zero schema, creates publication
- * 3. Removes Zero replica files (zero.db, zero.db-wal, zero.db-shm)
+ * 1. Drops all tables in public schema (session, user, Zero tables, etc.)
+ * 2. Applies Better Auth schema (user, organization, member, invitation, etc.)
+ * 3. Drops Zero publication and tables, re-applies Zero schema, creates publication
+ * 4. Removes Zero replica files (zero.db, zero.db-wal, zero.db-shm)
  *
  * Run from apps/start: `bun run db:reset`
  */
@@ -12,9 +13,14 @@
 import { spawnSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { Pool } from 'pg'
 
 const appDir = join(import.meta.dir, '..')
 const authConfigPath = join(appDir, 'src/lib/auth/auth.server.ts')
+
+function quoteIdentifier(identifier: string): string {
+  return `"${identifier.replaceAll('"', '""')}"`
+}
 
 async function loadEnv(): Promise<void> {
   const envLocal = join(appDir, '.env.local')
@@ -37,17 +43,49 @@ async function loadEnv(): Promise<void> {
   }
 }
 
+async function dropAllTables(pool: Pool): Promise<void> {
+  await pool.query('DROP PUBLICATION IF EXISTS zero_data')
+
+  const tableQuery = await pool.query<{ table_name: string }>(
+    `SELECT table_name
+     FROM information_schema.tables
+     WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+     ORDER BY table_name`,
+  )
+
+  if (!tableQuery.rowCount || tableQuery.rowCount === 0) {
+    console.log('  No tables to drop.')
+    return
+  }
+
+  console.log(`  Dropping ${tableQuery.rowCount} table(s)...`)
+  for (const { table_name } of tableQuery.rows) {
+    const qualified = `${quoteIdentifier('public')}.${quoteIdentifier(table_name)}`
+    await pool.query(`DROP TABLE IF EXISTS ${qualified} CASCADE`)
+    console.log(`  ✓ dropped ${table_name}`)
+  }
+}
+
 async function main(): Promise<void> {
   await loadEnv()
 
-  if (!process.env.ZERO_UPSTREAM_DB?.trim()) {
+  const connectionString = process.env.ZERO_UPSTREAM_DB?.trim()
+  if (!connectionString) {
     console.error(
       'ZERO_UPSTREAM_DB is not set. Set it in apps/start/.env or .env.local.',
     )
     process.exit(1)
   }
 
-  console.log('1. Running Better Auth migrations...')
+  console.log('1. Dropping all tables (auth + Zero)...')
+  const pool = new Pool({ connectionString })
+  try {
+    await dropAllTables(pool)
+  } finally {
+    await pool.end()
+  }
+
+  console.log('\n2. Running Better Auth migrations...')
   const migrateResult = spawnSync(
     'bunx',
     ['@better-auth/cli', 'migrate', '--yes', '--config', authConfigPath],
@@ -61,7 +99,7 @@ async function main(): Promise<void> {
     process.exit(migrateResult.status ?? 1)
   }
 
-  console.log('\n2. Running Zero reset...')
+  console.log('\n3. Running Zero reset...')
   const zeroResult = spawnSync('bun', ['run', 'scripts/zero-dev-reset.ts'], {
     env: process.env,
     stdio: 'inherit',

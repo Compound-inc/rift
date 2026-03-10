@@ -11,7 +11,6 @@ import {
 } from '../workspace-usage/persistence'
 import type {
   CurrentOrgSubscription,
-  MembershipRoleRow,
   OrgMemberCounts,
   OrgSeatAvailability,
   WorkspaceSubscriptionRow,
@@ -81,22 +80,6 @@ export async function readOrganizationMembersForSeatReconciliation(
   )
 
   return result.rows
-}
-
-export async function readMembershipRole(input: {
-  organizationId: string
-  userId: string
-}): Promise<string | null> {
-  const result = await authPool.query<MembershipRoleRow>(
-    `select role
-     from member
-     where "organizationId" = $1
-       and "userId" = $2
-     limit 1`,
-    [input.organizationId, input.userId],
-  )
-
-  return result.rows[0]?.role ?? null
 }
 
 export async function readCurrentWorkspaceSubscription(

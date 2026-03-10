@@ -2,8 +2,8 @@ import { defineQuery } from '@rocicorp/zero'
 import { z } from 'zod'
 import {
   missingOrganizationQuery,
-  readScopedOrgViewerContext,
-  whereViewerIsAdminOrOwner,
+  requireOrgAdmin,
+  getOrgContext,
 } from '../org-access'
 import { zql } from '../zql'
 
@@ -17,15 +17,18 @@ const membersDirectoryArgs = z.object({
 export const orgSettingsQueryDefinitions = {
   orgSettings: {
     membersDirectory: defineQuery(membersDirectoryArgs, ({ args, ctx }) => {
-      const scoped = readScopedOrgViewerContext(ctx)
-
+      const scoped = getOrgContext(ctx)
       if (!scoped) {
+        return missingOrganizationQuery()
+      }
+      try {
+        requireOrgAdmin({ ctx })
+      } catch {
         return missingOrganizationQuery()
       }
 
       return zql.organization
         .where('id', scoped.organizationId)
-        .whereExists('members', whereViewerIsAdminOrOwner(scoped.userID))
         .related('members', (members) => {
           let q = members
             .orderBy('id', 'asc')

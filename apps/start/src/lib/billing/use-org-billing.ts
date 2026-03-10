@@ -19,6 +19,7 @@ type BillingSummaryRow = {
     id: string
     planId: string
     status: string
+    providerSubscriptionId?: string
     seatCount?: number
     billingInterval?: string
     currentPeriodStart?: number
@@ -38,18 +39,6 @@ type BillingSummaryRow = {
     effectiveFeatures?: Record<WorkspaceFeatureId, boolean>
     usagePolicy?: Record<string, string | number | boolean | null>
   }>
-  grants?: Array<{
-    id: string
-    currency: string
-    grantedAmountMinor: number
-    remainingAmountMinor: number
-    status: string
-    product?: {
-      id: string
-      displayName: string
-      priceMinor: number
-    } | null
-  }>
   seatSlots?: Array<{
     id: string
     seatIndex: number
@@ -65,16 +54,6 @@ type BillingSummaryRow = {
       currentWindowEndsAt?: number
     }>
   }>
-}
-
-type TopupProductRow = {
-  id: string
-  code: string
-  displayName: string
-  currency: string
-  priceMinor: number
-  creditAmountMinor: number
-  provider: string
 }
 
 /**
@@ -99,7 +78,6 @@ export function useOrgBillingSummary() {
       organizationSlug: row?.slug ?? null,
       subscription: row?.subscriptions?.[0] ?? null,
       entitlement: row?.entitlementSnapshots?.[0] ?? null,
-      grants: row?.grants ?? [],
       currentSeatSlot,
       seatWindowBucket,
       seatOverageBucket,
@@ -109,22 +87,6 @@ export function useOrgBillingSummary() {
   return {
     ...normalized,
     loading: result.type !== 'complete',
-  }
-}
-
-export function useOrgTopupProducts() {
-  const [products, result] = useQuery(queries.orgBilling.catalog())
-  return {
-    products: ((products as TopupProductRow[] | undefined | null) ?? []).filter(Boolean),
-    loading: result.type !== 'complete',
-  }
-}
-
-export function useOrgTopupGrants() {
-  const { grants, loading } = useOrgBillingSummary()
-  return {
-    grants,
-    loading,
   }
 }
 

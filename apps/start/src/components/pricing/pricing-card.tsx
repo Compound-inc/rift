@@ -67,6 +67,15 @@ export type PricingCardProps = {
   locale?: string
   /** When true, uses fixed width for secondary row (Enterprise, Self-hosting). */
   fixedWidth?: boolean
+  actionOverride?: PricingPlanActionOverride
+}
+
+export type PricingPlanActionOverride = {
+  buttonText?: string
+  href?: string
+  disabled?: boolean
+  description?: string
+  onSelect?: () => void | Promise<void>
 }
 
 /**
@@ -78,6 +87,7 @@ export function PricingCard({
   plan,
   locale = 'en',
   fixedWidth = false,
+  actionOverride,
 }: PricingCardProps) {
   const useUsd =
     locale === 'en' && plan.usdPriceAmount != null && plan.priceAmount != null
@@ -90,6 +100,12 @@ export function PricingCard({
   const formattedPrice =
     amount !== null ? formatPrice(amount, currency, locale) : 'Custom'
   const period = periodLabel ? `/${periodLabel}` : ''
+
+  const buttonText = actionOverride?.buttonText ?? plan.buttonText
+  const href = actionOverride?.href ?? plan.href
+  const isDisabled = actionOverride?.disabled ?? false
+  const helperDescription = actionOverride?.description
+  const handleSelect = actionOverride?.onSelect
 
   return (
     <article
@@ -161,9 +177,30 @@ export function PricingCard({
       </ul>
 
       <footer className="mt-auto w-full max-w-[280px]">
-        {plan.href.startsWith('mailto:') ? (
+        {handleSelect ? (
+          <Button
+            variant="outline"
+            size="large"
+            className="w-full"
+            type="button"
+            disabled={isDisabled}
+            onClick={() => void handleSelect()}
+          >
+            {buttonText}
+          </Button>
+        ) : href.startsWith('mailto:') ? (
           <Button variant="outline" size="large" className="w-full" asChild>
-            <a href={plan.href}>{plan.buttonText}</a>
+            <a href={href}>{buttonText}</a>
+          </Button>
+        ) : isDisabled ? (
+          <Button
+            variant="outline"
+            size="large"
+            className="w-full"
+            type="button"
+            disabled
+          >
+            {buttonText}
           </Button>
         ) : (
           <Button
@@ -172,9 +209,14 @@ export function PricingCard({
             className="w-full"
             asChild
           >
-            <Link to={plan.href}>{plan.buttonText}</Link>
+            <Link to={href}>{buttonText}</Link>
           </Button>
         )}
+        {helperDescription ? (
+          <p className="mt-2 text-center text-xs text-content-muted">
+            {helperDescription}
+          </p>
+        ) : null}
       </footer>
     </article>
   )

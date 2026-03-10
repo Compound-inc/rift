@@ -1,10 +1,8 @@
 import { WorkspaceBillingConfigurationError, WorkspaceBillingForbiddenError } from '../../domain/errors'
 import { resolveStripePlanPriceId } from '../../../billing/plan-catalog'
-import { isWorkspaceBillingManagerRole } from '../../permissions'
 import {
   clearScheduledOrgSubscriptionChange,
   readCurrentWorkspaceSubscription,
-  readMembershipRole,
   recordScheduledOrgSubscriptionChange,
   updateSubscriptionMirror,
   updateSubscriptionScheduleId,
@@ -12,6 +10,26 @@ import {
 import { isScheduledDowngrade, requireStripeClient } from './shared'
 import type { WorkspaceSubscriptionRow } from './types'
 import type { StripeManagedWorkspacePlanId } from '../../../billing/plan-catalog'
+import { isAdminRole } from '@/lib/auth/roles'
+
+async function assertActiveOrgAdmin(input: {
+  headers: Headers
+  organizationId: string
+  userId: string
+}): Promise<void> {
+  const authModule: typeof import('@/lib/auth/auth.server') = await import('@/lib/auth/auth.server')
+  const result = await authModule.auth.api.getActiveMemberRole({
+    headers: input.headers,
+  })
+
+  if (!result?.role || !isAdminRole(result.role)) {
+    throw new WorkspaceBillingForbiddenError({
+      message: 'Only workspace owners or admins can manage billing.',
+      organizationId: input.organizationId,
+      userId: input.userId,
+    })
+  }
+}
 
 async function syncDirectSubscriptionUpdate(input: {
   currentSubscription: WorkspaceSubscriptionRow
@@ -191,17 +209,7 @@ export async function startCheckoutOperation(input: {
   planId: StripeManagedWorkspacePlanId
   seats: number
 }): Promise<{ url: string }> {
-  const role = await readMembershipRole({
-    organizationId: input.organizationId,
-    userId: input.userId,
-  })
-  if (!role || !isWorkspaceBillingManagerRole(role)) {
-    throw new WorkspaceBillingForbiddenError({
-      message: 'Only workspace owners or admins can manage billing.',
-      organizationId: input.organizationId,
-      userId: input.userId,
-    })
-  }
+  await assertActiveOrgAdmin(input)
 
   const currentSubscription = await readCurrentWorkspaceSubscription(input.organizationId)
   if (currentSubscription?.stripeSubscriptionId) {
@@ -256,18 +264,7 @@ export async function openBillingPortalOperation(input: {
   organizationId: string
   userId: string
 }): Promise<{ url: string }> {
-  const role = await readMembershipRole({
-    organizationId: input.organizationId,
-    userId: input.userId,
-  })
-
-  if (!role || !isWorkspaceBillingManagerRole(role)) {
-    throw new WorkspaceBillingForbiddenError({
-      message: 'Only workspace owners or admins can manage billing.',
-      organizationId: input.organizationId,
-      userId: input.userId,
-    })
-  }
+  await assertActiveOrgAdmin(input)
 
   const authModule: typeof import('@/lib/auth/auth.server') = await import('@/lib/auth/auth.server')
   const result = await authModule.auth.api.createBillingPortal({

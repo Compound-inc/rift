@@ -5,13 +5,14 @@ import {
   enterprisePlan,
   selfHostingPlan,
 } from '@/lib/pricing'
-import { PricingCard } from './pricing-card'
+import { PricingCard, type PricingPlanActionOverride } from './pricing-card'
 import { DashedBorderFrame } from './pricing-decorative'
 
 type PricingSectionProps = {
   heading?: string
   summary?: string
   locale?: string
+  resolvePlanAction?: (planName: string) => PricingPlanActionOverride | undefined
 }
 
 
@@ -19,6 +20,7 @@ export function PricingSection({
   heading = 'Simple, Transparent Plans',
   summary = 'Choose the plan that best fits your needs. No hidden costs.',
   locale = 'en',
+  resolvePlanAction,
 }: PricingSectionProps) {
   return (
     <>
@@ -104,7 +106,12 @@ export function PricingSection({
           <DashedBorderFrame>
             <div className="relative flex w-full items-stretch justify-center gap-8 overflow-hidden max-lg:flex-col max-lg:gap-6 lg:gap-6">
               {mainPlans.map((plan) => (
-                <PricingCard key={plan.name} plan={plan} locale={locale} />
+                <PricingCard
+                  key={plan.name}
+                  plan={plan}
+                  locale={locale}
+                  actionOverride={resolvePlanAction?.(plan.name)}
+                />
               ))}
             </div>
           </DashedBorderFrame>
@@ -118,11 +125,13 @@ export function PricingSection({
                 plan={enterprisePlan}
                 locale={locale}
                 fixedWidth
+                actionOverride={resolvePlanAction?.(enterprisePlan.name)}
               />
               <PricingCard
                 plan={selfHostingPlan}
                 locale={locale}
                 fixedWidth
+                actionOverride={resolvePlanAction?.(selfHostingPlan.name)}
               />
             </div>
           </DashedBorderFrame>

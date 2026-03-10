@@ -2,7 +2,7 @@ import { defineQuery } from '@rocicorp/zero'
 import { z } from 'zod'
 import {
   missingOrganizationQuery,
-  readScopedOrgViewerContext,
+  getOrgContext,
   whereViewerIsMember,
 } from '../org-access'
 import { zql } from '../zql'
@@ -11,12 +11,12 @@ const emptyArgs = z.object({}).optional()
 
 /**
  * Billing queries are scoped to the active organization and exposed to any
- * member because grant visibility is already user-filtered inside the query.
+ * member of that organization.
  */
 export const orgBillingQueryDefinitions = {
   orgBilling: {
     currentSummary: defineQuery(emptyArgs, ({ ctx }) => {
-      const scoped = readScopedOrgViewerContext(ctx)
+      const scoped = getOrgContext(ctx)
 
       if (!scoped) {
         return missingOrganizationQuery()
@@ -31,18 +31,6 @@ export const orgBillingQueryDefinitions = {
         .related('entitlementSnapshots', (snapshots) =>
           snapshots.orderBy('computedAt', 'desc').limit(1),
         )
-        .related('grants', (grants) =>
-          grants
-            .where('userId', scoped.userID)
-            .where(({ cmp, or }) =>
-              or(
-                cmp('status', 'active'),
-                cmp('status', 'exhausted'),
-              ),
-            )
-            .orderBy('createdAt', 'asc')
-            .related('product'),
-        )
         .related('seatSlots', (seatSlots) =>
           seatSlots
             .where('currentAssigneeUserId', scoped.userID)
@@ -55,8 +43,5 @@ export const orgBillingQueryDefinitions = {
         )
         .one()
     }),
-    catalog: defineQuery(emptyArgs, () =>
-      zql.topupProduct.where('active', true).orderBy('priceMinor', 'asc'),
-    ),
   },
 }

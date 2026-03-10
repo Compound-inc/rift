@@ -47,10 +47,6 @@ export type WorkspaceSubscriptionRow = {
   stripeScheduleId: string | null
 }
 
-export type MembershipRoleRow = {
-  role: string
-}
-
 export type EffectiveFeatures = ReturnType<typeof getPlanEffectiveFeatures>
 
 export type OrgSeatAvailability = OrgMemberCounts & {
@@ -76,10 +72,6 @@ export type WorkspaceBillingServiceShape = {
     void,
     WorkspaceBillingPersistenceError | WorkspaceBillingSeatLimitExceededError
   >
-  readonly assertBillingManagerAccess: (input: {
-    organizationId: string
-    userId: string
-  }) => Effect.Effect<void, WorkspaceBillingPersistenceError | WorkspaceBillingForbiddenError>
   readonly assertFeatureEnabled: (input: {
     organizationId: string
     feature: WorkspaceFeatureId

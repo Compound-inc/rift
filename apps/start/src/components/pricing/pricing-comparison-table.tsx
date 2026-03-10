@@ -16,6 +16,7 @@ import {
   DashedBorderFrame,
   GradientBackground,
 } from './pricing-decorative'
+import type { PricingPlanActionOverride } from './pricing-card'
 
 type ComparisonCell = string | boolean
 
@@ -214,7 +215,9 @@ function ComparisonValue({ value }: { value: ComparisonCell }) {
  * outer frame mirrors the card grid, while each sticky plan header is rendered
  * as a compact card so the section feels like part of the same pricing system.
  */
-export function PricingComparisonTable() {
+export function PricingComparisonTable(props: {
+  resolvePlanAction?: (planName: string) => PricingPlanActionOverride | undefined
+}) {
   return (
     <>
       <style>{`
@@ -272,46 +275,75 @@ export function PricingComparisonTable() {
                                 gridTemplateColumns: `repeat(${comparisonPlans.length}, minmax(0, 1fr))`,
                               }}
                             >
-                              {comparisonPlans.map((plan) => (
-                                <div
-                                  key={plan.name}
-                                  className="relative px-4 py-3"
-                                >
-                                  <GradientBackground
-                                    id={plan.gradientId}
-                                    className="pricing-comparison__orb"
-                                  />
+                              {comparisonPlans.map((plan) => {
+                                const actionOverride = props.resolvePlanAction?.(plan.name)
+                                const buttonText = actionOverride?.buttonText ?? plan.buttonText
+                                const href = actionOverride?.href ?? plan.href
+                                const isDisabled = actionOverride?.disabled ?? false
+                                const handleSelect = actionOverride?.onSelect
 
-                                  <div className="relative z-[1] flex h-full flex-col items-center gap-3">
-                                    <span className="text-lg font-medium tracking-tight text-content-emphasis">
-                                      {plan.name}
-                                    </span>
-                                    {plan.href.startsWith('mailto:') ? (
-                                      <Button
-                                        variant="outline"
-                                        size="default"
-                                        className="mt-auto"
-                                        asChild
-                                      >
-                                        <a href={plan.href}>
-                                          {plan.buttonText}
-                                        </a>
-                                      </Button>
-                                    ) : (
-                                      <Button
-                                        variant="outline"
-                                        size="default"
-                                        className="mt-auto"
-                                        asChild
-                                      >
-                                        <Link to={plan.href}>
-                                          {plan.buttonText}
-                                        </Link>
-                                      </Button>
-                                    )}
+                                return (
+                                  <div
+                                    key={plan.name}
+                                    className="relative px-4 py-3"
+                                  >
+                                    <GradientBackground
+                                      id={plan.gradientId}
+                                      className="pricing-comparison__orb"
+                                    />
+
+                                    <div className="relative z-[1] flex h-full flex-col items-center gap-3">
+                                      <span className="text-lg font-medium tracking-tight text-content-emphasis">
+                                        {plan.name}
+                                      </span>
+                                      {handleSelect ? (
+                                        <Button
+                                          variant="outline"
+                                          size="default"
+                                          className="mt-auto"
+                                          type="button"
+                                          disabled={isDisabled}
+                                          onClick={() => void handleSelect()}
+                                        >
+                                          {buttonText}
+                                        </Button>
+                                      ) : href.startsWith('mailto:') ? (
+                                        <Button
+                                          variant="outline"
+                                          size="default"
+                                          className="mt-auto"
+                                          asChild
+                                        >
+                                          <a href={href}>
+                                            {buttonText}
+                                          </a>
+                                        </Button>
+                                      ) : isDisabled ? (
+                                        <Button
+                                          variant="outline"
+                                          size="default"
+                                          className="mt-auto"
+                                          type="button"
+                                          disabled
+                                        >
+                                          {buttonText}
+                                        </Button>
+                                      ) : (
+                                        <Button
+                                          variant="outline"
+                                          size="default"
+                                          className="mt-auto"
+                                          asChild
+                                        >
+                                          <Link to={href}>
+                                            {buttonText}
+                                          </Link>
+                                        </Button>
+                                      )}
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
+                                )
+                              })}
                             </div>
                           </div>
                         </div>

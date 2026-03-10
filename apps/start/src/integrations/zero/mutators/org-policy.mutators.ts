@@ -11,6 +11,7 @@ import {
   type WorkspaceFeatureId,
 } from '@/lib/billing/plan-catalog'
 import { isChatModeId } from '@/lib/chat-modes'
+import { requireOrgAdmin } from '../org-access'
 import { zql } from '../zql'
 
 const toggleProviderPolicyArgs = z.object({
@@ -101,15 +102,6 @@ function remove(values: readonly string[], candidate: string): string[] {
 /** Returns a new list with the target identifier appended if absent. */
 function add(values: readonly string[], candidate: string): string[] {
   return unique([...values, candidate])
-}
-
-/** Throws when org-scoped mutators are called outside an active org context. */
-function requireOrgWorkosId(ctx: { organizationId?: string }): string {
-  const organizationId = ctx.organizationId?.trim()
-  if (!organizationId) {
-    throw new Error('Organization context is required to update policy')
-  }
-  return organizationId
 }
 
 async function requireOrgFeature(args: {
@@ -254,7 +246,9 @@ async function persistOrgPolicy(args: {
 export const orgPolicyMutatorDefinitions = {
   orgPolicy: {
     toggleProvider: defineMutator(toggleProviderPolicyArgs, async ({ tx, args, ctx }) => {
-      const organizationId = requireOrgWorkosId(ctx)
+      const { organizationId } = requireOrgAdmin({
+        ctx,
+      })
       await requireOrgFeature({
         tx,
         organizationId,
@@ -284,7 +278,9 @@ export const orgPolicyMutatorDefinitions = {
     }),
 
     toggleModel: defineMutator(toggleModelPolicyArgs, async ({ tx, args, ctx }) => {
-      const organizationId = requireOrgWorkosId(ctx)
+      const { organizationId } = requireOrgAdmin({
+        ctx,
+      })
       await requireOrgFeature({
         tx,
         organizationId,
@@ -316,7 +312,9 @@ export const orgPolicyMutatorDefinitions = {
     toggleComplianceFlag: defineMutator(
       toggleComplianceFlagArgs,
       async ({ tx, args, ctx }) => {
-        const organizationId = requireOrgWorkosId(ctx)
+        const { organizationId } = requireOrgAdmin({
+          ctx,
+        })
         await requireOrgFeature({
           tx,
           organizationId,
@@ -344,7 +342,9 @@ export const orgPolicyMutatorDefinitions = {
       },
     ),
     setEnforcedMode: defineMutator(setEnforcedModeArgs, async ({ tx, args, ctx }) => {
-      const organizationId = requireOrgWorkosId(ctx)
+      const { organizationId } = requireOrgAdmin({
+        ctx,
+      })
       await requireOrgFeature({
         tx,
         organizationId,
@@ -373,7 +373,9 @@ export const orgPolicyMutatorDefinitions = {
     toggleProviderNativeTools: defineMutator(
       toggleProviderNativeToolsArgs,
       async ({ tx, args, ctx }) => {
-        const organizationId = requireOrgWorkosId(ctx)
+        const { organizationId } = requireOrgAdmin({
+          ctx,
+        })
         await requireOrgFeature({
           tx,
           organizationId,
@@ -399,7 +401,9 @@ export const orgPolicyMutatorDefinitions = {
     toggleExternalTools: defineMutator(
       toggleExternalToolsArgs,
       async ({ tx, args, ctx }) => {
-        const organizationId = requireOrgWorkosId(ctx)
+        const { organizationId } = requireOrgAdmin({
+          ctx,
+        })
         await requireOrgFeature({
           tx,
           organizationId,
@@ -423,7 +427,9 @@ export const orgPolicyMutatorDefinitions = {
       },
     ),
     toggleTool: defineMutator(toggleToolArgs, async ({ tx, args, ctx }) => {
-      const organizationId = requireOrgWorkosId(ctx)
+      const { organizationId } = requireOrgAdmin({
+        ctx,
+      })
       await requireOrgFeature({
         tx,
         organizationId,

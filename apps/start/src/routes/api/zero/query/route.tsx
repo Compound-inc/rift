@@ -7,6 +7,7 @@ import { Effect, Schema } from 'effect'
 import { schema } from '@/integrations/zero/schema'
 import type { Schema as ZeroSchema, ZeroContext } from '@/integrations/zero/schema'
 import { queries } from '@/integrations/zero/queries'
+import { auth } from '@/lib/auth/auth.server'
 import { requireUserAuth } from '@/lib/server-effect/http/server-auth'
 import { ServerRuntime } from '@/lib/server-effect'
 
@@ -38,10 +39,21 @@ export const Route = createFileRoute('/api/zero/query')({
             onUnauthorized: () =>
               new ZeroQueryUnauthorizedError({ message: 'Unauthorized' }),
           })
+          const memberRoleResult = yield* Effect.tryPromise({
+            try: () =>
+              auth.api.getActiveMemberRole({
+                headers: request.headers,
+              }),
+            catch: () => null,
+          })
+          const memberRole = (
+            memberRoleResult as { role?: unknown } | null
+          )?.role
 
           const context: ZeroContext = {
             userID: authContext.userId,
             organizationId: authContext.organizationId,
+            memberRole: typeof memberRole === 'string' ? memberRole : undefined,
             isAnonymous: authContext.isAnonymous,
           }
           const transformQuery = (name: string, args: unknown) => {
