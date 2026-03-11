@@ -22,6 +22,7 @@ import type { ComponentType } from 'react'
 import { useEffect, useMemo, useRef } from 'react'
 import { m } from '@/paraglide/messages.js'
 import { SidebarChatThreadPreloader } from './sidebar/sidebar-chat-thread-preloader'
+import { SidebarUsageMeter } from './sidebar/sidebar-usage-meter'
 
 const SIDEBAR_GROUPS_WIDTH = 64
 const SIDEBAR_AREAS_WIDTH = 240
@@ -134,6 +135,7 @@ export const AppSidebar: ComponentType = () => {
               })}
         </div>
         <div className="flex flex-col items-center gap-3">
+          <SidebarUsageMeter />
           <ThemeToggle />
           <UserProfileAvatar
             user={user ?? undefined}
