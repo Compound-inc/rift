@@ -27,10 +27,13 @@ export type SidebarNavData = {
 
 export type NavItemType = {
   name: string
-  href: string
+  /** Route target for link items. Optional for action-only items that use onSelect. */
+  href?: string
   icon?: ComponentType<SVGProps<SVGSVGElement> & { 'data-hovered'?: boolean }>
   exact?: boolean
   isActive?: (pathname: string, href: string) => boolean
+  /** Click handler for action-only items rendered with sidebar nav styling. */
+  onSelect?: () => void
   /** Optional trailing element (e.g. status indicator) shown after the label */
   trailing?: React.ReactNode
   /** Optional context-menu content shown on right-click for this nav item. */

@@ -25,22 +25,38 @@ export function SidebarNavItem({
     icon: Icon,
     exact,
     isActive: customIsActive,
+    onSelect,
     trailing,
     contextMenuContent,
     label: customLabel,
     disableLink,
   } = item
 
+  const isActionItem = typeof onSelect === 'function'
   const isActive = useMemo(
     () =>
-      customIsActive
+      isActionItem || !href
+        ? false
+        : customIsActive
         ? customIsActive(pathname, href)
         : isPathActive(pathname, href, exact),
-    [pathname, href, exact, customIsActive],
+    [pathname, href, exact, customIsActive, isActionItem],
   )
 
   const labelContent = customLabel ?? (
     <span className="min-w-0 flex-1 truncate">{name}</span>
+  )
+  const rowContent = (
+    <span className="flex w-full items-center gap-2">
+      {Icon ? (
+        <Icon
+          className={cn('size-4', isActive ? 'text-foreground-info' : '')}
+          data-hovered={hovered}
+        />
+      ) : null}
+      {labelContent}
+      {trailing}
+    </span>
   )
 
   const linkContent = disableLink ? (
@@ -52,21 +68,30 @@ export function SidebarNavItem({
       role="presentation"
     >
       <span
-        className="flex w-full items-center gap-2.5"
+        className="flex w-full items-center gap-2"
         data-active={isActive}
         onPointerEnter={() => setHovered(true)}
         onPointerLeave={() => setHovered(false)}
       >
-        {Icon ? (
-          <Icon
-            className={cn('size-4', isActive ? 'text-foreground-info' : '')}
-            data-hovered={hovered}
-          />
-        ) : null}
-        {labelContent}
-        {trailing}
+        {rowContent}
       </span>
     </div>
+  ) : isActionItem ? (
+    <Button asChild variant="sidebarNavItem" size="sidebarNavItem">
+      <a
+        href={href ?? '#'}
+        data-active={isActive}
+        onClick={(event) => {
+          event.preventDefault()
+          onSelect?.()
+        }}
+        onPointerEnter={() => setHovered(true)}
+        onPointerLeave={() => setHovered(false)}
+        className="group"
+      >
+        {rowContent}
+      </a>
+    </Button>
   ) : (
     <Button asChild variant="sidebarNavItem" size="sidebarNavItem">
       <Link
@@ -81,16 +106,7 @@ export function SidebarNavItem({
         onPointerLeave={() => setHovered(false)}
         className="group"
       >
-        <span className="flex w-full items-center gap-2.5">
-          {Icon ? (
-            <Icon
-              className={cn('size-4', isActive ? 'text-foreground-info' : '')}
-              data-hovered={hovered}
-            />
-          ) : null}
-          {labelContent}
-          {trailing}
-        </span>
+        {rowContent}
       </Link>
     </Button>
   )

@@ -1,10 +1,17 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Search, MessageCircle, MessageSquareText, Moon, SearchX, Sun, User } from 'lucide-react'
-import { Button } from '@rift/ui/button'
+import {
+  Plus,
+  MessageCircle,
+  MessageSquareText,
+  Moon,
+  Search,
+  SearchX,
+  Sun,
+  User,
+} from 'lucide-react'
 import { useTheme } from '@rift/ui/hooks/useTheme'
-import { cn } from '@rift/utils'
 import { useNavigate } from '@tanstack/react-router'
 import { AppCommandDialog, type AppCommandGroup } from '@/components/layout/command/app-command-dialog'
 import { searchChatThreads } from '@/lib/frontend/chat/chat-search.functions'
@@ -18,6 +25,26 @@ import {
 
 const DEFAULT_RESULT_LIMIT = 20
 const SEARCH_DEBOUNCE_MS = 120
+const OPEN_CHAT_SEARCH_COMMAND_EVENT = 'chat:open-search-command'
+
+type OpenChatSearchCommandOptions = {
+  /**
+   * When true, the command dialog opens in "search-only" mode and hides
+   * action shortcuts so users can focus exclusively on thread/message results.
+   */
+  hideActions?: boolean
+}
+
+/**
+ * Opens the chat search command palette.
+ */
+export function openChatSearchCommand(options: OpenChatSearchCommandOptions = {}) {
+  window.dispatchEvent(
+    new CustomEvent<OpenChatSearchCommandOptions>(OPEN_CHAT_SEARCH_COMMAND_EVENT, {
+      detail: options,
+    }),
+  )
+}
 
 function useDebouncedValue(value: string, delayMs: number): string {
   const [debouncedValue, setDebouncedValue] = useState(value)
@@ -63,7 +90,7 @@ function formatResultDate(timestamp: number): string {
 }
 
 /**
- * Search trigger + command dialog provider for chat history.
+ * Command dialog provider for chat history search/actions.
  *
  * The dialog is intentionally provider-driven: the generic shell receives
  * grouped items, which lets future command providers inject settings/actions
@@ -78,6 +105,7 @@ export function ChatSearchCommand() {
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [lastSettledQuery, setLastSettledQuery] = useState('')
+  const [hideActionGroups, setHideActionGroups] = useState(false)
   const requestSequenceRef = useRef(0)
   const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS)
 
@@ -91,12 +119,26 @@ export function ChatSearchCommand() {
       }
 
       event.preventDefault()
+      setHideActionGroups(false)
       setOpen((current) => !current)
     }
 
     window.addEventListener('keydown', onKeyDown)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [])
+
+  useEffect(() => {
+    const onOpenRequest = (event: Event) => {
+      const customEvent = event as CustomEvent<OpenChatSearchCommandOptions>
+      setHideActionGroups(Boolean(customEvent.detail?.hideActions))
+      setOpen(true)
+    }
+
+    window.addEventListener(OPEN_CHAT_SEARCH_COMMAND_EVENT, onOpenRequest)
+    return () => {
+      window.removeEventListener(OPEN_CHAT_SEARCH_COMMAND_EVENT, onOpenRequest)
     }
   }, [])
 
@@ -108,6 +150,7 @@ export function ChatSearchCommand() {
       setErrorMessage(null)
       setIsLoading(false)
       setLastSettledQuery('')
+      setHideActionGroups(false)
       return
     }
 
@@ -161,22 +204,28 @@ export function ChatSearchCommand() {
   const normalizedDebouncedQuery = normalizeSearchQuery(debouncedQuery)
   const isDebouncePending = normalizedQuery.length > 0 && normalizedQuery !== normalizedDebouncedQuery
 
-  /**
-   * Empty-state visibility rules:
-   * - First query: wait for debounce + request completion before showing empty.
-   * - Subsequent queries after any settled search: keep empty visible while
-   *   debounce/network is pending if there are still no rows, avoiding panel
-   *   collapse/re-expand flicker on each keystroke.
-   */
   const hasAnySettledSearch = lastSettledQuery.length > 0
   const hasNoResults = results.length === 0
   const isSettledForCurrentQuery =
     !isLoading && !isDebouncePending && lastSettledQuery === normalizedQuery
+  const isSearchOnlySidebarMode = hideActionGroups
+  const isEmptyQuery = normalizedQuery.length === 0
+  const shouldShowIdleSearchPrompt =
+    isSearchOnlySidebarMode &&
+    (isEmptyQuery || (!hasAnySettledSearch && hasNoResults))
 
   const shouldShowEmptyState =
-    normalizedQuery.length > 0 &&
-    hasNoResults &&
-    (isSettledForCurrentQuery || hasAnySettledSearch)
+    shouldShowIdleSearchPrompt ||
+    (!isEmptyQuery &&
+      hasNoResults &&
+      (isSettledForCurrentQuery || hasAnySettledSearch))
+
+  const emptyStateText = shouldShowIdleSearchPrompt
+    ? m.chat_search_empty_idle()
+    : errorMessage ?? m.chat_search_empty_results()
+  const emptyStateIcon = shouldShowIdleSearchPrompt
+    ? <Search aria-hidden="true" />
+    : <SearchX aria-hidden="true" />
 
   const openSearchResult = useCallback(
     (result: ChatSearchResult) => {
@@ -286,44 +335,23 @@ export function ChatSearchCommand() {
     ]
   }, [mounted, resolvedTheme, setTheme])
 
-  return (
-    <>
-      <Button
-        variant="sidebarNavItem"
-        size="sidebarNavItem"
-        onClick={() => setOpen(true)}
-        className={cn(
-          'mb-3 h-9 justify-between rounded-xl border border-border-faint bg-surface-inverse/5 px-3 text-foreground-secondary hover:bg-surface-inverse/7',
-          'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-strong',
-        )}
-        aria-label={m.chat_search_trigger_aria_label()}
-      >
-        <span className="flex min-w-0 items-center gap-2.5">
-          <Search className="size-4" />
-          <span className="truncate">{m.chat_search_trigger_label()}</span>
-        </span>
-        <span className="shrink-0 rounded-md border border-border-faint bg-surface-base px-1.5 py-0.5 text-[11px] text-foreground-tertiary">
-          {typeof navigator !== 'undefined' && navigator.platform.includes('Mac')
-            ? '⌘K'
-            : 'Ctrl K'}
-        </span>
-      </Button>
+  const visibleActionGroups = hideActionGroups ? [] : actionGroups
 
-      <AppCommandDialog
-        open={open}
-        onOpenChange={setOpen}
-        title={m.chat_search_dialog_title()}
-        description={m.chat_search_dialog_description()}
-        query={query}
-        onQueryChange={setQuery}
-        placeholder={m.chat_search_placeholder()}
-        emptyText={errorMessage ?? m.chat_search_empty_results()}
-        emptyIcon={<SearchX aria-hidden="true" />}
-        showEmptyState={shouldShowEmptyState}
-        isLoading={false}
-        actionGroups={actionGroups}
-        groups={groups}
-      />
-    </>
+  return (
+    <AppCommandDialog
+      open={open}
+      onOpenChange={setOpen}
+      title={m.chat_search_dialog_title()}
+      description={m.chat_search_dialog_description()}
+      query={query}
+      onQueryChange={setQuery}
+      placeholder={m.chat_search_placeholder()}
+      emptyText={emptyStateText}
+      emptyIcon={emptyStateIcon}
+      showEmptyState={shouldShowEmptyState}
+      isLoading={false}
+      actionGroups={visibleActionGroups}
+      groups={groups}
+    />
   )
 }

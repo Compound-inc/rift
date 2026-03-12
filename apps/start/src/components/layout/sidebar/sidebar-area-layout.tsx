@@ -93,9 +93,9 @@ export function SidebarAreaLayout({
                       }),
                     )}
                   >
-                    {section.items.map((item) => (
+                    {section.items.map((item, itemIndex) => (
                       <div
-                        key={item.href}
+                        key={item.href ?? `${sectionKey}-item-${itemIndex}`}
                         className="min-h-[2.25rem] [contain-intrinsic-size:0_2.25rem] [content-visibility:auto]"
                       >
                         <SidebarNavItem
@@ -113,9 +113,9 @@ export function SidebarAreaLayout({
                     rtl: 'pl-3',
                   })}
                 >
-                  {section.items.map((item) => (
+                  {section.items.map((item, itemIndex) => (
                     <SidebarNavItem
-                      key={item.href}
+                      key={item.href ?? `${sectionKey}-item-${itemIndex}`}
                       item={item}
                       pathname={pathname}
                     />

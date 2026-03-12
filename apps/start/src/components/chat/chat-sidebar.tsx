@@ -18,6 +18,7 @@ import {
   Link2,
   MessageCircle,
   Pencil,
+  Search,
   Trash2,
 } from 'lucide-react'
 import { SidebarGroupTooltip } from '@rift/ui/tooltip'
@@ -35,7 +36,7 @@ import { mutators, queries } from '@/integrations/zero'
 import { CACHE_CHAT_NAV } from '@/integrations/zero/query-cache-policy'
 import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 import { m } from '@/paraglide/messages.js'
-import { ChatSearchCommand } from './chat-search-command'
+import { ChatSearchCommand, openChatSearchCommand } from './chat-search-command'
 import { syncThreadGenerationStatuses } from './thread-status-store'
 
 // --- Single source of truth: constants and static content ---
@@ -64,6 +65,11 @@ function getStaticSections(): NavSection[] {
       items: [
         { name: m.chat_sidebar_new_chat(), href: CHAT_HREF, icon: Link2, exact: true },
         { name: m.chat_sidebar_projects(), href: `${CHAT_HREF}/projects`, icon: Globe },
+        {
+          name: m.chat_search_trigger_label(),
+          onSelect: () => openChatSearchCommand({ hideActions: true }),
+          icon: Search,
+        },
       ],
     },
   ]
@@ -425,13 +431,15 @@ export function ChatSidebarContent({ pathname }: { pathname: string }) {
   const sections = [...getStaticSections(), historySection]
 
   return (
-    <SidebarAreaLayout
-      title={CHAT_SIDEBAR_TITLE()}
-      headerContent={<ChatSearchCommand />}
-      sections={sections}
-      pathname={pathname}
-      scrollableSectionName={CHAT_HISTORY_SECTION_NAME()}
-    />
+    <>
+      <ChatSearchCommand />
+      <SidebarAreaLayout
+        title={CHAT_SIDEBAR_TITLE()}
+        sections={sections}
+        pathname={pathname}
+        scrollableSectionName={CHAT_HISTORY_SECTION_NAME()}
+      />
+    </>
   )
 }
 

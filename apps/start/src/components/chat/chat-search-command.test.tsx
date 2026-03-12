@@ -107,7 +107,7 @@ describe('ChatSearchCommand', () => {
 
     render(<ChatSearchCommand />)
 
-    fireEvent.click(screen.getByRole('button'))
+    fireEvent.keyDown(window, { key: 'k', metaKey: true })
     fireEvent.change(screen.getByLabelText('query'), {
       target: { value: 'stale query' },
     })
