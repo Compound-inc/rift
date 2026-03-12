@@ -29,19 +29,21 @@ function TestHarness(input: {
       <output data-testid="disable-initial-alignment">
         {String(disableInitialAlignment)}
       </output>
-      {input.messages.map((message) => (
-        <div key={message.id} id={`chat-message-${message.id}`}>
-          {message.parts
-            .filter(
-              (
-                part,
-              ): part is Extract<typeof part, { type: 'text'; text: string }> =>
-                part.type === 'text',
-            )
-            .map((part) => part.text)
-            .join(' ')}
-        </div>
-      ))}
+      <div data-testid="scroll-container" style={{ overflowY: 'auto' }}>
+        {input.messages.map((message) => (
+          <div key={message.id} id={`chat-message-${message.id}`}>
+            {message.parts
+              .filter(
+                (
+                  part,
+                ): part is Extract<typeof part, { type: 'text'; text: string }> =>
+                  part.type === 'text',
+              )
+              .map((part) => part.text)
+              .join(' ')}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -193,5 +195,182 @@ describe('useChatSearchReveal', () => {
     expect(
       view.getByTestId('disable-initial-alignment').textContent,
     ).toBe('false')
+  })
+
+  it('scrolls with top padding when target is near the top edge of a scroll container', async () => {
+    const revealMessageBranch = vi.fn(async () => true)
+    const scrollIntoViewMock = vi.fn()
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView
+    HTMLElement.prototype.scrollIntoView = scrollIntoViewMock
+
+    const view = render(
+      <TestHarness
+        activeThreadId="thread-3"
+        messages={[
+          {
+            id: 'edge-message',
+            role: 'assistant',
+            parts: [{ type: 'text', text: 'near top edge' }],
+          },
+        ]}
+        revealMessageBranch={revealMessageBranch}
+      />,
+    )
+
+    const scrollContainer = view.getByTestId('scroll-container') as HTMLElement
+    const target = document.getElementById('chat-message-edge-message')
+    expect(target).not.toBeNull()
+    if (!(target instanceof HTMLElement)) {
+      throw new Error('Expected target message element to exist')
+    }
+
+    Object.defineProperty(scrollContainer, 'clientHeight', {
+      configurable: true,
+      value: 400,
+    })
+    Object.defineProperty(scrollContainer, 'scrollHeight', {
+      configurable: true,
+      value: 1600,
+    })
+    Object.defineProperty(scrollContainer, 'scrollTop', {
+      configurable: true,
+      value: 500,
+      writable: true,
+    })
+    scrollContainer.getBoundingClientRect = () =>
+      ({
+        top: 100,
+        bottom: 500,
+        left: 0,
+        right: 800,
+        width: 800,
+        height: 400,
+        x: 0,
+        y: 100,
+        toJSON: () => ({}),
+      }) as DOMRect
+    target.getBoundingClientRect = () =>
+      ({
+        top: 110,
+        bottom: 170,
+        left: 0,
+        right: 800,
+        width: 800,
+        height: 60,
+        x: 0,
+        y: 110,
+        toJSON: () => ({}),
+      }) as DOMRect
+
+    const scrollToMock = vi.fn(
+      (options: number | ScrollToOptions | undefined, _y?: number) => {
+        if (typeof options === 'object' && options?.top != null) {
+          scrollContainer.scrollTop = options.top
+        }
+      },
+    )
+    scrollContainer.scrollTo = scrollToMock
+
+    await act(async () => {
+      setPendingChatSearchReveal({
+        threadId: 'thread-3',
+        messageId: 'edge-message',
+        query: 'edge',
+        nonce: '3',
+      })
+      await Promise.resolve()
+    })
+
+    expect(scrollToMock).toHaveBeenCalledWith({
+      top: 438,
+      behavior: 'smooth',
+    })
+    expect(scrollIntoViewMock).not.toHaveBeenCalled()
+
+    HTMLElement.prototype.scrollIntoView = originalScrollIntoView
+  })
+
+  it('does not scroll when target is already comfortably inside padded viewport bounds', async () => {
+    const revealMessageBranch = vi.fn(async () => true)
+    const scrollIntoViewMock = vi.fn()
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView
+    HTMLElement.prototype.scrollIntoView = scrollIntoViewMock
+
+    const view = render(
+      <TestHarness
+        activeThreadId="thread-4"
+        messages={[
+          {
+            id: 'visible-message',
+            role: 'assistant',
+            parts: [{ type: 'text', text: 'already visible' }],
+          },
+        ]}
+        revealMessageBranch={revealMessageBranch}
+      />,
+    )
+
+    const scrollContainer = view.getByTestId('scroll-container') as HTMLElement
+    const target = document.getElementById('chat-message-visible-message')
+    expect(target).not.toBeNull()
+    if (!(target instanceof HTMLElement)) {
+      throw new Error('Expected target message element to exist')
+    }
+
+    Object.defineProperty(scrollContainer, 'clientHeight', {
+      configurable: true,
+      value: 400,
+    })
+    Object.defineProperty(scrollContainer, 'scrollHeight', {
+      configurable: true,
+      value: 1600,
+    })
+    Object.defineProperty(scrollContainer, 'scrollTop', {
+      configurable: true,
+      value: 500,
+      writable: true,
+    })
+    scrollContainer.getBoundingClientRect = () =>
+      ({
+        top: 100,
+        bottom: 500,
+        left: 0,
+        right: 800,
+        width: 800,
+        height: 400,
+        x: 0,
+        y: 100,
+        toJSON: () => ({}),
+      }) as DOMRect
+    target.getBoundingClientRect = () =>
+      ({
+        top: 220,
+        bottom: 280,
+        left: 0,
+        right: 800,
+        width: 800,
+        height: 60,
+        x: 0,
+        y: 220,
+        toJSON: () => ({}),
+      }) as DOMRect
+
+    const scrollToMock = vi.fn()
+    scrollContainer.scrollTo = scrollToMock
+
+    await act(async () => {
+      setPendingChatSearchReveal({
+        threadId: 'thread-4',
+        messageId: 'visible-message',
+        query: 'visible',
+        nonce: '4',
+      })
+      await Promise.resolve()
+    })
+
+    expect(scrollToMock).not.toHaveBeenCalled()
+    expect(scrollIntoViewMock).not.toHaveBeenCalled()
+
+    HTMLElement.prototype.scrollIntoView = originalScrollIntoView
   })
 })

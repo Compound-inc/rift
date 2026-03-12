@@ -1,8 +1,9 @@
-const SEARCH_HIGHLIGHT_ATTR = 'data-chat-search-highlight'
+import {
+  CHAT_SEARCH_HIGHLIGHT_CLASS_NAME,
+  getSearchHighlightMatcher,
+} from '@/lib/shared/chat-search-highlight'
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
+const SEARCH_HIGHLIGHT_ATTR = 'data-chat-search-highlight'
 
 /**
  * Removes any transient command-search highlights from the given message
@@ -27,22 +28,18 @@ export function clearSearchHighlights(container: HTMLElement | null) {
 }
 
 /**
- * Highlights literal query matches inside a rendered chat message without
+ * Highlights query-token matches inside a rendered chat message without
  * touching code blocks or editable controls.
- *
- * The highlight intentionally uses background color only. Padding changes line
- * metrics and causes visible layout shift when the mark is later removed.
  */
 export function highlightSearchQueryInMessage(input: {
   readonly container: HTMLElement
   readonly query: string
 }): boolean {
-  const normalizedQuery = input.query.trim()
-  if (normalizedQuery.length === 0) return false
+  const { tokens, pattern } = getSearchHighlightMatcher(input.query)
+  if (tokens.length === 0 || !pattern) return false
 
   clearSearchHighlights(input.container)
 
-  const pattern = new RegExp(escapeRegExp(normalizedQuery), 'gi')
   const walker = document.createTreeWalker(
     input.container,
     NodeFilter.SHOW_TEXT,
@@ -92,8 +89,7 @@ export function highlightSearchQueryInMessage(input: {
 
         const highlight = document.createElement('mark')
         highlight.setAttribute(SEARCH_HIGHLIGHT_ATTR, 'true')
-        highlight.className =
-          'rounded-[0.2rem] bg-foreground-info/20 text-inherit shadow-[inset_0_-1px_0_rgba(94,170,255,0.24)]'
+        highlight.className = CHAT_SEARCH_HIGHLIGHT_CLASS_NAME
         highlight.textContent = matchedText
         fragment.append(highlight)
         lastIndex = endIndex

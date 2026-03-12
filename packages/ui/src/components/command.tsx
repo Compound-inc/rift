@@ -11,10 +11,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@rift/ui/dialog"
-import {
-  InputGroup,
-  InputGroupAddon,
-} from "@rift/ui/input-group"
 import { SearchIcon, CheckIcon } from "lucide-react"
 
 function Command({
@@ -72,19 +68,18 @@ function CommandInput({
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
     <div data-slot="command-input-wrapper" className="p-1 pb-0">
-      <InputGroup className="bg-input/30 border-input/30 h-8! rounded-lg! shadow-none! *:data-[slot=input-group-addon]:pl-2!">
+      {/* Mirrors the base Input primitive styles so command search looks and behaves consistently. */}
+      <div className="relative">
         <CommandPrimitive.Input
           data-slot="command-input"
           className={cn(
-            "w-full text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50",
+            "block w-full min-w-0 border border-border-base bg-transparent px-3 py-2 pr-9 text-sm text-foreground-strong transition-colors placeholder:text-foreground-secondary focus-visible:border-foreground-tertiary focus-visible:ring-3 focus-visible:ring-foreground-tertiary/50 focus-visible:outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-foreground-error aria-invalid:ring-3 aria-invalid:ring-foreground-error/20 sm:text-sm h-9 rounded-md",
             className
           )}
           {...props}
         />
-        <InputGroupAddon>
-          <SearchIcon className="size-4 shrink-0 opacity-50" />
-        </InputGroupAddon>
-      </InputGroup>
+        <SearchIcon className="text-foreground-secondary pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2" />
+      </div>
     </div>
   )
 }

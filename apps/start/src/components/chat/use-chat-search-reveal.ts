@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { UIMessage } from 'ai'
+import { normalizeSearchQuery } from '@/lib/shared/chat-search-highlight'
 import {
   clearSearchHighlights,
   highlightSearchQueryInMessage,
@@ -19,6 +20,69 @@ type UseChatSearchRevealInput = {
 
 type UseChatSearchRevealResult = {
   readonly disableInitialAlignment: boolean
+}
+
+const REVEAL_VIEWPORT_PADDING_PX = 72
+
+function findScrollableAncestor(node: HTMLElement): HTMLElement | null {
+  let current: HTMLElement | null = node.parentElement
+  while (current) {
+    const style = window.getComputedStyle(current)
+    const overflowY = style.overflowY
+    const isScrollableOverflow =
+      overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay'
+    if (isScrollableOverflow && current.scrollHeight > current.clientHeight) {
+      return current
+    }
+    current = current.parentElement
+  }
+  return null
+}
+
+/**
+ * Reveals the target message in the nearest scroll container while preserving
+ * top breathing room so highlights do not stick to the viewport edge.
+ */
+function revealMessageElement(messageElement: HTMLElement) {
+  const scrollContainer = findScrollableAncestor(messageElement)
+  if (!scrollContainer) {
+    messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    return
+  }
+
+  const containerRect = scrollContainer.getBoundingClientRect()
+  const messageRect = messageElement.getBoundingClientRect()
+  const viewportTopBoundary = containerRect.top + REVEAL_VIEWPORT_PADDING_PX
+  const viewportBottomBoundary = containerRect.bottom - REVEAL_VIEWPORT_PADDING_PX
+  const isComfortablyVisible =
+    messageRect.top >= viewportTopBoundary &&
+    messageRect.bottom <= viewportBottomBoundary
+
+  if (isComfortablyVisible) {
+    return
+  }
+
+  const currentScrollTop = scrollContainer.scrollTop
+  const messageTopInScrollSpace =
+    currentScrollTop + (messageRect.top - containerRect.top)
+  const desiredScrollTop = Math.max(
+    0,
+    messageTopInScrollSpace - REVEAL_VIEWPORT_PADDING_PX,
+  )
+  const maxScrollTop = Math.max(
+    0,
+    scrollContainer.scrollHeight - scrollContainer.clientHeight,
+  )
+  const nextScrollTop = Math.min(desiredScrollTop, maxScrollTop)
+
+  if (Math.abs(nextScrollTop - currentScrollTop) <= 1) {
+    return
+  }
+
+  scrollContainer.scrollTo({
+    top: nextScrollTop,
+    behavior: 'smooth',
+  })
 }
 
 /**
@@ -86,13 +150,16 @@ export function useChatSearchReveal(
     const messageElement = document.getElementById(
       `chat-message-${pendingReveal.messageId}`,
     )
-    messageElement?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (messageElement instanceof HTMLElement) {
+      revealMessageElement(messageElement)
+    }
 
-    if (messageElement && pendingReveal.query.trim().length > 0) {
+    const normalizedRevealQuery = normalizeSearchQuery(pendingReveal.query)
+    if (messageElement && normalizedRevealQuery.length > 0) {
       requestAnimationFrame(() => {
         highlightSearchQueryInMessage({
           container: messageElement,
-          query: pendingReveal.query,
+          query: normalizedRevealQuery,
         })
       })
     }

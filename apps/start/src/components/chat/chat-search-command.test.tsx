@@ -5,6 +5,7 @@ import { ChatSearchCommand } from './chat-search-command'
 
 const navigateMock = vi.fn()
 const searchChatThreadsMock = vi.fn()
+const setThemeMock = vi.fn()
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
@@ -12,6 +13,14 @@ vi.mock('@tanstack/react-router', () => ({
 
 vi.mock('@/lib/frontend/chat/chat-search.functions', () => ({
   searchChatThreads: (input: unknown) => searchChatThreadsMock(input),
+}))
+
+vi.mock('@rift/ui/hooks/useTheme', () => ({
+  useTheme: () => ({
+    resolvedTheme: 'light',
+    setTheme: setThemeMock,
+    mounted: true,
+  }),
 }))
 
 vi.mock('@/components/layout/command/app-command-dialog', () => ({

@@ -1,13 +1,15 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Search, MessageSquareText, TextSearch } from 'lucide-react'
+import { Plus, Search, MessageCircle, MessageSquareText, Moon, SearchX, Sun, User } from 'lucide-react'
 import { Button } from '@rift/ui/button'
+import { useTheme } from '@rift/ui/hooks/useTheme'
 import { cn } from '@rift/utils'
 import { useNavigate } from '@tanstack/react-router'
 import { AppCommandDialog, type AppCommandGroup } from '@/components/layout/command/app-command-dialog'
 import { searchChatThreads } from '@/lib/frontend/chat/chat-search.functions'
 import type { ChatSearchResult } from '@/lib/shared/chat-search'
+import { normalizeSearchQuery } from '@/lib/shared/chat-search-highlight'
 import { m } from '@/paraglide/messages.js'
 import {
   clearPendingChatSearchReveal,
@@ -69,11 +71,13 @@ function formatResultDate(timestamp: number): string {
  */
 export function ChatSearchCommand() {
   const navigate = useNavigate()
+  const { resolvedTheme, setTheme, mounted } = useTheme()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<readonly ChatSearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [lastSettledQuery, setLastSettledQuery] = useState('')
   const requestSequenceRef = useRef(0)
   const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS)
 
@@ -103,14 +107,16 @@ export function ChatSearchCommand() {
       setResults([])
       setErrorMessage(null)
       setIsLoading(false)
+      setLastSettledQuery('')
       return
     }
 
-    const nextQuery = debouncedQuery.trim()
+    const nextQuery = normalizeSearchQuery(debouncedQuery)
     if (nextQuery.length === 0) {
       setResults([])
       setErrorMessage(null)
       setIsLoading(false)
+      setLastSettledQuery('')
       return
     }
 
@@ -130,12 +136,14 @@ export function ChatSearchCommand() {
           return
         }
         setResults(response)
+        setLastSettledQuery(nextQuery)
       })
       .catch((error) => {
         if (requestSequenceRef.current !== requestSequence) {
           return
         }
         setResults([])
+        setLastSettledQuery(nextQuery)
         setErrorMessage(
           error instanceof Error
             ? error.message
@@ -149,13 +157,34 @@ export function ChatSearchCommand() {
       })
   }, [debouncedQuery, open])
 
+  const normalizedQuery = normalizeSearchQuery(query)
+  const normalizedDebouncedQuery = normalizeSearchQuery(debouncedQuery)
+  const isDebouncePending = normalizedQuery.length > 0 && normalizedQuery !== normalizedDebouncedQuery
+
+  /**
+   * Empty-state visibility rules:
+   * - First query: wait for debounce + request completion before showing empty.
+   * - Subsequent queries after any settled search: keep empty visible while
+   *   debounce/network is pending if there are still no rows, avoiding panel
+   *   collapse/re-expand flicker on each keystroke.
+   */
+  const hasAnySettledSearch = lastSettledQuery.length > 0
+  const hasNoResults = results.length === 0
+  const isSettledForCurrentQuery =
+    !isLoading && !isDebouncePending && lastSettledQuery === normalizedQuery
+
+  const shouldShowEmptyState =
+    normalizedQuery.length > 0 &&
+    hasNoResults &&
+    (isSettledForCurrentQuery || hasAnySettledSearch)
+
   const openSearchResult = useCallback(
     (result: ChatSearchResult) => {
       if (result.messageId) {
         setPendingChatSearchReveal({
           threadId: result.threadId,
           messageId: result.messageId,
-          query: query.trim(),
+          query: normalizeSearchQuery(query),
           nonce: String(Date.now()),
         })
       } else {
@@ -178,13 +207,15 @@ export function ChatSearchCommand() {
       subtitle:
         result.matchType === 'message'
           ? result.snippet ?? m.chat_search_match_message()
-          : m.chat_search_match_title(),
+          : undefined,
+      subtitleHighlightQuery:
+        result.matchType === 'message' ? normalizeSearchQuery(query) : undefined,
       meta: formatResultDate(result.matchedAt),
       icon:
         result.matchType === 'message' ? (
           <MessageSquareText className="size-4" />
         ) : (
-          <TextSearch className="size-4" />
+          <MessageCircle className="size-4" />
         ),
       onSelect: () => {
         openSearchResult(result)
@@ -198,7 +229,62 @@ export function ChatSearchCommand() {
         items,
       },
     ]
-  }, [openSearchResult, results])
+  }, [openSearchResult, query, results])
+
+  /**
+   * Command actions are injected into the shared dialog so users get useful
+   * shortcuts before typing, while still allowing the same query field to
+   * search both actions and threads once input starts.
+   */
+  const actionGroups = useMemo<readonly AppCommandGroup[]>(() => {
+    const canResolveTheme = mounted
+    const nextTheme = canResolveTheme && resolvedTheme === 'dark' ? 'light' : 'dark'
+    const themeActionTitle = nextTheme === 'dark' ? 'Switch to dark mode' : 'Switch to light mode'
+
+    return [
+      {
+        id: 'chat-actions',
+        heading: 'Actions',
+        items: [
+          {
+            id: 'new-chat',
+            title: 'New chat',
+            value: 'new chat create conversation thread',
+            icon: <Plus className="size-4" />,
+            onSelect: () => {
+              clearPendingChatSearchReveal()
+              setOpen(false)
+              void navigate({ to: '/chat' })
+            },
+          },
+          {
+            id: 'open-account',
+            title: 'Account',
+            value: 'account settings profile preferences',
+            icon: <User className="size-4" />,
+            onSelect: () => {
+              setOpen(false)
+              void navigate({ to: '/settings' })
+            },
+          },
+          {
+            id: 'toggle-theme',
+            title: themeActionTitle,
+            value: `${themeActionTitle} theme appearance color scheme`,
+            icon: nextTheme === 'dark' ? (
+              <Moon className="size-4" />
+            ) : (
+              <Sun className="size-4" />
+            ),
+            onSelect: () => {
+              setTheme(nextTheme)
+              setOpen(false)
+            },
+          },
+        ],
+      },
+    ]
+  }, [mounted, resolvedTheme, setTheme])
 
   return (
     <>
@@ -231,13 +317,11 @@ export function ChatSearchCommand() {
         query={query}
         onQueryChange={setQuery}
         placeholder={m.chat_search_placeholder()}
-        emptyText={
-          query.trim().length === 0
-            ? m.chat_search_empty_idle()
-            : errorMessage ?? m.chat_search_empty_results()
-        }
-        loadingText={m.chat_search_loading()}
-        isLoading={isLoading}
+        emptyText={errorMessage ?? m.chat_search_empty_results()}
+        emptyIcon={<SearchX aria-hidden="true" />}
+        showEmptyState={shouldShowEmptyState}
+        isLoading={false}
+        actionGroups={actionGroups}
         groups={groups}
       />
     </>

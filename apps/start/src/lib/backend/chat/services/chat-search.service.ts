@@ -9,6 +9,7 @@ import {
   CHAT_SEARCHABLE_MESSAGE_STATUS,
   type ChatSearchResult,
 } from '@/lib/shared/chat-search'
+import { normalizeSearchQuery } from '@/lib/shared/chat-search-highlight'
 
 const DEFAULT_SEARCH_LIMIT = 20
 const MAX_SEARCH_LIMIT = 30
@@ -34,10 +35,6 @@ type SearchRow = {
   readonly snippet: string | null
   readonly match_type: 'title' | 'message'
   readonly matched_at: number | string
-}
-
-function normalizeSearchQuery(query: string): string {
-  return query.trim().replace(/\s+/g, ' ')
 }
 
 function normalizeSearchLimit(limit?: number): number {

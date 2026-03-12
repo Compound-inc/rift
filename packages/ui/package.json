@@ -69,6 +69,11 @@
       "import": "./src/components/command.tsx",
       "default": "./src/components/command.tsx"
     },
+    "./kbd": {
+      "types": "./src/components/kbd.tsx",
+      "import": "./src/components/kbd.tsx",
+      "default": "./src/components/kbd.tsx"
+    },
     "./context-menu": {
       "types": "./src/components/context-menu.tsx",
       "import": "./src/components/context-menu.tsx",
