@@ -9,16 +9,6 @@ import {
   settingsNavArea,
   SETTINGS_AREA_KEY,
 } from '@/routes/(app)/_layout/settings/-settings-nav'
-import {
-  isInsightPath,
-  insightNavArea,
-  INSIGHT_AREA_KEY,
-} from '@/routes/(app)/_layout/insight/-insight-nav'
-import {
-  isWriterPath,
-  writerNavArea,
-  WRITER_AREA_KEY,
-} from '@/routes/(app)/_layout/writer/-writer-nav'
 import type { ComponentType, SVGProps } from 'react'
 
 export type SidebarNavData = {
@@ -68,8 +58,6 @@ export type SidebarNavAreas = Record<
 export const NAV_AREAS: SidebarNavAreas = {
   [ORG_SETTINGS_AREA_KEY]: orgSettingsNavArea,
   [CHAT_AREA_KEY]: chatNavArea,
-  [INSIGHT_AREA_KEY]: insightNavArea,
-  [WRITER_AREA_KEY]: writerNavArea,
   [SETTINGS_AREA_KEY]: settingsNavArea,
 }
 
@@ -80,8 +68,6 @@ export { SETTINGS_AREA_KEY }
  */
 export function getCurrentArea(pathname: string): string | null {
   if (isOrgSettingsPath(pathname)) return ORG_SETTINGS_AREA_KEY
-  if (isWriterPath(pathname)) return WRITER_AREA_KEY
-  if (isInsightPath(pathname)) return INSIGHT_AREA_KEY
   if (isSettingsPath(pathname)) return SETTINGS_AREA_KEY
   if (isChatPath(pathname)) return CHAT_AREA_KEY
   return null

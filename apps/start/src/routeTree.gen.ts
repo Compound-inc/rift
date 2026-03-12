@@ -24,10 +24,8 @@ import { Route as ApiZeroMutateRouteRouteImport } from './routes/api/zero/mutate
 import { Route as ApiOrgModelPolicyRouteRouteImport } from './routes/api/org/model-policy/route'
 import { Route as ApiFilesUploadRouteRouteImport } from './routes/api/files/upload/route'
 import { Route as ApiFilesMarkdownRouteRouteImport } from './routes/api/files/markdown/route'
-import { Route as appLayoutWriterRouteRouteImport } from './routes/(app)/_layout/writer/route'
 import { Route as appLayoutSettingsRouteRouteImport } from './routes/(app)/_layout/settings/route'
 import { Route as appLayoutOrganizationRouteRouteImport } from './routes/(app)/_layout/organization/route'
-import { Route as appLayoutInsightRouteRouteImport } from './routes/(app)/_layout/insight/route'
 import { Route as appLayoutChatRouteRouteImport } from './routes/(app)/_layout/chat/route'
 import { Route as appLayoutSettingsIndexRouteImport } from './routes/(app)/_layout/settings/index'
 import { Route as appLayoutChatIndexRouteImport } from './routes/(app)/_layout/chat/index'
@@ -123,11 +121,6 @@ const ApiFilesMarkdownRouteRoute = ApiFilesMarkdownRouteRouteImport.update({
   path: '/api/files/markdown',
   getParentRoute: () => rootRouteImport,
 } as any)
-const appLayoutWriterRouteRoute = appLayoutWriterRouteRouteImport.update({
-  id: '/writer',
-  path: '/writer',
-  getParentRoute: () => appLayoutRouteRoute,
-} as any)
 const appLayoutSettingsRouteRoute = appLayoutSettingsRouteRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -139,11 +132,6 @@ const appLayoutOrganizationRouteRoute =
     path: '/organization',
     getParentRoute: () => appLayoutRouteRoute,
   } as any)
-const appLayoutInsightRouteRoute = appLayoutInsightRouteRouteImport.update({
-  id: '/insight',
-  path: '/insight',
-  getParentRoute: () => appLayoutRouteRoute,
-} as any)
 const appLayoutChatRouteRoute = appLayoutChatRouteRouteImport.update({
   id: '/chat',
   path: '/chat',
@@ -263,10 +251,8 @@ export interface FileRoutesByFullPath {
   '/auth/sign-in': typeof AuthSignInRouteRoute
   '/auth/sign-up': typeof AuthSignUpRouteRoute
   '/chat': typeof appLayoutChatRouteRouteWithChildren
-  '/insight': typeof appLayoutInsightRouteRoute
   '/organization': typeof appLayoutOrganizationRouteRouteWithChildren
   '/settings': typeof appLayoutSettingsRouteRouteWithChildren
-  '/writer': typeof appLayoutWriterRouteRoute
   '/api/files/markdown': typeof ApiFilesMarkdownRouteRoute
   '/api/files/upload': typeof ApiFilesUploadRouteRoute
   '/api/org/model-policy': typeof ApiOrgModelPolicyRouteRoute
@@ -301,9 +287,7 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRouteRoute
   '/auth/sign-in': typeof AuthSignInRouteRoute
   '/auth/sign-up': typeof AuthSignUpRouteRoute
-  '/insight': typeof appLayoutInsightRouteRoute
   '/organization': typeof appLayoutOrganizationRouteRouteWithChildren
-  '/writer': typeof appLayoutWriterRouteRoute
   '/api/files/markdown': typeof ApiFilesMarkdownRouteRoute
   '/api/files/upload': typeof ApiFilesUploadRouteRoute
   '/api/org/model-policy': typeof ApiOrgModelPolicyRouteRoute
@@ -339,10 +323,8 @@ export interface FileRoutesById {
   '/auth/sign-in': typeof AuthSignInRouteRoute
   '/auth/sign-up': typeof AuthSignUpRouteRoute
   '/(app)/_layout/chat': typeof appLayoutChatRouteRouteWithChildren
-  '/(app)/_layout/insight': typeof appLayoutInsightRouteRoute
   '/(app)/_layout/organization': typeof appLayoutOrganizationRouteRouteWithChildren
   '/(app)/_layout/settings': typeof appLayoutSettingsRouteRouteWithChildren
-  '/(app)/_layout/writer': typeof appLayoutWriterRouteRoute
   '/api/files/markdown': typeof ApiFilesMarkdownRouteRoute
   '/api/files/upload': typeof ApiFilesUploadRouteRoute
   '/api/org/model-policy': typeof ApiOrgModelPolicyRouteRoute
@@ -380,10 +362,8 @@ export interface FileRouteTypes {
     | '/auth/sign-in'
     | '/auth/sign-up'
     | '/chat'
-    | '/insight'
     | '/organization'
     | '/settings'
-    | '/writer'
     | '/api/files/markdown'
     | '/api/files/upload'
     | '/api/org/model-policy'
@@ -418,9 +398,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/auth/sign-in'
     | '/auth/sign-up'
-    | '/insight'
     | '/organization'
-    | '/writer'
     | '/api/files/markdown'
     | '/api/files/upload'
     | '/api/org/model-policy'
@@ -455,10 +433,8 @@ export interface FileRouteTypes {
     | '/auth/sign-in'
     | '/auth/sign-up'
     | '/(app)/_layout/chat'
-    | '/(app)/_layout/insight'
     | '/(app)/_layout/organization'
     | '/(app)/_layout/settings'
-    | '/(app)/_layout/writer'
     | '/api/files/markdown'
     | '/api/files/upload'
     | '/api/org/model-policy'
@@ -608,13 +584,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiFilesMarkdownRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/(app)/_layout/writer': {
-      id: '/(app)/_layout/writer'
-      path: '/writer'
-      fullPath: '/writer'
-      preLoaderRoute: typeof appLayoutWriterRouteRouteImport
-      parentRoute: typeof appLayoutRouteRoute
-    }
     '/(app)/_layout/settings': {
       id: '/(app)/_layout/settings'
       path: '/settings'
@@ -627,13 +596,6 @@ declare module '@tanstack/react-router' {
       path: '/organization'
       fullPath: '/organization'
       preLoaderRoute: typeof appLayoutOrganizationRouteRouteImport
-      parentRoute: typeof appLayoutRouteRoute
-    }
-    '/(app)/_layout/insight': {
-      id: '/(app)/_layout/insight'
-      path: '/insight'
-      fullPath: '/insight'
-      preLoaderRoute: typeof appLayoutInsightRouteRouteImport
       parentRoute: typeof appLayoutRouteRoute
     }
     '/(app)/_layout/chat': {
@@ -896,20 +858,16 @@ const appLayoutSettingsRouteRouteWithChildren =
 
 interface appLayoutRouteRouteChildren {
   appLayoutChatRouteRoute: typeof appLayoutChatRouteRouteWithChildren
-  appLayoutInsightRouteRoute: typeof appLayoutInsightRouteRoute
   appLayoutOrganizationRouteRoute: typeof appLayoutOrganizationRouteRouteWithChildren
   appLayoutSettingsRouteRoute: typeof appLayoutSettingsRouteRouteWithChildren
-  appLayoutWriterRouteRoute: typeof appLayoutWriterRouteRoute
   appLayoutSplatRoute: typeof appLayoutSplatRoute
   appLayoutIndexRoute: typeof appLayoutIndexRoute
 }
 
 const appLayoutRouteRouteChildren: appLayoutRouteRouteChildren = {
   appLayoutChatRouteRoute: appLayoutChatRouteRouteWithChildren,
-  appLayoutInsightRouteRoute: appLayoutInsightRouteRoute,
   appLayoutOrganizationRouteRoute: appLayoutOrganizationRouteRouteWithChildren,
   appLayoutSettingsRouteRoute: appLayoutSettingsRouteRouteWithChildren,
-  appLayoutWriterRouteRoute: appLayoutWriterRouteRoute,
   appLayoutSplatRoute: appLayoutSplatRoute,
   appLayoutIndexRoute: appLayoutIndexRoute,
 }
