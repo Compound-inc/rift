@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo  } from 'react'
-import type {SVGProps} from 'react';
+import { useMemo } from 'react'
+import type { SVGProps } from 'react'
 import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 import { motion } from 'motion/react'
 import { m } from '@/paraglide/messages.js'
@@ -22,7 +22,7 @@ export function ChatWelcomeScreen({
   const suggestions = useMemo(
     () => [
       {
-        icon: <StudentIcon className="h-6 w-6 text-blue-600" />,
+        icon: <BrainPersonIcon className="h-6 w-6 text-violet-600" />,
         title: m.chat_welcome_suggestion_1_title(),
         prompt: m.chat_welcome_suggestion_1_prompt(),
       },
@@ -32,12 +32,12 @@ export function ChatWelcomeScreen({
         prompt: m.chat_welcome_suggestion_2_prompt(),
       },
       {
-        icon: <BrainPersonIcon className="h-6 w-6 text-violet-600" />,
+        icon: <GrowthIcon className="h-6 w-6 text-emerald-600" />,
         title: m.chat_welcome_suggestion_3_title(),
         prompt: m.chat_welcome_suggestion_3_prompt(),
       },
       {
-        icon: <DeskIcon className="h-6 w-6 text-green-600" />,
+        icon: <StudentIcon className="h-6 w-6 text-blue-600" />,
         title: m.chat_welcome_suggestion_4_title(),
         prompt: m.chat_welcome_suggestion_4_prompt(),
       },
@@ -47,7 +47,7 @@ export function ChatWelcomeScreen({
         prompt: m.chat_welcome_suggestion_5_prompt(),
       },
       {
-        icon: <GrowthIcon className="h-6 w-6 text-emerald-600" />,
+        icon: <DeskIcon className="h-6 w-6 text-green-600" />,
         title: m.chat_welcome_suggestion_6_title(),
         prompt: m.chat_welcome_suggestion_6_prompt(),
       },
@@ -143,7 +143,7 @@ export function ChatWelcomeScreen({
               type="button"
               onClick={() => onSuggestionClick(item.prompt)}
               disabled={disabled}
-              className="rounded-3xl border border-border-base bg-surface-overlay p-4 text-start cursor-pointer hover:bg-surface-inverse/5 active:bg-surface-inverse/10"
+              className="rounded-3xl border border-border-base bg-surface-overlay p-4 text-start cursor-pointer hover:bg-surface-inverse/5 active:bg-surface-inverse/10 flex flex-col items-start"
             >
               <h3 className="mb-2 flex items-center gap-2 font-medium text-foreground-primary">
                 {item.icon}
