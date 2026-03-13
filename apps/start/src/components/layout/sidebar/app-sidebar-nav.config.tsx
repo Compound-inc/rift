@@ -61,6 +61,7 @@ export const NAV_AREAS: SidebarNavAreas = {
   [SETTINGS_AREA_KEY]: settingsNavArea,
 }
 
+export { CHAT_AREA_KEY }
 export { SETTINGS_AREA_KEY }
 
 /**

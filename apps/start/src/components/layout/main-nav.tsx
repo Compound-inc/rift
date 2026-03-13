@@ -74,7 +74,7 @@ export function MainNav({ children, sidebar: Sidebar }: MainNavProps) {
       >
         <div
           className={cn(
-            'relative h-full w-min max-w-full bg-surface-strong transition-transform md:translate-x-0',
+            'relative h-full w-min max-w-full bg-surface-base transition-transform md:translate-x-0',
             !isOpen &&
               directionClass(direction, {
                 ltr: '-translate-x-full',

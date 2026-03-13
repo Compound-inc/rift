@@ -308,6 +308,8 @@
   "home_go_to_chat": "Ir al chat",
   "home_title": "Rift",
   "layout_open_settings_aria_label": "Abrir configuración",
+  "layout_collapse_page_sidebar_aria_label": "Contraer barra lateral de la página",
+  "layout_expand_page_sidebar_aria_label": "Expandir barra lateral de la página",
   "layout_organization_settings_aria_label": "Configuración de la organización",
   "layout_organization_tooltip_description": "Configuración y controles a nivel de organización.",
   "layout_organization_tooltip_name": "Organización",

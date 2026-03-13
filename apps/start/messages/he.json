@@ -308,6 +308,8 @@
   "home_go_to_chat": "מעבר לצ'אט",
   "home_title": "Rift",
   "layout_open_settings_aria_label": "פתיחת הגדרות",
+  "layout_collapse_page_sidebar_aria_label": "כיווץ סרגל הצד של הדף",
+  "layout_expand_page_sidebar_aria_label": "הרחבת סרגל הצד של הדף",
   "layout_organization_settings_aria_label": "הגדרות הארגון",
   "layout_organization_tooltip_description": "הגדרות ובקרות ברמת הארגון.",
   "layout_organization_tooltip_name": "ארגון",

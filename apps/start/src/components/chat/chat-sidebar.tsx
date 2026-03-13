@@ -18,8 +18,9 @@ import {
   useZeroVirtualizer,
 } from '@rocicorp/zero-virtual/react'
 import { useZero } from '@rocicorp/zero/react'
-import { useNavigate } from '@tanstack/react-router'
-import { buttonVariants } from '@rift/ui/button'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { Button, buttonVariants } from '@rift/ui/button'
+import { cn, copyToClipboard } from '@rift/utils'
 import {
   AlertTriangle,
   Copy,
@@ -33,7 +34,6 @@ import {
 import { SidebarGroupTooltip } from '@rift/ui/tooltip'
 import { ContextMenuItem, ContextMenuSeparator } from '@rift/ui/context-menu'
 import { Spinner } from '@rift/ui/spinner'
-import { copyToClipboard } from '@rift/utils'
 import { toast } from 'sonner'
 import { isAreaPath } from '@/utils/nav-utils'
 import { SidebarAreaLayout } from '@/components/layout/sidebar/sidebar-area-layout'
@@ -695,24 +695,42 @@ function ChatSidebarHistory({
 }
 
 export function ChatSidebarContent({ pathname }: { pathname: string }) {
-  const { activeOrganizationId } = useAppAuth()
+  const { activeOrganizationId, isAnonymous } = useAppAuth()
   const normalizedOrganizationId =
     activeOrganizationId?.trim() ?? '__missing_org__'
   const staticSections = useMemo(() => getStaticSections(), [])
+  const shouldShowLoginButton = isAnonymous
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <SidebarAreaLayout
-        title={CHAT_SIDEBAR_TITLE()}
-        sections={staticSections}
-        pathname={pathname}
-      />
-      <div className="mt-8 flex min-h-0 flex-1 flex-col">
-        <ChatSidebarHistory
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      <div
+        className={cn(
+          'flex min-h-0 flex-1 flex-col',
+          // Reserve space so the bottom-fixed CTA does not cover thread rows.
+          shouldShowLoginButton ? 'pb-20' : undefined,
+        )}
+      >
+        <SidebarAreaLayout
+          title={CHAT_SIDEBAR_TITLE()}
+          sections={staticSections}
           pathname={pathname}
-          activeOrganizationId={normalizedOrganizationId}
         />
+        <div className="mt-8 flex min-h-0 flex-1 flex-col">
+          <ChatSidebarHistory
+            pathname={pathname}
+            activeOrganizationId={normalizedOrganizationId}
+          />
+        </div>
       </div>
+      {shouldShowLoginButton ? (
+        <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-surface-overlay via-surface-overlay to-transparent px-3 pb-1 pt-8">
+          <Button asChild size="default" className="w-full">
+            <Link to="/auth/sign-in" preload="intent">
+              {m.auth_login_sign_in()}
+            </Link>
+          </Button>
+        </div>
+      ) : null}
     </div>
   )
 }

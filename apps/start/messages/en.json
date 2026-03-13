@@ -308,6 +308,8 @@
   "home_go_to_chat": "Go to Chat",
   "home_title": "Rift",
   "layout_open_settings_aria_label": "Open settings",
+  "layout_collapse_page_sidebar_aria_label": "Collapse page sidebar",
+  "layout_expand_page_sidebar_aria_label": "Expand page sidebar",
   "layout_organization_settings_aria_label": "Organization settings",
   "layout_organization_tooltip_description": "Organization-level settings and controls.",
   "layout_organization_tooltip_name": "Organization",
