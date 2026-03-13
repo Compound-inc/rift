@@ -1,6 +1,17 @@
 import type { AnthropicLanguageModelOptions } from '@ai-sdk/anthropic'
 import type { AiModelCatalogEntry } from '../types'
 
+type AnthropicEffort = NonNullable<AnthropicLanguageModelOptions['effort']>
+type AnthropicThinkingPreset =
+  | { readonly adaptive: true }
+  | { readonly budgetTokens: number }
+
+function isAdaptiveThinkingPreset(
+  preset: AnthropicThinkingPreset,
+): preset is { readonly adaptive: true } {
+  return 'adaptive' in preset
+}
+
 /**
  * Shared base options for all Anthropic Messages API calls.
  */
@@ -12,23 +23,52 @@ function anthropicBaseOptions(): AnthropicLanguageModelOptions {
 }
 
 /**
- * Builds Anthropic provider options for a given reasoning effort.
+ * Builds Anthropic `thinking` options.
+ *
+ * We intentionally model thinking independently from effort so model entries
+ * can opt into each capability explicitly.
  */
-function anthropicReasoningOptions(
-  effort: 'low' | 'medium' | 'high' | 'max',
-  options: number | { adaptive: true },
-): Record<string, unknown> {
-  const thinking =
-    typeof options === 'object' && options.adaptive
-      ? { type: 'adaptive' as const }
-      : { type: 'enabled' as const, budgetTokens: options as number }
+function anthropicThinkingOptions(
+  preset: AnthropicThinkingPreset,
+): NonNullable<AnthropicLanguageModelOptions['thinking']> {
+  return isAdaptiveThinkingPreset(preset)
+    ? { type: 'adaptive' }
+    : { type: 'enabled', budgetTokens: preset.budgetTokens }
+}
+
+/**
+ * Builds Anthropic provider options for reasoning-capable models.
+ */
+function anthropicReasoningProviderOptions(input: {
+  readonly thinking: AnthropicThinkingPreset
+  readonly effort?: AnthropicEffort
+}): Record<string, unknown> {
   return {
     anthropic: {
       ...anthropicBaseOptions(),
-      effort,
-      thinking,
+      thinking: anthropicThinkingOptions(input.thinking),
+      ...(input.effort ? { effort: input.effort } : {}),
     } satisfies AnthropicLanguageModelOptions,
   }
+}
+
+/**
+ * Convenience helper for models that support thinking but not effort.
+ */
+function anthropicThinkingOnlyOptions(
+  thinking: AnthropicThinkingPreset,
+): Record<string, unknown> {
+  return anthropicReasoningProviderOptions({ thinking })
+}
+
+/**
+ * Convenience helper for models that support both thinking and effort.
+ */
+function anthropicEffortAndThinkingOptions(
+  effort: AnthropicEffort,
+  thinking: AnthropicThinkingPreset,
+): Record<string, unknown> {
+  return anthropicReasoningProviderOptions({ effort, thinking })
 }
 
 /**
@@ -74,10 +114,10 @@ export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
     reasoningEfforts: ['low', 'medium', 'high', 'max'],
     defaultReasoningEffort: 'medium',
     providerOptionsByReasoning: {
-      low: anthropicReasoningOptions('low', { adaptive: true }),
-      medium: anthropicReasoningOptions('medium', { adaptive: true }),
-      high: anthropicReasoningOptions('high', { adaptive: true }),
-      max: anthropicReasoningOptions('max', { adaptive: true }),
+      low: anthropicEffortAndThinkingOptions('low', { adaptive: true }),
+      medium: anthropicEffortAndThinkingOptions('medium', { adaptive: true }),
+      high: anthropicEffortAndThinkingOptions('high', { adaptive: true }),
+      max: anthropicEffortAndThinkingOptions('max', { adaptive: true }),
     },
     defaultProviderOptions: anthropicDefaultProviderOptions(),
     defaultMaxOutputTokens: 128000,
@@ -131,12 +171,14 @@ export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
     reasoningEfforts: ['low', 'medium', 'high'],
     defaultReasoningEffort: 'medium',
     providerOptionsByReasoning: {
-      low: anthropicReasoningOptions('low', 4000),
-      medium: anthropicReasoningOptions('medium', 10000),
-      high: anthropicReasoningOptions('high', 20000),
+      low: anthropicEffortAndThinkingOptions('low', { budgetTokens: 4000 }),
+      medium: anthropicEffortAndThinkingOptions('medium', {
+        budgetTokens: 10000,
+      }),
+      high: anthropicEffortAndThinkingOptions('high', { budgetTokens: 20000 }),
     },
     defaultProviderOptions: anthropicDefaultProviderOptions(),
-    defaultMaxOutputTokens: 64000,
+    defaultMaxOutputTokens: 128000,
     pricing: {
       inputPerToken: '0.000005',
       outputPerToken: '0.000025',
@@ -170,9 +212,9 @@ export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
     reasoningEfforts: ['low', 'medium', 'high'],
     defaultReasoningEffort: 'medium',
     providerOptionsByReasoning: {
-      low: anthropicReasoningOptions('low', { adaptive: true }),
-      medium: anthropicReasoningOptions('medium', { adaptive: true }),
-      high: anthropicReasoningOptions('high', { adaptive: true }),
+      low: anthropicThinkingOnlyOptions({ adaptive: true }),
+      medium: anthropicThinkingOnlyOptions({ adaptive: true }),
+      high: anthropicThinkingOnlyOptions({ adaptive: true }),
     },
     defaultProviderOptions: anthropicDefaultProviderOptions(),
     defaultMaxOutputTokens: 64000,
@@ -226,9 +268,9 @@ export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
     reasoningEfforts: ['low', 'medium', 'high'],
     defaultReasoningEffort: 'medium',
     providerOptionsByReasoning: {
-      low: anthropicReasoningOptions('low', 4000),
-      medium: anthropicReasoningOptions('medium', 10000),
-      high: anthropicReasoningOptions('high', 20000),
+      low: anthropicThinkingOnlyOptions({ budgetTokens: 4000 }),
+      medium: anthropicThinkingOnlyOptions({ budgetTokens: 10000 }),
+      high: anthropicThinkingOnlyOptions({ budgetTokens: 20000 }),
     },
     defaultProviderOptions: anthropicDefaultProviderOptions(),
     defaultMaxOutputTokens: 64000,
@@ -282,9 +324,9 @@ export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
     reasoningEfforts: ['low', 'medium', 'high'],
     defaultReasoningEffort: 'medium',
     providerOptionsByReasoning: {
-      low: anthropicReasoningOptions('low', 4000),
-      medium: anthropicReasoningOptions('medium', 8000),
-      high: anthropicReasoningOptions('high', 16000),
+      low: anthropicThinkingOnlyOptions({ budgetTokens: 4000 }),
+      medium: anthropicThinkingOnlyOptions({ budgetTokens: 8000 }),
+      high: anthropicThinkingOnlyOptions({ budgetTokens: 16000 }),
     },
     defaultProviderOptions: anthropicDefaultProviderOptions(),
     defaultMaxOutputTokens: 64000,
@@ -326,9 +368,9 @@ export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
     reasoningEfforts: ['low', 'medium', 'high'],
     defaultReasoningEffort: 'medium',
     providerOptionsByReasoning: {
-      low: anthropicReasoningOptions('low', 4000),
-      medium: anthropicReasoningOptions('medium', 8000),
-      high: anthropicReasoningOptions('high', 16000),
+      low: anthropicThinkingOnlyOptions({ budgetTokens: 4000 }),
+      medium: anthropicThinkingOnlyOptions({ budgetTokens: 8000 }),
+      high: anthropicThinkingOnlyOptions({ budgetTokens: 16000 }),
     },
     defaultProviderOptions: anthropicDefaultProviderOptions(),
     defaultMaxOutputTokens: 64000,
@@ -366,9 +408,9 @@ export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
     reasoningEfforts: ['low', 'medium', 'high'],
     defaultReasoningEffort: 'medium',
     providerOptionsByReasoning: {
-      low: anthropicReasoningOptions('low', 4000),
-      medium: anthropicReasoningOptions('medium', 8000),
-      high: anthropicReasoningOptions('high', 16000),
+      low: anthropicThinkingOnlyOptions({ budgetTokens: 4000 }),
+      medium: anthropicThinkingOnlyOptions({ budgetTokens: 8000 }),
+      high: anthropicThinkingOnlyOptions({ budgetTokens: 16000 }),
     },
     defaultProviderOptions: anthropicDefaultProviderOptions(),
     defaultMaxOutputTokens: 8192,

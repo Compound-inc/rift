@@ -89,6 +89,7 @@ type ThreadItemRow = {
 
 type ThreadHistoryListContext = {
   readonly organizationId: string
+  readonly revision: number
 }
 
 /** Static sections only. Dynamic history is rendered as a dedicated virtualized pane. */
@@ -345,13 +346,17 @@ function ChatSidebarHistory({
   const [optimisticThreads, setOptimisticThreads] = useState<
     readonly OptimisticThread[]
   >([])
+  const [historyRevision, setHistoryRevision] = useState(0)
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
   const [contextMenuResetToken, setContextMenuResetToken] = useState(0)
   const activeThreadId = useMemo(() => getActiveThreadId(pathname), [pathname])
   const listContextParams = useMemo<ThreadHistoryListContext>(
-    () => ({ organizationId: activeOrganizationId }),
-    [activeOrganizationId],
+    () => ({
+      organizationId: activeOrganizationId,
+      revision: historyRevision,
+    }),
+    [activeOrganizationId, historyRevision],
   )
 
   const getPageQuery = useCallback(
@@ -437,8 +442,14 @@ function ChatSidebarHistory({
 
   useEffect(() => {
     if (editingThreadId) {
-      editingInputRef.current?.focus()
-      editingInputRef.current?.select()
+      const focusTimer = window.setTimeout(() => {
+        editingInputRef.current?.focus()
+        editingInputRef.current?.select()
+      }, 0)
+
+      return () => {
+        window.clearTimeout(focusTimer)
+      }
     }
   }, [editingThreadId])
 
@@ -552,6 +563,17 @@ function ChatSidebarHistory({
       try {
         const write = z.mutate(mutators.threads.delete({ threadId }))
         await write.client
+        z.preload(
+          queries.threads.historyPage({
+            organizationId: activeOrganizationId,
+            limit: CHAT_SIDEBAR_PAGE_SIZE,
+            start: null,
+            dir: 'forward',
+            inclusive: true,
+          }),
+          CACHE_CHAT_NAV,
+        )
+        setHistoryRevision((previous) => previous + 1)
         toast.success(m.chat_sidebar_thread_deleted())
         if (activeThreadId === threadId) {
           navigate({ to: CHAT_HREF })
@@ -565,7 +587,7 @@ function ChatSidebarHistory({
         toast.error(m.chat_sidebar_thread_delete_failed())
       }
     },
-    [activeThreadId, navigate, z],
+    [activeOrganizationId, activeThreadId, navigate, z],
   )
 
   const handleCopyThreadLink = useCallback(async (threadId: string) => {
