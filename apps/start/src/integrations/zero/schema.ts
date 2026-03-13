@@ -76,9 +76,6 @@ const orgAiPolicy = table('orgAiPolicy')
     disabledToolKeys: json<readonly string[]>()
       .from('disabled_tool_keys'),
     orgKnowledgeEnabled: boolean().from('org_knowledge_enabled').optional(),
-    activeOrgKnowledgeCount: number()
-      .from('active_org_knowledge_count')
-      .optional(),
     providerKeyStatus: json<{
       syncedAt: number
       hasAnyProviderKey: boolean

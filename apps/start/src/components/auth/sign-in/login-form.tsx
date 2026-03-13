@@ -7,7 +7,7 @@ import { Button } from '@rift/ui/button'
 import { Input } from '@rift/ui/input'
 import { Label } from '@rift/ui/label'
 import { cardVariants, staggerChildVariants } from '@/lib/shared/animations'
-import { GoogleIcon, MicrosoftIcon } from '@/components/icons/provider-icons'
+import { GitHubIcon, GoogleIcon } from '@/components/icons/provider-icons'
 import {
   AUTH_PASSWORD_MIN_LENGTH,
   isValidEmailAddress,
@@ -49,7 +49,7 @@ export function LoginForm({
   const [passwordError, setPasswordError] = useState('')
   const [confirmPasswordError, setConfirmPasswordError] = useState('')
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
-  const [isMicrosoftLoading, setIsMicrosoftLoading] = useState(false)
+  const [isGithubLoading, setIsGithubLoading] = useState(false)
   const isInteractionDisabled = parentIsLoading || isInvitationLookupLoading
 
   const handleGoogleSignIn = async () => {
@@ -69,20 +69,20 @@ export function LoginForm({
     }
   }
 
-  const handleMicrosoftSignIn = async () => {
-    setIsMicrosoftLoading(true)
+  const handleGithubSignIn = async () => {
+    setIsGithubLoading(true)
     try {
       await authClient.signIn.social(
-        { provider: 'microsoft' },
+        { provider: 'github' },
         {
           onError: (ctx) => {
-            setEmailError(ctx.error?.message ?? m.auth_error_microsoft())
-            setIsMicrosoftLoading(false)
+            setEmailError(ctx.error?.message ?? m.auth_error_github())
+            setIsGithubLoading(false)
           },
         },
       )
     } catch {
-      setIsMicrosoftLoading(false)
+      setIsGithubLoading(false)
     }
   }
 
@@ -347,7 +347,7 @@ export function LoginForm({
               variant="outline"
               size="big"
               onClick={handleGoogleSignIn}
-              disabled={isGoogleLoading || isMicrosoftLoading || isInteractionDisabled}
+              disabled={isGoogleLoading || isGithubLoading || isInteractionDisabled}
             >
               <GoogleIcon className="mr-2.5 size-5" />
               {isGoogleLoading
@@ -358,13 +358,13 @@ export function LoginForm({
               type="button"
               variant="outline"
               size="big"
-              onClick={handleMicrosoftSignIn}
-              disabled={isMicrosoftLoading || isGoogleLoading || isInteractionDisabled}
+              onClick={handleGithubSignIn}
+              disabled={isGithubLoading || isGoogleLoading || isInteractionDisabled}
             >
-              <MicrosoftIcon className="mr-2.5 size-5" />
-              {isMicrosoftLoading
-                ? (isSignUp ? m.auth_login_submitting_microsoft_sign_up() : m.auth_login_submitting_microsoft())
-                : (isSignUp ? m.auth_login_sign_up_microsoft() : m.auth_login_sign_in_microsoft())}
+              <GitHubIcon className="mr-2.5 size-5" />
+              {isGithubLoading
+                ? (isSignUp ? m.auth_login_submitting_github_sign_up() : m.auth_login_submitting_github())
+                : (isSignUp ? m.auth_login_sign_up_github() : m.auth_login_sign_in_github())}
             </Button>
           </motion.div>
         </div>

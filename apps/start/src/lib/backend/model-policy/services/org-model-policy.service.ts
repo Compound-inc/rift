@@ -252,8 +252,6 @@ export class OrgModelPolicyService extends ServiceMap.Service<
                 complianceFlags,
                 toolPolicy,
                 orgKnowledgeEnabled: existing?.orgKnowledgeEnabled ?? false,
-                activeOrgKnowledgeCount:
-                  existing?.activeOrgKnowledgeCount ?? 0,
                 providerKeyStatus:
                   existing?.providerKeyStatus ?? EMPTY_ORG_PROVIDER_KEY_STATUS,
                 enforcedModeId,
@@ -341,7 +339,6 @@ function toOrgModelPolicyPayload(
           DEFAULT_ORG_TOOL_POLICY.disabledToolKeys,
       },
       orgKnowledgeEnabled: policy?.orgKnowledgeEnabled ?? false,
-      activeOrgKnowledgeCount: policy?.activeOrgKnowledgeCount ?? 0,
       enforcedModeId: policy?.enforcedModeId,
       updatedAt: policy?.updatedAt,
     },

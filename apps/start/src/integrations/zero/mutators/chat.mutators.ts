@@ -109,7 +109,6 @@ function buildOrgToolPolicy(input: {
         ? input.policyRow.enforcedModeId
         : undefined,
     orgKnowledgeEnabled: false,
-    activeOrgKnowledgeCount: 0,
     providerKeyStatus: EMPTY_ORG_PROVIDER_KEY_STATUS,
     updatedAt: input.policyRow?.updatedAt ?? Date.now(),
   }

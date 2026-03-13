@@ -238,26 +238,40 @@ export function ChatSearchCommand() {
   )
 
   const groups = useMemo<readonly AppCommandGroup[]>(() => {
-    const items = results.map((result) => ({
-      id: `${result.threadId}:${result.messageId ?? 'title'}`,
-      title: result.threadTitle,
-      subtitle:
+    const items = results.map((result) => {
+      const itemId = `${result.threadId}:${result.messageId ?? 'title'}`
+      const subtitle =
         result.matchType === 'message'
           ? result.snippet ?? m.chat_search_match_message()
-          : undefined,
-      subtitleHighlightQuery:
-        result.matchType === 'message' ? normalizeSearchQuery(query) : undefined,
-      meta: formatResultDate(result.matchedAt),
-      icon:
-        result.matchType === 'message' ? (
-          <MessageSquareText className="size-4" />
-        ) : (
-          <MessageCircle className="size-4" />
-        ),
-      onSelect: () => {
-        openSearchResult(result)
-      },
-    }))
+          : undefined
+      const meta = formatResultDate(result.matchedAt)
+
+      return {
+        id: itemId,
+        title: result.threadTitle,
+        /**
+         * cmdk uses `value` as the canonical option identity for keyboard
+         * navigation/selection. Prefixing with a stable unique id prevents
+         * duplicate thread titles from collapsing into a single highlighted row.
+         */
+        value: `${itemId} ${result.threadTitle} ${subtitle ?? ''} ${meta}`,
+        subtitle,
+        subtitleHighlightQuery:
+          result.matchType === 'message'
+            ? normalizeSearchQuery(query)
+            : undefined,
+        meta,
+        icon:
+          result.matchType === 'message' ? (
+            <MessageSquareText className="size-4" />
+          ) : (
+            <MessageCircle className="size-4" />
+          ),
+        onSelect: () => {
+          openSearchResult(result)
+        },
+      }
+    })
 
     return [
       {

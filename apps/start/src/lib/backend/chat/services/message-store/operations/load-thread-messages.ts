@@ -388,8 +388,7 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
         if (
           latestUserText.trim().length > 0 &&
           organizationId &&
-          orgPolicy?.orgKnowledgeEnabled &&
-          orgPolicy.activeOrgKnowledgeCount > 0
+          orgPolicy?.orgKnowledgeEnabled
         ) {
           const retrievalLimits = getRetrievalLimits()
           const activeOrgAttachmentIds =

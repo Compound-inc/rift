@@ -57,7 +57,6 @@ export type OrgAiPolicy = {
   readonly complianceFlags: OrgComplianceFlags
   readonly toolPolicy: OrgToolPolicy
   readonly orgKnowledgeEnabled: boolean
-  readonly activeOrgKnowledgeCount: number
   readonly enforcedModeId?: ChatModeId
   /**
    * Optional provider-key presence snapshot used to short-circuit BYOK key

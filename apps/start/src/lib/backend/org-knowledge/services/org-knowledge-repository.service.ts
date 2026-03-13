@@ -87,7 +87,7 @@ export type OrgKnowledgeRepositoryServiceShape = {
   readonly syncPolicyState: (input: {
     readonly organizationId: string
     readonly requestId: string
-  }) => Effect.Effect<{ readonly activeCount: number }, OrgKnowledgePersistenceError>
+  }) => Effect.Effect<void, OrgKnowledgePersistenceError>
 }
 
 /**
@@ -252,7 +252,6 @@ export class OrgKnowledgeRepositoryService extends ServiceMap.Service<
                       await tx.mutate.orgAiPolicy.update({
                         id: existingPolicy.id,
                         orgKnowledgeEnabled: activeCount > 0,
-                        activeOrgKnowledgeCount: activeCount,
                         updatedAt,
                       })
                       return
@@ -268,14 +267,11 @@ export class OrgKnowledgeRepositoryService extends ServiceMap.Service<
                       externalToolsEnabled: true,
                       disabledToolKeys: [],
                       orgKnowledgeEnabled: activeCount > 0,
-                      activeOrgKnowledgeCount: activeCount,
                       providerKeyStatus: EMPTY_ORG_PROVIDER_KEY_STATUS,
                       enforcedModeId: null,
                       updatedAt,
                     })
                   })
-
-                  return { activeCount }
                 },
                 catch: (error) =>
                   new OrgKnowledgePersistenceError({

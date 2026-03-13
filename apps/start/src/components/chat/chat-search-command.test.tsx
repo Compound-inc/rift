@@ -42,7 +42,7 @@ vi.mock('@/components/layout/command/app-command-dialog', () => ({
     onQueryChange: (query: string) => void
     groups: Array<{
       id: string
-      items: Array<{ id: string; title: string }>
+      items: Array<{ id: string; title: string; value?: string }>
     }>
   }) => {
     const itemCount = groups.reduce((total, group) => total + group.items.length, 0)
@@ -62,7 +62,12 @@ vi.mock('@/components/layout/command/app-command-dialog', () => ({
               close
             </button>
             {groups.flatMap((group) =>
-              group.items.map((item) => <div key={item.id}>{item.title}</div>),
+              group.items.map((item) => (
+                <div key={item.id}>
+                  <span>{item.title}</span>
+                  <span data-testid={`item-value-${item.id}`}>{item.value ?? ''}</span>
+                </div>
+              )),
             )}
           </>
         ) : null}
@@ -155,5 +160,47 @@ describe('ChatSearchCommand', () => {
     })
 
     expect(screen.getByTestId('item-count').textContent).toBe('0')
+  })
+
+  it('builds unique command values when multiple results share the same title', async () => {
+    searchChatThreadsMock.mockResolvedValueOnce([
+      {
+        threadId: 'thread-1',
+        messageId: undefined,
+        threadTitle: 'Duplicate title',
+        snippet: undefined,
+        matchType: 'thread',
+        matchedAt: 1,
+      },
+      {
+        threadId: 'thread-2',
+        messageId: undefined,
+        threadTitle: 'Duplicate title',
+        snippet: undefined,
+        matchType: 'thread',
+        matchedAt: 2,
+      },
+    ])
+
+    render(<ChatSearchCommand />)
+
+    act(() => {
+      openChatSearchCommand()
+    })
+    fireEvent.change(screen.getByLabelText('query'), {
+      target: { value: 'duplicate' },
+    })
+
+    await act(async () => {
+      vi.advanceTimersByTime(130)
+      await Promise.resolve()
+    })
+
+    const firstValue = screen.getByTestId('item-value-thread-1:title').textContent
+    const secondValue = screen.getByTestId('item-value-thread-2:title').textContent
+
+    expect(firstValue).toContain('thread-1:title')
+    expect(secondValue).toContain('thread-2:title')
+    expect(firstValue).not.toEqual(secondValue)
   })
 })

@@ -14,9 +14,11 @@ import type { NavItemType } from './app-sidebar-nav.config'
 export function SidebarNavItem({
   item,
   pathname,
+  contextMenuResetToken = 0,
 }: {
   item: NavItemType
   pathname: string
+  contextMenuResetToken?: number
 }) {
   const [hovered, setHovered] = useState(false)
   const {
@@ -116,7 +118,7 @@ export function SidebarNavItem({
   }
 
   return (
-    <ContextMenu>
+    <ContextMenu key={contextMenuResetToken}>
       <ContextMenuTrigger className="block w-full">
         {linkContent}
       </ContextMenuTrigger>

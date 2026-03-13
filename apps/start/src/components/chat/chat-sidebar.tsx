@@ -347,6 +347,7 @@ function ChatSidebarHistory({
   >([])
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
+  const [contextMenuResetToken, setContextMenuResetToken] = useState(0)
   const activeThreadId = useMemo(() => getActiveThreadId(pathname), [pathname])
   const listContextParams = useMemo<ThreadHistoryListContext>(
     () => ({ organizationId: activeOrganizationId }),
@@ -440,6 +441,25 @@ function ChatSidebarHistory({
       editingInputRef.current?.select()
     }
   }, [editingThreadId])
+
+  useEffect(() => {
+    const resetContextMenus = () => {
+      setContextMenuResetToken((previous) => previous + 1)
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        resetContextMenus()
+      }
+    }
+    window.addEventListener('focus', resetContextMenus)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      window.removeEventListener('focus', resetContextMenus)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [])
 
   useEffect(() => {
     syncThreadGenerationStatuses(
@@ -578,7 +598,11 @@ function ChatSidebarHistory({
           onFocus={() => preloadThreadMessages(thread.threadId)}
         >
           <div className={THREAD_ROW_SHELL_CLASS}>
-            <SidebarNavItem item={item} pathname={pathname} />
+            <SidebarNavItem
+              item={item}
+              pathname={pathname}
+              contextMenuResetToken={contextMenuResetToken}
+            />
           </div>
         </div>
       )

@@ -114,6 +114,7 @@ export function AppCommandDialog({
 
   const hasVisibleItems = visibleGroups.some((group) => group.items.length > 0)
   const showLoadingState = isLoading && shouldShowThreadGroups && visibleThreadGroups.length === 0
+  const shouldRenderGroups = !showLoadingState && hasVisibleItems
   const [navigationMode, setNavigationMode] = useState<'pointer' | 'keyboard'>('pointer')
 
   return (
@@ -129,7 +130,7 @@ export function AppCommandDialog({
       showCloseButton={false}
     >
       <div className="relative bg-surface-strong">
-        <div className="relative z-10 flex flex-col space-y-6 rounded-b-2xl bg-surface-raised p-6 shadow-[0_2px_12px_rgb(0,0,0,0.05)]">
+        <div className="relative z-10 flex flex-col space-y-6 rounded-b-2xl bg-surface-raised px-6 pt-6 shadow-[0_2px_12px_rgb(0,0,0,0.05)]">
           <CommandPrimitive
             shouldFilter={false}
             className="flex w-full flex-col focus-visible:outline-none"
@@ -176,7 +177,7 @@ export function AppCommandDialog({
               ) : null}
 
               {!showLoadingState && showEmptyState && !hasVisibleItems ? (
-                <CommandPrimitive.Empty className="py-8 text-center text-sm text-foreground-secondary">
+                <CommandPrimitive.Empty className="flex min-h-[140px] items-center justify-center px-3 py-0 text-center text-sm text-foreground-secondary">
                   <div className="flex flex-col items-center gap-2">
                     {emptyIcon ? (
                       <div className="text-foreground-tertiary [&_svg]:size-5">
@@ -188,80 +189,82 @@ export function AppCommandDialog({
                 </CommandPrimitive.Empty>
               ) : null}
 
-              <div className="relative grid h-full grid-cols-1 xl:grid-cols-2">
-                <div className="col-span-1 space-y-3 xl:col-span-2">
-                  {visibleGroups.map((group, groupIndex) => (
-                    <div
-                      key={group.id}
-                      className={groupIndex > 0 ? 'mt-3' : undefined}
-                    >
-                      <div className="px-3 pb-1.5 pt-2 text-sm leading-[21px] text-foreground-secondary">
-                        {group.heading}
-                      </div>
+              {shouldRenderGroups ? (
+                <div className="relative grid h-full grid-cols-1 xl:grid-cols-2">
+                  <div className="col-span-1 space-y-3 xl:col-span-2">
+                    {visibleGroups.map((group, groupIndex) => (
+                      <div
+                        key={group.id}
+                        className={groupIndex > 0 ? 'mt-3' : undefined}
+                      >
+                        <div className="px-3 pb-1.5 pt-2 text-sm leading-[21px] text-foreground-secondary">
+                          {group.heading}
+                        </div>
 
-                      <CommandPrimitive.Group className="p-0">
-                        {group.items.map((item) => (
-                          <CommandPrimitive.Item
-                            key={item.id}
-                            value={item.value ?? `${item.title} ${item.subtitle ?? ''} ${item.meta ?? ''}`}
-                            onSelect={item.onSelect}
-                            className={cn(
-                              // Match sidebar interaction language: compact radius + soft neutral hover/active fills.
-                              'group grid min-h-10 grid-cols-1 grid-rows-1 rounded-lg p-2 outline-hidden select-none transition-colors duration-75',
-                              navigationMode === 'pointer'
-                                ? 'hover:bg-surface-inverse/5 active:bg-surface-inverse/10'
-                                : undefined,
-                              'data-[selected=true]:bg-surface-inverse/5 data-[selected=true]:hover:bg-surface-inverse/7',
-                            )}
-                          >
-                            <div className="col-start-1 col-end-2 row-start-1 row-end-2 flex cursor-pointer items-center gap-2">
-                              <div className="min-w-0 flex-1">
-                                <div className="flex w-full items-center gap-2">
-                                  <div className="flex min-h-6 w-full items-center gap-2">
-                                    {item.icon ? (
-                                      <div className="h-4 w-4 shrink-0 text-foreground-primary [&_svg]:h-4 [&_svg]:w-4 [&_svg]:stroke-[2]">
-                                        {item.icon}
-                                      </div>
-                                    ) : null}
-                                    <span className="w-full truncate text-sm text-foreground-primary">
-                                      {item.title}
-                                    </span>
+                        <CommandPrimitive.Group className="p-0">
+                          {group.items.map((item) => (
+                            <CommandPrimitive.Item
+                              key={item.id}
+                              value={item.value ?? `${item.title} ${item.subtitle ?? ''} ${item.meta ?? ''}`}
+                              onSelect={item.onSelect}
+                              className={cn(
+                                // Match sidebar interaction language: compact radius + soft neutral hover/active fills.
+                                'group grid min-h-10 grid-cols-1 grid-rows-1 rounded-lg p-2 outline-hidden select-none transition-colors duration-75',
+                                navigationMode === 'pointer'
+                                  ? 'hover:bg-surface-inverse/5 active:bg-surface-inverse/10'
+                                  : undefined,
+                                'data-[selected=true]:bg-surface-inverse/5 data-[selected=true]:hover:bg-surface-inverse/7',
+                              )}
+                            >
+                              <div className="col-start-1 col-end-2 row-start-1 row-end-2 flex cursor-pointer items-center gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex w-full items-center gap-2">
+                                    <div className="flex min-h-6 w-full items-center gap-2">
+                                      {item.icon ? (
+                                        <div className="h-4 w-4 shrink-0 text-foreground-primary [&_svg]:h-4 [&_svg]:w-4 [&_svg]:stroke-[2]">
+                                          {item.icon}
+                                        </div>
+                                      ) : null}
+                                      <span className="w-full truncate text-sm text-foreground-primary">
+                                        {item.title}
+                                      </span>
+                                    </div>
                                   </div>
+                                  {item.subtitle ? (
+                                    <div className="mt-0.5 line-clamp-1 text-xs text-foreground-secondary">
+                                      {item.subtitleHighlightQuery
+                                        ? getSearchHighlightSegments(item.subtitle, item.subtitleHighlightQuery).map(
+                                            (segment, index) => (
+                                              <span
+                                                key={`${item.id}:subtitle:${index}:${segment.text}`}
+                                                className={
+                                                  segment.isMatch
+                                                    ? CHAT_SEARCH_HIGHLIGHT_CLASS_NAME
+                                                    : undefined
+                                                }
+                                              >
+                                                {segment.text}
+                                              </span>
+                                            ),
+                                          )
+                                        : item.subtitle}
+                                    </div>
+                                  ) : null}
                                 </div>
-                                {item.subtitle ? (
-                                  <div className="mt-0.5 line-clamp-1 text-xs text-foreground-secondary">
-                                    {item.subtitleHighlightQuery
-                                      ? getSearchHighlightSegments(item.subtitle, item.subtitleHighlightQuery).map(
-                                          (segment, index) => (
-                                            <span
-                                              key={`${item.id}:subtitle:${index}:${segment.text}`}
-                                              className={
-                                                segment.isMatch
-                                                  ? CHAT_SEARCH_HIGHLIGHT_CLASS_NAME
-                                                  : undefined
-                                              }
-                                            >
-                                              {segment.text}
-                                            </span>
-                                          ),
-                                        )
-                                      : item.subtitle}
-                                  </div>
+                                {item.meta ? (
+                                  <span className="ms-2 hidden whitespace-nowrap text-sm text-foreground-secondary md:inline">
+                                    {item.meta}
+                                  </span>
                                 ) : null}
                               </div>
-                              {item.meta ? (
-                                <span className="ms-2 hidden whitespace-nowrap text-sm text-foreground-secondary md:inline">
-                                  {item.meta}
-                                </span>
-                              ) : null}
-                            </div>
-                          </CommandPrimitive.Item>
-                        ))}
-                      </CommandPrimitive.Group>
-                    </div>
-                  ))}
+                            </CommandPrimitive.Item>
+                          ))}
+                        </CommandPrimitive.Group>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </CommandPrimitive.List>
           </CommandPrimitive>
         </div>

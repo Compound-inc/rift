@@ -3,9 +3,9 @@ import { Effect } from 'effect'
 import { makeLoadThreadMessagesOperation } from './load-thread-messages'
 
 describe('makeLoadThreadMessagesOperation', () => {
-  it('skips org knowledge lookup when the indexed active count is zero', async () => {
+  it('attempts org knowledge lookup whenever org knowledge is enabled', async () => {
     const listActiveAttachmentIds = vi.fn(() =>
-      Effect.succeed<readonly string[]>(['should-not-run']),
+      Effect.succeed<readonly string[]>([]),
     )
 
     const loadThreadMessages = makeLoadThreadMessagesOperation({
@@ -48,7 +48,6 @@ describe('makeLoadThreadMessagesOperation', () => {
             disabledToolKeys: [],
           },
           orgKnowledgeEnabled: true,
-          activeOrgKnowledgeCount: 0,
           providerKeyStatus: {
             syncedAt: 0,
             hasAnyProviderKey: false,
@@ -64,6 +63,6 @@ describe('makeLoadThreadMessagesOperation', () => {
     )
 
     expect(messages).toEqual([])
-    expect(listActiveAttachmentIds).not.toHaveBeenCalled()
+    expect(listActiveAttachmentIds).toHaveBeenCalledOnce()
   })
 })

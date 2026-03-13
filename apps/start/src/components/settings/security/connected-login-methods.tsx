@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@rift/ui/dropdown-menu'
-import { GitHubIcon, GoogleIcon, MicrosoftIcon } from '@/components/icons/provider-icons'
+import { GitHubIcon, GoogleIcon } from '@/components/icons/provider-icons'
 import { Mail, MoreHorizontal } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { m } from '@/paraglide/messages.js'
@@ -56,7 +56,6 @@ export function ConnectedLoginMethods({
     findMethodByProvider('email-password')
   const googleMethod = findMethodByProvider('google')
   const githubMethod = findMethodByProvider('github')
-  const microsoftMethod = findMethodByProvider('microsoft')
 
   const canRemoveEmail =
     !!credentialMethod && connectedLoginMethods.length > 1
@@ -78,12 +77,6 @@ export function ConnectedLoginMethods({
       providerLabel: m.settings_security_login_methods_provider_github(),
       connectedMethod: githubMethod,
       icon: <GitHubIcon className="size-5 text-foreground-primary" />,
-    },
-    {
-      providerId: 'microsoft',
-      providerLabel: 'Microsoft',
-      connectedMethod: microsoftMethod,
-      icon: <MicrosoftIcon className="size-5" />,
     },
   ]
 
