@@ -1,5 +1,7 @@
-export const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024
-export const MAX_UPLOAD_SIZE = '10m'
+export const CHAT_ATTACHMENT_MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024
+export const CHAT_ATTACHMENT_MAX_UPLOAD_SIZE = '10m'
+export const ORG_KNOWLEDGE_MAX_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024
+export const ORG_KNOWLEDGE_MAX_UPLOAD_SIZE = '25m'
 
 export const ALLOWED_UPLOAD_MIME_TYPES = [
   'image/jpeg',

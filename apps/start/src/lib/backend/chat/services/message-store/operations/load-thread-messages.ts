@@ -3,10 +3,16 @@ import { Effect } from 'effect'
 import { getCatalogModel } from '@/lib/shared/ai-catalog'
 import { isEmbeddingFeatureEnabled } from '@/utils/app-feature-flags'
 import type { ChatAttachment } from '@/lib/shared/chat-contracts/attachments'
+import { ORG_KNOWLEDGE_KIND } from '@/lib/shared/org-knowledge'
 import { MessagePersistenceError } from '@/lib/backend/chat/domain/errors'
 import { zql } from '@/lib/backend/chat/infra/zero/db'
+import type { OrgKnowledgeRepositoryService } from '@/lib/backend/org-knowledge/services/org-knowledge-repository.service'
 import type { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
-import type { AttachmentRagService } from '@/lib/backend/chat/services/rag'
+import type { AttachmentRecordService } from '@/lib/backend/chat/services/attachment-record.service'
+import type {
+  AttachmentRagService,
+  OrgKnowledgeRagService,
+} from '@/lib/backend/chat/services/rag'
 import {
   buildAttachmentExcerptFallback,
   buildQueryEmbedding,
@@ -52,22 +58,54 @@ function supportsNativeAttachment(input: {
   return false
 }
 
-function buildRetrievedChunksContextBlock(
-  chunks: readonly {
-    attachmentName: string
-    mimeType: string
-    content: string
-  }[],
+type RetrievedContextChunk = {
+  attachmentName: string
+  mimeType: string
+  content: string
+}
+
+/**
+ * Formats retrieved user attachment excerpts as an inline prompt supplement.
+ * These excerpts originate from files the user attached to the current thread,
+ * so the model can treat them as directly user-provided evidence.
+ */
+function buildAttachmentContextBlock(
+  label: string,
+  chunks: readonly RetrievedContextChunk[],
 ): string {
   if (chunks.length === 0) return ''
   const sections = chunks.map(
     (chunk, index) =>
-      `## Source ${index + 1}: ${chunk.attachmentName} (${chunk.mimeType})\n\n${chunk.content}`,
+      `## ${label} ${index + 1}: ${chunk.attachmentName} (${chunk.mimeType})\n\n${chunk.content}`,
   )
 
   return [
-    'Use the following extracted file excerpts as supporting context for the next user request.',
-    'If the user question is unrelated, ignore this context.',
+    'The following extracted file excerpts are supporting context uploaded by the user in this conversation.',
+    '',
+    ...sections,
+  ].join('\n\n')
+}
+
+/**
+ * Formats retrieved organization knowledge excerpts as system-provided
+ * background context. This makes the distinction explicit for the model:
+ * org knowledge is not a user attachment and should only be used when it helps
+ * answer the current request.
+ */
+function buildOrgKnowledgeContextBlock(
+  label: string,
+  chunks: readonly RetrievedContextChunk[],
+): string {
+  if (chunks.length === 0) return ''
+  const sections = chunks.map(
+    (chunk, index) =>
+      `## ${label} ${index + 1}: ${chunk.attachmentName} (${chunk.mimeType})\n\n${chunk.content}`,
+  )
+
+  return [
+    'System-provided organization knowledge is available below.',
+    'These excerpts come from organization knowledge attachments configured by the system for the active organization, not from the user in this conversation.',
+    'Use them only when they are relevant as supporting background context for the next user request.',
     '',
     ...sections,
   ].join('\n\n')
@@ -75,16 +113,26 @@ function buildRetrievedChunksContextBlock(
 
 export const makeLoadThreadMessagesOperation = (dependencies: {
   readonly zeroDatabase: ZeroDatabaseService['Service']
+  readonly attachmentRecord: AttachmentRecordService['Service']
   readonly attachmentRag: AttachmentRagService['Service']
+  readonly orgKnowledgeRag: OrgKnowledgeRagService['Service']
+  readonly orgKnowledgeRepository: OrgKnowledgeRepositoryService['Service']
 }): MessageStoreServiceShape['loadThreadMessages'] => {
   /**
    * Loads canonical thread history and enriches the latest user turn with
    * fallback attachment context when the selected model cannot consume files natively.
    */
-  const { zeroDatabase, attachmentRag } = dependencies
+  const {
+    zeroDatabase,
+    attachmentRecord,
+    attachmentRag,
+    orgKnowledgeRag,
+    orgKnowledgeRepository,
+  } =
+    dependencies
 
   return Effect.fn('MessageStoreService.loadThreadMessages')(
-    ({ threadId, model, untilMessageId, requestId }) =>
+    ({ threadId, model, organizationId, orgPolicy, untilMessageId, requestId }) =>
       Effect.gen(function* () {
         const db = yield* requireMessagePersistenceDb({
           zeroDatabase,
@@ -132,6 +180,22 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
 
         const attachmentsById = new Map(
           attachmentRows.map((attachment) => [attachment.id, attachment]),
+        )
+        const attachmentContentRows = yield* attachmentRecord
+          .listAttachmentContentRowsByThread(threadId)
+          .pipe(
+            Effect.mapError(
+              (error) =>
+                new MessagePersistenceError({
+                  message: 'Failed to load attachment content',
+                  requestId,
+                  threadId,
+                  cause: String(error),
+                }),
+            ),
+          )
+        const attachmentContentById = new Map(
+          attachmentContentRows.map((attachment) => [attachment.id, attachment]),
         )
 
         const { canonicalMessages: canonicalMessageRows } = resolveCanonicalBranch(
@@ -189,6 +253,7 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
         )
 
         let fallbackContextBlock = ''
+        let orgKnowledgeContextBlock = ''
         if (latestUserText.trim().length > 0 && fallbackAttachmentById.size > 0) {
           const retrievalLimits = getRetrievalLimits()
 
@@ -254,7 +319,8 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
               usedChars += chunk.content.length
             }
 
-            fallbackContextBlock = buildRetrievedChunksContextBlock(
+            fallbackContextBlock = buildAttachmentContextBlock(
+              'Source',
               selectedChunks
                 .map((chunk) => {
                   const attachment = fallbackAttachmentById.get(chunk.sourceId)
@@ -277,8 +343,158 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
             )
           } else {
             fallbackContextBlock = buildAttachmentExcerptFallback([
-              ...fallbackAttachmentById.values(),
+              ...[...fallbackAttachmentById.values()]
+                .map((attachment) => {
+                  const content = attachmentContentById.get(attachment.id)
+                  if (!content) return null
+                  return {
+                    fileName: attachment.fileName,
+                    mimeType: attachment.mimeType,
+                    fileContent: content.fileContent,
+                  }
+                })
+                .filter(
+                  (
+                    attachment,
+                  ): attachment is {
+                    fileName: string
+                    mimeType: string
+                    fileContent: string
+                  } => !!attachment,
+                ),
             ])
+          }
+        }
+
+        if (
+          latestUserText.trim().length > 0 &&
+          organizationId &&
+          orgPolicy?.orgKnowledgeEnabled &&
+          orgPolicy.activeOrgKnowledgeCount > 0
+        ) {
+          const retrievalLimits = getRetrievalLimits()
+          const activeOrgAttachmentIds =
+            yield* orgKnowledgeRepository
+              .listActiveAttachmentIds({
+                organizationId,
+                requestId,
+              })
+              .pipe(
+                Effect.catch((error) =>
+                  Effect.logError('Failed to load active organization knowledge attachments', {
+                    requestId,
+                    threadId,
+                    organizationId,
+                    cause: error.cause ?? error.message,
+                  }).pipe(Effect.as([])),
+                ),
+              )
+
+          if (activeOrgAttachmentIds.length > 0) {
+            const queryEmbedding = yield* Effect.tryPromise({
+              try: () => buildQueryEmbedding(latestUserText),
+              catch: (error): QueryEmbeddingFallbackError => ({
+                _tag: 'QueryEmbeddingFallbackError',
+                cause: String(error),
+              }),
+            }).pipe(
+              Effect.catchTag('QueryEmbeddingFallbackError', (error) =>
+                isEmbeddingFeatureEnabled()
+                  ? Effect.logError(
+                      'Organization knowledge query embedding failed; skipping org knowledge retrieval',
+                      {
+                        requestId,
+                        threadId,
+                        organizationId,
+                        cause: error.cause,
+                      },
+                    ).pipe(Effect.as(null))
+                  : Effect.succeed(null),
+              ),
+            )
+
+            const orgKnowledgeChunks = queryEmbedding
+              ? yield* orgKnowledgeRag
+                  .searchOrgKnowledge({
+                    request: {
+                      scopeType: 'org_knowledge',
+                      ownerOrgId: organizationId,
+                      sourceIds: activeOrgAttachmentIds,
+                      queryEmbedding: queryEmbedding.embedding,
+                      limit: retrievalLimits.maxChunks * 3,
+                    },
+                  })
+                  .pipe(
+                    Effect.catch((error) =>
+                      Effect.logError('Organization knowledge retrieval failed; skipping org knowledge context', {
+                        requestId,
+                        threadId,
+                        organizationId,
+                        cause: String(error),
+                      }).pipe(Effect.as([])),
+                    ),
+                  )
+              : []
+
+            if (orgKnowledgeChunks.length > 0) {
+              const orgKnowledgeSourceIds = [...new Set(
+                orgKnowledgeChunks.map((chunk) => chunk.sourceId)
+              )]
+              const orgKnowledgeRows = yield* Effect.tryPromise({
+                try: () =>
+                  db.run(
+                    zql.attachment
+                      .where('id', 'IN', orgKnowledgeSourceIds)
+                      .where('ownerOrgId', organizationId)
+                      .where('orgKnowledgeKind', ORG_KNOWLEDGE_KIND)
+                      .where('orgKnowledgeActive', true)
+                      .where('embeddingStatus', 'indexed')
+                      .where('status', 'uploaded')
+                      .orderBy('updatedAt', 'desc'),
+                  ),
+                catch: (error) =>
+                  new MessagePersistenceError({
+                    message: 'Failed to load organization knowledge attachment metadata',
+                    requestId,
+                    threadId,
+                    cause: String(error),
+                  }),
+              })
+              const orgKnowledgeById = new Map(
+                orgKnowledgeRows.map((attachment) => [attachment.id, attachment]),
+              )
+              const selectedChunks: Array<(typeof orgKnowledgeChunks)[number]> = []
+              let usedChars = 0
+              for (const chunk of orgKnowledgeChunks) {
+                if (selectedChunks.length >= retrievalLimits.maxChunks) break
+                if (usedChars + chunk.content.length > retrievalLimits.maxChars) continue
+                selectedChunks.push(chunk)
+                usedChars += chunk.content.length
+              }
+
+              orgKnowledgeContextBlock = buildOrgKnowledgeContextBlock(
+                'Organization source',
+                selectedChunks
+                  .map((chunk) => {
+                    const attachment = orgKnowledgeById.get(chunk.sourceId)
+                    if (!attachment) return null
+                    return {
+                      attachmentName: attachment.fileName,
+                      mimeType: attachment.mimeType,
+                      content: chunk.content,
+                    }
+                  })
+                  .filter(
+                    (
+                      chunk,
+                    ): chunk is {
+                      attachmentName: string
+                      mimeType: string
+                      content: string
+                    } => !!chunk,
+                  ),
+              )
+            }
           }
         }
 
@@ -318,8 +534,14 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
             latestUserMessageRow?.messageId === message.messageId &&
             canonicalMessageIdSet.has(message.messageId) &&
             canonicalRowIdSet.has(message.messageId) &&
-            fallbackContextBlock.length > 0
-              ? `${message.content}\n\n${fallbackContextBlock}`
+            (orgKnowledgeContextBlock.length > 0 || fallbackContextBlock.length > 0)
+              ? [
+                  message.content,
+                  orgKnowledgeContextBlock,
+                  fallbackContextBlock,
+                ]
+                  .filter((value) => value.length > 0)
+                  .join('\n\n')
               : message.content
 
           const messageParts: UIMessage['parts'] = [

@@ -27,6 +27,8 @@ function fromRow(row: {
   readonly providerNativeToolsEnabled?: boolean | null
   readonly externalToolsEnabled?: boolean | null
   readonly disabledToolKeys?: readonly string[]
+  readonly orgKnowledgeEnabled?: boolean | null
+  readonly activeOrgKnowledgeCount?: number | null
   readonly providerKeyStatus?: OrgProviderKeyStatusSnapshot
   readonly enforcedModeId?: string | null
   readonly updatedAt?: number
@@ -64,6 +66,8 @@ function fromRow(row: {
     disabledModelIds: row.disabledModelIds ?? [],
     complianceFlags: row.complianceFlags ?? {},
     toolPolicy,
+    orgKnowledgeEnabled: row.orgKnowledgeEnabled ?? false,
+    activeOrgKnowledgeCount: row.activeOrgKnowledgeCount ?? 0,
     providerKeyStatus,
     enforcedModeId: normalizedModeId,
     updatedAt: row.updatedAt ?? now(),
@@ -96,6 +100,8 @@ export async function upsertOrgAiPolicy(input: {
   readonly disabledModelIds: readonly string[]
   readonly complianceFlags: Record<string, boolean>
   readonly toolPolicy: OrgToolPolicy
+  readonly orgKnowledgeEnabled?: boolean
+  readonly activeOrgKnowledgeCount?: number
   readonly providerKeyStatus: OrgProviderKeyStatusSnapshot
   readonly enforcedModeId?: ChatModeId | null
 }): Promise<OrgAiPolicy> {
@@ -122,6 +128,8 @@ export async function upsertOrgAiPolicy(input: {
         providerNativeToolsEnabled: input.toolPolicy.providerNativeToolsEnabled,
         externalToolsEnabled: input.toolPolicy.externalToolsEnabled,
         disabledToolKeys: [...input.toolPolicy.disabledToolKeys],
+        orgKnowledgeEnabled: input.orgKnowledgeEnabled ?? false,
+        activeOrgKnowledgeCount: input.activeOrgKnowledgeCount ?? 0,
         providerKeyStatus: input.providerKeyStatus,
         enforcedModeId: input.enforcedModeId ?? null,
         updatedAt,
@@ -139,6 +147,8 @@ export async function upsertOrgAiPolicy(input: {
         externalToolsEnabled: input.toolPolicy.externalToolsEnabled,
         disabledToolKeys: [...input.toolPolicy.disabledToolKeys],
       },
+      orgKnowledgeEnabled: input.orgKnowledgeEnabled ?? false,
+      activeOrgKnowledgeCount: input.activeOrgKnowledgeCount ?? 0,
       providerKeyStatus: input.providerKeyStatus,
       enforcedModeId: input.enforcedModeId ?? undefined,
       updatedAt,
@@ -154,6 +164,8 @@ export async function upsertOrgAiPolicy(input: {
       providerNativeToolsEnabled: input.toolPolicy.providerNativeToolsEnabled,
       externalToolsEnabled: input.toolPolicy.externalToolsEnabled,
       disabledToolKeys: [...input.toolPolicy.disabledToolKeys],
+      orgKnowledgeEnabled: input.orgKnowledgeEnabled ?? false,
+      activeOrgKnowledgeCount: input.activeOrgKnowledgeCount ?? 0,
       providerKeyStatus: input.providerKeyStatus,
       enforcedModeId: input.enforcedModeId ?? null,
       updatedAt,
@@ -170,6 +182,8 @@ export async function upsertOrgAiPolicy(input: {
       externalToolsEnabled: input.toolPolicy.externalToolsEnabled,
       disabledToolKeys: [...input.toolPolicy.disabledToolKeys],
     },
+    orgKnowledgeEnabled: input.orgKnowledgeEnabled ?? false,
+    activeOrgKnowledgeCount: input.activeOrgKnowledgeCount ?? 0,
     providerKeyStatus: input.providerKeyStatus,
     enforcedModeId: input.enforcedModeId ?? undefined,
     updatedAt,

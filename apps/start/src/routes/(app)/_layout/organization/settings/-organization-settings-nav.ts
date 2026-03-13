@@ -2,6 +2,7 @@ import { isAreaPath } from '@/utils/nav-utils'
 import {
   Building2,
   Cpu,
+  Database,
   CreditCard,
   Key,
   Lock,
@@ -95,17 +96,17 @@ export const orgSettingsNavArea = () => ({
           exact: true,
         },
         {
+          name: 'Knowledge',
+          icon: Database,
+          href: `${ORG_SETTINGS_HREF}/knowledge`,
+          exact: true,
+        },
+        {
           name: 'BYOK',
           icon: Key,
           href: `${ORG_SETTINGS_HREF}/byok`,
           exact: true,
         },
-        // {
-        //   name: 'RAG & Knowledge',
-        //   icon: Database,
-        //   href: `${ORG_SETTINGS_HREF}/rag`,
-        //   exact: true,
-        // },
       ],
     },
     {

@@ -167,6 +167,8 @@ CREATE TABLE IF NOT EXISTS org_ai_policy (
   provider_native_tools_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   external_tools_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   disabled_tool_keys JSONB NOT NULL DEFAULT '[]'::jsonb,
+  org_knowledge_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  active_org_knowledge_count BIGINT NOT NULL DEFAULT 0,
   provider_key_status JSONB NOT NULL DEFAULT '{"syncedAt": 0, "hasAnyProviderKey": false, "providers": {"openai": false, "anthropic": false}}'::jsonb,
   enforced_mode_id TEXT,
   version BIGINT NOT NULL DEFAULT 1,
@@ -182,6 +184,10 @@ ALTER TABLE org_ai_policy
 ADD COLUMN IF NOT EXISTS external_tools_enabled BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE org_ai_policy
 ADD COLUMN IF NOT EXISTS disabled_tool_keys JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE org_ai_policy
+ADD COLUMN IF NOT EXISTS org_knowledge_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE org_ai_policy
+ADD COLUMN IF NOT EXISTS active_org_knowledge_count BIGINT NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS org_ai_policy_organization_id ON org_ai_policy (organization_id);
 CREATE INDEX IF NOT EXISTS org_ai_policy_updated_at ON org_ai_policy (updated_at);
 
@@ -597,10 +603,18 @@ CREATE TABLE IF NOT EXISTS attachments (
   owner_org_id TEXT,
   workspace_id TEXT,
   access_scope TEXT DEFAULT 'user',
+  org_knowledge_kind TEXT,
+  org_knowledge_active BOOLEAN NOT NULL DEFAULT FALSE,
   access_group_ids JSONB,
   vector_indexed_at BIGINT,
   vector_error TEXT
 );
+ALTER TABLE attachments
+ADD COLUMN IF NOT EXISTS org_knowledge_kind TEXT;
+ALTER TABLE attachments
+ADD COLUMN IF NOT EXISTS org_knowledge_active BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS attachments_thread_id ON attachments (thread_id);
 CREATE INDEX IF NOT EXISTS attachments_message_id ON attachments (message_id);
 CREATE INDEX IF NOT EXISTS attachments_user_id ON attachments (user_id);
+CREATE INDEX IF NOT EXISTS attachments_org_knowledge_lookup
+  ON attachments (owner_org_id, org_knowledge_kind, org_knowledge_active, status, updated_at DESC);

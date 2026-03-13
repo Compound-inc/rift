@@ -58,6 +58,8 @@ type OrgPolicyRow = {
   providerNativeToolsEnabled?: boolean | null
   externalToolsEnabled?: boolean | null
   disabledToolKeys?: readonly string[]
+  orgKnowledgeEnabled?: boolean | null
+  activeOrgKnowledgeCount?: number | null
   providerKeyStatus: {
     syncedAt: number
     hasAnyProviderKey: boolean
@@ -76,6 +78,8 @@ type OrgPolicySnapshot = {
   providerNativeToolsEnabled: boolean
   externalToolsEnabled: boolean
   disabledToolKeys: readonly string[]
+  orgKnowledgeEnabled: boolean
+  activeOrgKnowledgeCount: number
   providerKeyStatus: {
     syncedAt: number
     hasAnyProviderKey: boolean
@@ -198,6 +202,8 @@ function toSnapshot(row?: OrgPolicyRow): OrgPolicySnapshot {
     providerNativeToolsEnabled: row?.providerNativeToolsEnabled ?? true,
     externalToolsEnabled: row?.externalToolsEnabled ?? true,
     disabledToolKeys: row?.disabledToolKeys ?? [],
+    orgKnowledgeEnabled: row?.orgKnowledgeEnabled ?? false,
+    activeOrgKnowledgeCount: row?.activeOrgKnowledgeCount ?? 0,
     providerKeyStatus: row?.providerKeyStatus ?? {
       syncedAt: 0,
       hasAnyProviderKey: false,
@@ -230,6 +236,8 @@ async function persistOrgPolicy(args: {
           providerNativeToolsEnabled: boolean
           externalToolsEnabled: boolean
           disabledToolKeys: readonly string[]
+          orgKnowledgeEnabled: boolean
+          activeOrgKnowledgeCount: number
           providerKeyStatus: {
             syncedAt: number
             hasAnyProviderKey: boolean
@@ -249,6 +257,8 @@ async function persistOrgPolicy(args: {
           providerNativeToolsEnabled: boolean
           externalToolsEnabled: boolean
           disabledToolKeys: readonly string[]
+          orgKnowledgeEnabled: boolean
+          activeOrgKnowledgeCount: number
           providerKeyStatus: {
             syncedAt: number
             hasAnyProviderKey: boolean
@@ -279,6 +289,8 @@ async function persistOrgPolicy(args: {
       providerNativeToolsEnabled: args.next.providerNativeToolsEnabled,
       externalToolsEnabled: args.next.externalToolsEnabled,
       disabledToolKeys: args.next.disabledToolKeys,
+      orgKnowledgeEnabled: args.next.orgKnowledgeEnabled,
+      activeOrgKnowledgeCount: args.next.activeOrgKnowledgeCount,
       providerKeyStatus: args.next.providerKeyStatus,
       enforcedModeId: args.next.enforcedModeId ?? null,
       updatedAt,
@@ -294,6 +306,8 @@ async function persistOrgPolicy(args: {
     providerNativeToolsEnabled: args.next.providerNativeToolsEnabled,
     externalToolsEnabled: args.next.externalToolsEnabled,
     disabledToolKeys: args.next.disabledToolKeys,
+    orgKnowledgeEnabled: args.next.orgKnowledgeEnabled,
+    activeOrgKnowledgeCount: args.next.activeOrgKnowledgeCount,
     providerKeyStatus: args.next.providerKeyStatus,
     enforcedModeId: args.next.enforcedModeId ?? null,
     updatedAt,

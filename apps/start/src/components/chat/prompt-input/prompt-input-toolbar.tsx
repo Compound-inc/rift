@@ -6,8 +6,8 @@ import type { ChatStatus } from 'ai'
 import { cn } from '@rift/utils'
 import type { HTMLAttributes } from 'react'
 import { useRef } from 'react'
+import { CHAT_ATTACHMENT_UPLOAD_POLICY } from '@/lib/shared/upload/upload-validation'
 import { PromptInputSubmit } from './prompt-input-submit'
-import { ACCEPTED_FILE_TYPES } from '../../../hooks/chat/upload'
 import { PromptInputActionsMenu } from './prompt-input-actions-menu'
 import type { ChatVisibleTool } from '../chat-context'
 
@@ -131,7 +131,7 @@ export function PromptInputToolbar({
       <input
         ref={fileInputRef}
         type="file"
-        accept={ACCEPTED_FILE_TYPES}
+        accept={CHAT_ATTACHMENT_UPLOAD_POLICY.acceptedFileTypes}
         multiple
         className="sr-only"
         aria-hidden

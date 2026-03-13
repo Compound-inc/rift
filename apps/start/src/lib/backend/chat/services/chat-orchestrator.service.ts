@@ -359,6 +359,8 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             messages = yield* messageStore.loadThreadMessages({
               threadId,
               model: modelResolution.modelId,
+              organizationId,
+              orgPolicy,
               untilMessageId: regeneration.anchorMessageId,
               requestId,
             })
@@ -385,6 +387,8 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             messages = yield* messageStore.loadThreadMessages({
               threadId,
               model: modelResolution.modelId,
+              organizationId,
+              orgPolicy,
               untilMessageId: edited.editedMessageId,
               requestId,
             })
@@ -413,6 +417,8 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             messages = yield* messageStore.loadThreadMessages({
               threadId,
               model: modelResolution.modelId,
+              organizationId,
+              orgPolicy,
               requestId,
             })
             assistantParentMessageId = command.message!.id

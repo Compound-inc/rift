@@ -4,6 +4,7 @@ import { Effect, Layer, ServiceMap } from 'effect'
 import type { AiReasoningEffort } from '@/lib/shared/ai-catalog/types'
 import type { PersistedGenerationAnalytics } from '@/lib/backend/chat/domain/generation-metrics'
 import type { ChatAttachmentInput } from '@/lib/shared/chat-contracts/attachments'
+import type { OrgAiPolicy } from '@/lib/shared/model-policy/types'
 import type {
   BranchVersionConflictError,
   InvalidEditTargetError,
@@ -12,10 +13,12 @@ import type {
 import {
   MessagePersistenceError,
 } from '@/lib/backend/chat/domain/errors'
+import { OrgKnowledgeRepositoryService } from '@/lib/backend/org-knowledge/services/org-knowledge-repository.service'
 import type { IncomingUserMessage } from '@/lib/backend/chat/domain/schemas'
 import { getMemoryState } from '@/lib/backend/chat/infra/memory/state'
 import { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
-import { AttachmentRagService } from './rag'
+import { AttachmentRecordService } from './attachment-record.service'
+import { AttachmentRagService, OrgKnowledgeRagService } from './rag'
 import { toUserMessage } from './message-store/helpers'
 import { makeAppendUserMessageOperation } from './message-store/operations/append-user-message'
 import { makeFinalizeAssistantMessageOperation } from './message-store/operations/finalize-assistant-message'
@@ -31,6 +34,8 @@ export type MessageStoreServiceShape = {
   readonly loadThreadMessages: (input: {
     readonly threadId: string
     readonly model: string
+    readonly organizationId?: string
+    readonly orgPolicy?: OrgAiPolicy
     readonly untilMessageId?: string
     readonly requestId: string
   }) => Effect.Effect<UIMessage[], MessagePersistenceError>
@@ -115,13 +120,19 @@ export class MessageStoreService extends ServiceMap.Service<
   static readonly layer = Layer.effect(
   MessageStoreService,
   Effect.gen(function* () {
+    const attachmentRecord = yield* AttachmentRecordService
     const attachmentRag = yield* AttachmentRagService
+    const orgKnowledgeRag = yield* OrgKnowledgeRagService
+    const orgKnowledgeRepository = yield* OrgKnowledgeRepositoryService
     const zeroDatabase = yield* ZeroDatabaseService
 
     return {
       loadThreadMessages: makeLoadThreadMessagesOperation({
         zeroDatabase,
+        attachmentRecord,
         attachmentRag,
+        orgKnowledgeRag,
+        orgKnowledgeRepository,
       }),
       appendUserMessage: makeAppendUserMessageOperation({
         zeroDatabase,

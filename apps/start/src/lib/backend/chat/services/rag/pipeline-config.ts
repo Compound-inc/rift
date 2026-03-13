@@ -2,7 +2,6 @@
  * Centralized RAG pipeline presets.
  */
 export type RagPipelineConfig = {
-  readonly maxMarkdownChars: number
   readonly chunkTargetChars: number
   readonly chunkOverlapChars: number
   readonly maxChunksPerDocument: number
@@ -13,7 +12,6 @@ export type RagPipelineConfig = {
 }
 
 const ATTACHMENT_RAG_PIPELINE_CONFIG: RagPipelineConfig = Object.freeze({
-  maxMarkdownChars: 120_000,
   chunkTargetChars: 1_600,
   chunkOverlapChars: 260,
   maxChunksPerDocument: 140,
@@ -24,7 +22,6 @@ const ATTACHMENT_RAG_PIPELINE_CONFIG: RagPipelineConfig = Object.freeze({
 })
 
 const ORG_KNOWLEDGE_RAG_PIPELINE_CONFIG: RagPipelineConfig = Object.freeze({
-  maxMarkdownChars: 240_000,
   chunkTargetChars: 1_800,
   chunkOverlapChars: 280,
   maxChunksPerDocument: 260,

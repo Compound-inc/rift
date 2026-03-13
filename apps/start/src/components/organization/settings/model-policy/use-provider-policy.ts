@@ -20,6 +20,8 @@ function buildPolicyPayload(input: {
     providerNativeToolsEnabled?: boolean | null
     externalToolsEnabled?: boolean | null
     disabledToolKeys?: readonly string[]
+    orgKnowledgeEnabled?: boolean | null
+    activeOrgKnowledgeCount?: number | null
     enforcedModeId?: string | null
     updatedAt?: number
   } | null
@@ -52,6 +54,9 @@ function buildPolicyPayload(input: {
           disabledModelIds: policy.disabledModelIds,
           complianceFlags: policy.complianceFlags,
           toolPolicy: policy.toolPolicy,
+          orgKnowledgeEnabled: input.policyRow?.orgKnowledgeEnabled ?? false,
+          activeOrgKnowledgeCount:
+            input.policyRow?.activeOrgKnowledgeCount ?? 0,
           updatedAt: policy.updatedAt ?? Date.now(),
         },
       })

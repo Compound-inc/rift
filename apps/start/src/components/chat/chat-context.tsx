@@ -255,6 +255,15 @@ function toOrgAiPolicy(row: unknown): OrgAiPolicy | undefined {
           ? row.disabledToolKeys
           : DEFAULT_ORG_TOOL_POLICY.disabledToolKeys,
     },
+    orgKnowledgeEnabled:
+      'orgKnowledgeEnabled' in row && typeof row.orgKnowledgeEnabled === 'boolean'
+        ? row.orgKnowledgeEnabled
+        : false,
+    activeOrgKnowledgeCount:
+      'activeOrgKnowledgeCount' in row &&
+      typeof row.activeOrgKnowledgeCount === 'number'
+        ? row.activeOrgKnowledgeCount
+        : 0,
     providerKeyStatus:
       'providerKeyStatus' in row &&
       typeof row.providerKeyStatus === 'object' &&

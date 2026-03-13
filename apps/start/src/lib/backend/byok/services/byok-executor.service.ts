@@ -163,6 +163,9 @@ const runSet = (
               disabledModelIds: existing?.disabledModelIds ?? [],
               complianceFlags: existing?.complianceFlags ?? {},
               toolPolicy: existing?.toolPolicy ?? DEFAULT_ORG_TOOL_POLICY,
+              orgKnowledgeEnabled: existing?.orgKnowledgeEnabled ?? false,
+              activeOrgKnowledgeCount:
+                existing?.activeOrgKnowledgeCount ?? 0,
               enforcedModeId: existing?.enforcedModeId,
               providerKeyStatus: toOrgProviderKeyStatusSnapshot({
                 ...baseline,
@@ -217,6 +220,9 @@ const runRemove = (
               disabledModelIds: existing?.disabledModelIds ?? [],
               complianceFlags: existing?.complianceFlags ?? {},
               toolPolicy: existing?.toolPolicy ?? DEFAULT_ORG_TOOL_POLICY,
+              orgKnowledgeEnabled: existing?.orgKnowledgeEnabled ?? false,
+              activeOrgKnowledgeCount:
+                existing?.activeOrgKnowledgeCount ?? 0,
               enforcedModeId: existing?.enforcedModeId,
               providerKeyStatus: toOrgProviderKeyStatusSnapshot({
                 ...baseline,

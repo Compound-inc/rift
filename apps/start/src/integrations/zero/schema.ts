@@ -75,6 +75,10 @@ const orgAiPolicy = table('orgAiPolicy')
     externalToolsEnabled: boolean().from('external_tools_enabled').optional(),
     disabledToolKeys: json<readonly string[]>()
       .from('disabled_tool_keys'),
+    orgKnowledgeEnabled: boolean().from('org_knowledge_enabled').optional(),
+    activeOrgKnowledgeCount: number()
+      .from('active_org_knowledge_count')
+      .optional(),
     providerKeyStatus: json<{
       syncedAt: number
       hasAnyProviderKey: boolean
@@ -330,17 +334,14 @@ const attachment = table('attachment')
     fileName: string().from('file_name'),
     mimeType: string().from('mime_type'),
     fileSize: number().from('file_size'),
-    fileContent: string().from('file_content'),
-    embeddingModel: string().from('embedding_model').optional(),
-    embeddingTokens: number().from('embedding_tokens').optional(),
-    embeddingDimensions: number().from('embedding_dimensions').optional(),
-    embeddingChunks: number().from('embedding_chunks').optional(),
     embeddingStatus: string().from('embedding_status').optional(),
     ownerOrgId: string().from('owner_org_id').optional(),
     workspaceId: string().from('workspace_id').optional(),
     accessScope: enumeration<'user' | 'workspace' | 'org'>()
       .from('access_scope')
       .optional(),
+    orgKnowledgeKind: string().from('org_knowledge_kind').optional(),
+    orgKnowledgeActive: boolean().from('org_knowledge_active').optional(),
     accessGroupIds: json<readonly string[]>().from('access_group_ids').optional(),
     vectorIndexedAt: number().from('vector_indexed_at').optional(),
     vectorError: string().from('vector_error').optional(),
@@ -423,6 +424,14 @@ const orgAiPolicyRelationships = relationships(orgAiPolicy, ({ one }) => ({
   }),
 }))
 
+const attachmentRelationships = relationships(attachment, ({ one }) => ({
+  organization: one({
+    sourceField: ['ownerOrgId'],
+    destField: ['id'],
+    destSchema: organization,
+  }),
+}))
+
 const orgSubscriptionRelationships = relationships(orgSubscription, ({ one }) => ({
   organization: one({
     sourceField: ['organizationId'],
@@ -490,6 +499,7 @@ export const schema = createSchema({
     organizationRelationships,
     memberRelationships,
     orgAiPolicyRelationships,
+    attachmentRelationships,
     orgSubscriptionRelationships,
     orgSeatSlotRelationships,
     orgSeatBucketBalanceRelationships,

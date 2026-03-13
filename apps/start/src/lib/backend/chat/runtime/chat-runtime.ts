@@ -7,6 +7,8 @@ import {
 } from '@/lib/backend/billing/services/workspace-usage-settlement.service'
 import { makeRuntimeRunner } from '@/lib/backend/server-effect'
 import { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
+import { OrgKnowledgeRepositoryService } from '@/lib/backend/org-knowledge/services/org-knowledge-repository.service'
+import { AttachmentRecordService } from '../services/attachment-record.service'
 import { ChatOrchestratorService } from '../services/chat-orchestrator.service'
 import { ChatSearchService } from '../services/chat-search.service'
 import { FreeChatAllowanceService } from '../services/free-chat-allowance.service'
@@ -25,10 +27,15 @@ import { ToolPolicyService } from '../services/tool-policy.service'
  * Persistence uses Zero/Postgres, stream resume uses Redis, and quota/rate
  * limiting resolve through the shared billing-backed Postgres services.
  */
+const messageStoreLayer = MessageStoreService.layer.pipe(
+  Layer.provideMerge(OrgKnowledgeRepositoryService.layer),
+  Layer.provideMerge(AttachmentRecordService.layer),
+)
+
 const dependencyLayer = Layer.mergeAll(
   ThreadService.layer,
   ChatSearchService.layer,
-  MessageStoreService.layer,
+  messageStoreLayer,
   RateLimitService.layer,
   FreeChatAllowanceService.layer,
   ModelPolicyService.layer,
@@ -42,7 +49,7 @@ const dependencyLayer = Layer.mergeAll(
   // Provide shared infra dependencies into service layers that require them.
   Layer.provideMerge(ZeroDatabaseService.layer),
   Layer.provideMerge(AttachmentRagService.layer),
-  Layer.provideMerge(OrgKnowledgeRagService.layerNoop),
+  Layer.provideMerge(OrgKnowledgeRagService.layer),
 )
 
 const layer = ChatOrchestratorService.layer.pipe(

@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { uploadFileToServer } from '@/lib/frontend/chat/upload'
-import { MAX_UPLOAD_SIZE_BYTES } from '@/lib/shared/upload/upload.model'
+import { CHAT_ATTACHMENT_MAX_UPLOAD_SIZE_BYTES } from '@/lib/shared/upload/upload.model'
 import { m } from '@/paraglide/messages.js'
 
 const DEFAULT_AVATAR_MIME_TYPES = [
@@ -35,7 +35,7 @@ export function useAvatarUpload({
   onPersistImage,
   onImageChange,
   acceptedMimeTypes = DEFAULT_AVATAR_MIME_TYPES,
-  maxSizeBytes = MAX_UPLOAD_SIZE_BYTES,
+  maxSizeBytes = CHAT_ATTACHMENT_MAX_UPLOAD_SIZE_BYTES,
 }: UseAvatarUploadOptions): UseAvatarUploadResult {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [isUploading, setIsUploading] = useState(false)

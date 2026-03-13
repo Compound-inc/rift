@@ -26,7 +26,7 @@ import {
   ContextTrigger,
 } from './composer-bar'
 import { getCatalogModel } from '@/lib/shared/ai-catalog'
-import { useFileAttachments } from '../../hooks/chat/upload'
+import { useFileAttachments } from '../../hooks/chat/upload/use-file-attachments'
 import { parseChatApiError } from './chat-error-messages'
 import { getChatModeDefinition } from '@/lib/shared/chat-modes'
 import { m } from '@/paraglide/messages.js'

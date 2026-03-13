@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { embed, embedMany } from 'ai'
 import { isEmbeddingFeatureEnabled } from '@/utils/app-feature-flags'
 import { getAttachmentRagPipelineConfig } from './pipeline-config'
@@ -46,14 +47,27 @@ function normalizeWhitespace(input: string): string {
 }
 
 /**
- * Bounds markdown payload size before persistence/indexing.
- * This avoids unbounded row growth and gives deterministic context ceilings.
+ * Qdrant point IDs must be integers or UUIDs.
  */
+function buildDeterministicChunkId(input: {
+  readonly attachmentId: string
+  readonly chunkIndex: number
+}): string {
+  const hash = createHash('sha256')
+    .update(`${input.attachmentId}:${input.chunkIndex}`)
+    .digest('hex')
+
+  return [
+    hash.slice(0, 8),
+    hash.slice(8, 12),
+    `4${hash.slice(13, 16)}`,
+    `a${hash.slice(17, 20)}`,
+    hash.slice(20, 32),
+  ].join('-')
+}
+
 export function normalizeMarkdownForStorage(markdown: string): string {
-  const maxChars = ATTACHMENT_PIPELINE_CONFIG.maxMarkdownChars
-  const normalized = normalizeWhitespace(markdown)
-  if (normalized.length <= maxChars) return normalized
-  return `${normalized.slice(0, maxChars)}\n\n[Truncated due to context size limit]`
+  return normalizeWhitespace(markdown)
 }
 
 function splitIntoParagraphAwareChunks(input: string): readonly string[] {
@@ -155,7 +169,10 @@ export async function buildAttachmentChunkRows(input: {
   }
 
   const rows = chunks.map((content, index) => ({
-    id: crypto.randomUUID(),
+    id: buildDeterministicChunkId({
+      attachmentId: input.attachmentId,
+      chunkIndex: index,
+    }),
     attachmentId: input.attachmentId,
     userId: input.userId,
     chunkIndex: index,

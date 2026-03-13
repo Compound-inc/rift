@@ -1,6 +1,7 @@
 import { Effect, Layer, ServiceMap } from 'effect'
 import { isEmbeddingFeatureEnabled } from '@/utils/app-feature-flags'
 import { emitWideErrorEvent } from '@/lib/backend/chat/observability/wide-event'
+import { AttachmentRecordService } from '@/lib/backend/chat/services/attachment-record.service'
 import { AttachmentRagService } from '@/lib/backend/chat/services/rag'
 import { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
 import {
@@ -11,6 +12,7 @@ import {
   R2UploadServiceError,
   r2UploadService,
 } from '@/lib/backend/upload/upload.service'
+import { CHAT_ATTACHMENT_UPLOAD_POLICY } from '@/lib/shared/upload/upload-validation'
 import {
   FileConversionError,
   FilePersistenceError,
@@ -54,6 +56,7 @@ export class FileUploadOrchestratorService extends ServiceMap.Service<
   static readonly layer = Layer.effect(
     FileUploadOrchestratorService,
     Effect.gen(function* () {
+      const attachmentRecords = yield* AttachmentRecordService
       const attachmentRag = yield* AttachmentRagService
       const zeroDatabase = yield* ZeroDatabaseService
       const markdownConversion = yield* MarkdownConversionService
@@ -76,6 +79,7 @@ export class FileUploadOrchestratorService extends ServiceMap.Service<
               r2UploadService.upload({
                 userId,
                 file,
+                validationPolicy: CHAT_ATTACHMENT_UPLOAD_POLICY,
               }),
             catch: (error) => {
               if (error instanceof R2UploadServiceError) {
@@ -140,43 +144,37 @@ export class FileUploadOrchestratorService extends ServiceMap.Service<
             requestId,
           })
 
-          yield* Effect.tryPromise({
-            try: () =>
-              db.transaction(async (tx) => {
-                await tx.mutate.attachment.insert({
-                  id: attachmentId,
-                  messageId: undefined,
-                  threadId: undefined,
-                  userId,
-                  fileKey: uploaded.key,
-                  attachmentUrl: uploaded.url,
-                  fileName: uploaded.name,
-                  mimeType: uploaded.contentType,
-                  fileSize: uploaded.size,
-                  fileContent: markdown,
-                  embeddingModel: chunkBuild.metrics.embeddingModel,
-                  embeddingTokens: chunkBuild.metrics.embeddingTokens,
-                  embeddingDimensions: chunkBuild.metrics.embeddingDimensions,
-                  embeddingChunks: chunkBuild.metrics.embeddingChunks,
-                  embeddingStatus: chunkBuild.metrics.embeddingStatus,
-                  ownerOrgId,
-                  workspaceId,
-                  accessScope: accessScope ?? 'user',
-                  accessGroupIds: accessGroupIds ?? [],
-                  vectorIndexedAt: undefined,
-                  vectorError: undefined,
-                  status: 'uploaded',
-                  createdAt: now,
-                  updatedAt: now,
-                })
-              }),
-            catch: (error) =>
-              new FilePersistenceError({
-                message: 'Failed to persist uploaded attachment',
-                requestId,
-                cause: String(error),
-              }),
-          })
+          yield* attachmentRecords.insertAttachmentRecord({
+            id: attachmentId,
+            userId,
+            fileKey: uploaded.key,
+            attachmentUrl: uploaded.url,
+            fileName: uploaded.name,
+            mimeType: uploaded.contentType,
+            fileSize: uploaded.size,
+            fileContent: markdown,
+            embeddingModel: chunkBuild.metrics.embeddingModel,
+            embeddingTokens: chunkBuild.metrics.embeddingTokens,
+            embeddingDimensions: chunkBuild.metrics.embeddingDimensions,
+            embeddingChunks: chunkBuild.metrics.embeddingChunks,
+            embeddingStatus: chunkBuild.metrics.embeddingStatus,
+            ownerOrgId,
+            workspaceId,
+            accessScope: accessScope ?? 'user',
+            accessGroupIds: accessGroupIds ?? [],
+            status: 'uploaded',
+            createdAt: now,
+            updatedAt: now,
+          }).pipe(
+            Effect.mapError(
+              (error) =>
+                new FilePersistenceError({
+                  message: 'Failed to persist uploaded attachment',
+                  requestId,
+                  cause: String(error),
+                }),
+            ),
+          )
 
           yield* attachmentRag
             .indexAttachmentChunks({

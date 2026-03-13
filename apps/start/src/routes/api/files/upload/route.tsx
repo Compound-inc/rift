@@ -8,7 +8,7 @@ import {
   getServerAuthContextFromHeaders,
   requireNonAnonymousUserAuth,
 } from '@/lib/backend/server-effect/http/server-auth'
-import { MAX_UPLOAD_SIZE_BYTES } from '@/lib/shared/upload/upload.model'
+import { CHAT_ATTACHMENT_UPLOAD_POLICY } from '@/lib/shared/upload/upload-validation'
 import {
   FileInvalidRequestError,
   FileForbiddenError,
@@ -76,10 +76,10 @@ export const Route = createFileRoute('/api/files/upload')({
               }),
             )
           }
-          if (input.size > MAX_UPLOAD_SIZE_BYTES) {
+          if (input.size > CHAT_ATTACHMENT_UPLOAD_POLICY.maxSizeBytes) {
             return yield* Effect.fail(
               new FileInvalidRequestError({
-                message: `File exceeds limit of ${Math.floor(MAX_UPLOAD_SIZE_BYTES / (1024 * 1024))}MB`,
+                message: `File exceeds limit of ${Math.floor(CHAT_ATTACHMENT_UPLOAD_POLICY.maxSizeBytes / (1024 * 1024))}MB`,
                 requestId,
                 issue: 'file_too_large',
               }),

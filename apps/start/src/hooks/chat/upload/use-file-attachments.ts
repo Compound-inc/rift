@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AttachedFile } from '../../../components/chat/prompt-input'
 import {
+  CHAT_ATTACHMENT_UPLOAD_POLICY,
+  getUploadValidationError,
+} from '../../../lib/shared/upload/upload-validation'
+import {
   createAttachedFile,
-  getFileValidationError,
   uploadFileToServer,
 } from '../../../lib/frontend/chat/upload'
 
@@ -104,7 +107,10 @@ export function useFileAttachments(options: UseFileAttachmentsOptions = {}) {
       const queue: Array<{ id: string; file: File }> = []
       const nextItems = toConsider.map((file) => {
         const base = createAttachedFile(file)
-        const validationError = getFileValidationError(file)
+        const validationError = getUploadValidationError(
+          file,
+          CHAT_ATTACHMENT_UPLOAD_POLICY,
+        )
         if (validationError) {
           return {
             ...base,
