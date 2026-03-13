@@ -320,6 +320,7 @@ export type StreamResumeServiceShape = {
     readonly streamId: string
     readonly requestId: string
     readonly stream: ReadableStream<string>
+    readonly onPhaseChange?: (phase: string) => void
   }) => Effect.Effect<void, StreamProtocolError>
   readonly resumeStream: (input: {
     readonly userId: string
@@ -462,13 +463,22 @@ export class StreamResumeService extends ServiceMap.Service<
           streamId,
           requestId,
           stream,
+          onPhaseChange,
         }: {
           readonly streamId: string
           readonly requestId: string
           readonly stream: ReadableStream<string>
-        }) =>
-          Effect.tryPromise({
+          readonly onPhaseChange?: (phase: string) => void
+        }) => {
+          let currentPhase = 'initializing'
+          return Effect.tryPromise({
             try: async () => {
+              const setPhase = (phase: string) => {
+                currentPhase = phase
+                onPhaseChange?.(phase)
+              }
+
+              setPhase('batch_sse_stream')
               const batchedStream = batchSseStream(stream, {
                 maxChars: RESUME_BATCH_MAX_CHARS,
                 maxDelayMs: RESUME_BATCH_MAX_DELAY_MS,
@@ -477,6 +487,7 @@ export class StreamResumeService extends ServiceMap.Service<
 
               const local = runtime.localStreams.get(streamId)
               if (local) {
+                setPhase('mirror_local_stream')
                 void (async () => {
                   const localReader = localStream.getReader()
                   try {
@@ -528,6 +539,7 @@ export class StreamResumeService extends ServiceMap.Service<
                 })().catch(() => undefined)
               }
 
+              setPhase('create_resumable_stream')
               const resumableStream =
                 await runtime.streamContext.createNewResumableStream(
                   streamId,
@@ -537,6 +549,7 @@ export class StreamResumeService extends ServiceMap.Service<
               if (!resumableStream) return
 
               // Drain the internal stream so the resumable context never stalls on backpressure.
+              setPhase('drain_resumable_stream')
               const reader = resumableStream.getReader()
               try {
                 for (;;) {
@@ -546,14 +559,17 @@ export class StreamResumeService extends ServiceMap.Service<
               } finally {
                 reader.releaseLock()
               }
+
+              setPhase('completed')
             },
             catch: (error) =>
               toProtocolError({
                 requestId,
-                message: 'Failed to persist resumable stream',
-                error,
+                message: 'Failed to persist resumable stream during detached persistence',
+                error: `phase=${currentPhase}; ${String(error)}`,
               }),
-          }),
+          })
+        },
       )
 
       const resumeStream = Effect.fn('StreamResumeService.resumeStream')(

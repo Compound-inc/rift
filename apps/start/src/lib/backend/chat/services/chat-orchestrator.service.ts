@@ -661,12 +661,17 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               'Cache-Control': 'no-cache, no-transform',
             },
             consumeSseStream: ({ stream }) => {
+              let persistPhase = 'initializing'
+
               runDetachedUnsafe({
                 effect: streamResume
                   .persistSseStream({
                     streamId,
                     requestId,
                     stream,
+                    onPhaseChange: (phase) => {
+                      persistPhase = phase
+                    },
                   })
                   .pipe(
                     Effect.catch((error) =>
@@ -681,21 +686,37 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                         errorTag: error._tag,
                         message: error.message,
                         latencyMs: Date.now() - startedAt,
+                        cause: error.cause ?? `phase=${persistPhase}`,
                       }),
                     ),
                   ),
                 onFailure: () => Effect.void,
-                onTimeout: emitWideErrorEvent({
-                  eventName: 'chat.stream.resume.persist.timed_out',
-                  route,
-                  requestId,
-                  userId,
-                  threadId,
-                  model: modelResolution.modelId,
-                  errorTag: 'DetachedTimeout',
-                  message: 'Detached resumable stream persistence timed out',
-                  latencyMs: Date.now() - startedAt,
-                }),
+                onTimeout: () =>
+                  emitWideErrorEvent({
+                    eventName: 'chat.stream.resume.persist.timed_out',
+                    route,
+                    requestId,
+                    userId,
+                    threadId,
+                    model: modelResolution.modelId,
+                    errorTag: 'DetachedTimeout',
+                    message: 'Detached resumable stream persistence timed out',
+                    latencyMs: Date.now() - startedAt,
+                    cause: `phase=${persistPhase}`,
+                  }),
+                onInterrupt: () =>
+                  emitWideErrorEvent({
+                    eventName: 'chat.stream.resume.persist.interrupted',
+                    route,
+                    requestId,
+                    userId,
+                    threadId,
+                    model: modelResolution.modelId,
+                    errorTag: 'Interrupted',
+                    message: 'Detached resumable stream persistence interrupted',
+                    latencyMs: Date.now() - startedAt,
+                    cause: `phase=${persistPhase}`,
+                  }),
               })
             },
             onError: (error: unknown) => {
