@@ -136,12 +136,11 @@ export const RUNTIME_FEATURE_MINIMUM_PLANS: Record<RuntimeFeatureAccessId, PaidW
 const BILLING_SETTINGS_HREF = '/organization/settings/billing'
 const ENTERPRISE_CONTACT_HREF = 'mailto:enterprise@rift.mx'
 
-const FREE_TIER_ALLOWED_MODEL_IDS = new Set<string>([
-  'openai/gpt-5-nano',
-  ...AI_CATALOG
+const FREE_TIER_ALLOWED_MODEL_IDS = new Set<string>(
+  AI_CATALOG
     .filter((model) => model.providerId === 'meta' && model.id.startsWith('meta/llama-'))
     .map((model) => model.id),
-])
+)
 
 export function getWorkspacePlan(planId: WorkspacePlanId): WorkspacePlan {
   const plan = WORKSPACE_PLANS.find((candidate) => candidate.id === planId)
