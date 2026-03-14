@@ -16,7 +16,7 @@ import { join } from 'node:path'
 import { Pool } from 'pg'
 
 const appDir = join(import.meta.dir, '..')
-const authConfigPath = join(appDir, 'src/lib/auth/auth.server.ts')
+const authConfigPath = join(appDir, 'src/lib/backend/auth/auth.server.ts')
 
 function quoteIdentifier(identifier: string): string {
   return `"${identifier.replaceAll('"', '""')}"`
