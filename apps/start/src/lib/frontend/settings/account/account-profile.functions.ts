@@ -1,7 +1,10 @@
 import { z } from 'zod'
 import { createServerFn } from '@tanstack/react-start'
+import { locales } from '@/paraglide/runtime.js'
 import {
+  getUserPreferredLocale,
   requestUserEmailChange,
+  updateUserPreferredLocale,
   updateUserProfileName,
 } from './account-profile.server'
 
@@ -12,9 +15,13 @@ const UpdateProfileNameInputSchema = z.object({
 const RequestEmailChangeInputSchema = z.object({
   newEmail: z.string().trim().email().max(320),
 })
+const UpdatePreferredLocaleInputSchema = z.object({
+  locale: z.enum(locales),
+})
 
 export type UpdateProfileNameInput = z.infer<typeof UpdateProfileNameInputSchema>
 export type RequestEmailChangeInput = z.infer<typeof RequestEmailChangeInputSchema>
+export type UpdatePreferredLocaleInput = z.infer<typeof UpdatePreferredLocaleInputSchema>
 
 /**
  * Input validator for profile name updates.
@@ -28,6 +35,13 @@ function updateProfileNameInputValidator(input: unknown): UpdateProfileNameInput
  */
 function requestEmailChangeInputValidator(input: unknown): RequestEmailChangeInput {
   return RequestEmailChangeInputSchema.parse(input)
+}
+
+/**
+ * Input validator for preferred locale persistence.
+ */
+function updatePreferredLocaleInputValidator(input: unknown): UpdatePreferredLocaleInput {
+  return UpdatePreferredLocaleInputSchema.parse(input)
 }
 
 /**
@@ -46,4 +60,21 @@ export const requestEmailChange = createServerFn({ method: 'POST' })
   .inputValidator(requestEmailChangeInputValidator)
   .handler(async ({ data }) => {
     return requestUserEmailChange(data)
+  })
+
+/**
+ * Server mutation for saving account locale preference.
+ */
+export const updatePreferredLocale = createServerFn({ method: 'POST' })
+  .inputValidator(updatePreferredLocaleInputValidator)
+  .handler(async ({ data }) => {
+    return updateUserPreferredLocale(data)
+  })
+
+/**
+ * Server query for the authenticated user's locale preference.
+ */
+export const getPreferredLocale = createServerFn({ method: 'GET' })
+  .handler(async () => {
+    return getUserPreferredLocale()
   })

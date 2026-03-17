@@ -33,7 +33,11 @@ import {
   shouldProvisionDefaultOrganization,
   slugifyOrganizationName,
 } from './default-organization'
-import { sendAuthEmail } from './auth-email.server'
+import {
+  sendAuthOtpEmail,
+  sendAuthVerificationLinkEmail,
+  sendOrganizationInvitationEmail,
+} from './auth-email.server'
 import type { Subscription as BetterAuthStripeSubscription } from '@better-auth/stripe'
 
 async function syncWorkspaceSubscription(input: {
@@ -295,6 +299,12 @@ const auth = betterAuth({
     },
   },
   user: {
+    additionalFields: {
+      preferredLocale: {
+        type: 'string',
+        required: false,
+      },
+    },
     changeEmail: {
       enabled: true,
     },
@@ -305,6 +315,19 @@ const auth = betterAuth({
     maxPasswordLength: 128,
     requireEmailVerification: true,
     revokeSessionsOnPasswordReset: true,
+  },
+  emailVerification: {
+    async sendVerificationEmail({ user, url }, request) {
+      const acceptLanguageHeader = request?.headers.get('accept-language')
+      void sendAuthVerificationLinkEmail({
+        to: user.email,
+        verifyUrl: url,
+        userId: user.id,
+        fallbackAcceptLanguageHeader: acceptLanguageHeader,
+      }).catch((error) => {
+        console.error('Failed to send verification-link email', error)
+      })
+    },
   },
   ...(googleClientId && googleClientSecret
     ? {
@@ -325,22 +348,11 @@ const auth = betterAuth({
       allowedAttempts: 5,
       storeOTP: 'hashed',
       async sendVerificationOTP({ email, otp, type }) {
-        const subjectByType: Record<string, string> = {
-          'email-verification': 'Verify your email',
-          'forget-password': 'Reset your password',
-          'sign-in': 'Your sign-in code',
-        }
-
-        const actionByType: Record<string, string> = {
-          'email-verification': 'verify your email',
-          'forget-password': 'reset your password',
-          'sign-in': 'sign in',
-        }
-
-        void sendAuthEmail({
+        void sendAuthOtpEmail({
           to: email,
-          subject: subjectByType[type] ?? 'Your verification code',
-          text: `Your Rift code is ${otp}. Enter it in the app to ${actionByType[type] ?? 'continue'}. This code expires in 5 minutes.`,
+          otp,
+          kind: type,
+          expiresInMinutes: 5,
         }).catch((error) => {
           console.error(`Failed to send ${type} OTP`, error)
         })
@@ -411,10 +423,11 @@ const auth = betterAuth({
         const inviteLink = `${authBaseURL}/auth/accept-invitation/${data.id}`
         const inviterName = data.inviter.user.name || data.inviter.user.email || 'A team member'
         const orgName = data.organization.name || 'the organization'
-        void sendAuthEmail({
+        void sendOrganizationInvitationEmail({
           to: data.email,
-          subject: `You're invited to join ${orgName}`,
-          text: `${inviterName} invited you to join ${orgName}. Open this link to accept: ${inviteLink}`,
+          inviteLink,
+          inviterName,
+          organizationName: orgName,
         }).catch((error) => {
           console.error('Failed to send organization invitation email', error)
         })

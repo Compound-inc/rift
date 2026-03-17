@@ -4,7 +4,13 @@ import { useEffect, useState } from 'react'
 import { useServerFn } from '@tanstack/react-start'
 import { authClient } from '@/lib/frontend/auth/auth-client'
 import { useAppAuth } from '@/lib/frontend/auth/use-auth'
-import { requestEmailChange, saveAvatar, updateProfileName } from '@/lib/frontend/settings/account'
+import {
+  getPreferredLocale,
+  requestEmailChange,
+  saveAvatar,
+  updatePreferredLocale,
+  updateProfileName,
+} from '@/lib/frontend/settings/account'
 import { getLocale, locales, setLocale } from '@/paraglide/runtime.js'
 import { m } from '@/paraglide/messages.js'
 
@@ -51,7 +57,8 @@ function getInitials(name: string, email: string): string {
   if (normalizedName.length > 0) {
     const parts = normalizedName.split(/\s+/).filter(Boolean)
     const first = parts[0]?.slice(0, 1) ?? ''
-    const last = (parts.length > 1 ? parts[parts.length - 1] : '')?.slice(0, 1) ?? ''
+    const last =
+      (parts.length > 1 ? parts[parts.length - 1] : '')?.slice(0, 1) ?? ''
     return (first + last).toUpperCase() || '?'
   }
 
@@ -67,7 +74,9 @@ function getLocaleLabel(targetLocale: SupportedLocale): string {
      * regardless of the current UI language (e.g. Hebrew UI still shows "English",
      * "Español", etc., instead of translating them to equivalents).
      */
-    const displayNames = new Intl.DisplayNames([baseLanguage], { type: 'language' })
+    const displayNames = new Intl.DisplayNames([baseLanguage], {
+      type: 'language',
+    })
     const localizedLabel = displayNames.of(baseLanguage)
     if (!localizedLabel) return targetLocale
     return localizedLabel.charAt(0).toUpperCase() + localizedLabel.slice(1)
@@ -88,10 +97,13 @@ function resolveSettingsCallbackURLClient(): string {
  * Centralized logic for user account settings.
  */
 export function useAccountPageLogic(): AccountPageLogicResult {
-  const { loading, user, isAnonymous, emailVerified, refetchSession } = useAppAuth()
+  const { loading, user, isAnonymous, emailVerified, refetchSession } =
+    useAppAuth()
   const saveAvatarFn = useServerFn(saveAvatar)
   const updateProfileNameFn = useServerFn(updateProfileName)
   const requestEmailChangeFn = useServerFn(requestEmailChange)
+  const updatePreferredLocaleFn = useServerFn(updatePreferredLocale)
+  const getPreferredLocaleFn = useServerFn(getPreferredLocale)
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -103,37 +115,70 @@ export function useAccountPageLogic(): AccountPageLogicResult {
   const [nameMessage, setNameMessage] = useState<string | null>(null)
   const [emailMessage, setEmailMessage] = useState<string | null>(null)
 
+  const canEdit = !loading && !!user && !isAnonymous
 
   useEffect(() => {
-    if (user) {
-      setName(user.name ?? '')
-      setEmail(user.email ?? '')
-      setConfirmedEmailTarget(user.email ?? '')
-      setAvatarImage(user.image ?? null)
-      setAvatarMessage(null)
-      return
-    }
+    if (!user) return
 
-    setName('')
-    setEmail('')
-    setConfirmedEmailTarget('')
-    setAvatarImage(null)
-    setAvatarMessage(null)
-  }, [user?.email, user?.image, user?.name])
-  const canEdit = !loading && !!user && !isAnonymous
+    /**
+     * Hydrate account form fields from the authenticated session once available.
+     * The guards prevent clobbering user-entered drafts while still ensuring first
+     * render (and post-refetch session changes) populate empty form state.
+     */
+    const sessionName = typeof user.name === 'string' ? user.name : ''
+    const sessionEmail = typeof user.email === 'string' ? user.email : ''
+    const sessionAvatar = typeof user.image === 'string' ? user.image : null
+
+    setName((current) => (current.length === 0 ? sessionName : current))
+    setEmail((current) => (current.length === 0 ? sessionEmail : current))
+    setConfirmedEmailTarget((current) =>
+      current.length === 0 ? sessionEmail : current,
+    )
+    setAvatarImage((current) => (current == null ? sessionAvatar : current))
+  }, [user])
+
+  useEffect(() => {
+    if (!canEdit) return
+
+    let cancelled = false
+    void getPreferredLocaleFn()
+      .then((result) => {
+        if (cancelled || !result?.locale) return
+        const storedLocale = result.locale
+        setLanguage(storedLocale)
+        if (storedLocale !== getLocale()) {
+          void Promise.resolve(setLocale(storedLocale))
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLanguageError(m.settings_account_language_error_default())
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [canEdit, getPreferredLocaleFn])
   const initials = getInitials(name, email)
   const normalizedCurrentEmail = user?.email?.trim().toLowerCase() ?? ''
   const normalizedDraftEmail = email.trim().toLowerCase()
-  const normalizedConfirmedEmailTarget = confirmedEmailTarget.trim().toLowerCase()
+  const normalizedConfirmedEmailTarget = confirmedEmailTarget
+    .trim()
+    .toLowerCase()
   const isEditingCurrentEmail = normalizedDraftEmail === normalizedCurrentEmail
   const emailVerificationStatus =
     normalizedConfirmedEmailTarget.length === 0
       ? null
-      : normalizedConfirmedEmailTarget === normalizedCurrentEmail && emailVerified
+      : normalizedConfirmedEmailTarget === normalizedCurrentEmail &&
+          emailVerified
         ? 'verified'
         : 'not-verified'
   const canResendCurrentEmailVerification =
-    canEdit && isEditingCurrentEmail && normalizedDraftEmail.length > 0 && !emailVerified
+    canEdit &&
+    isEditingCurrentEmail &&
+    normalizedDraftEmail.length > 0 &&
+    !emailVerified
   const languageOptions = locales.map((localeCode) => ({
     value: localeCode,
     label: getLocaleLabel(localeCode),
@@ -165,6 +210,13 @@ export function useAccountPageLogic(): AccountPageLogicResult {
      * ensuring translated strings and direction-sensitive layout are in sync globally.
      */
     try {
+      if (canEdit) {
+        await updatePreferredLocaleFn({
+          data: {
+            locale: nextLanguage,
+          },
+        })
+      }
       await Promise.resolve(setLocale(nextLanguage))
     } catch {
       setLanguageError(m.settings_account_language_error_default())
@@ -192,7 +244,9 @@ export function useAccountPageLogic(): AccountPageLogicResult {
       setName(nextName)
       setNameMessage(NAME_SUCCESS_MESSAGE())
     } catch (cause) {
-      setNameMessage(getErrorMessage(cause, m.settings_account_error_name_save_failed()))
+      setNameMessage(
+        getErrorMessage(cause, m.settings_account_error_name_save_failed()),
+      )
     }
   }
 
@@ -224,7 +278,9 @@ export function useAccountPageLogic(): AccountPageLogicResult {
       setEmail(nextEmail)
       setEmailMessage(EMAIL_SUCCESS_MESSAGE())
     } catch (cause) {
-      setEmailMessage(getErrorMessage(cause, m.settings_account_error_email_change_failed()))
+      setEmailMessage(
+        getErrorMessage(cause, m.settings_account_error_email_change_failed()),
+      )
     }
   }
 
@@ -257,7 +313,9 @@ export function useAccountPageLogic(): AccountPageLogicResult {
       setEmail(nextEmail)
       setEmailMessage(EMAIL_SUCCESS_MESSAGE())
     } catch (cause) {
-      setEmailMessage(getErrorMessage(cause, m.settings_account_error_email_change_failed()))
+      setEmailMessage(
+        getErrorMessage(cause, m.settings_account_error_email_change_failed()),
+      )
     }
   }
 

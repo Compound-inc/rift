@@ -10,6 +10,7 @@ export type BetterAuthSessionContext = {
     id: string
     email: string
     isAnonymous?: boolean | null
+    preferredLocale?: string | null
   }
 }
 
@@ -37,6 +38,7 @@ export async function getSessionFromHeaders(
     id?: unknown
     email?: unknown
     isAnonymous?: unknown
+    preferredLocale?: unknown
   }
 
   if (
@@ -63,6 +65,10 @@ export async function getSessionFromHeaders(
       isAnonymous:
         typeof normalizedUser.isAnonymous === 'boolean'
           ? normalizedUser.isAnonymous
+          : null,
+      preferredLocale:
+        typeof normalizedUser.preferredLocale === 'string'
+          ? normalizedUser.preferredLocale
           : null,
     },
   }
