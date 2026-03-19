@@ -30,47 +30,57 @@ import { ThreadService } from '@/lib/backend/chat/services/thread.service'
 import { ToolPolicyService } from '@/lib/backend/chat/services/tool-policy.service'
 import { ToolRegistryService } from '@/lib/backend/chat/services/tool-registry.service'
 
+let lastStreamRequest: {
+  readonly providerOptions?: Record<string, unknown>
+} | null = null
+
 const TestModelGatewayLive = Layer.succeed(ModelGatewayService, {
-  streamResponse: ({ messages }) =>
-    Effect.succeed<ModelStreamResult>({
-      totalUsage: Promise.resolve({
-        inputTokens: 5,
-        inputTokenDetails: {
-          noCacheTokens: 5,
-          cacheReadTokens: 0,
-          cacheWriteTokens: 0,
+  streamResponse: ({ messages, providerOptions }) =>
+    Effect.sync<ModelStreamResult>(() => {
+      lastStreamRequest = {
+        providerOptions,
+      }
+
+      return {
+        totalUsage: Promise.resolve({
+          inputTokens: 5,
+          inputTokenDetails: {
+            noCacheTokens: 5,
+            cacheReadTokens: 0,
+            cacheWriteTokens: 0,
+          },
+          outputTokens: 3,
+          outputTokenDetails: {
+            textTokens: 3,
+            reasoningTokens: 0,
+          },
+          totalTokens: 8,
+        } satisfies LanguageModelUsage),
+        providerMetadata: Promise.resolve(undefined),
+        toUIMessageStreamResponse: (options) => {
+          const onFinish = options?.onFinish
+          const assistantMessage: UIMessage = {
+            id: 'assistant-1',
+            role: 'assistant',
+            parts: [
+              { type: 'reasoning', text: 'Mocked reasoning trace', state: 'done' },
+              { type: 'text', text: 'Mocked assistant response' },
+            ],
+            metadata: { totalTokens: 8 },
+          }
+
+          const finishedMessages = [...messages, assistantMessage]
+
+          void onFinish?.({
+            messages: finishedMessages,
+            isAborted: false,
+            responseMessage: assistantMessage,
+            isContinuation: false,
+          })
+
+          return new Response('stream-ok', { status: 200 })
         },
-        outputTokens: 3,
-        outputTokenDetails: {
-          textTokens: 3,
-          reasoningTokens: 0,
-        },
-        totalTokens: 8,
-      } satisfies LanguageModelUsage),
-      providerMetadata: Promise.resolve(undefined),
-      toUIMessageStreamResponse: (options) => {
-        const onFinish = options?.onFinish
-        const assistantMessage: UIMessage = {
-          id: 'assistant-1',
-          role: 'assistant',
-          parts: [
-            { type: 'reasoning', text: 'Mocked reasoning trace', state: 'done' },
-            { type: 'text', text: 'Mocked assistant response' },
-          ],
-          metadata: { totalTokens: 8 },
-        }
-
-        const finishedMessages = [...messages, assistantMessage]
-
-        void onFinish?.({
-          messages: finishedMessages,
-          isAborted: false,
-          responseMessage: assistantMessage,
-          isContinuation: false,
-        })
-
-        return new Response('stream-ok', { status: 200 })
-      },
+      }
     }),
 })
 
@@ -83,6 +93,11 @@ const RecordingToolRegistryLayer = Layer.succeed(ToolRegistryService, {
       return {
         tools: {},
         activeTools: [],
+        defaultProviderOptions: {
+          openai: {
+            reasoningEffort: 'medium',
+          },
+        },
         providerOptionsByReasoning: {},
       }
     }),
@@ -109,6 +124,7 @@ beforeEach(() => {
   state.rateLimits.clear()
   state.freeAllowances.clear()
   lastResolvedToolKeys = []
+  lastStreamRequest = null
 })
 
 const paidAccessPolicy = resolveChatAccessPolicy({
@@ -216,6 +232,105 @@ describe('chat-backend scaffold', () => {
       'openai.code_interpreter',
     ])
     expect(getMemoryState().threads.get(threadId)?.modeId).toBeUndefined()
+  })
+
+  it('adds AI Gateway ZDR provider options when org policy requires it', async () => {
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const orchestrator = yield* ChatOrchestratorService
+        const created = yield* orchestrator.createThread({
+          userId: 'user-zdr',
+          requestId: 'req-zdr-create',
+          modelId: 'openai/gpt-5-mini',
+        })
+
+        return yield* orchestrator.streamChat({
+          userId: 'user-zdr',
+          threadId: created.threadId,
+          organizationId: 'org-zdr',
+          accessPolicy: paidAccessPolicy,
+          orgPolicy: {
+            organizationId: 'org-zdr',
+            disabledProviderIds: [],
+            disabledModelIds: [],
+            complianceFlags: { require_zdr: true },
+            toolPolicy: {
+              providerNativeToolsEnabled: true,
+              externalToolsEnabled: true,
+              disabledToolKeys: [],
+            },
+            orgKnowledgeEnabled: true,
+            updatedAt: Date.now(),
+          },
+          requestId: 'req-zdr-stream',
+          route: '/api/chat',
+          modelId: 'openai/gpt-5-mini',
+          expectedBranchVersion: 1,
+          message: {
+            id: 'user-zdr-message',
+            role: 'user',
+            parts: [{ type: 'text', text: 'handle sensitive data' }],
+          },
+        })
+      }).pipe(Effect.provide(TestChatLayer)),
+    )
+
+    expect(lastStreamRequest?.providerOptions).toMatchObject({
+      openai: {
+        reasoningEffort: 'medium',
+      },
+      gateway: {
+        zeroDataRetention: true,
+      },
+    })
+  })
+
+  it('does not add AI Gateway ZDR provider options when org policy does not require it', async () => {
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const orchestrator = yield* ChatOrchestratorService
+        const created = yield* orchestrator.createThread({
+          userId: 'user-no-zdr',
+          requestId: 'req-no-zdr-create',
+          modelId: 'openai/gpt-5-mini',
+        })
+
+        return yield* orchestrator.streamChat({
+          userId: 'user-no-zdr',
+          threadId: created.threadId,
+          organizationId: 'org-no-zdr',
+          accessPolicy: paidAccessPolicy,
+          orgPolicy: {
+            organizationId: 'org-no-zdr',
+            disabledProviderIds: [],
+            disabledModelIds: [],
+            complianceFlags: {},
+            toolPolicy: {
+              providerNativeToolsEnabled: true,
+              externalToolsEnabled: true,
+              disabledToolKeys: [],
+            },
+            orgKnowledgeEnabled: true,
+            updatedAt: Date.now(),
+          },
+          requestId: 'req-no-zdr-stream',
+          route: '/api/chat',
+          modelId: 'openai/gpt-5-mini',
+          expectedBranchVersion: 1,
+          message: {
+            id: 'user-no-zdr-message',
+            role: 'user',
+            parts: [{ type: 'text', text: 'regular request' }],
+          },
+        })
+      }).pipe(Effect.provide(TestChatLayer)),
+    )
+
+    expect(lastStreamRequest?.providerOptions).toEqual({
+      openai: {
+        reasoningEffort: 'medium',
+      },
+    })
   })
 
   it('creates a new edited user branch and regenerates from it', async () => {

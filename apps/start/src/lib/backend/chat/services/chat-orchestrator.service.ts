@@ -68,6 +68,30 @@ function getResolvedCatalogModel(modelId: string) {
   return catalogModel
 }
 
+function withGatewayComplianceProviderOptions(input: {
+  readonly providerOptions?: Record<string, unknown>
+  readonly orgPolicy?: OrgAiPolicy
+}): Record<string, unknown> | undefined {
+  if (!input.orgPolicy?.complianceFlags.require_zdr) {
+    return input.providerOptions
+  }
+
+  const gatewayOptions =
+    input.providerOptions?.gateway &&
+    typeof input.providerOptions.gateway === 'object' &&
+    !Array.isArray(input.providerOptions.gateway)
+      ? (input.providerOptions.gateway as Record<string, unknown>)
+      : undefined
+
+  return {
+    ...(input.providerOptions ?? {}),
+    gateway: {
+      ...(gatewayOptions ?? {}),
+      zeroDataRetention: true,
+    },
+  }
+}
+
 /**
  * High-level chat orchestration boundary.
  * Coordinates cross-cutting concerns (authz, throttling, model policy, persistence,
@@ -716,11 +740,14 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             requestId,
             tools: toolRegistry.tools,
             activeTools: toolRegistry.activeTools,
-            providerOptions: modelResolution.reasoningEffort
-              ? toolRegistry.providerOptionsByReasoning[
-                  modelResolution.reasoningEffort
-                ]
-              : toolRegistry.defaultProviderOptions,
+            providerOptions: withGatewayComplianceProviderOptions({
+              providerOptions: modelResolution.reasoningEffort
+                ? toolRegistry.providerOptionsByReasoning[
+                    modelResolution.reasoningEffort
+                  ]
+                : toolRegistry.defaultProviderOptions,
+              orgPolicy,
+            }),
             reasoningEffort: modelResolution.reasoningEffort,
             abortSignal: streamAbortController.signal,
             onChunk: (chunk: unknown) => {
