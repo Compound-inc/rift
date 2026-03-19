@@ -33,24 +33,26 @@ export function ChatPageShell() {
 
   return (
     <div className="relative flex min-h-full flex-1 flex-col overflow-visible">
-      <div className="sticky top-0 z-30 shrink-0 px-4 pb-2 pt-3">
+      <div className="pointer-events-none sticky top-0 z-30 h-0 overflow-visible px-4 pt-3">
         <div className="flex w-full items-center justify-start gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="iconSmall"
-            aria-label={toggleLabel}
-            title={toggleLabel}
-            onClick={() => {
-              setIsChatPageSidebarCollapsed((current) => !current)
-            }}
-          >
-            {isChatPageSidebarCollapsed ? (
-              <PanelLeftOpen className="size-4" aria-hidden />
-            ) : (
-              <PanelLeftClose className="size-4" aria-hidden />
-            )}
-          </Button>
+          <div className="pointer-events-auto">
+            <Button
+              type="button"
+              variant="ghost"
+              size="iconSmall"
+              aria-label={toggleLabel}
+              title={toggleLabel}
+              onClick={() => {
+                setIsChatPageSidebarCollapsed((current) => !current)
+              }}
+            >
+              {isChatPageSidebarCollapsed ? (
+                <PanelLeftOpen className="size-4" aria-hidden />
+              ) : (
+                <PanelLeftClose className="size-4" aria-hidden />
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 
