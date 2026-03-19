@@ -1,7 +1,7 @@
 import type { OrgUsageSummary } from '@/lib/frontend/billing/org-usage-summary.server'
 
 export type SidebarUsageMeterModel = {
-  label: string
+  kind: 'empty' | 'free' | 'paid'
   usedPercent: number
   remainingPercent: number
   remainingLabel: string
@@ -23,12 +23,11 @@ function formatRelativeDuration(timestampMs: number | null | undefined, nowMs: n
   const totalHours = Math.floor(totalMinutes / 60)
   const days = Math.floor(totalHours / 24)
   const hours = totalHours % 24
-  const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
 
+  if (days <= 0 && hours <= 0 && minutes <= 0) return 'under 1m'
   if (days > 0 && hours <= 0) return `${days}d`
   if (days > 0) return `${days}d ${hours}h`
-  if (hours <= 0 && minutes <= 0) return 'under 1m'
   if (hours <= 0) return `${minutes}m`
   if (minutes <= 0) return `${hours}h`
   return `${hours}h ${minutes}m`
@@ -40,7 +39,7 @@ export function buildSidebarUsageMeterModel(
 ): SidebarUsageMeterModel {
   if (!summary) {
     return {
-      label: 'Usage',
+      kind: 'empty',
       usedPercent: 0,
       remainingPercent: 100,
       remainingLabel: '100%',
@@ -49,7 +48,7 @@ export function buildSidebarUsageMeterModel(
   }
 
   return {
-    label: summary.kind === 'free' ? 'Free allowance' : 'Monthly cycle',
+    kind: summary.kind,
     usedPercent: summary.monthlyUsedPercent,
     remainingPercent: summary.monthlyRemainingPercent,
     remainingLabel: formatPercentLabel(summary.monthlyRemainingPercent),

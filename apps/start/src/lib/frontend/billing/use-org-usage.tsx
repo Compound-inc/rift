@@ -80,12 +80,25 @@ type UsageSummaryRow = {
 
 type EntitlementSnapshotRow = {
   computedAt: number
+  activeMemberCount?: number
+  seatCount?: number
+  isOverSeatLimit?: boolean
+}
+
+type MemberAccessRow = {
+  status?: string
+  reasonCode?: string | null
+}
+
+type CurrentMemberRow = {
+  access?: MemberAccessRow
 }
 
 type UsageSummaryContainerRow = {
   id?: string
   usageSummaries?: UsageSummaryRow[]
   entitlementSnapshots?: EntitlementSnapshotRow[]
+  members?: CurrentMemberRow[]
 }
 
 function toSummary(row: UsageSummaryContainerRow | null | undefined): OrgUsageSummary | null {
@@ -165,6 +178,12 @@ type OrgUsageSummaryContextValue = {
   summary: OrgUsageSummary | null
   nowMs: number
   loading: boolean
+  currentMemberAccess: MemberAccessRow | null
+  entitlement: {
+    activeMemberCount: number
+    seatCount: number
+    isOverSeatLimit: boolean
+  } | null
 }
 
 const OrgUsageSummaryContext = createContext<OrgUsageSummaryContextValue | null>(null)
@@ -204,6 +223,25 @@ export function OrgUsageSummaryProvider({ children }: { children: ReactNode }) {
   })
   const summary = resolvedSummary.summary
   const summaryRefreshAt = summary == null ? null : getNextRefreshAt(summary)
+  const currentMemberAccess = liveSummaryRow?.id === activeOrganizationId
+    ? liveSummaryRow?.members?.[0]?.access ?? null
+    : null
+  const entitlementRow = liveSummaryRow?.id === activeOrganizationId
+    ? liveSummaryRow?.entitlementSnapshots?.[0]
+    : undefined
+  const entitlement = entitlementRow
+    ? {
+        activeMemberCount:
+          typeof entitlementRow.activeMemberCount === 'number'
+            ? entitlementRow.activeMemberCount
+            : 0,
+        seatCount:
+          typeof entitlementRow.seatCount === 'number'
+            ? entitlementRow.seatCount
+            : 1,
+        isOverSeatLimit: Boolean(entitlementRow.isOverSeatLimit),
+      }
+    : null
 
   /**
    * The latest request always wins. This keeps the shared summary pinned to the
@@ -396,6 +434,8 @@ export function OrgUsageSummaryProvider({ children }: { children: ReactNode }) {
           activeOrganizationId != null
           && summary == null
           && (ensuring || summaryResult.type !== 'complete'),
+        currentMemberAccess,
+        entitlement,
       }}
     >
       {children}

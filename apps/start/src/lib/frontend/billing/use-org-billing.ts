@@ -37,12 +37,19 @@ type BillingSummaryRow = {
     isOverSeatLimit: boolean
     effectiveFeatures?: Record<WorkspaceFeatureId, boolean>
   }>
+  members?: Array<{
+    access?: {
+      status?: string
+      reasonCode?: string | null
+    }
+  }>
 }
 
 export function useOrgBillingSummary() {
   const [summary, result] = useQuery(queries.orgBilling.currentSummary())
   const row = (summary as BillingSummaryRow | undefined | null) ?? null
   const organizationId = row?.id ?? null
+  const currentMemberAccess = row?.members?.[0]?.access ?? null
 
   return {
     organizationId,
@@ -50,6 +57,7 @@ export function useOrgBillingSummary() {
     organizationSlug: row?.slug ?? null,
     subscription: row?.subscriptions?.[0] ?? null,
     entitlement: row?.entitlementSnapshots?.[0] ?? null,
+    currentMemberAccess,
     loading: result.type !== 'complete',
   }
 }

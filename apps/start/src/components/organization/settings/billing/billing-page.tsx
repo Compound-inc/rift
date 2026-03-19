@@ -9,6 +9,7 @@ import { openWorkspaceBillingPortal } from '@/lib/frontend/billing/billing.funct
 import { useOrgBillingSummary } from '@/lib/frontend/billing/use-org-billing'
 import { getWorkspacePlan } from '@/lib/shared/access-control'
 import type { WorkspacePlanId } from '@/lib/shared/access-control'
+import { m } from '@/paraglide/messages.js'
 
 function formatUnixDate(timestampMs?: number): string | null {
   if (timestampMs == null || !Number.isFinite(timestampMs)) return null
@@ -29,6 +30,59 @@ function formatBillingCycleDateRange(
   if (end) return `Through ${end}`
   if (start) return `From ${start}`
   return ''
+}
+
+/**
+ * The billing page stays intentionally minimal, so the custom seat bar only
+ * visualizes how many active members are currently covered by paid seats versus
+ * how many are beyond the purchased seat count.
+ */
+function SeatAllocationBar(props: {
+  activeMembers: number
+  seatCount: number
+}) {
+  const coveredMembers = Math.min(props.activeMembers, props.seatCount)
+  const overSeatMembers = Math.max(0, props.activeMembers - props.seatCount)
+  const coveredPercent = props.activeMembers > 0
+    ? (coveredMembers / props.activeMembers) * 100
+    : 0
+  const overSeatPercent = props.activeMembers > 0
+    ? (overSeatMembers / props.activeMembers) * 100
+    : 0
+
+  return (
+    <div className="space-y-2 rounded-xl border border-border-faint bg-surface-raised px-4 py-3">
+      <div className="flex items-center justify-between gap-3 text-sm">
+        <span className="text-foreground-secondary">
+          {m.org_billing_seat_allocation_label()}
+        </span>
+        <span className="font-medium text-content">
+          {m.org_billing_seat_allocation_value({
+            activeMembers: String(props.activeMembers),
+            seatCount: String(props.seatCount),
+          })}
+        </span>
+      </div>
+      <div className="flex h-2 overflow-hidden rounded-sm bg-surface-base-tertiary">
+        {coveredPercent > 0 ? (
+          <div className="bg-sky-500" style={{ width: `${coveredPercent}%` }} />
+        ) : null}
+        {overSeatPercent > 0 ? (
+          <div className="bg-rose-500" style={{ width: `${overSeatPercent}%` }} />
+        ) : null}
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-foreground-secondary">
+        <span>
+          {m.org_billing_seat_allocation_covered({ count: String(coveredMembers) })}
+        </span>
+        <span>
+          {overSeatMembers > 0
+            ? m.org_billing_seat_allocation_over_limit({ count: String(overSeatMembers) })
+            : m.org_billing_seat_allocation_all_covered()}
+        </span>
+      </div>
+    </div>
+  )
 }
 
 export function BillingPage() {
@@ -65,7 +119,6 @@ export function BillingPage() {
   )
   const activeMembers = entitlement?.activeMemberCount ?? 0
   const totalSeats = subscription?.seatCount ?? entitlement?.seatCount ?? 1
-  const seatUsagePercent = totalSeats > 0 ? Math.min(100, (activeMembers / totalSeats) * 100) : 0
 
   return (
     <ContentPage
@@ -75,23 +128,19 @@ export function BillingPage() {
       <Form
         title={`${plan.name} Plan`}
         description={billingCycle}
-        progressBar={
-          !loading
-            ? {
-                value: seatUsagePercent,
-                label: 'Seat usage',
-                valueLabel: `${activeMembers} of ${totalSeats} seats`,
-              }
-            : undefined
-        }
         contentSlot={
-          !loading && subscription?.scheduledPlanId ? (
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
-              Scheduled change: {subscription.scheduledPlanId}
-              {subscription.scheduledSeatCount != null
-                ? ` · ${subscription.scheduledSeatCount} seats`
-                : ''}
-              {scheduledChangeDate ? ` · effective ${scheduledChangeDate}` : ''}
+          !loading ? (
+            <div className="space-y-3">
+              <SeatAllocationBar activeMembers={activeMembers} seatCount={totalSeats} />
+              {subscription?.scheduledPlanId ? (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+                  Scheduled change: {subscription.scheduledPlanId}
+                  {subscription.scheduledSeatCount != null
+                    ? ` · ${subscription.scheduledSeatCount} seats`
+                    : ''}
+                  {scheduledChangeDate ? ` · effective ${scheduledChangeDate}` : ''}
+                </div>
+              ) : null}
             </div>
           ) : undefined
         }

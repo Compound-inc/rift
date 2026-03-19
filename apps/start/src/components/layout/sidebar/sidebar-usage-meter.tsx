@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from 'motion/react'
 import { Link } from '@tanstack/react-router'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@rift/ui/tooltip'
 import { cn } from '@rift/utils'
+import { m } from '@/paraglide/messages.js'
 import {
   OrgUsageSummaryProvider,
   useOrgUsageSummary,
@@ -67,9 +68,9 @@ function UsageRing({
 
 type UsageTooltipBarProps = {
   label: string
-  remainingLabel: string
-  resetLabel: string | null
-  resetPrefix: string
+  valueLabel: string
+  footerLabel: string
+  footerValue: string
   percent: number
   fillClassName: string
   trackClassName: string
@@ -77,9 +78,9 @@ type UsageTooltipBarProps = {
 
 function UsageTooltipBar({
   label,
-  remainingLabel,
-  resetLabel,
-  resetPrefix,
+  valueLabel,
+  footerLabel,
+  footerValue,
   percent,
   fillClassName,
   trackClassName,
@@ -88,7 +89,7 @@ function UsageTooltipBar({
     <div className="space-y-1.5">
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-white">{label}</span>
-        <span className="font-medium text-white">{remainingLabel} left</span>
+        <span className="font-medium text-white">{valueLabel}</span>
       </div>
       <div className={cn('h-1.5 overflow-hidden rounded-sm', trackClassName)}>
         <motion.div
@@ -99,8 +100,8 @@ function UsageTooltipBar({
         />
       </div>
       <div className="flex justify-between gap-3 text-white/65">
-        <span>Remaining</span>
-        <span>{resetLabel ? `${resetPrefix} ${resetLabel}` : 'Reset unavailable'}</span>
+        <span>{footerLabel}</span>
+        <span>{footerValue}</span>
       </div>
     </div>
   )
@@ -112,16 +113,42 @@ function UsageTooltipBar({
  */
 function SidebarUsageMeterContent() {
   const reducedMotion = useReducedMotion()
-  const { summary, nowMs, loading } = useOrgUsageSummary()
+  const { summary, nowMs, loading, currentMemberAccess } = useOrgUsageSummary()
   const model = buildSidebarUsageMeterModel(summary, nowMs)
-  const hasUsageData = summary != null
+  const isOverSeatRestricted =
+    currentMemberAccess?.status === 'restricted'
+    && currentMemberAccess.reasonCode === 'seat_limit_downgrade'
+  const hasUsageData = summary != null || isOverSeatRestricted
   const trackStroke = 'rgba(59, 130, 246, 0.18)'
-  const fillStroke = hasUsageData ? '#3b82f6' : 'rgba(59, 130, 246, 0.42)'
+  const fillStroke = isOverSeatRestricted
+    ? '#ef4444'
+    : hasUsageData
+      ? '#3b82f6'
+      : 'rgba(59, 130, 246, 0.42)'
+  const usagePercent = isOverSeatRestricted ? 100 : model.remainingPercent
+  const usageLabel = isOverSeatRestricted
+    ? m.org_billing_sidebar_over_seat_label()
+    : model.kind === 'free'
+      ? m.org_billing_sidebar_free_allowance_label()
+      : model.kind === 'paid'
+        ? m.org_billing_sidebar_monthly_cycle_label()
+        : m.org_billing_sidebar_generic_usage_label()
+  const usageValueLabel = isOverSeatRestricted
+    ? m.org_billing_sidebar_restricted_value()
+    : m.org_billing_sidebar_remaining_value({ value: model.remainingLabel })
+  const usageFooterLabel = isOverSeatRestricted
+    ? m.org_billing_sidebar_status_label()
+    : m.org_billing_sidebar_remaining_label()
+  const usageFooterValue = isOverSeatRestricted
+    ? m.org_billing_sidebar_over_seat_status()
+    : model.resetLabel
+      ? m.org_billing_sidebar_resets_value({ time: model.resetLabel })
+      : m.org_billing_sidebar_reset_unavailable()
   const meter = (
     <Link
       to={BILLING_HREF}
       preload="intent"
-      aria-label="Open billing usage details"
+      aria-label={m.org_billing_sidebar_open_usage_details_aria()}
       className={cn(
         'block outline-none transition-opacity duration-150 hover:opacity-90 focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-foreground-secondary/40',
         loading ? 'cursor-default' : '',
@@ -139,7 +166,7 @@ function SidebarUsageMeterContent() {
               strokeWidth={4.5}
               trackStroke={trackStroke}
               fillStroke={fillStroke}
-              percent={loading ? 0 : model.remainingPercent}
+              percent={loading ? 0 : usagePercent}
               reducedMotion={Boolean(reducedMotion)}
               minVisiblePercent={10}
             />
@@ -161,17 +188,22 @@ function SidebarUsageMeterContent() {
         className="min-w-56 rounded-lg px-3 py-3 text-xs"
       >
         <div className="space-y-3">
-          <div className="font-medium text-sm text-white">Usage</div>
+          <div className="font-medium text-sm text-white">{m.org_billing_sidebar_title()}</div>
           <div className="space-y-3 text-white/80">
             <UsageTooltipBar
-              label={model.label}
-              remainingLabel={model.remainingLabel}
-              resetLabel={model.resetLabel}
-              resetPrefix="Resets"
-              percent={model.remainingPercent}
-              fillClassName="bg-[#3b82f6]"
-              trackClassName="bg-[#3b82f6]/20"
+              label={usageLabel}
+              valueLabel={usageValueLabel}
+              footerLabel={usageFooterLabel}
+              footerValue={usageFooterValue}
+              percent={usagePercent}
+              fillClassName={isOverSeatRestricted ? 'bg-rose-500' : 'bg-[#3b82f6]'}
+              trackClassName={isOverSeatRestricted ? 'bg-rose-500/20' : 'bg-[#3b82f6]/20'}
             />
+            {isOverSeatRestricted ? (
+              <p className="text-white/65">
+                {m.org_billing_sidebar_over_seat_description()}
+              </p>
+            ) : null}
           </div>
         </div>
       </TooltipContent>

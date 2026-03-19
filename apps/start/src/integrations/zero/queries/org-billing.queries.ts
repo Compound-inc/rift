@@ -31,6 +31,12 @@ export const orgBillingQueryDefinitions = {
         .related('entitlementSnapshots', (snapshots) =>
           snapshots.orderBy('computedAt', 'desc').limit(1),
         )
+        .related('members', (members) =>
+          members
+            .where('userId', scoped.userID)
+            .limit(1)
+            .related('access'),
+        )
         .one()
     }),
     currentUsageSummary: defineQuery(emptyArgs, ({ ctx }) => {
@@ -45,6 +51,12 @@ export const orgBillingQueryDefinitions = {
         .whereExists('members', isOrgMember(scoped.userID))
         .related('entitlementSnapshots', (snapshots) =>
           snapshots.orderBy('computedAt', 'desc').limit(1),
+        )
+        .related('members', (members) =>
+          members
+            .where('userId', scoped.userID)
+            .limit(1)
+            .related('access'),
         )
         .related('usageSummaries', (usageSummaries) =>
           usageSummaries

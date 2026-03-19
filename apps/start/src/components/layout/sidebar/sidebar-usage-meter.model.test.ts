@@ -14,7 +14,7 @@ describe('buildSidebarUsageMeterModel', () => {
       Date.UTC(2026, 2, 11, 14, 0),
     )
 
-    expect(model.label).toBe('Monthly cycle')
+    expect(model.kind).toBe('paid')
     expect(model.usedPercent).toBe(25)
     expect(model.remainingPercent).toBe(75)
     expect(model.remainingLabel).toBe('75%')
@@ -24,6 +24,7 @@ describe('buildSidebarUsageMeterModel', () => {
   it('defaults to an empty state without a summary', () => {
     const model = buildSidebarUsageMeterModel(null)
 
+    expect(model.kind).toBe('empty')
     expect(model.usedPercent).toBe(0)
     expect(model.remainingPercent).toBe(100)
     expect(model.remainingLabel).toBe('100%')
@@ -41,7 +42,7 @@ describe('buildSidebarUsageMeterModel', () => {
       Date.UTC(2026, 2, 11, 14, 30),
     )
 
-    expect(model.label).toBe('Free allowance')
+    expect(model.kind).toBe('free')
     expect(model.remainingLabel).toBe('80%')
     expect(model.resetLabel).toBe('30m')
   })
