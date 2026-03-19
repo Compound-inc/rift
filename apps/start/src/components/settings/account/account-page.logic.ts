@@ -28,6 +28,8 @@ export type AccountPageLogicResult = {
   avatarMessage: string | null
   nameMessage: string | null
   emailMessage: string | null
+  logoutMessage: string | null
+  isLoggingOut: boolean
   canEdit: boolean
   initials: string
   setNameInput: (nextName: string) => void
@@ -36,6 +38,7 @@ export type AccountPageLogicResult = {
   applyLanguageSelection: (nextLanguage: SupportedLocale) => Promise<void>
   submitName: () => Promise<void>
   submitEmail: () => Promise<void>
+  submitLogout: () => Promise<void>
   resendEmailVerification: () => Promise<void>
   persistAvatar: (uploadedUrl: string) => Promise<void>
   applyAvatarChange: (uploadedUrl: string) => void
@@ -97,7 +100,7 @@ function resolveSettingsCallbackURLClient(): string {
  * Centralized logic for user account settings.
  */
 export function useAccountPageLogic(): AccountPageLogicResult {
-  const { loading, user, isAnonymous, emailVerified, refetchSession } =
+  const { loading, user, isAnonymous, emailVerified, refetchSession, signOut } =
     useAppAuth()
   const saveAvatarFn = useServerFn(saveAvatar)
   const updateProfileNameFn = useServerFn(updateProfileName)
@@ -114,6 +117,8 @@ export function useAccountPageLogic(): AccountPageLogicResult {
   const [avatarMessage, setAvatarMessage] = useState<string | null>(null)
   const [nameMessage, setNameMessage] = useState<string | null>(null)
   const [emailMessage, setEmailMessage] = useState<string | null>(null)
+  const [logoutMessage, setLogoutMessage] = useState<string | null>(null)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   const canEdit = !loading && !!user && !isAnonymous
 
@@ -319,6 +324,23 @@ export function useAccountPageLogic(): AccountPageLogicResult {
     }
   }
 
+  const submitLogout = async () => {
+    if (isLoggingOut) return
+    setLogoutMessage(null)
+    setIsLoggingOut(true)
+
+    /**
+     * Logout is delegated to the shared auth hook so every auth-dependent cache
+     * and session reader follows a single, consistent sign-out path.
+     */
+    try {
+      await signOut()
+    } catch (cause) {
+      setLogoutMessage(getErrorMessage(cause, m.settings_account_logout_error()))
+      setIsLoggingOut(false)
+    }
+  }
+
   const persistAvatar = async (uploadedUrl: string) => {
     if (!canEdit) {
       throw new Error(m.settings_account_error_sign_in_required_avatar())
@@ -355,6 +377,8 @@ export function useAccountPageLogic(): AccountPageLogicResult {
     avatarMessage,
     nameMessage,
     emailMessage,
+    logoutMessage,
+    isLoggingOut,
     canEdit,
     initials,
     setNameInput,
@@ -363,6 +387,7 @@ export function useAccountPageLogic(): AccountPageLogicResult {
     applyLanguageSelection,
     submitName,
     submitEmail,
+    submitLogout,
     resendEmailVerification,
     persistAvatar,
     applyAvatarChange,

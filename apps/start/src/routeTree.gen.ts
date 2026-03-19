@@ -30,7 +30,6 @@ import { Route as appLayoutChatRouteRouteImport } from './routes/(app)/_layout/c
 import { Route as appLayoutSettingsIndexRouteImport } from './routes/(app)/_layout/settings/index'
 import { Route as appLayoutChatIndexRouteImport } from './routes/(app)/_layout/chat/index'
 import { Route as appLayoutSettingsSecurityRouteRouteImport } from './routes/(app)/_layout/settings/security/route'
-import { Route as appLayoutSettingsDebugAuthRouteRouteImport } from './routes/(app)/_layout/settings/debug-auth/route'
 import { Route as appLayoutOrganizationSettingsRouteRouteImport } from './routes/(app)/_layout/organization/settings/route'
 import { Route as appLayoutChatThreadIdRouteRouteImport } from './routes/(app)/_layout/chat/$threadId/route'
 import { Route as appLayoutOrganizationSettingsIndexRouteImport } from './routes/(app)/_layout/organization/settings/index'
@@ -154,12 +153,6 @@ const appLayoutSettingsSecurityRouteRoute =
     path: '/security',
     getParentRoute: () => appLayoutSettingsRouteRoute,
   } as any)
-const appLayoutSettingsDebugAuthRouteRoute =
-  appLayoutSettingsDebugAuthRouteRouteImport.update({
-    id: '/debug-auth',
-    path: '/debug-auth',
-    getParentRoute: () => appLayoutSettingsRouteRoute,
-  } as any)
 const appLayoutOrganizationSettingsRouteRoute =
   appLayoutOrganizationSettingsRouteRouteImport.update({
     id: '/settings',
@@ -271,7 +264,6 @@ export interface FileRoutesByFullPath {
   '/': typeof appLayoutIndexRoute
   '/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
   '/organization/settings': typeof appLayoutOrganizationSettingsRouteRouteWithChildren
-  '/settings/debug-auth': typeof appLayoutSettingsDebugAuthRouteRoute
   '/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/chat/': typeof appLayoutChatIndexRoute
   '/settings/': typeof appLayoutSettingsIndexRoute
@@ -306,7 +298,6 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/': typeof appLayoutIndexRoute
   '/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
-  '/settings/debug-auth': typeof appLayoutSettingsDebugAuthRouteRoute
   '/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/chat': typeof appLayoutChatIndexRoute
   '/settings': typeof appLayoutSettingsIndexRoute
@@ -345,7 +336,6 @@ export interface FileRoutesById {
   '/(app)/_layout/': typeof appLayoutIndexRoute
   '/(app)/_layout/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
   '/(app)/_layout/organization/settings': typeof appLayoutOrganizationSettingsRouteRouteWithChildren
-  '/(app)/_layout/settings/debug-auth': typeof appLayoutSettingsDebugAuthRouteRoute
   '/(app)/_layout/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/(app)/_layout/chat/': typeof appLayoutChatIndexRoute
   '/(app)/_layout/settings/': typeof appLayoutSettingsIndexRoute
@@ -385,7 +375,6 @@ export interface FileRouteTypes {
     | '/'
     | '/chat/$threadId'
     | '/organization/settings'
-    | '/settings/debug-auth'
     | '/settings/security'
     | '/chat/'
     | '/settings/'
@@ -420,7 +409,6 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/'
     | '/chat/$threadId'
-    | '/settings/debug-auth'
     | '/settings/security'
     | '/chat'
     | '/settings'
@@ -458,7 +446,6 @@ export interface FileRouteTypes {
     | '/(app)/_layout/'
     | '/(app)/_layout/chat/$threadId'
     | '/(app)/_layout/organization/settings'
-    | '/(app)/_layout/settings/debug-auth'
     | '/(app)/_layout/settings/security'
     | '/(app)/_layout/chat/'
     | '/(app)/_layout/settings/'
@@ -637,13 +624,6 @@ declare module '@tanstack/react-router' {
       path: '/security'
       fullPath: '/settings/security'
       preLoaderRoute: typeof appLayoutSettingsSecurityRouteRouteImport
-      parentRoute: typeof appLayoutSettingsRouteRoute
-    }
-    '/(app)/_layout/settings/debug-auth': {
-      id: '/(app)/_layout/settings/debug-auth'
-      path: '/debug-auth'
-      fullPath: '/settings/debug-auth'
-      preLoaderRoute: typeof appLayoutSettingsDebugAuthRouteRouteImport
       parentRoute: typeof appLayoutSettingsRouteRoute
     }
     '/(app)/_layout/organization/settings': {
@@ -862,14 +842,12 @@ const appLayoutOrganizationRouteRouteWithChildren =
   )
 
 interface appLayoutSettingsRouteRouteChildren {
-  appLayoutSettingsDebugAuthRouteRoute: typeof appLayoutSettingsDebugAuthRouteRoute
   appLayoutSettingsSecurityRouteRoute: typeof appLayoutSettingsSecurityRouteRoute
   appLayoutSettingsIndexRoute: typeof appLayoutSettingsIndexRoute
 }
 
 const appLayoutSettingsRouteRouteChildren: appLayoutSettingsRouteRouteChildren =
   {
-    appLayoutSettingsDebugAuthRouteRoute: appLayoutSettingsDebugAuthRouteRoute,
     appLayoutSettingsSecurityRouteRoute: appLayoutSettingsSecurityRouteRoute,
     appLayoutSettingsIndexRoute: appLayoutSettingsIndexRoute,
   }

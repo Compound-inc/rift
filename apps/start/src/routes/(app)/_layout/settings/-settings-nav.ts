@@ -1,5 +1,5 @@
 import { isAreaPath } from '@/utils/nav-utils'
-import { Bug, Lock, Settings, User } from 'lucide-react'
+import { Lock, Settings, User } from 'lucide-react'
 import { m } from '@/paraglide/messages.js'
 
 export const SETTINGS_HREF = '/settings'
@@ -26,11 +26,6 @@ export const settingsNavArea = () => ({
           name: m.settings_security_page_title(),
           icon: Lock,
           href: `${SETTINGS_HREF}/security`,
-        },
-        {
-          name: m.debug_auth_page_title(),
-          icon: Bug,
-          href: `${SETTINGS_HREF}/debug-auth`,
         },
       ],
     },

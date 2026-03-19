@@ -24,6 +24,8 @@ export function AccountPage() {
     avatarMessage,
     nameMessage,
     emailMessage,
+    logoutMessage,
+    isLoggingOut,
     canEdit,
     initials,
     setNameInput,
@@ -32,6 +34,7 @@ export function AccountPage() {
     applyLanguageSelection,
     submitName,
     submitEmail,
+    submitLogout,
     persistAvatar,
     applyAvatarChange,
   } = useAccountPageLogic()
@@ -124,7 +127,8 @@ export function AccountPage() {
         buttonDisabled={!canEdit || email.trim().length === 0}
         handleSubmit={submitEmail}
       />
-            <Form
+
+      <Form
         title={m.settings_account_language_title()}
         description={m.settings_account_language_description()}
         error={languageError ?? undefined}
@@ -151,6 +155,22 @@ export function AccountPage() {
             </SelectContent>
           </Select>
         )}
+      />
+
+      <Form
+        title={m.settings_account_logout_title()}
+        description={m.settings_account_logout_description()}
+        error={logoutMessage ?? undefined}
+        helpText={
+          <p className="text-sm text-foreground-tertiary">
+            {m.settings_account_logout_help()}
+          </p>
+        }
+        forceActions
+        buttonText={m.settings_account_logout_button()}
+        buttonVariant="danger"
+        buttonDisabled={!canEdit || isLoggingOut}
+        handleSubmit={submitLogout}
       />
     </ContentPage>
   )
