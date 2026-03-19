@@ -122,7 +122,6 @@ const orgSubscription = table('orgSubscription')
       .from('scheduled_change_effective_at')
       .optional(),
     pendingChangeReason: string().from('pending_change_reason').optional(),
-    usagePolicyTemplateId: string().from('usage_policy_template_id').optional(),
     metadata: json<Record<string, string | number | boolean | null>>(),
     createdAt: number().from('created_at'),
     updatedAt: number().from('updated_at'),
@@ -142,8 +141,6 @@ const orgEntitlementSnapshot = table('orgEntitlementSnapshot')
     isOverSeatLimit: boolean().from('is_over_seat_limit'),
     effectiveFeatures: json<Record<string, boolean | string | number>>()
       .from('effective_features'),
-    usagePolicy: json<Record<string, string | number | boolean | null>>()
-      .from('usage_policy'),
     computedAt: number().from('computed_at'),
     version: number(),
   })
@@ -165,36 +162,20 @@ const orgMemberAccess = table('orgMemberAccess')
   })
   .primaryKey('id')
 
-const orgSeatSlot = table('orgSeatSlot')
-  .from('org_seat_slot')
+const orgUserUsageSummary = table('orgUserUsageSummary')
+  .from('org_user_usage_summary')
   .columns({
     id: string(),
     organizationId: string().from('organization_id'),
-    orgSubscriptionId: string().from('org_subscription_id').optional(),
-    planId: string().from('plan_id'),
-    cycleStartAt: number().from('cycle_start_at'),
-    cycleEndAt: number().from('cycle_end_at'),
-    seatIndex: number().from('seat_index'),
-    status: string(),
-    currentAssigneeUserId: string().from('current_assignee_user_id').optional(),
-    firstAssignedAt: number().from('first_assigned_at').optional(),
-    lastAssignedAt: number().from('last_assigned_at').optional(),
-    createdAt: number().from('created_at'),
-    updatedAt: number().from('updated_at'),
-  })
-  .primaryKey('id')
-
-const orgSeatBucketBalance = table('orgSeatBucketBalance')
-  .from('org_seat_bucket_balance')
-  .columns({
-    id: string(),
-    organizationId: string().from('organization_id'),
-    seatSlotId: string().from('seat_slot_id'),
-    bucketType: string().from('bucket_type'),
-    totalNanoUsd: number().from('total_nano_usd'),
-    remainingNanoUsd: number().from('remaining_nano_usd'),
-    currentWindowStartedAt: number().from('current_window_started_at').optional(),
-    currentWindowEndsAt: number().from('current_window_ends_at').optional(),
+    userId: string().from('user_id'),
+    kind: enumeration<'free' | 'paid'>(),
+    seatIndex: number().from('seat_index').optional(),
+    monthlyUsedPercent: number().from('monthly_used_percent'),
+    monthlyRemainingPercent: number().from('monthly_remaining_percent'),
+    monthlyResetAt: number().from('monthly_reset_at'),
+    windowUsedPercent: number().from('window_used_percent').optional(),
+    windowRemainingPercent: number().from('window_remaining_percent').optional(),
+    windowResetAt: number().from('window_reset_at').optional(),
     createdAt: number().from('created_at'),
     updatedAt: number().from('updated_at'),
   })
@@ -388,9 +369,9 @@ const organizationRelationships = relationships(organization, ({ many }) => ({
     destSchema: orgMemberAccess,
     destField: ['organizationId'],
   }),
-  seatSlots: many({
+  usageSummaries: many({
     sourceField: ['id'],
-    destSchema: orgSeatSlot,
+    destSchema: orgUserUsageSummary,
     destField: ['organizationId'],
   }),
 }))
@@ -442,24 +423,11 @@ const orgSubscriptionRelationships = relationships(orgSubscription, ({ one }) =>
   }),
 }))
 
-const orgSeatSlotRelationships = relationships(orgSeatSlot, ({ one, many }) => ({
+const orgUserUsageSummaryRelationships = relationships(orgUserUsageSummary, ({ one }) => ({
   organization: one({
     sourceField: ['organizationId'],
     destField: ['id'],
     destSchema: organization,
-  }),
-  bucketBalances: many({
-    sourceField: ['id'],
-    destField: ['seatSlotId'],
-    destSchema: orgSeatBucketBalance,
-  }),
-}))
-
-const orgSeatBucketBalanceRelationships = relationships(orgSeatBucketBalance, ({ one }) => ({
-  seatSlot: one({
-    sourceField: ['seatSlotId'],
-    destField: ['id'],
-    destSchema: orgSeatSlot,
   }),
 }))
 
@@ -486,8 +454,7 @@ export const schema = createSchema({
     orgSubscription,
     orgEntitlementSnapshot,
     orgMemberAccess,
-    orgSeatSlot,
-    orgSeatBucketBalance,
+    orgUserUsageSummary,
     thread,
     message,
     attachment,
@@ -498,8 +465,7 @@ export const schema = createSchema({
     orgAiPolicyRelationships,
     attachmentRelationships,
     orgSubscriptionRelationships,
-    orgSeatSlotRelationships,
-    orgSeatBucketBalanceRelationships,
+    orgUserUsageSummaryRelationships,
     messageRelationships,
   ],
 })

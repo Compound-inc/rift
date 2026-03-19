@@ -1,16 +1,14 @@
 'use client'
 
 import { useQuery } from '@rocicorp/zero/react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { authClient } from '@/lib/frontend/auth/auth-client'
 import { queries } from '@/integrations/zero'
 import {
   coerceWorkspacePlanId,
   getWorkspaceFeatureAccessState
-  
-  
 } from '@/lib/shared/access-control'
-import type {WorkspaceFeatureAccessState, WorkspaceFeatureId} from '@/lib/shared/access-control';
+import type { WorkspaceFeatureAccessState, WorkspaceFeatureId } from '@/lib/shared/access-control'
 
 type BillingSummaryRow = {
   id: string
@@ -38,55 +36,20 @@ type BillingSummaryRow = {
     pendingInvitationCount: number
     isOverSeatLimit: boolean
     effectiveFeatures?: Record<WorkspaceFeatureId, boolean>
-    usagePolicy?: Record<string, string | number | boolean | null>
-  }>
-  seatSlots?: Array<{
-    id: string
-    seatIndex: number
-    cycleStartAt: number
-    cycleEndAt: number
-    currentAssigneeUserId?: string
-    bucketBalances?: Array<{
-      id: string
-      bucketType: string
-      totalNanoUsd: number
-      remainingNanoUsd: number
-      currentWindowStartedAt?: number
-      currentWindowEndsAt?: number
-    }>
   }>
 }
 
-/**
- * Zero-backed billing summary for the active organization. The hook normalizes
- * the optional relational payload so pages can render predictable empty states.
- */
 export function useOrgBillingSummary() {
   const [summary, result] = useQuery(queries.orgBilling.currentSummary())
-  const normalized = useMemo(() => {
-    const row = (summary as BillingSummaryRow | undefined | null) ?? null
-    const currentSeatSlot = row?.seatSlots?.[0] ?? null
-    const seatWindowBucket = currentSeatSlot?.bucketBalances?.find(
-      (bucket) => bucket.bucketType === 'seat_window',
-    ) ?? null
-    const seatOverageBucket = currentSeatSlot?.bucketBalances?.find(
-      (bucket) => bucket.bucketType === 'seat_overage',
-    ) ?? null
-
-    return {
-      organizationId: row?.id ?? null,
-      organizationName: row?.name ?? null,
-      organizationSlug: row?.slug ?? null,
-      subscription: row?.subscriptions?.[0] ?? null,
-      entitlement: row?.entitlementSnapshots?.[0] ?? null,
-      currentSeatSlot,
-      seatWindowBucket,
-      seatOverageBucket,
-    }
-  }, [summary])
+  const row = (summary as BillingSummaryRow | undefined | null) ?? null
+  const organizationId = row?.id ?? null
 
   return {
-    ...normalized,
+    organizationId,
+    organizationName: row?.name ?? null,
+    organizationSlug: row?.slug ?? null,
+    subscription: row?.subscriptions?.[0] ?? null,
+    entitlement: row?.entitlementSnapshots?.[0] ?? null,
     loading: result.type !== 'complete',
   }
 }

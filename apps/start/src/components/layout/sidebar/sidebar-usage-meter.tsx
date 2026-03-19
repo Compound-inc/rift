@@ -4,8 +4,11 @@ import { motion, useReducedMotion } from 'motion/react'
 import { Link } from '@tanstack/react-router'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@rift/ui/tooltip'
 import { cn } from '@rift/utils'
-import { useOrgBillingSummary } from '@/lib/frontend/billing/use-org-billing'
-import { buildSidebarUsageMeterModel } from '@/lib/frontend/billing/sidebar-usage'
+import {
+  OrgUsageSummaryProvider,
+  useOrgUsageSummary,
+} from '@/lib/frontend/billing/use-org-usage'
+import { buildSidebarUsageMeterModel } from './sidebar-usage-meter.model'
 import { ORG_SETTINGS_HREF } from '@/routes/(app)/_layout/organization/settings/-organization-settings-nav'
 
 const BILLING_HREF = `${ORG_SETTINGS_HREF}/billing`
@@ -107,18 +110,11 @@ function UsageTooltipBar({
  * Compact usage meter for the icon rail. In the current single-bucket quota
  * mode, the ring represents monthly remaining budget only.
  */
-export function SidebarUsageMeter() {
+function SidebarUsageMeterContent() {
   const reducedMotion = useReducedMotion()
-  const {
-    currentSeatSlot,
-    seatOverageBucket,
-    loading,
-  } = useOrgBillingSummary()
-  const model = buildSidebarUsageMeterModel({
-    currentSeatSlot,
-    seatOverageBucket,
-  })
-  const hasUsageData = seatOverageBucket != null
+  const { summary, nowMs, loading } = useOrgUsageSummary()
+  const model = buildSidebarUsageMeterModel(summary, nowMs)
+  const hasUsageData = summary != null
   const trackStroke = 'rgba(59, 130, 246, 0.18)'
   const fillStroke = hasUsageData ? '#3b82f6' : 'rgba(59, 130, 246, 0.42)'
   const meter = (
@@ -143,7 +139,7 @@ export function SidebarUsageMeter() {
               strokeWidth={4.5}
               trackStroke={trackStroke}
               fillStroke={fillStroke}
-              percent={loading ? 0 : model.monthly.remainingPercent}
+              percent={loading ? 0 : model.remainingPercent}
               reducedMotion={Boolean(reducedMotion)}
               minVisiblePercent={10}
             />
@@ -168,11 +164,11 @@ export function SidebarUsageMeter() {
           <div className="font-medium text-sm text-white">Usage</div>
           <div className="space-y-3 text-white/80">
             <UsageTooltipBar
-              label="Monthly cycle"
-              remainingLabel={model.monthly.remainingLabel}
-              resetLabel={model.monthly.resetLabel}
+              label={model.label}
+              remainingLabel={model.remainingLabel}
+              resetLabel={model.resetLabel}
               resetPrefix="Resets"
-              percent={model.monthly.remainingPercent}
+              percent={model.remainingPercent}
               fillClassName="bg-[#3b82f6]"
               trackClassName="bg-[#3b82f6]/20"
             />
@@ -180,5 +176,13 @@ export function SidebarUsageMeter() {
         </div>
       </TooltipContent>
     </Tooltip>
+  )
+}
+
+export function SidebarUsageMeter() {
+  return (
+    <OrgUsageSummaryProvider>
+      <SidebarUsageMeterContent />
+    </OrgUsageSummaryProvider>
   )
 }

@@ -578,6 +578,25 @@ CREATE TABLE IF NOT EXISTS org_monetization_event (
 );
 CREATE INDEX IF NOT EXISTS org_monetization_event_org_status ON org_monetization_event (organization_id, status, updated_at);
 
+-- org_user_usage_summary
+CREATE TABLE IF NOT EXISTS org_user_usage_summary (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL REFERENCES organization(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('free', 'paid')),
+  seat_index INTEGER,
+  monthly_used_percent BIGINT NOT NULL,
+  monthly_remaining_percent BIGINT NOT NULL,
+  monthly_reset_at BIGINT NOT NULL,
+  window_used_percent BIGINT,
+  window_remaining_percent BIGINT,
+  window_reset_at BIGINT,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS org_user_usage_summary_org_user ON org_user_usage_summary (organization_id, user_id);
+CREATE INDEX IF NOT EXISTS org_user_usage_summary_org_updated_at ON org_user_usage_summary (organization_id, updated_at);
+
 -- chat_request_rate_limit_window
 CREATE TABLE IF NOT EXISTS chat_request_rate_limit_window (
   user_id TEXT NOT NULL,

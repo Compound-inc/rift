@@ -12,6 +12,7 @@ import {
   selectExistingReservation,
 } from './reservation-store'
 import { readBucketBalances } from './seat-store'
+import { upsertPaidOrgUserUsageSummaryRecordWithClient } from './usage-summary-store'
 
 export async function recordChatUsageRecord(input: {
   readonly organizationId?: string
@@ -126,6 +127,7 @@ export async function settleMonetizationEventRecord(input: {
 }): Promise<void> {
   const client = await authPool.connect()
   const now = Date.now()
+  let summaryTarget: { organizationId: string; userId: string } | null = null
 
   try {
     await client.query('BEGIN')
@@ -148,10 +150,19 @@ export async function settleMonetizationEventRecord(input: {
     }
 
     const reservation = monetization.reservationId
-      ? await client.query<UsageReservationRow & { allocation: unknown }>(
+      ? await client.query<
+          UsageReservationRow
+          & {
+            allocation: unknown
+            organizationId: string
+            userId: string
+          }
+        >(
           `select
              id,
              request_id as "requestId",
+             organization_id as "organizationId",
+             user_id as "userId",
              seat_slot_id as "seatSlotId",
              status,
              estimated_nano_usd as "estimatedNanoUsd",
@@ -179,6 +190,10 @@ export async function settleMonetizationEventRecord(input: {
       )
       await client.query('COMMIT')
       return
+    }
+    summaryTarget = {
+      organizationId: reservation.organizationId,
+      userId: reservation.userId,
     }
 
     const bucketRows = await readBucketBalances(client, reservation.seatSlotId)
@@ -333,6 +348,14 @@ export async function settleMonetizationEventRecord(input: {
       ],
     )
 
+    try {
+      await upsertPaidOrgUserUsageSummaryRecordWithClient({
+        client,
+        organizationId: summaryTarget.organizationId,
+        userId: summaryTarget.userId,
+        now,
+      })
+    } catch {}
     await client.query('COMMIT')
   } catch (error) {
     await client.query('ROLLBACK')

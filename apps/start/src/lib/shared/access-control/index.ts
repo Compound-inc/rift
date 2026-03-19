@@ -39,9 +39,9 @@ export type WorkspacePlan = {
   id: WorkspacePlanId
   name: string
   description: string
-  monthlyPriceUsd: number
   includedSeats: number
   features: readonly string[]
+  monthlyPriceUsd: number
   stripePriceEnvKey?: string
 }
 
@@ -60,52 +60,52 @@ export type ModelAccessState = {
 }
 
 /**
- * Workspace plans remain defined here because pricing, billing, and access
- * resolution all need a shared understanding of plan ordering.
+ * Workspace plans remain defined here because billing and access resolution
+ * need a shared understanding of plan ordering.
  */
 export const WORKSPACE_PLANS: readonly WorkspacePlan[] = [
   {
     id: 'free',
     name: 'Free',
     description: 'Core workspace access for one member.',
-    monthlyPriceUsd: 0,
     includedSeats: 1,
     features: ['Core models', 'Single-member workspace'],
+    monthlyPriceUsd: 0,
   },
   {
     id: 'plus',
     name: 'Plus',
     description: 'Expanded model access and workspace controls.',
-    monthlyPriceUsd: 8,
     includedSeats: 1,
     features: ['Expanded usage', 'BYOK', 'Workspace settings'],
+    monthlyPriceUsd: 8,
     stripePriceEnvKey: 'STRIPE_PRICE_PLUS_MONTHLY',
   },
   {
     id: 'pro',
     name: 'Pro',
     description: 'Higher-capacity workspaces with advanced controls.',
-    monthlyPriceUsd: 50,
     includedSeats: 1,
     features: ['Higher limits', 'Priority support', 'Advanced policies'],
+    monthlyPriceUsd: 50,
     stripePriceEnvKey: 'STRIPE_PRICE_PRO_MONTHLY',
   },
   {
     id: 'scale',
     name: 'Scale',
     description: 'Operational scale with advanced identity and access controls.',
-    monthlyPriceUsd: 100,
     includedSeats: 1,
     features: ['SAML SSO', 'Verified domains', 'Higher throughput'],
+    monthlyPriceUsd: 100,
     stripePriceEnvKey: 'STRIPE_PRICE_SCALE_MONTHLY',
   },
   {
     id: 'enterprise',
     name: 'Enterprise',
     description: 'Custom contracts, provisioning, and security controls.',
-    monthlyPriceUsd: 0,
     includedSeats: 1,
     features: ['Directory provisioning', 'Custom onboarding', 'Manual billing support'],
+    monthlyPriceUsd: 0,
   },
 ] as const
 

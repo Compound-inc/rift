@@ -13,7 +13,12 @@ export type FreeChatAllowanceServiceShape = {
     readonly windowMs: number
     readonly maxRequests: number
   }) => Effect.Effect<
-    { readonly allowed: true; readonly remaining: number },
+    {
+      readonly allowed: true
+      readonly remaining: number
+      readonly hits: number
+      readonly evaluatedAt: number
+    },
     QuotaExceededError | RateLimitPersistenceError
   >
 }
@@ -71,6 +76,8 @@ export class FreeChatAllowanceService extends ServiceMap.Service<
             return {
               allowed: true as const,
               remaining: maxRequests - hits,
+              hits,
+              evaluatedAt: now,
             }
           },
           catch: (error) =>
@@ -110,7 +117,12 @@ export class FreeChatAllowanceService extends ServiceMap.Service<
             windowStartMs: now,
             hits: 1,
           })
-          return { allowed: true as const, remaining: maxRequests - 1 }
+          return {
+            allowed: true as const,
+            remaining: maxRequests - 1,
+            hits: 1,
+            evaluatedAt: now,
+          }
         }
 
         if (bucket.hits >= maxRequests) {
@@ -127,7 +139,12 @@ export class FreeChatAllowanceService extends ServiceMap.Service<
 
         bucket.hits += 1
         getMemoryState().freeAllowances.set(key, bucket)
-        return { allowed: true as const, remaining: maxRequests - bucket.hits }
+        return {
+          allowed: true as const,
+          remaining: maxRequests - bucket.hits,
+          hits: bucket.hits,
+          evaluatedAt: now,
+        }
       },
     ),
   })

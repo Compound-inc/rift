@@ -47,6 +47,7 @@ import {
 } from './chat-orchestrator/failure-telemetry'
 import { normalizeStreamCommand } from './chat-orchestrator/command'
 import { buildPersistedGenerationAnalytics } from '../domain/generation-metrics'
+import { writeFreeOrgUserUsageSummaryRecord } from '@/lib/backend/billing/services/workspace-usage/usage-summary-store'
 
 /**
  * High-level chat orchestration boundary.
@@ -248,14 +249,28 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               }),
             )
           }
-          if (accessPolicy.allowance) {
-            yield* freeChatAllowance.assertAllowed({
+          const allowance = accessPolicy.allowance
+          if (allowance) {
+            const allowanceUsage = yield* freeChatAllowance.assertAllowed({
               userId,
               requestId,
-              policyKey: accessPolicy.allowance.policyKey,
-              windowMs: accessPolicy.allowance.windowMs,
-              maxRequests: accessPolicy.allowance.maxRequests,
+              policyKey: allowance.policyKey,
+              windowMs: allowance.windowMs,
+              maxRequests: allowance.maxRequests,
             })
+            if (organizationId) {
+              yield* Effect.tryPromise({
+                try: () =>
+                  writeFreeOrgUserUsageSummaryRecord({
+                    organizationId,
+                    userId,
+                    allowance,
+                    now: allowanceUsage.evaluatedAt,
+                    hits: allowanceUsage.hits,
+                  }),
+                catch: () => undefined,
+              }).pipe(Effect.catch(() => Effect.void))
+            }
           }
           const requestedDisabledToolKeys =
             disabledToolKeys ?? threadAccess.disabledToolKeys

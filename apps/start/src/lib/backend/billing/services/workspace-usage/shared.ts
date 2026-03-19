@@ -1,7 +1,7 @@
 import type { UIMessage } from 'ai'
 import { getCatalogModel } from '@/lib/shared/ai-catalog'
-import type { WorkspacePlanId } from '@/lib/shared/access-control'
 import { getWorkspacePlan } from '@/lib/shared/access-control'
+import type { WorkspacePlanId } from '@/lib/shared/access-control'
 import { estimatePromptTokens } from '@/lib/shared/chat-contracts'
 
 export const CHAT_USAGE_FEATURE_KEY = 'chat_message' as const
@@ -199,6 +199,8 @@ export function isUsagePlanEligible(planId: WorkspacePlanId): planId is Exclude<
 }
 
 export function buildDisabledUsagePolicy(planId: WorkspacePlanId): UsagePolicySnapshot {
+  const seatPriceUsd = getWorkspacePlan(planId).monthlyPriceUsd
+
   return {
     featureKey: CHAT_USAGE_FEATURE_KEY,
     enabled: false,
@@ -209,7 +211,7 @@ export function buildDisabledUsagePolicy(planId: WorkspacePlanId): UsagePolicySn
     averageSessionsPerSeatPerMonth: 0,
     reserveHeadroomRatioBps: 0,
     minReserveNanoUsd: 0,
-    seatPriceUsd: getWorkspacePlan(planId).monthlyPriceUsd,
+    seatPriceUsd,
     seatMonthlyBudgetNanoUsd: 0,
     seatOverageBudgetNanoUsd: 0,
     seatWindowBudgetNanoUsd: 0,

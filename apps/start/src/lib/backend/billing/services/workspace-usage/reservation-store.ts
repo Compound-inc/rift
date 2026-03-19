@@ -26,6 +26,7 @@ import {
   readBucketBalances,
 } from './seat-store'
 import type { QuotaReservationResult } from './types'
+import { upsertPaidOrgUserUsageSummaryRecordWithClient } from './usage-summary-store'
 
 export async function selectExistingReservation(
   client: PoolClient,
@@ -438,6 +439,14 @@ export async function reserveChatQuotaRecord(input: {
       ],
     )
 
+    try {
+      await upsertPaidOrgUserUsageSummaryRecordWithClient({
+        client,
+        organizationId: input.organizationId,
+        userId: input.userId,
+        now,
+      })
+    } catch {}
     await client.query('COMMIT')
     return {
       bypassed: false,
@@ -461,14 +470,38 @@ export async function releaseReservationRecord(input: {
 }): Promise<void> {
   const client = await authPool.connect()
   const now = Date.now()
+  let summaryTarget: { organizationId: string; userId: string } | null = null
 
   try {
     await client.query('BEGIN')
+    const summaryTargetResult = await client.query<{
+      organizationId: string
+      userId: string
+    }>(
+      `select
+         organization_id as "organizationId",
+         user_id as "userId"
+       from org_usage_reservation
+       where request_id = $1
+       limit 1`,
+      [input.requestId],
+    )
+    summaryTarget = summaryTargetResult.rows[0] ?? null
     await releaseReservationWithClient(client, {
       requestId: input.requestId,
       reasonCode: input.reasonCode,
       now,
     })
+    if (summaryTarget) {
+      try {
+        await upsertPaidOrgUserUsageSummaryRecordWithClient({
+          client,
+          organizationId: summaryTarget.organizationId,
+          userId: summaryTarget.userId,
+          now,
+        })
+      } catch {}
+    }
     await client.query('COMMIT')
   } catch (error) {
     await client.query('ROLLBACK')

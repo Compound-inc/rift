@@ -477,6 +477,28 @@ const auth = betterAuth({
             'UPDATE chat_free_allowance_window SET user_id = $1 WHERE user_id = $2',
             [toUserId, fromUserId],
           )
+          await lockClient.query(
+            `delete from org_user_usage_summary target
+             using org_user_usage_summary source
+             where target.user_id = $1
+               and source.user_id = $2
+               and target.organization_id = source.organization_id
+               and target.updated_at <= source.updated_at`,
+            [toUserId, fromUserId],
+          )
+          await lockClient.query(
+            `delete from org_user_usage_summary source
+             using org_user_usage_summary target
+             where source.user_id = $2
+               and target.user_id = $1
+               and source.organization_id = target.organization_id
+               and source.updated_at < target.updated_at`,
+            [toUserId, fromUserId],
+          )
+          await lockClient.query(
+            'UPDATE org_user_usage_summary SET user_id = $1 WHERE user_id = $2',
+            [toUserId, fromUserId],
+          )
         })
       },
     }),
