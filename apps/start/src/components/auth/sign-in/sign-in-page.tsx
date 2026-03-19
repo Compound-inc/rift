@@ -48,8 +48,11 @@ export function SignInPage({
     handleBackFromMfa,
   } = useSignInPageLogic(redirectTarget, initialMode, invitationId)
 
+  const authModeFormKey = isSignUp ? 'sign-up' : 'sign-in'
+
   return (
-    <AnimatePresence>
+    <div className="relative grid w-full place-items-center">
+      <AnimatePresence initial={false}>
         {view === 'forgot-password' ? (
           <ForgotPassword
             key="forgot-password"
@@ -61,7 +64,9 @@ export function SignInPage({
             key="email-verification"
             title={m.auth_email_verification_title()}
             description={m.auth_email_verification_description()}
-            instruction={m.auth_email_verification_instruction({ email: pendingVerificationEmail })}
+            instruction={m.auth_email_verification_instruction({
+              email: pendingVerificationEmail,
+            })}
             message={verificationMessage}
             formId="email-verification-form"
             otpSentAt={otpSentAt}
@@ -91,8 +96,8 @@ export function SignInPage({
           />
         ) : (
           <motion.div
-            key="login-form"
-            className="relative z-10 w-full max-w-md"
+            key={`login-form-${authModeFormKey}`}
+            className="col-start-1 row-start-1 relative z-10 w-full max-w-md"
             variants={menuCardContainerVariants}
             initial="hidden"
             animate="visible"
@@ -101,6 +106,7 @@ export function SignInPage({
           >
             <LoginHeader isSignUp={isSignUp} />
             <LoginForm
+              key={`auth-form-${authModeFormKey}`}
               isSignUp={isSignUp}
               onToggleMode={handleToggleMode}
               onSubmit={handleAuthSubmit}
@@ -114,6 +120,7 @@ export function SignInPage({
             <LegalLinks isSignUp={isSignUp} />
           </motion.div>
         )}
-    </AnimatePresence>
+      </AnimatePresence>
+    </div>
   )
 }
