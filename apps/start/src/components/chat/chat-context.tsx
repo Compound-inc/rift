@@ -898,7 +898,7 @@ export function ChatProvider({
   const orgEnforcedModeId = useMemo<ChatModeId | undefined>(() => {
     return orgPolicy?.enforcedModeId
   }, [orgPolicy])
-  const threadModeId = useMemo<ChatModeId | undefined>(() => {
+  const persistedThreadModeId = useMemo<ChatModeId | undefined>(() => {
     if (!threadRow || typeof threadRow !== 'object') return undefined
     const candidate =
       'modeId' in threadRow && typeof threadRow.modeId === 'string'
@@ -907,7 +907,22 @@ export function ChatProvider({
     return candidate && isChatModeId(candidate) ? candidate : undefined
   }, [threadRow])
   const isModeEnforced = Boolean(orgEnforcedModeId)
-  const effectiveModeId = orgEnforcedModeId ?? threadModeId
+  const [draftModeId, setDraftModeId] = useState<ChatModeId | undefined>(
+    undefined,
+  )
+  const [threadModeIdById, setThreadModeIdById] = useState<
+    Record<string, ChatModeId | undefined>
+  >({})
+  const threadModeId = activeThreadId
+    ? (threadModeIdById[activeThreadId] ?? persistedThreadModeId)
+    : draftModeId
+  const resolvedMode = useMemo(() => {
+    return resolveEffectiveChatMode({
+      orgEnforcedModeId,
+      threadModeId,
+    })
+  }, [orgEnforcedModeId, threadModeId])
+  const effectiveModeId = resolvedMode?.modeId
   const [selectedModelId, setSelectedModelId] = useState(
     selectableModels[0]?.id ?? '',
   )
@@ -932,6 +947,7 @@ export function ChatProvider({
   const selectedModelIdRef = useRef(selectedModelId)
   const selectedReasoningEffortRef = useRef(selectedReasoningEffort)
   const selectedContextWindowModeRef = useRef(selectedContextWindowMode)
+  const selectedModeIdRef = useRef<ChatModeId | undefined>(effectiveModeId)
   const branchVersionByThreadIdRef = useRef<Record<string, number>>({})
   const pendingAttachmentsRef = useRef<
     readonly ChatAttachmentInput[] | undefined
@@ -963,10 +979,6 @@ export function ChatProvider({
       persistedThreadContextWindowMode)
     : selectedContextWindowMode
   const visibleTools = useMemo<readonly ChatVisibleTool[]>(() => {
-    const resolvedMode = resolveEffectiveChatMode({
-      orgEnforcedModeId: orgPolicy?.enforcedModeId,
-      threadModeId,
-    })
     const toolPolicy = resolveToolPolicy({
       modelId:
         resolvedMode?.modeId === 'study'
@@ -1003,13 +1015,10 @@ export function ChatProvider({
         reasons.includes('blocked_by_external_tools_switch'),
       advanced: entry.advanced,
     }))
-  }, [orgPolicy, selectedModelId, threadModeId, threadDisabledToolKeys])
+  }, [orgPolicy, resolvedMode, selectedModelId, threadDisabledToolKeys])
   const resolvedContextWindowMode = useMemo(() => {
-    return resolveEffectiveChatMode({
-      orgEnforcedModeId: orgPolicy?.enforcedModeId,
-      threadModeId,
-    })
-  }, [orgPolicy?.enforcedModeId, threadModeId])
+    return resolvedMode
+  }, [resolvedMode])
   const effectiveContextModelId =
     resolvedContextWindowMode?.definition.fixedModelId ?? selectedModelId
   const effectiveContextCatalogModel = effectiveContextModelId
@@ -1035,6 +1044,7 @@ export function ChatProvider({
   selectedModelIdRef.current = selectedModelId
   selectedReasoningEffortRef.current = selectedReasoningEffort
   selectedContextWindowModeRef.current = effectiveSelectedContextWindowMode
+  selectedModeIdRef.current = effectiveModeId
   const disabledToolKeysRef = useRef(threadDisabledToolKeys)
   disabledToolKeysRef.current = threadDisabledToolKeys
   if (
@@ -1144,6 +1154,7 @@ export function ChatProvider({
                 requestTrigger === 'submit-message' ? attachments : undefined,
               createIfMissing: createIfMissingRef.current,
               modelId: selectedModelIdRef.current,
+              modeId: selectedModeIdRef.current,
               reasoningEffort: selectedReasoningEffortRef.current,
               contextWindowMode: selectedContextWindowModeRef.current,
               disabledToolKeys: disabledToolKeysRef.current,
@@ -1247,6 +1258,21 @@ export function ChatProvider({
         : model.defaultReasoningEffort,
     )
   }, [activeThreadId, threadRow, visibleModels])
+
+  useEffect(() => {
+    if (!activeThreadId) return
+    if (!threadRow || threadRow.threadId !== activeThreadId) return
+    setThreadModeIdById((current) => {
+      const existing = current[activeThreadId]
+      if (existing === persistedThreadModeId) {
+        return current
+      }
+      return {
+        ...current,
+        [activeThreadId]: persistedThreadModeId,
+      }
+    })
+  }, [activeThreadId, persistedThreadModeId, threadRow])
 
   useEffect(() => {
     if (!activeThreadId) return
@@ -1574,6 +1600,10 @@ export function ChatProvider({
                 ...current,
                 [newThreadId]: draftDisabledToolKeys,
               }))
+              setThreadModeIdById((current) => ({
+                ...current,
+                [newThreadId]: draftModeId,
+              }))
               setThreadContextWindowModeById((current) => ({
                 ...current,
                 [newThreadId]: selectedContextWindowModeRef.current,
@@ -1629,6 +1659,7 @@ export function ChatProvider({
         await sendAIMessageRef.current({ text })
         createIfMissingRef.current = false
         if (creatingThread) {
+          setDraftModeId(undefined)
           setDraftDisabledToolKeys([])
         }
         setLocalError(null)
@@ -1657,6 +1688,7 @@ export function ChatProvider({
       accessContext,
       activeContextWindow,
       draftDisabledToolKeys,
+      draftModeId,
       effectiveContextWindowResolution.supportsDistinctMaxMode,
       effectiveSelectedContextWindowMode,
       navigate,
@@ -2052,6 +2084,7 @@ export function ChatProvider({
   )
 
   const clear = useCallback(() => {
+    setDraftModeId(undefined)
     setDraftDisabledToolKeys([])
     setSelectedContextWindowMode(DEFAULT_CONTEXT_WINDOW_MODE)
     setMessages([])
@@ -2125,16 +2158,36 @@ export function ChatProvider({
   )
   const setModeSelection = useCallback(
     async (modeId?: ChatModeId) => {
-      if (!activeThreadId) return
       if (orgEnforcedModeId) return
-      await z.mutate(
-        mutators.threads.setMode({
-          threadId: activeThreadId,
-          modeId: modeId ?? null,
-        }),
-      ).client
+      if (!activeThreadId) {
+        setDraftModeId(modeId)
+        return
+      }
+      setThreadModeIdById((current) => ({
+        ...current,
+        [activeThreadId]: modeId,
+      }))
+      const fallbackModeId = persistedThreadModeId
+      try {
+        await z.mutate(
+          mutators.threads.setMode({
+            threadId: activeThreadId,
+            modeId: modeId ?? null,
+          }),
+        ).client
+      } catch (modeError) {
+        setThreadModeIdById((current) => ({
+          ...current,
+          [activeThreadId]: fallbackModeId,
+        }))
+        setLocalError(
+          modeError instanceof Error
+            ? modeError
+            : new Error('Failed to update thread mode'),
+        )
+      }
     },
-    [activeThreadId, orgEnforcedModeId, z],
+    [activeThreadId, orgEnforcedModeId, persistedThreadModeId, z],
   )
   const setThreadDisabledToolKeys = useCallback(
     async (nextDisabledToolKeys: readonly string[]) => {

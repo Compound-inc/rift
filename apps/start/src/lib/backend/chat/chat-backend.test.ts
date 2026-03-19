@@ -139,7 +139,7 @@ describe('chat-backend scaffold', () => {
     )
 
     expect(result.threadId).toBeTypeOf('string')
-    expect(getMemoryState().threads.has(result.threadId)).toBe(true)
+    expect(getMemoryState().threads.get(result.threadId)?.modeId).toBeUndefined()
   })
 
   it('streams and persists assistant message on finish', async () => {
@@ -215,6 +215,7 @@ describe('chat-backend scaffold', () => {
     expect(getMemoryState().threads.get(threadId)?.disabledToolKeys).toEqual([
       'openai.code_interpreter',
     ])
+    expect(getMemoryState().threads.get(threadId)?.modeId).toBeUndefined()
   })
 
   it('creates a new edited user branch and regenerates from it', async () => {

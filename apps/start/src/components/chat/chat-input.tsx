@@ -54,7 +54,6 @@ export function ChatInput() {
     setSelectedModelId,
     setSelectedReasoningEffort,
     setSelectedContextWindowMode,
-    activeThreadId,
     selectedModeId,
     isModeEnforced,
     setSelectedModeId,
@@ -189,9 +188,6 @@ export function ChatInput() {
   const modeLockedModelId = isStudyModeEnabled
     ? studyModeDefinition.fixedModelId
     : selectedModelId
-  const modeLockedModelName =
-    visibleModels.find((model) => model.id === studyModeDefinition.fixedModelId)
-      ?.name ?? m.chat_mode_study_default_model_name()
   const reasoningOptions = selectedModel?.reasoningEfforts ?? []
 
   const hasReasoningOptions = !isStudyModeEnabled && reasoningOptions.length > 0
@@ -296,8 +292,6 @@ export function ChatInput() {
         isBusy={isSendBlocked}
         isStudyModeEnabled={isStudyModeEnabled}
         isModeEnforced={isModeEnforced}
-        activeThreadId={activeThreadId ?? null}
-        modeLockedModelName={modeLockedModelName}
         setSelectedModeId={setSelectedModeId}
         visibleTools={visibleTools}
         disabledToolKeys={disabledToolKeys}
@@ -333,8 +327,6 @@ const ComposerToolbar = memo(function ComposerToolbar({
   isBusy,
   isStudyModeEnabled,
   isModeEnforced,
-  activeThreadId,
-  modeLockedModelName,
   setSelectedModeId,
   visibleTools,
   disabledToolKeys,
@@ -351,8 +343,6 @@ const ComposerToolbar = memo(function ComposerToolbar({
   isBusy: boolean
   isStudyModeEnabled: boolean
   isModeEnforced: boolean
-  activeThreadId: string | null
-  modeLockedModelName: string
   setSelectedModeId: ReturnType<typeof useChatComposer>['setSelectedModeId']
   visibleTools: ReturnType<typeof useChatComposer>['visibleTools']
   disabledToolKeys: ReturnType<typeof useChatComposer>['disabledToolKeys']
@@ -375,8 +365,6 @@ const ComposerToolbar = memo(function ComposerToolbar({
       isBusy={isBusy}
       isStudyModeEnabled={isStudyModeEnabled}
       isModeEnforced={isModeEnforced}
-      activeThreadId={activeThreadId}
-      modeLockedModelName={modeLockedModelName}
       onToggleStudyMode={() =>
         void setSelectedModeId(isStudyModeEnabled ? undefined : 'study')}
       visibleTools={visibleTools}

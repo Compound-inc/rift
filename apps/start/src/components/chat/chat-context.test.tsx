@@ -685,4 +685,5 @@ describe('ChatProvider', () => {
       },
     })
   })
+
 })

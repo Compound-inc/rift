@@ -41,6 +41,7 @@ export type ThreadServiceShape = {
     readonly requestId: string
     readonly createIfMissing?: boolean
     readonly requestedModelId?: string
+    readonly requestedModeId?: string
     readonly requestedContextWindowMode?: AiContextWindowMode
     readonly organizationId?: string
   }) => Effect.Effect<
@@ -208,6 +209,7 @@ export class ThreadService extends ServiceMap.Service<
           requestId,
           createIfMissing,
           requestedModelId,
+          requestedModeId,
           requestedContextWindowMode,
           organizationId,
         }: {
@@ -216,6 +218,7 @@ export class ThreadService extends ServiceMap.Service<
           readonly requestId: string
           readonly createIfMissing?: boolean
           readonly requestedModelId?: string
+          readonly requestedModeId?: string
           readonly requestedContextWindowMode?: AiContextWindowMode
           readonly organizationId?: string
         }) =>
@@ -246,6 +249,10 @@ export class ThreadService extends ServiceMap.Service<
                       cause: 'missing_requested_model_id',
                     })
                   }
+                  const normalizedRequestedModeId =
+                    requestedModeId && isChatModeId(requestedModeId)
+                      ? requestedModeId
+                      : undefined
 
                   try {
                     await db.transaction(async (tx) => {
@@ -263,7 +270,7 @@ export class ThreadService extends ServiceMap.Service<
                         userId,
                         model: normalizedRequestedModelId,
                         reasoningEffort: undefined,
-                        modeId: undefined,
+                        modeId: normalizedRequestedModeId,
                         contextWindowMode:
                           requestedContextWindowMode ??
                           DEFAULT_CONTEXT_WINDOW_MODE,
@@ -745,8 +752,7 @@ User message: ${trimmedMessage}`,
             updatedAt: now,
             modelId,
             modeId,
-            contextWindowMode:
-              contextWindowMode ?? DEFAULT_CONTEXT_WINDOW_MODE,
+            contextWindowMode: contextWindowMode ?? DEFAULT_CONTEXT_WINDOW_MODE,
             disabledToolKeys: [],
           })
           getMemoryState().messages.set(threadId, [])
@@ -760,6 +766,7 @@ User message: ${trimmedMessage}`,
         requestId,
         createIfMissing,
         requestedModelId,
+        requestedModeId,
         requestedContextWindowMode,
         organizationId: _organizationId,
       }: {
@@ -768,6 +775,7 @@ User message: ${trimmedMessage}`,
         readonly requestId: string
         readonly createIfMissing?: boolean
         readonly requestedModelId?: string
+        readonly requestedModeId?: string
         readonly requestedContextWindowMode?: AiContextWindowMode
         readonly organizationId?: string
       }) {
@@ -789,7 +797,10 @@ User message: ${trimmedMessage}`,
             createdAt: now,
             updatedAt: now,
             modelId: requestedModelId?.trim() || '',
-            modeId: undefined,
+            modeId:
+              requestedModeId && isChatModeId(requestedModeId)
+                ? requestedModeId
+                : undefined,
             contextWindowMode:
               requestedContextWindowMode ?? DEFAULT_CONTEXT_WINDOW_MODE,
             disabledToolKeys: [],

@@ -95,6 +95,7 @@ export type ChatOrchestratorServiceShape = {
     readonly message?: IncomingUserMessage
     readonly attachments?: readonly IncomingAttachment[]
     readonly modelId?: string
+    readonly modeId?: string
     readonly reasoningEffort?: string
     readonly contextWindowMode?: AiContextWindowMode
     readonly disabledToolKeys?: readonly string[]
@@ -148,6 +149,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
         message,
         attachments,
         modelId,
+        modeId,
         reasoningEffort,
         contextWindowMode,
         disabledToolKeys,
@@ -194,12 +196,14 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             requestId,
             createIfMissing,
             requestedModelId: modelId,
+            requestedModeId: modeId,
             requestedContextWindowMode: contextWindowMode,
             organizationId,
           })
 
           const effectiveMode = resolveEffectiveChatMode({
             orgEnforcedModeId: orgPolicy?.enforcedModeId,
+            requestModeId: modeId,
             threadModeId: threadAccess.modeId,
           })
 

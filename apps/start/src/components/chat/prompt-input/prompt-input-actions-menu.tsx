@@ -22,8 +22,6 @@ export type PromptInputActionsMenuProps = {
   onOpenFilePicker: () => void
   isStudyModeEnabled: boolean
   isModeEnforced: boolean
-  activeThreadId: string | null
-  modeLockedModelName: string
   onToggleStudyMode: () => void
   visibleTools: readonly ChatVisibleTool[]
   disabledToolKeys: readonly string[]
@@ -43,8 +41,6 @@ export function PromptInputActionsMenu({
   onOpenFilePicker,
   isStudyModeEnabled,
   isModeEnforced,
-  activeThreadId,
-  modeLockedModelName,
   onToggleStudyMode,
   visibleTools,
   disabledToolKeys,
@@ -89,16 +85,12 @@ export function PromptInputActionsMenu({
         <DropdownMenuCheckboxItem
           className="h-9 rounded-lg px-2 text-sm font-medium text-foreground-primary focus:bg-surface-inverse/8"
           checked={isStudyModeEnabled}
-          disabled={isModeEnforced || !activeThreadId}
+          disabled={isModeEnforced}
           onCheckedChange={onToggleStudyMode}
           title={
             isModeEnforced
               ? m.chat_mode_study_enforced_by_org_title()
-              : !activeThreadId
-                ? m.chat_mode_study_requires_thread_title()
-                : isStudyModeEnabled
-                  ? m.chat_mode_study_enabled_locked_title({ modelName: modeLockedModelName })
-                  : m.chat_mode_study_enable_title()
+              : m.chat_mode_study_enable_title()
           }
         >
           {m.chat_mode_study_label()}
@@ -112,7 +104,7 @@ export function PromptInputActionsMenu({
             Max
           </DropdownMenuCheckboxItem>
         ) : null}
-        {visibleTools.length > 0 ? (
+        {!isStudyModeEnabled && visibleTools.length > 0 ? (
           <>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>

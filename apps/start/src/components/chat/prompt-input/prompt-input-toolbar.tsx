@@ -73,8 +73,6 @@ export type PromptInputToolbarProps = HTMLAttributes<HTMLDivElement> & {
   isBusy: boolean
   isStudyModeEnabled: boolean
   isModeEnforced: boolean
-  activeThreadId: string | null
-  modeLockedModelName: string
   onToggleStudyMode: () => void
   visibleTools: readonly ChatVisibleTool[]
   disabledToolKeys: readonly string[]
@@ -101,8 +99,6 @@ export function PromptInputToolbar({
   isBusy,
   isStudyModeEnabled,
   isModeEnforced,
-  activeThreadId,
-  modeLockedModelName,
   onToggleStudyMode,
   visibleTools,
   disabledToolKeys,
@@ -150,8 +146,6 @@ export function PromptInputToolbar({
           onOpenFilePicker={handleOpenFilePicker}
         isStudyModeEnabled={isStudyModeEnabled}
         isModeEnforced={isModeEnforced}
-        activeThreadId={activeThreadId}
-        modeLockedModelName={modeLockedModelName}
         onToggleStudyMode={onToggleStudyMode}
         visibleTools={visibleTools}
         disabledToolKeys={disabledToolKeys}

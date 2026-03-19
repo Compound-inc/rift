@@ -13,6 +13,7 @@ export function isChatModeId(value: string): value is ChatModeId {
  */
 export function resolveEffectiveChatMode(input: {
   readonly orgEnforcedModeId?: string
+  readonly requestModeId?: string
   readonly threadModeId?: string
 }): ResolvedChatMode | undefined {
   const orgMode = normalizeModeId(input.orgEnforcedModeId)
@@ -22,6 +23,16 @@ export function resolveEffectiveChatMode(input: {
       isEnforced: true,
       source: 'org',
       definition: getChatModeDefinition(orgMode),
+    }
+  }
+
+  const requestMode = normalizeModeId(input.requestModeId)
+  if (requestMode) {
+    return {
+      modeId: requestMode,
+      isEnforced: false,
+      source: 'request',
+      definition: getChatModeDefinition(requestMode),
     }
   }
 
