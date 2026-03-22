@@ -91,10 +91,12 @@ export async function ensureOrganizationBillingBaseline(
        is_over_seat_limit,
        effective_features,
        usage_policy,
+       usage_sync_status,
+       usage_sync_error,
        computed_at,
        version
      )
-     values ($1, 'free', 'manual', 'inactive', 1, $2, $3, ($2 > 1 or ($2 + $3) > 1), '{}'::jsonb, '{}'::jsonb, $4, 1)
+     values ($1, 'free', 'manual', 'inactive', 1, $2, $3, ($2 > 1 or ($2 + $3) > 1), '{}'::jsonb, '{}'::jsonb, 'ok', null, $4, 1)
      on conflict (organization_id) do nothing`,
     [organizationId, counts.activeMemberCount, counts.pendingInvitationCount, now],
   )

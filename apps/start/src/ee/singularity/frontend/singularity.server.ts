@@ -1,5 +1,6 @@
 import { getRequestHeaders } from '@tanstack/react-start/server'
 import { Effect } from 'effect'
+import type { ManualBillingInterval } from '@/lib/backend/billing/services/workspace-billing/shared'
 import type { WorkspacePlanId } from '@/lib/shared/access-control'
 import { requireSingularityAdminAuth } from '../backend/auth/singularity-auth.server'
 import { SingularityAdminService } from '../backend/services/singularity-admin.service'
@@ -118,6 +119,12 @@ export async function setSingularityOrganizationPlanAction(input: {
   organizationId: string
   planId: WorkspacePlanId
   seatCount: number
+  billingInterval: ManualBillingInterval | null
+  monthlyUsageLimitUsd: number | null
+  overrideReason: string | null
+  internalNote: string | null
+  billingReference: string | null
+  featureOverrides: Record<string, boolean>
 }) {
   const authContext = await requireSingularityAdminAuth(getRequestHeaders())
 
@@ -129,6 +136,12 @@ export async function setSingularityOrganizationPlanAction(input: {
         actorUserId: authContext.userId,
         planId: input.planId,
         seatCount: input.seatCount,
+        billingInterval: input.billingInterval,
+        monthlyUsageLimitUsd: input.monthlyUsageLimitUsd,
+        overrideReason: input.overrideReason,
+        internalNote: input.internalNote,
+        billingReference: input.billingReference,
+        featureOverrides: input.featureOverrides,
       })
     }),
   )

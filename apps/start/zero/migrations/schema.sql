@@ -262,6 +262,8 @@ CREATE TABLE IF NOT EXISTS org_entitlement_snapshot (
   is_over_seat_limit BOOLEAN NOT NULL DEFAULT FALSE,
   effective_features JSONB NOT NULL DEFAULT '{}'::jsonb,
   usage_policy JSONB NOT NULL DEFAULT '{}'::jsonb,
+  usage_sync_status TEXT NOT NULL DEFAULT 'ok',
+  usage_sync_error TEXT,
   computed_at BIGINT NOT NULL,
   version BIGINT NOT NULL DEFAULT 1
 );
@@ -452,6 +454,7 @@ CREATE TABLE IF NOT EXISTS org_usage_policy_override (
   average_sessions_per_seat_per_month INTEGER,
   reserve_headroom_ratio_bps INTEGER,
   min_reserve_nano_usd BIGINT,
+  organization_monthly_budget_nano_usd BIGINT,
   max_reserve_nano_usd BIGINT,
   enabled BOOLEAN,
   created_at BIGINT NOT NULL,

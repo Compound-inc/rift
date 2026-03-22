@@ -3,6 +3,7 @@ export {
   readCurrentUsageSubscription,
   resolveEffectiveUsagePolicyRecord,
   syncOrganizationUsageQuotaState,
+  upsertOrganizationUsagePolicyOverrideRecord,
 } from './policy-store'
 export { ensureSeatAssignmentRecord } from './seat-assignment'
 export {

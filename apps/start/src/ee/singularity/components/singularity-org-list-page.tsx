@@ -30,7 +30,7 @@ function SortableHeader({
     <Button
       type="button"
       variant="ghost"
-      size="sm"
+      size="default"
       className="-ml-2 h-8 px-2"
       onClick={onToggle}
     >
@@ -95,19 +95,30 @@ export function SingularityOrgListPage({
         cell: ({ row }) => <Badge variant="outline">{row.original.planName}</Badge>,
       },
       {
-        accessorKey: 'memberCount',
+        accessorKey: 'subscriptionStatusLabel',
         header: ({ column }) => (
           <SortableHeader
-            label="Users"
+            label="Status"
             onToggle={() => column.toggleSorting(column.getIsSorted() === 'asc')}
           />
         ),
+        cell: ({ row }) => (
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline">{row.original.subscriptionStatusLabel}</Badge>
+            {row.original.isOverSeatLimit ? (
+              <Badge variant="destructive">Over limit</Badge>
+            ) : null}
+            {row.original.usageSyncStatus === 'degraded' ? (
+              <Badge variant="outline">Quota sync</Badge>
+            ) : null}
+          </div>
+        ),
       },
       {
-        accessorKey: 'pendingInvitationCount',
+        accessorKey: 'seatUsage',
         header: ({ column }) => (
           <SortableHeader
-            label="Pending invites"
+            label="Seats"
             onToggle={() => column.toggleSorting(column.getIsSorted() === 'asc')}
           />
         ),
@@ -140,7 +151,7 @@ export function SingularityOrgListPage({
                 }
               />
               <DropdownMenuContent align="end" sideOffset={6} className="min-w-40">
-                <DropdownMenuItem asChild>
+                <DropdownMenuItem>
                   <Link
                     className="block w-full"
                     to="/singularity/orgs/$organizationId"

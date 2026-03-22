@@ -106,6 +106,7 @@ async function readUsagePolicyOverrideRow(
        average_sessions_per_seat_per_month as "averageSessionsPerSeatPerMonth",
        reserve_headroom_ratio_bps as "reserveHeadroomRatioBps",
        min_reserve_nano_usd as "minReserveNanoUsd",
+       organization_monthly_budget_nano_usd as "organizationMonthlyBudgetNanoUsd",
        enabled
      from org_usage_policy_override
      where organization_id = $1
@@ -121,6 +122,99 @@ async function readUsagePolicyOverrideRow(
     ...row,
     seatWindowDurationMs: asOptionalNumber(row.seatWindowDurationMs) ?? undefined,
     minReserveNanoUsd: asOptionalNumber(row.minReserveNanoUsd) ?? undefined,
+    organizationMonthlyBudgetNanoUsd:
+      asOptionalNumber(row.organizationMonthlyBudgetNanoUsd) ?? undefined,
+  }
+}
+
+function hasUsagePolicyOverrideValues(
+  input: UsagePolicyOverrideRow,
+): boolean {
+  return [
+    input.seatWindowDurationMs,
+    input.targetMarginRatioBps,
+    input.monthlyOverageRatioBps,
+    input.averageSessionsPerSeatPerMonth,
+    input.reserveHeadroomRatioBps,
+    input.minReserveNanoUsd,
+    input.organizationMonthlyBudgetNanoUsd,
+    input.enabled,
+  ].some((value) => value != null)
+}
+
+export async function upsertOrganizationUsagePolicyOverrideRecord(input: {
+  readonly organizationId: string
+  readonly override: UsagePolicyOverrideRow
+  readonly now: number
+  readonly client?: PoolClient
+}): Promise<void> {
+  const run = async (client: PoolClient) => {
+    if (!hasUsagePolicyOverrideValues(input.override)) {
+      await client.query(
+        `delete from org_usage_policy_override
+         where organization_id = $1
+           and feature_key = $2`,
+        [input.organizationId, CHAT_USAGE_FEATURE_KEY],
+      )
+      return
+    }
+
+    const rowId = `org_usage_policy_override:${input.organizationId}:${CHAT_USAGE_FEATURE_KEY}`
+
+    await client.query(
+      `insert into org_usage_policy_override (
+         id,
+         organization_id,
+         feature_key,
+         seat_window_duration_ms,
+         target_margin_ratio_bps,
+         monthly_overage_ratio_bps,
+         average_sessions_per_seat_per_month,
+         reserve_headroom_ratio_bps,
+         min_reserve_nano_usd,
+         organization_monthly_budget_nano_usd,
+         enabled,
+         created_at,
+         updated_at
+       )
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)
+       on conflict (organization_id, feature_key) do update
+       set seat_window_duration_ms = excluded.seat_window_duration_ms,
+           target_margin_ratio_bps = excluded.target_margin_ratio_bps,
+           monthly_overage_ratio_bps = excluded.monthly_overage_ratio_bps,
+           average_sessions_per_seat_per_month = excluded.average_sessions_per_seat_per_month,
+           reserve_headroom_ratio_bps = excluded.reserve_headroom_ratio_bps,
+           min_reserve_nano_usd = excluded.min_reserve_nano_usd,
+           organization_monthly_budget_nano_usd = excluded.organization_monthly_budget_nano_usd,
+           enabled = excluded.enabled,
+           updated_at = excluded.updated_at`,
+      [
+        rowId,
+        input.organizationId,
+        CHAT_USAGE_FEATURE_KEY,
+        input.override.seatWindowDurationMs ?? null,
+        input.override.targetMarginRatioBps ?? null,
+        input.override.monthlyOverageRatioBps ?? null,
+        input.override.averageSessionsPerSeatPerMonth ?? null,
+        input.override.reserveHeadroomRatioBps ?? null,
+        input.override.minReserveNanoUsd ?? null,
+        input.override.organizationMonthlyBudgetNanoUsd ?? null,
+        input.override.enabled ?? null,
+        input.now,
+      ],
+    )
+  }
+
+  if (input.client) {
+    await run(input.client)
+    return
+  }
+
+  const client = await authPool.connect()
+  try {
+    await run(client)
+  } finally {
+    client.release()
   }
 }
 
@@ -164,7 +258,11 @@ export async function resolveEffectiveUsagePolicyRecord(input: {
       overrideRow,
     })
 
-    return resolveUsagePolicySnapshot(currentSubscription.planId, merged)
+    return resolveUsagePolicySnapshot(
+      currentSubscription.planId,
+      merged,
+      { seatCount: currentSubscription.seatCount },
+    )
   }
 
   if (input.client) {

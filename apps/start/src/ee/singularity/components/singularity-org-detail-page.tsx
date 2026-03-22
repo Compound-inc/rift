@@ -17,6 +17,8 @@ import { Badge } from '@rift/ui/badge'
 import { Button } from '@rift/ui/button'
 import { Input } from '@rift/ui/input'
 import { Label } from '@rift/ui/label'
+import { Switch } from '@rift/ui/switch'
+import { Textarea } from '@rift/ui/textarea'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,7 +38,11 @@ import {
   SelectValue,
 } from '@rift/ui/select'
 import { MoreVertical, UserPlus } from 'lucide-react'
-import { WORKSPACE_PLANS } from '@/lib/shared/access-control'
+import {
+  WORKSPACE_FEATURE_IDS,
+  WORKSPACE_PLANS,
+} from '@/lib/shared/access-control'
+import type { WorkspaceFeatureId } from '@/lib/shared/access-control'
 import type { SingularityOrganizationDetail } from '@/ee/singularity/shared/singularity-admin'
 import { useSingularityOrgDetailPageLogic } from './singularity-org-detail-page.logic'
 
@@ -65,8 +71,28 @@ const mediumDateFormatter = new Intl.DateTimeFormat('en-US', {
   year: 'numeric',
 })
 
+const billingIntervalLabels: Record<string, string> = {
+  month: 'Monthly',
+  year: 'Yearly',
+  custom: 'Custom',
+}
+
+const workspaceFeatureLabels: Record<WorkspaceFeatureId, string> = {
+  byok: 'BYOK',
+  providerPolicy: 'Provider policy',
+  compliancePolicy: 'Compliance policy',
+  toolPolicy: 'Tool policy',
+  verifiedDomains: 'Verified domains',
+  singleSignOn: 'Single sign-on',
+  directoryProvisioning: 'Directory provisioning',
+}
+
 function formatCurrencyAmount(amount: number): string {
   return usdCurrencyFormatter.format(Number.isFinite(amount) ? amount : 0)
+}
+
+function formatOptionalCurrencyAmount(amount: number | null): string {
+  return amount == null ? 'Plan default' : formatCurrencyAmount(amount)
 }
 
 function formatDateLabel(timestamp: number | null): string {
@@ -95,6 +121,89 @@ function formatBillingPeriodLabel(
   }
 
   return 'Not available'
+}
+
+function formatBillingIntervalLabel(interval: string | null): string {
+  if (!interval) {
+    return 'Not set'
+  }
+
+  return billingIntervalLabels[interval] ?? interval
+}
+
+function formatSingularityBillingSource(input: {
+  planId: SingularityOrganizationDetail['planId']
+  billingProvider: string
+  providerSubscriptionId: string | null
+  hasManualPlanOverride: boolean
+}): string | null {
+  if (input.planId === 'free' && !input.hasManualPlanOverride) {
+    return null
+  }
+
+  if (input.billingProvider === 'stripe' || input.providerSubscriptionId) {
+    return 'Stripe'
+  }
+
+  return 'Manual contract'
+}
+
+function formatSingularitySubscriptionStatus(
+  organization: SingularityOrganizationDetail,
+): string {
+  if (
+    organization.planId === 'free'
+    && Object.keys(organization.manualPlanOverride.featureOverrides).length === 0
+    && !organization.manualPlanOverride.overrideReason
+    && !organization.manualPlanOverride.internalNote
+    && !organization.manualPlanOverride.billingReference
+  ) {
+    return 'Free tier'
+  }
+
+  switch (organization.subscriptionStatus.toLowerCase()) {
+    case 'active':
+      return 'Active'
+    case 'trialing':
+      return 'Trialing'
+    case 'past_due':
+      return 'Past due'
+    case 'canceled':
+      return 'Canceled'
+    case 'inactive':
+      return 'Inactive'
+    default:
+      return organization.subscriptionStatus
+  }
+}
+
+function formatUsageCapLabel(
+  organization: SingularityOrganizationDetail,
+): string {
+  if (
+    organization.planId === 'free'
+    && Object.keys(organization.manualPlanOverride.featureOverrides).length === 0
+    && !organization.manualPlanOverride.overrideReason
+    && !organization.manualPlanOverride.internalNote
+    && !organization.manualPlanOverride.billingReference
+  ) {
+    return 'Free tier'
+  }
+
+  return formatOptionalCurrencyAmount(
+    organization.usagePolicy.organizationMonthlyBudgetUsd,
+  )
+}
+
+function hasManualContractState(
+  organization: SingularityOrganizationDetail,
+): boolean {
+  return (
+    Object.keys(organization.manualPlanOverride.featureOverrides).length > 0
+    || Boolean(organization.manualPlanOverride.overrideReason)
+    || Boolean(organization.manualPlanOverride.internalNote)
+    || Boolean(organization.manualPlanOverride.billingReference)
+  )
 }
 
 /**
@@ -132,41 +241,6 @@ function formatSubscriptionAge(timestamp: number | null): string {
   }
 
   return `${years}y ${remainingMonths}mo`
-}
-
-/**
- * Shared shell for the remaining sections so the page keeps one consistent
- * rhythm after invites move into the table toolbar.
- */
-function DetailSection({
-  title,
-  description,
-  children,
-  className,
-}: {
-  title: string
-  description?: string
-  children: ReactNode
-  className?: string
-}) {
-  return (
-    <section
-      className={
-        className ??
-        'overflow-hidden rounded-2xl border border-border-light bg-surface-base'
-      }
-    >
-      <div className="border-b border-border-light px-5 py-4 md:px-6">
-        <h2 className="text-base font-semibold text-foreground-strong">
-          {title}
-        </h2>
-        {description ? (
-          <p className="mt-1 text-sm text-foreground-tertiary">{description}</p>
-        ) : null}
-      </div>
-      <div className="px-5 py-5 md:px-6">{children}</div>
-    </section>
-  )
 }
 
 /**
@@ -223,10 +297,13 @@ function getStatusBadgeClassName(status: string): string {
   switch (status.toLowerCase()) {
     case 'active':
       return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+    case 'free tier':
+      return 'border-slate-500/30 bg-surface-overlay text-foreground-secondary'
     case 'pending':
       return 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400'
     case 'restricted':
     case 'revoked':
+    case 'past due':
       return 'border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-400'
     default:
       return ''
@@ -478,18 +555,41 @@ export function SingularityOrgDetailPage({
 }: {
   organization: SingularityOrganizationDetail
 }) {
+  const subscriptionStatusLabel = formatSingularitySubscriptionStatus(
+    organization,
+  )
+  const billingSourceLabel = formatSingularityBillingSource({
+    planId: organization.planId,
+    billingProvider: organization.billingProvider,
+    providerSubscriptionId: organization.providerSubscriptionId,
+    hasManualPlanOverride: hasManualContractState(organization),
+  })
   const {
     inviteEmail,
     inviteRole,
     selectedPlan,
+    selectedBillingInterval,
     selectedSeatCount,
+    selectedUsageLimitUsd,
+    selectedOverrideReason,
+    selectedInternalNote,
+    selectedBillingReference,
+    selectedFeatureAccess,
     isSeatCountValid,
+    isUsageLimitValid,
     isPending,
     activePlanName,
     setInviteEmail,
     setInviteRole,
     setSelectedPlan,
+    setSelectedBillingInterval,
     setSelectedSeatCount,
+    setSelectedUsageLimitUsd,
+    setSelectedOverrideReason,
+    setSelectedInternalNote,
+    setSelectedBillingReference,
+    setSelectedFeatureAccess,
+    resetSelectedOverridesToPlanDefaults,
     handleInvite,
     handleRoleChange,
     handleRemoveMember,
@@ -505,7 +605,35 @@ export function SingularityOrgDetailPage({
   const parsedSeatCount = Number.parseInt(selectedSeatCount, 10)
   const hasSeatCountChanged =
     isSeatCountValid && parsedSeatCount !== organization.seatCount
-  const hasOverrideChanges = hasPlanChanged || hasSeatCountChanged
+  const hasBillingIntervalChanged =
+    (selectedBillingInterval ?? null) !== (organization.billingInterval ?? null)
+  const hasUsageLimitChanged =
+    selectedUsageLimitUsd.trim()
+    !== (
+      organization.usagePolicy.hasCustomMonthlyBudget
+      && organization.usagePolicy.organizationMonthlyBudgetUsd != null
+        ? String(organization.usagePolicy.organizationMonthlyBudgetUsd)
+        : ''
+    )
+  const hasOverrideReasonChanged =
+    selectedOverrideReason.trim() !== (organization.manualPlanOverride.overrideReason ?? '')
+  const hasInternalNoteChanged =
+    selectedInternalNote.trim() !== (organization.manualPlanOverride.internalNote ?? '')
+  const hasBillingReferenceChanged =
+    selectedBillingReference.trim() !== (organization.manualPlanOverride.billingReference ?? '')
+  const hasFeatureOverridesChanged = WORKSPACE_FEATURE_IDS.some(
+    (featureId) =>
+      selectedFeatureAccess[featureId] !== organization.effectiveFeatures[featureId],
+  )
+  const hasOverrideChanges =
+    hasPlanChanged
+    || hasSeatCountChanged
+    || hasBillingIntervalChanged
+    || hasUsageLimitChanged
+    || hasOverrideReasonChanged
+    || hasInternalNoteChanged
+    || hasBillingReferenceChanged
+    || hasFeatureOverridesChanged
 
   const directoryColumns = useMemo<Array<DataTableColumnDef<DirectoryRow>>>(
     () => [
@@ -678,10 +806,10 @@ export function SingularityOrgDetailPage({
                   <Badge
                     variant="outline"
                     className={getStatusBadgeClassName(
-                      organization.subscriptionStatus,
+                      subscriptionStatusLabel,
                     )}
                   >
-                    {organization.subscriptionStatus}
+                    {subscriptionStatusLabel}
                   </Badge>
                 </div>
               </div>
@@ -702,8 +830,25 @@ export function SingularityOrgDetailPage({
                     : organization.pendingInvitationCount
                 }
               />
-              <SummaryMetric label="Seats" value={organization.seatCount} />
+              <SummaryMetric
+                label="Seats"
+                value={`${organization.memberCount}/${organization.seatCount}`}
+              />
               <SummaryMetric label="Plan" value={activePlanName} />
+              <SummaryMetric
+                label="Billing"
+                value={
+                  billingSourceLabel == null
+                    ? 'Free tier'
+                    : `${billingSourceLabel} · ${formatBillingIntervalLabel(
+                        organization.billingInterval,
+                      )}`
+                }
+              />
+              <SummaryMetric
+                label="Usage cap"
+                value={formatUsageCapLabel(organization)}
+              />
               <SummaryMetric
                 label="AI spend this month"
                 value={formatCurrencyAmount(organization.aiSpendThisMonth)}
@@ -718,6 +863,10 @@ export function SingularityOrgDetailPage({
                   organization.billingPeriodStart,
                   organization.billingPeriodEnd,
                 )}
+              />
+              <SummaryMetric
+                label="Subscription source"
+                value={billingSourceLabel ?? 'Not applicable'}
               />
               <SummaryMetric
                 label="Subscribed since"
@@ -781,9 +930,32 @@ export function SingularityOrgDetailPage({
           <aside className="space-y-5">
             <LayeredSideCard
               title="Plan Override"
-              description="Set a manual plan and seat allocation for support and account recovery workflows."
+              description="Configure manual subscriptions, usage caps, and feature access for workspaces billed outside Stripe."
             >
               <div className="space-y-5">
+                <div className="grid gap-3 rounded-xl border border-border-light/70 bg-surface-overlay/60 p-4">
+                  <SummaryMetric
+                    label="Current source"
+                    value={billingSourceLabel ?? 'Not applicable'}
+                  />
+                  <SummaryMetric
+                    label="Current cap"
+                    value={formatUsageCapLabel(organization)}
+                  />
+                  <SummaryMetric
+                    label="Quota sync"
+                    value={
+                      organization.usagePolicy.syncStatus === 'degraded'
+                        ? 'Needs attention'
+                        : 'Healthy'
+                    }
+                  />
+                  <SummaryMetric
+                    label="Override notes"
+                    value={organization.manualPlanOverride.overrideReason ?? 'None'}
+                  />
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="org-plan-override">Override plan</Label>
                   <Select
@@ -811,6 +983,28 @@ export function SingularityOrgDetailPage({
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="org-billing-interval">Billing interval</Label>
+                  <Select
+                    value={selectedBillingInterval ?? 'custom'}
+                    onValueChange={(value) => setSelectedBillingInterval(value)}
+                  >
+                    <SelectTrigger
+                      id="org-billing-interval"
+                      className="w-full bg-surface-overlay"
+                      aria-label="Select billing interval"
+                      disabled={isPending}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent align="start" alignItemWithTrigger={false}>
+                      <SelectItem value="month">Monthly</SelectItem>
+                      <SelectItem value="year">Yearly</SelectItem>
+                      <SelectItem value="custom">Custom</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="org-seat-override">Override seats</Label>
                   <Input
                     id="org-seat-override"
@@ -826,12 +1020,141 @@ export function SingularityOrgDetailPage({
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="org-usage-limit-override">
+                    Monthly usage cap (USD)
+                  </Label>
+                  <Input
+                    id="org-usage-limit-override"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    inputMode="decimal"
+                    value={selectedUsageLimitUsd}
+                    onChange={(event) =>
+                      setSelectedUsageLimitUsd(event.target.value)
+                    }
+                    disabled={isPending}
+                  />
+                  <p className="text-xs text-foreground-tertiary">
+                    Leave empty to use the plan-derived default. Current effective
+                    cap:{' '}
+                    {formatUsageCapLabel(organization)}
+                  </p>
+                  {organization.usagePolicy.syncStatus === 'degraded'
+                    && organization.usagePolicy.syncError ? (
+                      <p className="text-xs text-amber-700 dark:text-amber-400">
+                        Quota sync is degraded: {organization.usagePolicy.syncError}
+                      </p>
+                    ) : null}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="org-billing-reference">Billing reference</Label>
+                  <Input
+                    id="org-billing-reference"
+                    value={selectedBillingReference}
+                    onChange={(event) =>
+                      setSelectedBillingReference(event.target.value)
+                    }
+                    placeholder="Contract, PO, invoice, or CRM reference"
+                    disabled={isPending}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="org-override-reason">Override reason</Label>
+                  <Input
+                    id="org-override-reason"
+                    value={selectedOverrideReason}
+                    onChange={(event) =>
+                      setSelectedOverrideReason(event.target.value)
+                    }
+                    placeholder="Why this workspace differs from default billing"
+                    disabled={isPending}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="org-internal-note">Internal note</Label>
+                  <Textarea
+                    id="org-internal-note"
+                    value={selectedInternalNote}
+                    onChange={(event) =>
+                      setSelectedInternalNote(event.target.value)
+                    }
+                    placeholder="Renewal context, support notes, or contract details"
+                    disabled={isPending}
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label>Feature access overrides</Label>
+                    <p className="text-xs text-foreground-tertiary">
+                      These switches save the effective feature set for this
+                      organization on top of the selected plan.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {WORKSPACE_FEATURE_IDS.map((featureId) => (
+                      <div
+                        key={featureId}
+                        className="flex items-center justify-between gap-4 rounded-xl border border-border-light/70 bg-surface-overlay/60 px-4 py-3"
+                      >
+                        <div className="space-y-1">
+                          <div className="text-sm font-medium text-foreground-strong">
+                            {workspaceFeatureLabels[featureId]}
+                          </div>
+                          <p className="text-xs text-foreground-tertiary">
+                            Current:{' '}
+                            {organization.effectiveFeatures[featureId]
+                              ? 'Enabled'
+                              : 'Disabled'}
+                          </p>
+                        </div>
+                        <Switch
+                          checked={selectedFeatureAccess[featureId]}
+                          onCheckedChange={(checked) =>
+                            setSelectedFeatureAccess(featureId, checked)
+                          }
+                          disabled={isPending}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {organization.manualPlanOverride.overriddenAt != null ? (
+                  <p className="text-xs text-foreground-tertiary">
+                    Last manual update on{' '}
+                    {formatDateLabel(organization.manualPlanOverride.overriddenAt)}
+                    {organization.manualPlanOverride.overriddenByUserId
+                      ? ` by ${organization.manualPlanOverride.overriddenByUserId}`
+                      : ''}
+                    .
+                  </p>
+                ) : null}
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={resetSelectedOverridesToPlanDefaults}
+                  disabled={isPending}
+                >
+                  Reset cap and features to plan defaults
+                </Button>
+
                 <Button
                   className="w-full"
                   size="large"
                   onClick={() => void handleSetPlan()}
                   disabled={
-                    isPending || !isSeatCountValid || !hasOverrideChanges
+                    isPending
+                    || !isSeatCountValid
+                    || !isUsageLimitValid
+                    || !hasOverrideChanges
                   }
                 >
                   Apply override

@@ -20,6 +20,7 @@ export type UsagePolicyTemplateRow = Partial<UsagePolicyTemplate> & {
 }
 
 export type UsagePolicyOverrideRow = Partial<UsagePolicyTemplate> & {
+  organizationMonthlyBudgetNanoUsd?: number | null
   enabled?: boolean | null
 }
 

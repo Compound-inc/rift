@@ -3,17 +3,37 @@ import { auth } from '@/lib/backend/auth/auth.server'
 import { authPool } from '@/lib/backend/auth/auth-pool'
 import { ensureOrganizationBillingBaseline } from '@/lib/backend/auth/default-organization'
 import {
-  recomputeEntitlementSnapshotRecord,
-} from '@/lib/backend/billing/services/workspace-billing/entitlement'
-import {
   readCurrentOrgSubscription,
+  readOrganizationMemberCounts,
+  upsertEntitlementSnapshot,
   upsertOrgBillingAccount,
   upsertOrgSubscription,
+  markOrgBillingAccountStatus,
+  markOrgSubscriptionCanceled,
 } from '@/lib/backend/billing/services/workspace-billing/persistence'
-import type { WorkspacePlanId } from '@/lib/shared/access-control'
+import {
+  WORKSPACE_FEATURE_IDS,
+  resolveWorkspaceEffectiveFeatures,
+} from '@/lib/shared/access-control'
+import type {
+  WorkspaceEffectiveFeatures,
+  WorkspaceFeatureId,
+  WorkspacePlanId,
+} from '@/lib/shared/access-control'
+import { nanoUsdToUsd, usdToNanoUsd } from '@/lib/backend/billing/services/workspace-usage/shared'
+import { upsertOrganizationUsagePolicyOverrideRecord } from '@/lib/backend/billing/services/workspace-usage/persistence'
+import {
+  asOptionalBoolean,
+  asOptionalNumber,
+  asRecord,
+  coerceManualSubscriptionMetadata,
+  type ManualBillingInterval,
+} from '@/lib/backend/billing/services/workspace-billing/shared'
 import type {
   SingularityOrganizationDetail,
   SingularityOrganizationListItem,
+  SingularityManualPlanOverride,
+  SingularityUsagePolicySummary,
 } from '@/ee/singularity/shared/singularity-admin'
 import {
   SingularityNotFoundError,
@@ -61,6 +81,12 @@ export type SingularityAdminServiceShape = {
     actorUserId: string
     planId: WorkspacePlanId
     seatCount: number
+    billingInterval: ManualBillingInterval | null
+    monthlyUsageLimitUsd: number | null
+    overrideReason: string | null
+    internalNote: string | null
+    billingReference: string | null
+    featureOverrides: Partial<Record<WorkspaceFeatureId, boolean>>
   }) => Effect.Effect<
     void,
     SingularityNotFoundError | SingularityPersistenceError
@@ -73,8 +99,11 @@ type OrganizationListRow = {
   slug: string
   logo: string | null
   planId: WorkspacePlanId | null
+  subscriptionStatus: string | null
+  seatCount: number | null
   memberCount: number
-  pendingInvitationCount: number
+  isOverSeatLimit: boolean | null
+  usageSyncStatus: string | null
 }
 
 type OrganizationSummaryRow = {
@@ -83,10 +112,19 @@ type OrganizationSummaryRow = {
   slug: string
   logo: string | null
   planId: WorkspacePlanId | null
+  billingProvider: string | null
+  providerSubscriptionId: string | null
+  billingInterval: ManualBillingInterval | null
   subscriptionStatus: string | null
   seatCount: number | null
   memberCount: number
   pendingInvitationCount: number
+  isOverSeatLimit: boolean | null
+  effectiveFeatures: Record<string, boolean> | null
+  usagePolicy: Record<string, unknown> | null
+  usageSyncStatus: string | null
+  usageSyncError: string | null
+  subscriptionMetadata: Record<string, unknown> | null
   aiSpendThisMonth: number | null
   aiSpendAllTime: number | null
   billingPeriodStart: number | null
@@ -113,6 +151,77 @@ type InvitationRow = {
   role: string
   status: string
   inviterId: string | null
+}
+
+function toUsagePolicySummary(
+  value: unknown,
+  syncStatusValue: unknown,
+  syncErrorValue: unknown,
+): SingularityUsagePolicySummary {
+  const usagePolicy = typeof value === 'object' && value !== null
+    ? value as Record<string, unknown>
+    : null
+  const organizationMonthlyBudgetNanoUsd = asOptionalNumber(
+    usagePolicy?.organizationMonthlyBudgetNanoUsd,
+  )
+  const seatMonthlyBudgetNanoUsd = asOptionalNumber(
+    usagePolicy?.seatMonthlyBudgetNanoUsd,
+  )
+
+  return {
+    enabled: asOptionalBoolean(usagePolicy?.enabled) ?? false,
+    hasCustomMonthlyBudget:
+      asOptionalBoolean(usagePolicy?.hasOrganizationMonthlyBudgetOverride) ?? false,
+    organizationMonthlyBudgetUsd:
+      organizationMonthlyBudgetNanoUsd == null
+        ? null
+        : nanoUsdToUsd(organizationMonthlyBudgetNanoUsd),
+    seatMonthlyBudgetUsd:
+      seatMonthlyBudgetNanoUsd == null
+        ? null
+        : nanoUsdToUsd(seatMonthlyBudgetNanoUsd),
+    syncStatus: syncStatusValue === 'degraded' ? 'degraded' : 'ok',
+    syncError: typeof syncErrorValue === 'string' ? syncErrorValue : null,
+  }
+}
+
+function toManualPlanOverride(value: unknown): SingularityManualPlanOverride {
+  const metadata = coerceManualSubscriptionMetadata(value)
+
+  return {
+    overrideReason: metadata.overrideReason ?? null,
+    internalNote: metadata.internalNote ?? null,
+    billingReference: metadata.billingReference ?? null,
+    overriddenByUserId: metadata.overriddenByUserId ?? null,
+    overriddenAt: metadata.overriddenAt ?? null,
+    featureOverrides: metadata.featureOverrides ?? {},
+  }
+}
+
+function toEffectiveFeatures(input: {
+  planId: WorkspacePlanId
+  snapshotValue: unknown
+  metadataValue: unknown
+}): WorkspaceEffectiveFeatures {
+  const snapshotValue = input.snapshotValue
+  if (typeof snapshotValue === 'object' && snapshotValue !== null) {
+    const snapshotFeatures = snapshotValue as Record<string, unknown>
+    const resolved = resolveWorkspaceEffectiveFeatures({ planId: input.planId })
+
+    for (const featureId of WORKSPACE_FEATURE_IDS) {
+      const value = snapshotFeatures[featureId]
+      if (typeof value === 'boolean') {
+        resolved[featureId] = value
+      }
+    }
+
+    return resolved
+  }
+
+  return resolveWorkspaceEffectiveFeatures({
+    planId: input.planId,
+    featureOverrides: toManualPlanOverride(input.metadataValue).featureOverrides,
+  })
 }
 
 function toPersistenceError(
@@ -146,17 +255,15 @@ export class SingularityAdminService extends ServiceMap.Service<
                o.slug,
                o.logo,
                es.plan_id as "planId",
+               es.subscription_status as "subscriptionStatus",
+               es.seat_count as "seatCount",
                (
                  select count(*)::int
                  from member m
                  where m."organizationId" = o.id
                ) as "memberCount",
-               (
-                 select count(*)::int
-                 from invitation i
-                 where i."organizationId" = o.id
-                   and i.status = 'pending'
-               ) as "pendingInvitationCount"
+               es.is_over_seat_limit as "isOverSeatLimit",
+               es.usage_sync_status as "usageSyncStatus"
              from organization o
              left join org_entitlement_snapshot es
                on es.organization_id = o.id
@@ -169,8 +276,11 @@ export class SingularityAdminService extends ServiceMap.Service<
             slug: row.slug,
             logo: row.logo,
             planId: row.planId ?? 'free',
+            subscriptionStatus: row.subscriptionStatus ?? 'inactive',
             memberCount: row.memberCount,
-            pendingInvitationCount: row.pendingInvitationCount,
+            seatCount: Math.max(1, row.seatCount ?? 1),
+            isOverSeatLimit: Boolean(row.isOverSeatLimit),
+            usageSyncStatus: row.usageSyncStatus === 'degraded' ? 'degraded' : 'ok',
           }))
         },
         catch: (cause) =>
@@ -190,6 +300,7 @@ export class SingularityAdminService extends ServiceMap.Service<
                o.slug,
                o.logo,
                es.plan_id as "planId",
+               es.billing_provider as "billingProvider",
                es.subscription_status as "subscriptionStatus",
                es.seat_count as "seatCount",
                (
@@ -203,6 +314,11 @@ export class SingularityAdminService extends ServiceMap.Service<
                  where i."organizationId" = o.id
                    and i.status = 'pending'
                ) as "pendingInvitationCount",
+               es.is_over_seat_limit as "isOverSeatLimit",
+               es.effective_features as "effectiveFeatures",
+               es.usage_policy as "usagePolicy",
+               es.usage_sync_status as "usageSyncStatus",
+               es.usage_sync_error as "usageSyncError",
                (
                  select coalesce(sum(msg.public_cost), 0)::float8
                  from threads t
@@ -224,6 +340,9 @@ export class SingularityAdminService extends ServiceMap.Service<
                    and msg.role = 'assistant'
                    and msg.public_cost is not null
                ) as "aiSpendAllTime",
+               current_subscription."providerSubscriptionId" as "providerSubscriptionId",
+               current_subscription."billingInterval" as "billingInterval",
+               current_subscription.metadata as "subscriptionMetadata",
                current_subscription.current_period_start as "billingPeriodStart",
                current_subscription.current_period_end as "billingPeriodEnd",
                (
@@ -237,8 +356,11 @@ export class SingularityAdminService extends ServiceMap.Service<
                on es.organization_id = o.id
              left join lateral (
                select
+                 org_subscription.provider_subscription_id as "providerSubscriptionId",
+                 org_subscription.billing_interval as "billingInterval",
                  org_subscription.current_period_start,
-                 org_subscription.current_period_end
+                 org_subscription.current_period_end,
+                 org_subscription.metadata
                from org_subscription
                where org_subscription.organization_id = o.id
                  and org_subscription.status in ('active', 'trialing', 'past_due')
@@ -307,10 +429,25 @@ export class SingularityAdminService extends ServiceMap.Service<
             slug: summary.slug,
             logo: summary.logo,
             planId: summary.planId ?? 'free',
+            billingProvider: summary.billingProvider ?? 'manual',
+            providerSubscriptionId: summary.providerSubscriptionId ?? null,
+            billingInterval: summary.billingInterval ?? null,
             subscriptionStatus: summary.subscriptionStatus ?? 'inactive',
             seatCount: Math.max(1, summary.seatCount ?? 1),
             memberCount: summary.memberCount,
             pendingInvitationCount: summary.pendingInvitationCount,
+            isOverSeatLimit: Boolean(summary.isOverSeatLimit),
+            effectiveFeatures: toEffectiveFeatures({
+              planId: summary.planId ?? 'free',
+              snapshotValue: summary.effectiveFeatures,
+              metadataValue: summary.subscriptionMetadata,
+            }),
+            usagePolicy: toUsagePolicySummary(
+              summary.usagePolicy,
+              summary.usageSyncStatus,
+              summary.usageSyncError,
+            ),
+            manualPlanOverride: toManualPlanOverride(summary.subscriptionMetadata),
             aiSpendThisMonth: summary.aiSpendThisMonth ?? 0,
             aiSpendAllTime: summary.aiSpendAllTime ?? 0,
             billingPeriodStart: summary.billingPeriodStart ?? null,
@@ -447,7 +584,18 @@ export class SingularityAdminService extends ServiceMap.Service<
 
     setOrganizationPlanOverride: Effect.fn(
       'SingularityAdminService.setOrganizationPlanOverride',
-    )(({ organizationId, actorUserId, planId, seatCount }) =>
+    )(({
+      organizationId,
+      actorUserId,
+      planId,
+      seatCount,
+      billingInterval,
+      monthlyUsageLimitUsd,
+      overrideReason,
+      internalNote,
+      billingReference,
+      featureOverrides,
+    }) =>
       Effect.tryPromise({
         try: async () => {
           const orgResult = await authPool.query<{ id: string }>(
@@ -467,43 +615,129 @@ export class SingularityAdminService extends ServiceMap.Service<
 
           await ensureOrganizationBillingBaseline(organizationId)
 
-          const currentSubscription = await readCurrentOrgSubscription(organizationId)
-          const normalizedSeatCount = Math.max(1, seatCount)
-          const now = Date.now()
-          const billingAccountId = `billing_${organizationId}`
-          const subscriptionId = `workspace_subscription_${organizationId}`
+          const client = await authPool.connect()
+          try {
+            await client.query('BEGIN')
 
-          await upsertOrgBillingAccount({
-            billingAccountId,
-            organizationId,
-            provider: 'manual',
-            providerCustomerId: null,
-            status: 'active',
-            now,
-          })
+            const currentSubscription = await readCurrentOrgSubscription(
+              organizationId,
+              client,
+            )
+            const counts = await readOrganizationMemberCounts(organizationId, client)
+            const normalizedSeatCount = Math.max(1, seatCount)
+            const now = Date.now()
+            const billingAccountId = `billing_${organizationId}`
+            const subscriptionId = `workspace_subscription_${organizationId}`
+            const currentMetadata = asRecord(currentSubscription?.metadata)
+            const normalizedFeatureOverrides = Object.fromEntries(
+              Object.entries(
+                resolveWorkspaceEffectiveFeatures({
+                  planId,
+                }),
+              )
+                .map(([featureId, planEnabled]) => {
+                  const featureOverride = featureOverrides[featureId as WorkspaceFeatureId]
+                  return typeof featureOverride === 'boolean' && featureOverride !== planEnabled
+                    ? [featureId, featureOverride]
+                    : null
+                })
+                .filter((entry): entry is [string, boolean] => entry != null),
+            )
+            const monthlyUsageLimitNanoUsd = monthlyUsageLimitUsd == null
+              ? null
+              : usdToNanoUsd(monthlyUsageLimitUsd)
 
-          await upsertOrgSubscription({
-            subscriptionId,
-            organizationId,
-            billingAccountId,
-            providerSubscriptionId: null,
-            planId,
-            billingInterval: currentSubscription?.billingProvider === 'manual'
-              ? 'month'
-              : null,
-            seatCount: normalizedSeatCount,
-            status: 'active',
-            periodStart: now,
-            periodEnd: currentSubscription?.currentPeriodEnd ?? null,
-            cancelAtPeriodEnd: false,
-            metadata: {
-              overrideSource: 'singularity',
-              overriddenByUserId: actorUserId,
-            },
-            now,
-          })
+            if (planId === 'free') {
+              await markOrgSubscriptionCanceled({
+                organizationId,
+                status: 'inactive',
+                cancelAtPeriodEnd: false,
+                now,
+                client,
+              })
+              await markOrgBillingAccountStatus({
+                organizationId,
+                status: 'inactive',
+                now,
+                client,
+              })
+              await upsertOrganizationUsagePolicyOverrideRecord({
+                organizationId,
+                override: {},
+                now,
+                client,
+              })
+              await upsertEntitlementSnapshot({
+                organizationId,
+                currentSubscription: null,
+                counts,
+                client,
+              })
+            } else {
+              await upsertOrgBillingAccount({
+                billingAccountId,
+                organizationId,
+                provider: 'manual',
+                providerCustomerId: null,
+                status: 'active',
+                now,
+                client,
+              })
 
-          await recomputeEntitlementSnapshotRecord(organizationId)
+              await upsertOrgSubscription({
+                subscriptionId,
+                organizationId,
+                billingAccountId,
+                providerSubscriptionId: null,
+                planId,
+                billingInterval,
+                seatCount: normalizedSeatCount,
+                status: 'active',
+                periodStart: now,
+                periodEnd: currentSubscription?.currentPeriodEnd ?? null,
+                cancelAtPeriodEnd: false,
+                metadata: {
+                  ...currentMetadata,
+                  overrideSource: 'singularity',
+                  overriddenByUserId: actorUserId,
+                  overriddenAt: now,
+                  overrideReason,
+                  internalNote,
+                  billingReference,
+                  featureOverrides: normalizedFeatureOverrides,
+                },
+                now,
+                client,
+              })
+
+              await upsertOrganizationUsagePolicyOverrideRecord({
+                organizationId,
+                override: {
+                  organizationMonthlyBudgetNanoUsd:
+                    monthlyUsageLimitNanoUsd ?? undefined,
+                },
+                now,
+                client,
+              })
+
+              await upsertEntitlementSnapshot({
+                organizationId,
+                currentSubscription: await readCurrentOrgSubscription(
+                  organizationId,
+                  client,
+                ),
+                counts,
+                client,
+              })
+            }
+
+            await client.query('COMMIT')
+          } catch (error) {
+            await client.query('ROLLBACK')
+            throw error
+          } finally {
+            client.release()
+          }
         },
         catch: (cause) =>
           cause instanceof SingularityNotFoundError

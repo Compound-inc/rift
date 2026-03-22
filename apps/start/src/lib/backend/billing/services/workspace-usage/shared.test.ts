@@ -39,9 +39,27 @@ describe('resolveUsagePolicySnapshot', () => {
 
     expect(snapshot.planId).toBe('plus')
     expect(snapshot.enabled).toBe(true)
+    expect(snapshot.organizationMonthlyBudgetNanoUsd).toBe(usdToNanoUsd(6))
+    expect(snapshot.hasOrganizationMonthlyBudgetOverride).toBe(false)
     expect(snapshot.seatMonthlyBudgetNanoUsd).toBe(usdToNanoUsd(6))
     expect(snapshot.seatOverageBudgetNanoUsd).toBe(usdToNanoUsd(6))
     expect(snapshot.seatWindowBudgetNanoUsd).toBe(0)
+  })
+
+  it('supports an explicit organization monthly budget override', () => {
+    const snapshot = resolveUsagePolicySnapshot(
+      'enterprise',
+      {
+        ...resolveDefaultUsagePolicyTemplate('enterprise'),
+        organizationMonthlyBudgetNanoUsd: usdToNanoUsd(1200),
+      },
+      { seatCount: 12 },
+    )
+
+    expect(snapshot.organizationMonthlyBudgetNanoUsd).toBe(usdToNanoUsd(1200))
+    expect(snapshot.hasOrganizationMonthlyBudgetOverride).toBe(true)
+    expect(snapshot.seatMonthlyBudgetNanoUsd).toBe(usdToNanoUsd(100))
+    expect(snapshot.seatOverageBudgetNanoUsd).toBe(usdToNanoUsd(100))
   })
 })
 

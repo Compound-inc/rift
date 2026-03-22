@@ -2,9 +2,13 @@ import Stripe from 'stripe'
 import {
   coerceWorkspacePlanId,
   getWorkspacePlanRank
-  
 } from '@/lib/shared/access-control'
-import type {StripeManagedWorkspacePlanId, WorkspacePlanId } from '@/lib/shared/access-control';
+import { WORKSPACE_FEATURE_IDS } from '@/lib/shared/access-control'
+import type {
+  StripeManagedWorkspacePlanId,
+  WorkspaceFeatureId,
+  WorkspacePlanId,
+} from '@/lib/shared/access-control'
 import {
   WorkspaceBillingConfigurationError,
   WorkspaceBillingPersistenceError,
@@ -12,6 +16,77 @@ import {
 
 export const AUTO_RESTRICTION_STATUS = 'restricted'
 export const AUTO_RESTRICTION_REASON = 'seat_limit_downgrade'
+export const MANUAL_BILLING_INTERVALS = ['month', 'year', 'custom'] as const
+
+export type ManualBillingInterval = (typeof MANUAL_BILLING_INTERVALS)[number]
+export type OrgSubscriptionBillingInterval =
+  | 'day'
+  | 'week'
+  | ManualBillingInterval
+
+export type ManualSubscriptionMetadata = {
+  overrideSource?: string
+  overriddenByUserId?: string
+  overriddenAt?: number
+  overrideReason?: string
+  internalNote?: string
+  billingReference?: string
+  featureOverrides?: Partial<Record<WorkspaceFeatureId, boolean>>
+}
+
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+export function asOptionalString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
+}
+
+export function asOptionalNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+export function asOptionalBoolean(value: unknown): boolean | null {
+  return typeof value === 'boolean' ? value : null
+}
+
+/**
+ * Callers often need a JSON-safe object shape from nullable metadata columns.
+ * Returning `{}` keeps downstream merge logic simple and avoids repeated guards.
+ */
+export function asRecord(value: unknown): Record<string, unknown> {
+  return isRecord(value) ? value : {}
+}
+
+export function coerceManualSubscriptionMetadata(
+  value: unknown,
+): ManualSubscriptionMetadata {
+  if (!isRecord(value)) {
+    return {}
+  }
+
+  const featureOverridesValue = value.featureOverrides
+  const featureOverrides: Partial<Record<WorkspaceFeatureId, boolean>> = {}
+
+  if (isRecord(featureOverridesValue)) {
+    for (const featureId of WORKSPACE_FEATURE_IDS) {
+      const override = featureOverridesValue[featureId]
+      if (typeof override === 'boolean') {
+        featureOverrides[featureId] = override
+      }
+    }
+  }
+
+  return {
+    overrideSource: asOptionalString(value.overrideSource) ?? undefined,
+    overriddenByUserId: asOptionalString(value.overriddenByUserId) ?? undefined,
+    overriddenAt: asOptionalNumber(value.overriddenAt) ?? undefined,
+    overrideReason: asOptionalString(value.overrideReason) ?? undefined,
+    internalNote: asOptionalString(value.internalNote) ?? undefined,
+    billingReference: asOptionalString(value.billingReference) ?? undefined,
+    featureOverrides,
+  }
+}
 
 export function toPersistenceError(
   message: string,

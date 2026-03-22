@@ -141,6 +141,10 @@ const orgEntitlementSnapshot = table('orgEntitlementSnapshot')
     isOverSeatLimit: boolean().from('is_over_seat_limit'),
     effectiveFeatures: json<Record<string, boolean | string | number>>()
       .from('effective_features'),
+    usagePolicy: json<Record<string, boolean | string | number>>()
+      .from('usage_policy'),
+    usageSyncStatus: string().from('usage_sync_status'),
+    usageSyncError: string().from('usage_sync_error').optional(),
     computedAt: number().from('computed_at'),
     version: number(),
   })

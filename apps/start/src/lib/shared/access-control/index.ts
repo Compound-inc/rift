@@ -16,6 +16,16 @@ export type FeatureAccessId = WorkspaceFeatureId | RuntimeFeatureAccessId
 
 export type WorkspaceEffectiveFeatures = Record<WorkspaceFeatureId, boolean>
 
+export const WORKSPACE_FEATURE_IDS: readonly WorkspaceFeatureId[] = [
+  'byok',
+  'providerPolicy',
+  'compliancePolicy',
+  'toolPolicy',
+  'verifiedDomains',
+  'singleSignOn',
+  'directoryProvisioning',
+] as const
+
 export type WorkspaceFeatureAccessState = {
   feature: WorkspaceFeatureId
   planId: WorkspacePlanId
@@ -243,6 +253,27 @@ export function getPlanEffectiveFeatures(
       getWorkspacePlanRank(planId) >= getWorkspacePlanRank(minimumPlanId),
     ]),
   ) as WorkspaceEffectiveFeatures
+}
+
+/**
+ * Manual contracts can diverge from the default plan feature matrix. We keep
+ * that merge in one shared helper so entitlement recomputation and admin UIs
+ * reason about the same final feature set.
+ */
+export function resolveWorkspaceEffectiveFeatures(input: {
+  planId: WorkspacePlanId
+  featureOverrides?: Partial<Record<WorkspaceFeatureId, boolean>>
+}): WorkspaceEffectiveFeatures {
+  const resolved = getPlanEffectiveFeatures(input.planId)
+
+  for (const featureId of WORKSPACE_FEATURE_IDS) {
+    const override = input.featureOverrides?.[featureId]
+    if (typeof override === 'boolean') {
+      resolved[featureId] = override
+    }
+  }
+
+  return resolved
 }
 
 /**

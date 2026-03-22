@@ -1,16 +1,15 @@
+import type { PoolClient } from 'pg'
 import { authPool } from '@/lib/backend/auth/auth-pool'
-import {
-  selectRestrictedMembersForSeatLimit
-  
-} from '@/lib/shared/billing/member-seat-restrictions'
-import type {SeatReconciliationMember} from '@/lib/shared/billing/member-seat-restrictions';
-import { getPlanEffectiveFeatures } from '@/lib/shared/access-control'
+import { selectRestrictedMembersForSeatLimit } from '@/lib/shared/billing/member-seat-restrictions'
+import type { SeatReconciliationMember } from '@/lib/shared/billing/member-seat-restrictions'
+import { resolveWorkspaceEffectiveFeatures } from '@/lib/shared/access-control'
 import type { StripeManagedWorkspacePlanId } from '@/lib/shared/access-control'
 import {
   resolveEffectiveUsagePolicyRecord,
   syncOrganizationUsageQuotaState,
 } from '../workspace-usage/persistence'
 import type {
+  BillingPersistenceClient,
   CurrentOrgSubscription,
   OrgMemberCounts,
   OrgSeatAvailability,
@@ -19,13 +18,20 @@ import type {
 import {
   AUTO_RESTRICTION_REASON,
   AUTO_RESTRICTION_STATUS,
+  coerceManualSubscriptionMetadata,
   normalizePlanId,
+  type OrgSubscriptionBillingInterval,
 } from './shared'
+
+function getPersistenceRunner(client?: BillingPersistenceClient) {
+  return client ?? authPool
+}
 
 export async function readOrganizationMemberCounts(
   organizationId: string,
+  client?: BillingPersistenceClient,
 ): Promise<OrgMemberCounts> {
-  const result = await authPool.query<OrgMemberCounts>(
+  const result = await getPersistenceRunner(client).query<OrgMemberCounts>(
     `select
        (select count(*)::int from member where "organizationId" = $1) as "activeMemberCount",
        (select count(*)::int from invitation where "organizationId" = $1 and status = 'pending') as "pendingInvitationCount"`,
@@ -42,8 +48,11 @@ export async function readOrganizationMemberCounts(
 
 export async function readCurrentOrgSubscription(
   organizationId: string,
+  client?: BillingPersistenceClient,
 ): Promise<CurrentOrgSubscription | null> {
-  const result = await authPool.query<CurrentOrgSubscription>(
+  const result = await getPersistenceRunner(
+    client,
+  ).query<CurrentOrgSubscription>(
     `select
        org_subscription.id as id,
        plan_id as "planId",
@@ -52,7 +61,9 @@ export async function readCurrentOrgSubscription(
        provider as "billingProvider",
        provider_subscription_id as "providerSubscriptionId",
        current_period_start as "currentPeriodStart",
-       current_period_end as "currentPeriodEnd"
+       current_period_end as "currentPeriodEnd",
+       billing_interval as "billingInterval",
+       metadata
      from org_subscription
      join org_billing_account
        on org_billing_account.id = org_subscription.billing_account_id
@@ -116,7 +127,9 @@ export async function reconcileOrgMemberAccessForSeatLimit(input: {
   seatCount: number
   sourceSubscriptionId: string | null
 }): Promise<void> {
-  const members = await readOrganizationMembersForSeatReconciliation(input.organizationId)
+  const members = await readOrganizationMembersForSeatReconciliation(
+    input.organizationId,
+  )
   const restrictedMembers = selectRestrictedMembersForSeatLimit({
     members,
     seatCount: input.seatCount,
@@ -234,29 +247,53 @@ export async function upsertEntitlementSnapshot(input: {
   organizationId: string
   currentSubscription: CurrentOrgSubscription | null
   counts: OrgMemberCounts
+  client?: PoolClient
 }): Promise<OrgSeatAvailability> {
-  const usagePolicy = await syncOrganizationUsageQuotaState({
+  const normalizedCurrentSubscription = input.currentSubscription
+    ? {
+        id: input.currentSubscription.id,
+        planId: input.currentSubscription.planId,
+        seatCount: Math.max(1, input.currentSubscription.seatCount ?? 1),
+        currentPeriodStart: input.currentSubscription.currentPeriodStart,
+        currentPeriodEnd: input.currentSubscription.currentPeriodEnd,
+      }
+    : null
+  let usagePolicy = await resolveEffectiveUsagePolicyRecord({
     organizationId: input.organizationId,
-    currentSubscription: input.currentSubscription
-      ? {
-          id: input.currentSubscription.id,
-          planId: input.currentSubscription.planId,
-          seatCount: Math.max(1, input.currentSubscription.seatCount ?? 1),
-          currentPeriodStart: input.currentSubscription.currentPeriodStart,
-          currentPeriodEnd: input.currentSubscription.currentPeriodEnd,
-        }
-      : null,
+    currentSubscription: normalizedCurrentSubscription,
+    client: input.client,
   })
+  let usageSyncStatus: 'ok' | 'degraded' = 'ok'
+  let usageSyncError: string | null = null
+
+  try {
+    usagePolicy = await syncOrganizationUsageQuotaState({
+      organizationId: input.organizationId,
+      currentSubscription: normalizedCurrentSubscription,
+      usagePolicy,
+      client: input.client,
+    })
+  } catch (error) {
+    usageSyncStatus = 'degraded'
+    usageSyncError = error instanceof Error ? error.message : String(error)
+  }
   const seatCount = Math.max(1, input.currentSubscription?.seatCount ?? 1)
   const planId = normalizePlanId(input.currentSubscription?.planId)
   const subscriptionStatus = input.currentSubscription?.status ?? 'inactive'
   const billingProvider = input.currentSubscription?.billingProvider ?? 'manual'
-  const effectiveFeatures = getPlanEffectiveFeatures(planId)
+  const manualMetadata = coerceManualSubscriptionMetadata(
+    input.currentSubscription?.metadata,
+  )
+  const effectiveFeatures = resolveWorkspaceEffectiveFeatures({
+    planId,
+    featureOverrides: manualMetadata.featureOverrides,
+  })
   const isOverSeatLimit =
-    input.counts.activeMemberCount + input.counts.pendingInvitationCount > seatCount
+    input.counts.activeMemberCount + input.counts.pendingInvitationCount >
+    seatCount
   const now = Date.now()
 
-  await authPool.query(
+  await getPersistenceRunner(input.client).query(
     `insert into org_entitlement_snapshot (
        organization_id,
        plan_id,
@@ -268,10 +305,12 @@ export async function upsertEntitlementSnapshot(input: {
        is_over_seat_limit,
        effective_features,
        usage_policy,
+       usage_sync_status,
+       usage_sync_error,
        computed_at,
        version
      )
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11, 1)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11, $12, $13, 1)
      on conflict (organization_id) do update
      set plan_id = excluded.plan_id,
          billing_provider = excluded.billing_provider,
@@ -282,6 +321,8 @@ export async function upsertEntitlementSnapshot(input: {
          is_over_seat_limit = excluded.is_over_seat_limit,
          effective_features = excluded.effective_features,
          usage_policy = excluded.usage_policy,
+         usage_sync_status = excluded.usage_sync_status,
+         usage_sync_error = excluded.usage_sync_error,
          computed_at = excluded.computed_at`,
     [
       input.organizationId,
@@ -294,6 +335,8 @@ export async function upsertEntitlementSnapshot(input: {
       isOverSeatLimit,
       JSON.stringify(effectiveFeatures),
       JSON.stringify(usagePolicy),
+      usageSyncStatus,
+      usageSyncError,
       now,
     ],
   )
@@ -301,7 +344,8 @@ export async function upsertEntitlementSnapshot(input: {
   await reconcileOrgMemberAccessForSeatLimit({
     organizationId: input.organizationId,
     seatCount,
-    sourceSubscriptionId: input.currentSubscription?.providerSubscriptionId ?? null,
+    sourceSubscriptionId:
+      input.currentSubscription?.providerSubscriptionId ?? null,
   })
 
   return {
@@ -313,6 +357,8 @@ export async function upsertEntitlementSnapshot(input: {
     isOverSeatLimit,
     effectiveFeatures,
     usagePolicy,
+    usageSyncStatus,
+    usageSyncError,
   }
 }
 
@@ -333,6 +379,8 @@ export async function readEntitlementSnapshot(
     isOverSeatLimit: boolean
     effectiveFeatures: Record<string, boolean>
     usagePolicy: Awaited<ReturnType<typeof resolveEffectiveUsagePolicyRecord>>
+    usageSyncStatus: 'ok' | 'degraded'
+    usageSyncError: string | null
   }>(
     `select
        plan_id as "planId",
@@ -342,7 +390,9 @@ export async function readEntitlementSnapshot(
        pending_invitation_count as "pendingInvitationCount",
        is_over_seat_limit as "isOverSeatLimit",
        effective_features as "effectiveFeatures",
-       usage_policy as "usagePolicy"
+       usage_policy as "usagePolicy",
+       usage_sync_status as "usageSyncStatus",
+       usage_sync_error as "usageSyncError"
      from org_entitlement_snapshot
      where organization_id = $1
      limit 1`,
@@ -361,8 +411,12 @@ export async function readEntitlementSnapshot(
     activeMemberCount: row.activeMemberCount,
     pendingInvitationCount: row.pendingInvitationCount,
     isOverSeatLimit: row.isOverSeatLimit,
-    effectiveFeatures: row.effectiveFeatures as ReturnType<typeof getPlanEffectiveFeatures>,
+    effectiveFeatures: row.effectiveFeatures as ReturnType<
+      typeof resolveWorkspaceEffectiveFeatures
+    >,
     usagePolicy: row.usagePolicy,
+    usageSyncStatus: row.usageSyncStatus,
+    usageSyncError: row.usageSyncError,
   }
 }
 
@@ -373,8 +427,9 @@ export async function upsertOrgBillingAccount(input: {
   providerCustomerId: string | null
   status: string
   now: number
+  client?: BillingPersistenceClient
 }): Promise<void> {
-  await authPool.query(
+  await getPersistenceRunner(input.client).query(
     `insert into org_billing_account (
        id,
        organization_id,
@@ -407,7 +462,7 @@ export async function upsertOrgSubscription(input: {
   billingAccountId: string
   providerSubscriptionId: string | null
   planId: string
-  billingInterval: string | null
+  billingInterval: OrgSubscriptionBillingInterval | null
   seatCount: number
   status: string
   periodStart: number | null
@@ -415,8 +470,9 @@ export async function upsertOrgSubscription(input: {
   cancelAtPeriodEnd: boolean
   metadata: Record<string, unknown>
   now: number
+  client?: BillingPersistenceClient
 }): Promise<void> {
-  await authPool.query(
+  await getPersistenceRunner(input.client).query(
     `insert into org_subscription (
        id,
        organization_id,
@@ -470,8 +526,9 @@ export async function upsertOrgSubscription(input: {
 export async function clearScheduledOrgSubscriptionChange(input: {
   organizationId: string
   now: number
+  client?: BillingPersistenceClient
 }): Promise<void> {
-  await authPool.query(
+  await getPersistenceRunner(input.client).query(
     `update org_subscription
      set scheduled_plan_id = null,
          scheduled_seat_count = null,
@@ -517,7 +574,7 @@ export async function updateSubscriptionMirror(input: {
   periodStart: number | null
   periodEnd: number | null
   cancelAtPeriodEnd: boolean
-  billingInterval: string
+  billingInterval: OrgSubscriptionBillingInterval
   stripeScheduleId: string | null
 }): Promise<void> {
   await authPool.query(
@@ -562,8 +619,9 @@ export async function markOrgSubscriptionCanceled(input: {
   status: string
   cancelAtPeriodEnd: boolean
   now: number
+  client?: BillingPersistenceClient
 }): Promise<void> {
-  await authPool.query(
+  await getPersistenceRunner(input.client).query(
     `update org_subscription
      set status = $2,
          cancel_at_period_end = $3,
@@ -577,8 +635,9 @@ export async function markOrgBillingAccountStatus(input: {
   organizationId: string
   status: string
   now: number
+  client?: BillingPersistenceClient
 }): Promise<void> {
-  await authPool.query(
+  await getPersistenceRunner(input.client).query(
     `update org_billing_account
      set status = $2,
          updated_at = $3

@@ -1,8 +1,10 @@
 import type { Subscription as BetterAuthStripeSubscription } from '@better-auth/stripe'
 import type { Effect } from 'effect'
+import type { Pool, PoolClient } from 'pg'
 import type Stripe from 'stripe'
 import { getPlanEffectiveFeatures } from '@/lib/shared/access-control'
 import type { UsagePolicySnapshot } from '../workspace-usage/shared'
+import type { OrgSubscriptionBillingInterval } from './shared'
 import type {
   WorkspaceBillingConfigurationError,
   WorkspaceBillingFeatureUnavailableError,
@@ -30,6 +32,8 @@ export type CurrentOrgSubscription = {
   providerSubscriptionId: string | null
   currentPeriodStart: number | null
   currentPeriodEnd: number | null
+  billingInterval: OrgSubscriptionBillingInterval | null
+  metadata: Record<string, unknown> | null
 }
 
 export type WorkspaceSubscriptionRow = {
@@ -43,7 +47,7 @@ export type WorkspaceSubscriptionRow = {
   periodEnd: Date | null
   cancelAtPeriodEnd: boolean | null
   seats: number | null
-  billingInterval: 'day' | 'week' | 'month' | 'year' | null
+  billingInterval: OrgSubscriptionBillingInterval | null
   stripeScheduleId: string | null
 }
 
@@ -56,7 +60,11 @@ export type OrgSeatAvailability = OrgMemberCounts & {
   isOverSeatLimit: boolean
   effectiveFeatures: EffectiveFeatures
   usagePolicy: UsagePolicySnapshot
+  usageSyncStatus: 'ok' | 'degraded'
+  usageSyncError: string | null
 }
+
+export type BillingPersistenceClient = PoolClient | Pool
 
 export type WorkspaceBillingServiceShape = {
   readonly recomputeEntitlementSnapshot: (input: {

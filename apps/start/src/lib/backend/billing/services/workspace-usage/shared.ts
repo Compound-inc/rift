@@ -24,6 +24,7 @@ export type UsagePolicyTemplate = {
   readonly averageSessionsPerSeatPerMonth: number
   readonly reserveHeadroomRatioBps: number
   readonly minReserveNanoUsd: number
+  readonly organizationMonthlyBudgetNanoUsd?: number
   readonly enabled: boolean
 }
 
@@ -38,6 +39,8 @@ export type UsagePolicySnapshot = {
   readonly reserveHeadroomRatioBps: number
   readonly minReserveNanoUsd: number
   readonly seatPriceUsd: number
+  readonly organizationMonthlyBudgetNanoUsd: number
+  readonly hasOrganizationMonthlyBudgetOverride: boolean
   readonly seatMonthlyBudgetNanoUsd: number
   readonly seatOverageBudgetNanoUsd: number
   readonly seatWindowBudgetNanoUsd: number
@@ -212,6 +215,8 @@ export function buildDisabledUsagePolicy(planId: WorkspacePlanId): UsagePolicySn
     reserveHeadroomRatioBps: 0,
     minReserveNanoUsd: 0,
     seatPriceUsd,
+    organizationMonthlyBudgetNanoUsd: 0,
+    hasOrganizationMonthlyBudgetOverride: false,
     seatMonthlyBudgetNanoUsd: 0,
     seatOverageBudgetNanoUsd: 0,
     seatWindowBudgetNanoUsd: 0,
@@ -221,18 +226,31 @@ export function buildDisabledUsagePolicy(planId: WorkspacePlanId): UsagePolicySn
 export function resolveUsagePolicySnapshot(
   planId: WorkspacePlanId,
   template: UsagePolicyTemplate,
+  input?: {
+    readonly seatCount?: number
+  },
 ): UsagePolicySnapshot {
   if (!template.enabled) {
     return buildDisabledUsagePolicy(planId)
   }
 
+  const seatCount = Math.max(1, input?.seatCount ?? 1)
   const seatPriceUsd = getWorkspacePlan(planId).monthlyPriceUsd
-  const seatMonthlyBudgetNanoUsd = Math.max(
+  const defaultSeatMonthlyBudgetNanoUsd = Math.max(
     0,
     Math.round(
       usdToNanoUsd(seatPriceUsd) * (10_000 - template.targetMarginRatioBps) / 10_000,
     ),
   )
+  const hasOrganizationMonthlyBudgetOverride =
+    typeof template.organizationMonthlyBudgetNanoUsd === 'number'
+    && Number.isFinite(template.organizationMonthlyBudgetNanoUsd)
+  const organizationMonthlyBudgetNanoUsd = hasOrganizationMonthlyBudgetOverride
+    ? Math.max(0, Math.round(template.organizationMonthlyBudgetNanoUsd ?? 0))
+    : defaultSeatMonthlyBudgetNanoUsd * seatCount
+  const seatMonthlyBudgetNanoUsd = hasOrganizationMonthlyBudgetOverride
+    ? Math.floor(organizationMonthlyBudgetNanoUsd / seatCount)
+    : defaultSeatMonthlyBudgetNanoUsd
   /**
    * Temporary single-bucket mode:
    * Route the full margin-adjusted monthly budget into overage so users see a
@@ -253,6 +271,8 @@ export function resolveUsagePolicySnapshot(
     reserveHeadroomRatioBps: template.reserveHeadroomRatioBps,
     minReserveNanoUsd: template.minReserveNanoUsd,
     seatPriceUsd,
+    organizationMonthlyBudgetNanoUsd,
+    hasOrganizationMonthlyBudgetOverride,
     seatMonthlyBudgetNanoUsd,
     seatOverageBudgetNanoUsd,
     seatWindowBudgetNanoUsd,

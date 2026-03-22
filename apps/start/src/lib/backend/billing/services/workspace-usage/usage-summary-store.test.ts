@@ -35,6 +35,8 @@ function buildUsagePolicySnapshot(
     reserveHeadroomRatioBps: 1000,
     minReserveNanoUsd: 5_000_000,
     seatPriceUsd: 8,
+    organizationMonthlyBudgetNanoUsd: usdToNanoUsd(10),
+    hasOrganizationMonthlyBudgetOverride: false,
     seatMonthlyBudgetNanoUsd: usdToNanoUsd(10),
     seatOverageBudgetNanoUsd: usdToNanoUsd(4),
     seatWindowBudgetNanoUsd: usdToNanoUsd(6),

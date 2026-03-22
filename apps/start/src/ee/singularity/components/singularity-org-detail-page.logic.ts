@@ -4,8 +4,16 @@ import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { toast } from 'sonner'
-import { getWorkspacePlan } from '@/lib/shared/access-control'
-import type { WorkspacePlanId } from '@/lib/shared/access-control'
+import type { ManualBillingInterval } from '@/lib/backend/billing/services/workspace-billing/shared'
+import {
+  getPlanEffectiveFeatures,
+  getWorkspacePlan,
+  WORKSPACE_FEATURE_IDS,
+} from '@/lib/shared/access-control'
+import type {
+  WorkspaceFeatureId,
+  WorkspacePlanId,
+} from '@/lib/shared/access-control'
 import type { SingularityOrganizationDetail } from '@/ee/singularity/shared/singularity-admin'
 import {
   cancelSingularityInvitation,
@@ -21,14 +29,31 @@ export type SingularityOrgDetailPageLogicResult = {
   inviteEmail: string
   inviteRole: SingularityRole
   selectedPlan: WorkspacePlanId
+  selectedBillingInterval: ManualBillingInterval | null
   selectedSeatCount: string
+  selectedUsageLimitUsd: string
+  selectedOverrideReason: string
+  selectedInternalNote: string
+  selectedBillingReference: string
+  selectedFeatureAccess: Record<WorkspaceFeatureId, boolean>
   isSeatCountValid: boolean
+  isUsageLimitValid: boolean
   isPending: boolean
   activePlanName: string
   setInviteEmail: (value: string) => void
   setInviteRole: (value: SingularityRole) => void
   setSelectedPlan: (value: WorkspacePlanId) => void
+  setSelectedBillingInterval: (value: ManualBillingInterval | null) => void
   setSelectedSeatCount: (value: string) => void
+  setSelectedUsageLimitUsd: (value: string) => void
+  setSelectedOverrideReason: (value: string) => void
+  setSelectedInternalNote: (value: string) => void
+  setSelectedBillingReference: (value: string) => void
+  setSelectedFeatureAccess: (
+    feature: WorkspaceFeatureId,
+    value: boolean,
+  ) => void
+  resetSelectedOverridesToPlanDefaults: () => void
   handleInvite: () => Promise<void>
   handleRoleChange: (memberId: string, role: SingularityRole) => Promise<void>
   handleRemoveMember: (memberId: string) => Promise<void>
@@ -37,7 +62,47 @@ export type SingularityOrgDetailPageLogicResult = {
 }
 
 function toErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    const maybeMessage = 'message' in error ? error.message : null
+    const maybeCause = 'cause' in error ? error.cause : null
+    if (typeof maybeMessage === 'string' && maybeMessage.trim().length > 0) {
+      if (typeof maybeCause === 'string' && maybeCause.trim().length > 0) {
+        return `${maybeMessage} ${maybeCause}`
+      }
+      return maybeMessage
+    }
+  }
+
+  return fallback
+}
+
+function normalizeOptionalText(value: string): string | null {
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+function buildFeatureAccessState(
+  organization: SingularityOrganizationDetail,
+): Record<WorkspaceFeatureId, boolean> {
+  return Object.fromEntries(
+    WORKSPACE_FEATURE_IDS.map((featureId) => [
+      featureId,
+      Boolean(organization.effectiveFeatures[featureId]),
+    ]),
+  ) as Record<WorkspaceFeatureId, boolean>
+}
+
+function buildPlanDefaultFeatureAccess(
+  planId: WorkspacePlanId,
+): Record<WorkspaceFeatureId, boolean> {
+  const defaults = getPlanEffectiveFeatures(planId)
+  return Object.fromEntries(
+    WORKSPACE_FEATURE_IDS.map((featureId) => [featureId, defaults[featureId]]),
+  ) as Record<WorkspaceFeatureId, boolean>
 }
 
 export function useSingularityOrgDetailPageLogic(
@@ -57,6 +122,9 @@ export function useSingularityOrgDetailPageLogic(
   const [selectedPlan, setSelectedPlan] = useState<WorkspacePlanId>(
     organization.planId,
   )
+  const [selectedBillingInterval, setSelectedBillingInterval] = useState<ManualBillingInterval | null>(
+    organization.billingInterval ?? 'month',
+  )
   /**
    * Keep the seat count as raw text so operators can edit naturally while we
    * still validate before submitting the override mutation.
@@ -64,6 +132,24 @@ export function useSingularityOrgDetailPageLogic(
   const [selectedSeatCount, setSelectedSeatCount] = useState<string>(
     String(organization.seatCount),
   )
+  const [selectedUsageLimitUsd, setSelectedUsageLimitUsd] = useState<string>(
+    organization.usagePolicy.hasCustomMonthlyBudget
+      && organization.usagePolicy.organizationMonthlyBudgetUsd != null
+      ? String(organization.usagePolicy.organizationMonthlyBudgetUsd)
+      : '',
+  )
+  const [selectedOverrideReason, setSelectedOverrideReason] = useState<string>(
+    organization.manualPlanOverride.overrideReason ?? '',
+  )
+  const [selectedInternalNote, setSelectedInternalNote] = useState<string>(
+    organization.manualPlanOverride.internalNote ?? '',
+  )
+  const [selectedBillingReference, setSelectedBillingReference] = useState<string>(
+    organization.manualPlanOverride.billingReference ?? '',
+  )
+  const [selectedFeatureAccessState, setSelectedFeatureAccessState] = useState<
+    Record<WorkspaceFeatureId, boolean>
+  >(() => buildFeatureAccessState(organization))
   const [isPending, startTransition] = useTransition()
 
   const activePlanName = useMemo(
@@ -75,6 +161,12 @@ export function useSingularityOrgDetailPageLogic(
     Number.isFinite(parsedSeatCount) &&
     Number.isInteger(parsedSeatCount) &&
     parsedSeatCount >= 1
+  const parsedUsageLimitUsd = selectedUsageLimitUsd.trim().length === 0
+    ? null
+    : Number(selectedUsageLimitUsd)
+  const isUsageLimitValid =
+    parsedUsageLimitUsd == null
+    || (Number.isFinite(parsedUsageLimitUsd) && parsedUsageLimitUsd >= 0)
 
   /**
    * Wrap async mutations in a transition while still returning a promise that
@@ -168,6 +260,10 @@ export function useSingularityOrgDetailPageLogic(
         toast.error('Seat count must be a whole number greater than or equal to 1.')
         return
       }
+      if (!isUsageLimitValid) {
+        toast.error('Usage limit must be empty or a number greater than or equal to 0.')
+        return
+      }
 
       try {
         await setPlanFn({
@@ -175,6 +271,12 @@ export function useSingularityOrgDetailPageLogic(
             organizationId: organization.organizationId,
             planId: selectedPlan,
             seatCount: parsedSeatCount,
+            billingInterval: selectedBillingInterval,
+            monthlyUsageLimitUsd: parsedUsageLimitUsd,
+            overrideReason: normalizeOptionalText(selectedOverrideReason),
+            internalNote: normalizeOptionalText(selectedInternalNote),
+            billingReference: normalizeOptionalText(selectedBillingReference),
+            featureOverrides: selectedFeatureAccessState,
           },
         })
         toast.success('Plan override applied.')
@@ -188,14 +290,36 @@ export function useSingularityOrgDetailPageLogic(
     inviteEmail,
     inviteRole,
     selectedPlan,
+    selectedBillingInterval,
     selectedSeatCount,
+    selectedUsageLimitUsd,
+    selectedOverrideReason,
+    selectedInternalNote,
+    selectedBillingReference,
+    selectedFeatureAccess: selectedFeatureAccessState,
     isSeatCountValid,
+    isUsageLimitValid,
     isPending,
     activePlanName,
     setInviteEmail,
     setInviteRole,
     setSelectedPlan,
+    setSelectedBillingInterval,
     setSelectedSeatCount,
+    setSelectedUsageLimitUsd,
+    setSelectedOverrideReason,
+    setSelectedInternalNote,
+    setSelectedBillingReference,
+    setSelectedFeatureAccess: (feature, value) => {
+      setSelectedFeatureAccessState((current) => ({
+        ...current,
+        [feature]: value,
+      }))
+    },
+    resetSelectedOverridesToPlanDefaults: () => {
+      setSelectedUsageLimitUsd('')
+      setSelectedFeatureAccessState(buildPlanDefaultFeatureAccess(selectedPlan))
+    },
     handleInvite,
     handleRoleChange,
     handleRemoveMember,

@@ -8,9 +8,34 @@ export type SingularityOrganizationListRow = {
   organizationId: string
   name: string
   logo: string | null
-  memberCount: number
-  pendingInvitationCount: number
   planName: string
+  subscriptionStatusLabel: string
+  seatUsage: string
+  isOverSeatLimit: boolean
+  usageSyncStatus: 'ok' | 'degraded'
+}
+
+function getSubscriptionStatusLabel(
+  organization: SingularityOrganizationListItem,
+): string {
+  if (organization.planId === 'free') {
+    return 'Free tier'
+  }
+
+  switch (organization.subscriptionStatus.toLowerCase()) {
+    case 'active':
+      return 'Active'
+    case 'trialing':
+      return 'Trialing'
+    case 'past_due':
+      return 'Past due'
+    case 'canceled':
+      return 'Canceled'
+    case 'inactive':
+      return 'Inactive'
+    default:
+      return organization.subscriptionStatus
+  }
 }
 
 export function useSingularityOrgListPageLogic(
@@ -25,9 +50,11 @@ export function useSingularityOrgListPageLogic(
         organizationId: organization.organizationId,
         name: organization.name,
         logo: organization.logo,
-        memberCount: organization.memberCount,
-        pendingInvitationCount: organization.pendingInvitationCount,
         planName: getWorkspacePlan(organization.planId).name,
+        subscriptionStatusLabel: getSubscriptionStatusLabel(organization),
+        seatUsage: `${organization.memberCount}/${organization.seatCount}`,
+        isOverSeatLimit: organization.isOverSeatLimit,
+        usageSyncStatus: organization.usageSyncStatus,
       })),
     [organizations],
   )
