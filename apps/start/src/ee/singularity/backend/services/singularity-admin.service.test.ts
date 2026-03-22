@@ -160,6 +160,7 @@ describe('SingularityAdminService', () => {
       providerSubscriptionId: null,
       currentPeriodStart: null,
       currentPeriodEnd: null,
+      billingInterval: 'month',
       metadata: null,
     })
 
@@ -251,5 +252,61 @@ describe('SingularityAdminService', () => {
         status: 'inactive',
       }),
     )
+  })
+
+  it('rejects paid manual overrides without a billing interval', async () => {
+    await expect(
+      Effect.runPromise(
+        Effect.gen(function* () {
+          const service = yield* SingularityAdminService
+          yield* service.setOrganizationPlanOverride({
+            organizationId: 'org-1',
+            actorUserId: 'user-1',
+            planId: 'enterprise',
+            seatCount: 12,
+            billingInterval: null,
+            monthlyUsageLimitUsd: 1200,
+            overrideReason: 'Annual enterprise contract',
+            internalNote: null,
+            billingReference: null,
+            featureOverrides: {},
+          })
+        }).pipe(Effect.provide(SingularityAdminService.layer)),
+      ),
+    ).rejects.toBeInstanceOf(SingularityValidationError)
+
+    expect(mocks.authPoolQueryMock).not.toHaveBeenCalled()
+    expect(mocks.authPoolConnectMock).not.toHaveBeenCalled()
+  })
+
+  it('rolls back the transaction when a write fails', async () => {
+    mocks.authPoolQueryMock.mockResolvedValue({
+      rows: [{ id: 'org-1' }],
+    })
+    mocks.upsertOrgSubscriptionMock.mockRejectedValue(new Error('write failed'))
+
+    await expect(
+      Effect.runPromise(
+        Effect.gen(function* () {
+          const service = yield* SingularityAdminService
+          yield* service.setOrganizationPlanOverride({
+            organizationId: 'org-1',
+            actorUserId: 'user-1',
+            planId: 'enterprise',
+            seatCount: 12,
+            billingInterval: 'year',
+            monthlyUsageLimitUsd: 1200,
+            overrideReason: 'Annual enterprise contract',
+            internalNote: 'Signed off-platform',
+            billingReference: 'PO-42',
+            featureOverrides: {},
+          })
+        }).pipe(Effect.provide(SingularityAdminService.layer)),
+      ),
+    ).rejects.toThrow('Failed to apply the organization plan override.')
+
+    expect(mocks.clientQueryMock).toHaveBeenCalledWith('BEGIN')
+    expect(mocks.clientQueryMock).toHaveBeenCalledWith('ROLLBACK')
+    expect(mocks.clientQueryMock).not.toHaveBeenCalledWith('COMMIT')
   })
 })

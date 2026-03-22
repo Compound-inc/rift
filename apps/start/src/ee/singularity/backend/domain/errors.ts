@@ -53,3 +53,12 @@ export function isSingularityAccessError(error: unknown): boolean {
     || error instanceof SingularityForbiddenError
   )
 }
+
+export function isSingularityDomainError(error: unknown): boolean {
+  return (
+    isSingularityAccessError(error)
+    || error instanceof SingularityValidationError
+    || error instanceof SingularityNotFoundError
+    || error instanceof SingularityPersistenceError
+  )
+}

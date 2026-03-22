@@ -40,6 +40,7 @@ import {
   SingularityPersistenceError,
   SingularityValidationError,
 } from '../domain/errors'
+import { toReadableErrorCause } from '@/lib/backend/chat/domain/error-formatting'
 
 export type SingularityAdminServiceShape = {
   readonly listOrganizations: () => Effect.Effect<
@@ -89,7 +90,9 @@ export type SingularityAdminServiceShape = {
     featureOverrides: Partial<Record<WorkspaceFeatureId, boolean>>
   }) => Effect.Effect<
     void,
-    SingularityNotFoundError | SingularityPersistenceError
+    | SingularityNotFoundError
+    | SingularityValidationError
+    | SingularityPersistenceError
   >
 }
 
@@ -151,6 +154,23 @@ type InvitationRow = {
   role: string
   status: string
   inviterId: string | null
+}
+
+function toUsageSyncStatus(value: unknown): 'ok' | 'degraded' {
+  return value === 'degraded' ? 'degraded' : 'ok'
+}
+
+type NormalizedPlanOverrideInput = {
+  organizationId: string
+  actorUserId: string
+  planId: WorkspacePlanId
+  seatCount: number
+  billingInterval: ManualBillingInterval | null
+  monthlyUsageLimitUsd: number | null
+  overrideReason: string | null
+  internalNote: string | null
+  billingReference: string | null
+  featureOverrides: Partial<Record<WorkspaceFeatureId, boolean>>
 }
 
 function toUsagePolicySummary(
@@ -232,12 +252,102 @@ function toPersistenceError(
   return new SingularityPersistenceError({
     message,
     organizationId,
-    cause: cause instanceof Error ? cause.message : String(cause),
+    cause: toReadableErrorCause(cause, message),
   })
 }
 
 function normalizeRole(role: string): 'admin' | 'member' {
   return role === 'admin' ? 'admin' : 'member'
+}
+
+function normalizeManualFeatureOverrides(input: {
+  planId: WorkspacePlanId
+  featureOverrides: Partial<Record<WorkspaceFeatureId, boolean>>
+}): Partial<Record<WorkspaceFeatureId, boolean>> {
+  const planDefaults = resolveWorkspaceEffectiveFeatures({ planId: input.planId })
+
+  return Object.fromEntries(
+    WORKSPACE_FEATURE_IDS
+      .map((featureId) => {
+        const featureOverride = input.featureOverrides[featureId]
+        return typeof featureOverride === 'boolean'
+          && featureOverride !== planDefaults[featureId]
+          ? [featureId, featureOverride]
+          : null
+      })
+      .filter((entry): entry is [WorkspaceFeatureId, boolean] => entry != null),
+  )
+}
+
+function normalizePlanOverrideInput(
+  input: NormalizedPlanOverrideInput,
+): NormalizedPlanOverrideInput {
+  const normalizedSeatCount = Math.max(1, input.seatCount)
+
+  if (input.planId === 'free') {
+    return {
+      ...input,
+      seatCount: normalizedSeatCount,
+      billingInterval: null,
+      monthlyUsageLimitUsd: null,
+      overrideReason: null,
+      internalNote: null,
+      billingReference: null,
+      featureOverrides: {},
+    }
+  }
+
+  return {
+    ...input,
+    seatCount: normalizedSeatCount,
+    featureOverrides: normalizeManualFeatureOverrides({
+      planId: input.planId,
+      featureOverrides: input.featureOverrides,
+    }),
+  }
+}
+
+function validatePlanOverrideInput(
+  input: NormalizedPlanOverrideInput,
+): void {
+  if (input.planId !== 'free' && input.billingInterval == null) {
+    throw new SingularityValidationError({
+      message: 'Billing interval is required for paid manual contracts.',
+      field: 'billingInterval',
+    })
+  }
+
+  if (
+    input.billingInterval === 'custom'
+    && !input.overrideReason
+    && !input.internalNote
+  ) {
+    throw new SingularityValidationError({
+      message: 'Custom billing intervals require an override reason or internal note.',
+      field: 'billingInterval',
+    })
+  }
+}
+
+function buildManualSubscriptionMetadata(input: {
+  currentMetadata: Record<string, unknown>
+  actorUserId: string
+  now: number
+  overrideReason: string | null
+  internalNote: string | null
+  billingReference: string | null
+  featureOverrides: Partial<Record<WorkspaceFeatureId, boolean>>
+}): Record<string, unknown> {
+  return {
+    ...input.currentMetadata,
+    overrideSource: 'singularity',
+    overriddenByUserId: input.actorUserId,
+    overriddenAt: input.now,
+    overrideReason: input.overrideReason,
+    internalNote: input.internalNote,
+    billingReference: input.billingReference,
+    featureOverrides: input.featureOverrides,
+  }
 }
 
 export class SingularityAdminService extends ServiceMap.Service<
@@ -280,7 +390,7 @@ export class SingularityAdminService extends ServiceMap.Service<
             memberCount: row.memberCount,
             seatCount: Math.max(1, row.seatCount ?? 1),
             isOverSeatLimit: Boolean(row.isOverSeatLimit),
-            usageSyncStatus: row.usageSyncStatus === 'degraded' ? 'degraded' : 'ok',
+            usageSyncStatus: toUsageSyncStatus(row.usageSyncStatus),
           }))
         },
         catch: (cause) =>
@@ -598,6 +708,20 @@ export class SingularityAdminService extends ServiceMap.Service<
     }) =>
       Effect.tryPromise({
         try: async () => {
+          const normalizedInput = normalizePlanOverrideInput({
+            organizationId,
+            actorUserId,
+            planId,
+            seatCount,
+            billingInterval,
+            monthlyUsageLimitUsd,
+            overrideReason,
+            internalNote,
+            billingReference,
+            featureOverrides,
+          })
+          validatePlanOverrideInput(normalizedInput)
+
           const orgResult = await authPool.query<{ id: string }>(
             `select id
              from organization
@@ -624,30 +748,15 @@ export class SingularityAdminService extends ServiceMap.Service<
               client,
             )
             const counts = await readOrganizationMemberCounts(organizationId, client)
-            const normalizedSeatCount = Math.max(1, seatCount)
             const now = Date.now()
             const billingAccountId = `billing_${organizationId}`
             const subscriptionId = `workspace_subscription_${organizationId}`
             const currentMetadata = asRecord(currentSubscription?.metadata)
-            const normalizedFeatureOverrides = Object.fromEntries(
-              Object.entries(
-                resolveWorkspaceEffectiveFeatures({
-                  planId,
-                }),
-              )
-                .map(([featureId, planEnabled]) => {
-                  const featureOverride = featureOverrides[featureId as WorkspaceFeatureId]
-                  return typeof featureOverride === 'boolean' && featureOverride !== planEnabled
-                    ? [featureId, featureOverride]
-                    : null
-                })
-                .filter((entry): entry is [string, boolean] => entry != null),
-            )
-            const monthlyUsageLimitNanoUsd = monthlyUsageLimitUsd == null
+            const monthlyUsageLimitNanoUsd = normalizedInput.monthlyUsageLimitUsd == null
               ? null
-              : usdToNanoUsd(monthlyUsageLimitUsd)
+              : usdToNanoUsd(normalizedInput.monthlyUsageLimitUsd)
 
-            if (planId === 'free') {
+            if (normalizedInput.planId === 'free') {
               await markOrgSubscriptionCanceled({
                 organizationId,
                 status: 'inactive',
@@ -689,23 +798,22 @@ export class SingularityAdminService extends ServiceMap.Service<
                 organizationId,
                 billingAccountId,
                 providerSubscriptionId: null,
-                planId,
-                billingInterval,
-                seatCount: normalizedSeatCount,
+                planId: normalizedInput.planId,
+                billingInterval: normalizedInput.billingInterval,
+                seatCount: normalizedInput.seatCount,
                 status: 'active',
                 periodStart: now,
                 periodEnd: currentSubscription?.currentPeriodEnd ?? null,
                 cancelAtPeriodEnd: false,
-                metadata: {
-                  ...currentMetadata,
-                  overrideSource: 'singularity',
-                  overriddenByUserId: actorUserId,
-                  overriddenAt: now,
-                  overrideReason,
-                  internalNote,
-                  billingReference,
-                  featureOverrides: normalizedFeatureOverrides,
-                },
+                metadata: buildManualSubscriptionMetadata({
+                  currentMetadata,
+                  actorUserId,
+                  now,
+                  overrideReason: normalizedInput.overrideReason,
+                  internalNote: normalizedInput.internalNote,
+                  billingReference: normalizedInput.billingReference,
+                  featureOverrides: normalizedInput.featureOverrides,
+                }),
                 now,
                 client,
               })
@@ -733,7 +841,11 @@ export class SingularityAdminService extends ServiceMap.Service<
 
             await client.query('COMMIT')
           } catch (error) {
-            await client.query('ROLLBACK')
+            try {
+              await client.query('ROLLBACK')
+            } catch {
+              // Preserve the original mutation failure for callers and observability.
+            }
             throw error
           } finally {
             client.release()
@@ -741,6 +853,7 @@ export class SingularityAdminService extends ServiceMap.Service<
         },
         catch: (cause) =>
           cause instanceof SingularityNotFoundError
+            || cause instanceof SingularityValidationError
             ? cause
             : toPersistenceError(
                 'Failed to apply the organization plan override.',

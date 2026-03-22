@@ -105,6 +105,17 @@ function buildPlanDefaultFeatureAccess(
   ) as Record<WorkspaceFeatureId, boolean>
 }
 
+function buildSubmissionFeatureAccess(input: {
+  planId: WorkspacePlanId
+  selectedFeatureAccess: Record<WorkspaceFeatureId, boolean>
+}): Partial<Record<WorkspaceFeatureId, boolean>> {
+  if (input.planId === 'free') {
+    return {}
+  }
+
+  return input.selectedFeatureAccess
+}
+
 export function useSingularityOrgDetailPageLogic(
   organization: SingularityOrganizationDetail,
 ): SingularityOrgDetailPageLogicResult {
@@ -266,17 +277,31 @@ export function useSingularityOrgDetailPageLogic(
       }
 
       try {
+        const normalizedBillingInterval =
+          selectedPlan === 'free' ? null : selectedBillingInterval
+        const normalizedUsageLimitUsd =
+          selectedPlan === 'free' ? null : parsedUsageLimitUsd
+        const normalizedOverrideReason =
+          selectedPlan === 'free' ? null : normalizeOptionalText(selectedOverrideReason)
+        const normalizedInternalNote =
+          selectedPlan === 'free' ? null : normalizeOptionalText(selectedInternalNote)
+        const normalizedBillingReference =
+          selectedPlan === 'free' ? null : normalizeOptionalText(selectedBillingReference)
+
         await setPlanFn({
           data: {
             organizationId: organization.organizationId,
             planId: selectedPlan,
             seatCount: parsedSeatCount,
-            billingInterval: selectedBillingInterval,
-            monthlyUsageLimitUsd: parsedUsageLimitUsd,
-            overrideReason: normalizeOptionalText(selectedOverrideReason),
-            internalNote: normalizeOptionalText(selectedInternalNote),
-            billingReference: normalizeOptionalText(selectedBillingReference),
-            featureOverrides: selectedFeatureAccessState,
+            billingInterval: normalizedBillingInterval,
+            monthlyUsageLimitUsd: normalizedUsageLimitUsd,
+            overrideReason: normalizedOverrideReason,
+            internalNote: normalizedInternalNote,
+            billingReference: normalizedBillingReference,
+            featureOverrides: buildSubmissionFeatureAccess({
+              planId: selectedPlan,
+              selectedFeatureAccess: selectedFeatureAccessState,
+            }),
           },
         })
         toast.success('Plan override applied.')

@@ -50,6 +50,14 @@ const SetPlanSchema = z.object({
   internalNote: z.string().trim().max(2000).nullable(),
   billingReference: z.string().trim().max(255).nullable(),
   featureOverrides: z.record(z.string(), z.boolean()),
+}).superRefine((value, context) => {
+  if (value.planId !== 'free' && value.billingInterval == null) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['billingInterval'],
+      message: 'Billing interval is required for paid manual contracts.',
+    })
+  }
 })
 
 function parseSetPlanInput(input: unknown): {
