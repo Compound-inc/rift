@@ -22,8 +22,7 @@ export function Navbar({ dict }: NavbarProps) {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 w-full px-2 pt-2 sm:px-3 bg-surface-overlay">
-      {/* Match the app sidebar's panel treatment: rounded shape + soft bordered surface container. */}
-      <div className="mx-auto max-w-7xl rounded-xl border border-border-light bg-surface-overlay backdrop-blur-md supports-[backdrop-filter]:bg-surface-overlay/80">
+      <div className="mx-auto max-w-7xl rounded-xl bg-surface-overlay backdrop-blur-md supports-[backdrop-filter]:bg-surface-overlay/80">
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex h-14 items-center justify-between">
             <div className="flex items-center gap-8">
