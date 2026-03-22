@@ -24,15 +24,18 @@ import { Route as ApiZeroMutateRouteRouteImport } from './routes/api/zero/mutate
 import { Route as ApiOrgModelPolicyRouteRouteImport } from './routes/api/org/model-policy/route'
 import { Route as ApiFilesUploadRouteRouteImport } from './routes/api/files/upload/route'
 import { Route as ApiFilesMarkdownRouteRouteImport } from './routes/api/files/markdown/route'
+import { Route as eeSingularityLayoutRouteRouteImport } from './routes/(ee)/singularity/_layout/route'
 import { Route as appLayoutSettingsRouteRouteImport } from './routes/(app)/_layout/settings/route'
 import { Route as appLayoutOrganizationRouteRouteImport } from './routes/(app)/_layout/organization/route'
 import { Route as appLayoutChatRouteRouteImport } from './routes/(app)/_layout/chat/route'
+import { Route as eeSingularityLayoutIndexRouteImport } from './routes/(ee)/singularity/_layout/index'
 import { Route as appLayoutSettingsIndexRouteImport } from './routes/(app)/_layout/settings/index'
 import { Route as appLayoutChatIndexRouteImport } from './routes/(app)/_layout/chat/index'
 import { Route as appLayoutSettingsSecurityRouteRouteImport } from './routes/(app)/_layout/settings/security/route'
 import { Route as appLayoutOrganizationSettingsRouteRouteImport } from './routes/(app)/_layout/organization/settings/route'
 import { Route as appLayoutChatThreadIdRouteRouteImport } from './routes/(app)/_layout/chat/$threadId/route'
 import { Route as appLayoutOrganizationSettingsIndexRouteImport } from './routes/(app)/_layout/organization/settings/index'
+import { Route as eeSingularityLayoutOrgsOrganizationIdRouteImport } from './routes/(ee)/singularity/_layout/orgs/$organizationId'
 import { Route as appLayoutOrganizationSettingsToolsRouteRouteImport } from './routes/(app)/_layout/organization/settings/tools/route'
 import { Route as appLayoutOrganizationSettingsSecurityRouteRouteImport } from './routes/(app)/_layout/organization/settings/security/route'
 import { Route as appLayoutOrganizationSettingsProviderPolicyRouteRouteImport } from './routes/(app)/_layout/organization/settings/provider-policy/route'
@@ -121,6 +124,12 @@ const ApiFilesMarkdownRouteRoute = ApiFilesMarkdownRouteRouteImport.update({
   path: '/api/files/markdown',
   getParentRoute: () => rootRouteImport,
 } as any)
+const eeSingularityLayoutRouteRoute =
+  eeSingularityLayoutRouteRouteImport.update({
+    id: '/(ee)/singularity/_layout',
+    path: '/singularity',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const appLayoutSettingsRouteRoute = appLayoutSettingsRouteRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -137,6 +146,12 @@ const appLayoutChatRouteRoute = appLayoutChatRouteRouteImport.update({
   path: '/chat',
   getParentRoute: () => appLayoutRouteRoute,
 } as any)
+const eeSingularityLayoutIndexRoute =
+  eeSingularityLayoutIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => eeSingularityLayoutRouteRoute,
+  } as any)
 const appLayoutSettingsIndexRoute = appLayoutSettingsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -170,6 +185,12 @@ const appLayoutOrganizationSettingsIndexRoute =
     id: '/',
     path: '/',
     getParentRoute: () => appLayoutOrganizationSettingsRouteRoute,
+  } as any)
+const eeSingularityLayoutOrgsOrganizationIdRoute =
+  eeSingularityLayoutOrgsOrganizationIdRouteImport.update({
+    id: '/orgs/$organizationId',
+    path: '/orgs/$organizationId',
+    getParentRoute: () => eeSingularityLayoutRouteRoute,
   } as any)
 const appLayoutOrganizationSettingsToolsRouteRoute =
   appLayoutOrganizationSettingsToolsRouteRouteImport.update({
@@ -253,6 +274,7 @@ export interface FileRoutesByFullPath {
   '/chat': typeof appLayoutChatRouteRouteWithChildren
   '/organization': typeof appLayoutOrganizationRouteRouteWithChildren
   '/settings': typeof appLayoutSettingsRouteRouteWithChildren
+  '/singularity': typeof eeSingularityLayoutRouteRouteWithChildren
   '/api/files/markdown': typeof ApiFilesMarkdownRouteRoute
   '/api/files/upload': typeof ApiFilesUploadRouteRoute
   '/api/org/model-policy': typeof ApiOrgModelPolicyRouteRoute
@@ -267,6 +289,7 @@ export interface FileRoutesByFullPath {
   '/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/chat/': typeof appLayoutChatIndexRoute
   '/settings/': typeof appLayoutSettingsIndexRoute
+  '/singularity/': typeof eeSingularityLayoutIndexRoute
   '/organization/settings/analytics': typeof appLayoutOrganizationSettingsAnalyticsRouteRoute
   '/organization/settings/billing': typeof appLayoutOrganizationSettingsBillingRouteRoute
   '/organization/settings/byok': typeof appLayoutOrganizationSettingsByokRouteRoute
@@ -277,6 +300,7 @@ export interface FileRoutesByFullPath {
   '/organization/settings/provider-policy': typeof appLayoutOrganizationSettingsProviderPolicyRouteRoute
   '/organization/settings/security': typeof appLayoutOrganizationSettingsSecurityRouteRoute
   '/organization/settings/tools': typeof appLayoutOrganizationSettingsToolsRouteRoute
+  '/singularity/orgs/$organizationId': typeof eeSingularityLayoutOrgsOrganizationIdRoute
   '/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
   '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
   '/organization/settings/models/': typeof appLayoutOrganizationSettingsModelsIndexRoute
@@ -301,6 +325,7 @@ export interface FileRoutesByTo {
   '/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/chat': typeof appLayoutChatIndexRoute
   '/settings': typeof appLayoutSettingsIndexRoute
+  '/singularity': typeof eeSingularityLayoutIndexRoute
   '/organization/settings/analytics': typeof appLayoutOrganizationSettingsAnalyticsRouteRoute
   '/organization/settings/billing': typeof appLayoutOrganizationSettingsBillingRouteRoute
   '/organization/settings/byok': typeof appLayoutOrganizationSettingsByokRouteRoute
@@ -310,6 +335,7 @@ export interface FileRoutesByTo {
   '/organization/settings/provider-policy': typeof appLayoutOrganizationSettingsProviderPolicyRouteRoute
   '/organization/settings/security': typeof appLayoutOrganizationSettingsSecurityRouteRoute
   '/organization/settings/tools': typeof appLayoutOrganizationSettingsToolsRouteRoute
+  '/singularity/orgs/$organizationId': typeof eeSingularityLayoutOrgsOrganizationIdRoute
   '/organization/settings': typeof appLayoutOrganizationSettingsIndexRoute
   '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
   '/organization/settings/models': typeof appLayoutOrganizationSettingsModelsIndexRoute
@@ -325,6 +351,7 @@ export interface FileRoutesById {
   '/(app)/_layout/chat': typeof appLayoutChatRouteRouteWithChildren
   '/(app)/_layout/organization': typeof appLayoutOrganizationRouteRouteWithChildren
   '/(app)/_layout/settings': typeof appLayoutSettingsRouteRouteWithChildren
+  '/(ee)/singularity/_layout': typeof eeSingularityLayoutRouteRouteWithChildren
   '/api/files/markdown': typeof ApiFilesMarkdownRouteRoute
   '/api/files/upload': typeof ApiFilesUploadRouteRoute
   '/api/org/model-policy': typeof ApiOrgModelPolicyRouteRoute
@@ -339,6 +366,7 @@ export interface FileRoutesById {
   '/(app)/_layout/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/(app)/_layout/chat/': typeof appLayoutChatIndexRoute
   '/(app)/_layout/settings/': typeof appLayoutSettingsIndexRoute
+  '/(ee)/singularity/_layout/': typeof eeSingularityLayoutIndexRoute
   '/(app)/_layout/organization/settings/analytics': typeof appLayoutOrganizationSettingsAnalyticsRouteRoute
   '/(app)/_layout/organization/settings/billing': typeof appLayoutOrganizationSettingsBillingRouteRoute
   '/(app)/_layout/organization/settings/byok': typeof appLayoutOrganizationSettingsByokRouteRoute
@@ -349,6 +377,7 @@ export interface FileRoutesById {
   '/(app)/_layout/organization/settings/provider-policy': typeof appLayoutOrganizationSettingsProviderPolicyRouteRoute
   '/(app)/_layout/organization/settings/security': typeof appLayoutOrganizationSettingsSecurityRouteRoute
   '/(app)/_layout/organization/settings/tools': typeof appLayoutOrganizationSettingsToolsRouteRoute
+  '/(ee)/singularity/_layout/orgs/$organizationId': typeof eeSingularityLayoutOrgsOrganizationIdRoute
   '/(app)/_layout/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
   '/(app)/_layout/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
   '/(app)/_layout/organization/settings/models/': typeof appLayoutOrganizationSettingsModelsIndexRoute
@@ -364,6 +393,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/organization'
     | '/settings'
+    | '/singularity'
     | '/api/files/markdown'
     | '/api/files/upload'
     | '/api/org/model-policy'
@@ -378,6 +408,7 @@ export interface FileRouteTypes {
     | '/settings/security'
     | '/chat/'
     | '/settings/'
+    | '/singularity/'
     | '/organization/settings/analytics'
     | '/organization/settings/billing'
     | '/organization/settings/byok'
@@ -388,6 +419,7 @@ export interface FileRouteTypes {
     | '/organization/settings/provider-policy'
     | '/organization/settings/security'
     | '/organization/settings/tools'
+    | '/singularity/orgs/$organizationId'
     | '/organization/settings/'
     | '/organization/settings/models/$providerId'
     | '/organization/settings/models/'
@@ -412,6 +444,7 @@ export interface FileRouteTypes {
     | '/settings/security'
     | '/chat'
     | '/settings'
+    | '/singularity'
     | '/organization/settings/analytics'
     | '/organization/settings/billing'
     | '/organization/settings/byok'
@@ -421,6 +454,7 @@ export interface FileRouteTypes {
     | '/organization/settings/provider-policy'
     | '/organization/settings/security'
     | '/organization/settings/tools'
+    | '/singularity/orgs/$organizationId'
     | '/organization/settings'
     | '/organization/settings/models/$providerId'
     | '/organization/settings/models'
@@ -435,6 +469,7 @@ export interface FileRouteTypes {
     | '/(app)/_layout/chat'
     | '/(app)/_layout/organization'
     | '/(app)/_layout/settings'
+    | '/(ee)/singularity/_layout'
     | '/api/files/markdown'
     | '/api/files/upload'
     | '/api/org/model-policy'
@@ -449,6 +484,7 @@ export interface FileRouteTypes {
     | '/(app)/_layout/settings/security'
     | '/(app)/_layout/chat/'
     | '/(app)/_layout/settings/'
+    | '/(ee)/singularity/_layout/'
     | '/(app)/_layout/organization/settings/analytics'
     | '/(app)/_layout/organization/settings/billing'
     | '/(app)/_layout/organization/settings/byok'
@@ -459,6 +495,7 @@ export interface FileRouteTypes {
     | '/(app)/_layout/organization/settings/provider-policy'
     | '/(app)/_layout/organization/settings/security'
     | '/(app)/_layout/organization/settings/tools'
+    | '/(ee)/singularity/_layout/orgs/$organizationId'
     | '/(app)/_layout/organization/settings/'
     | '/(app)/_layout/organization/settings/models/$providerId'
     | '/(app)/_layout/organization/settings/models/'
@@ -469,6 +506,7 @@ export interface RootRouteChildren {
   PricingRouteRoute: typeof PricingRouteRoute
   appLayoutRouteRoute: typeof appLayoutRouteRouteWithChildren
   ApiChatRouteRoute: typeof ApiChatRouteRoute
+  eeSingularityLayoutRouteRoute: typeof eeSingularityLayoutRouteRouteWithChildren
   ApiFilesMarkdownRouteRoute: typeof ApiFilesMarkdownRouteRoute
   ApiFilesUploadRouteRoute: typeof ApiFilesUploadRouteRoute
   ApiOrgModelPolicyRouteRoute: typeof ApiOrgModelPolicyRouteRoute
@@ -584,6 +622,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiFilesMarkdownRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/(ee)/singularity/_layout': {
+      id: '/(ee)/singularity/_layout'
+      path: '/singularity'
+      fullPath: '/singularity'
+      preLoaderRoute: typeof eeSingularityLayoutRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/(app)/_layout/settings': {
       id: '/(app)/_layout/settings'
       path: '/settings'
@@ -604,6 +649,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/chat'
       preLoaderRoute: typeof appLayoutChatRouteRouteImport
       parentRoute: typeof appLayoutRouteRoute
+    }
+    '/(ee)/singularity/_layout/': {
+      id: '/(ee)/singularity/_layout/'
+      path: '/'
+      fullPath: '/singularity/'
+      preLoaderRoute: typeof eeSingularityLayoutIndexRouteImport
+      parentRoute: typeof eeSingularityLayoutRouteRoute
     }
     '/(app)/_layout/settings/': {
       id: '/(app)/_layout/settings/'
@@ -646,6 +698,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/organization/settings/'
       preLoaderRoute: typeof appLayoutOrganizationSettingsIndexRouteImport
       parentRoute: typeof appLayoutOrganizationSettingsRouteRoute
+    }
+    '/(ee)/singularity/_layout/orgs/$organizationId': {
+      id: '/(ee)/singularity/_layout/orgs/$organizationId'
+      path: '/orgs/$organizationId'
+      fullPath: '/singularity/orgs/$organizationId'
+      preLoaderRoute: typeof eeSingularityLayoutOrgsOrganizationIdRouteImport
+      parentRoute: typeof eeSingularityLayoutRouteRoute
     }
     '/(app)/_layout/organization/settings/tools': {
       id: '/(app)/_layout/organization/settings/tools'
@@ -877,11 +936,29 @@ const appLayoutRouteRouteWithChildren = appLayoutRouteRoute._addFileChildren(
   appLayoutRouteRouteChildren,
 )
 
+interface eeSingularityLayoutRouteRouteChildren {
+  eeSingularityLayoutIndexRoute: typeof eeSingularityLayoutIndexRoute
+  eeSingularityLayoutOrgsOrganizationIdRoute: typeof eeSingularityLayoutOrgsOrganizationIdRoute
+}
+
+const eeSingularityLayoutRouteRouteChildren: eeSingularityLayoutRouteRouteChildren =
+  {
+    eeSingularityLayoutIndexRoute: eeSingularityLayoutIndexRoute,
+    eeSingularityLayoutOrgsOrganizationIdRoute:
+      eeSingularityLayoutOrgsOrganizationIdRoute,
+  }
+
+const eeSingularityLayoutRouteRouteWithChildren =
+  eeSingularityLayoutRouteRoute._addFileChildren(
+    eeSingularityLayoutRouteRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   AuthRouteRoute: AuthRouteRouteWithChildren,
   PricingRouteRoute: PricingRouteRoute,
   appLayoutRouteRoute: appLayoutRouteRouteWithChildren,
   ApiChatRouteRoute: ApiChatRouteRoute,
+  eeSingularityLayoutRouteRoute: eeSingularityLayoutRouteRouteWithChildren,
   ApiFilesMarkdownRouteRoute: ApiFilesMarkdownRouteRoute,
   ApiFilesUploadRouteRoute: ApiFilesUploadRouteRoute,
   ApiOrgModelPolicyRouteRoute: ApiOrgModelPolicyRouteRoute,

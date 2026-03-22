@@ -116,6 +116,11 @@ Contributions are welcome.
 
 ## License
 
-This repository is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+Rift is an open-core repository. The core technology is fully open source
+under the GNU Affero General Public License v3.0 (AGPL-3.0), and the
+enterprise surface under `apps/start/src/routes/(ee)` and `apps/start/src/ee`
+is covered by a separate commercial license.
 
-See [LICENSE](./LICENSE) for full terms.
+See [LICENSE](./LICENSE) for the AGPL terms and
+[apps/start/src/ee/LICENSE.md](./apps/start/src/ee/LICENSE.md) for the
+enterprise license.

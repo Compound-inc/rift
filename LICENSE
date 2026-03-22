@@ -3,6 +3,16 @@ Version 3, 19 November 2007
 
 Copyright (C) 2025 The Unreal Compound SA de CV
 
+Portions of this software - namely all files that reside under the following
+directories of this repository - are licensed under the license defined in
+"[apps/start/src/ee/LICENSE.md](./apps/start/src/ee/LICENSE.md)".
+
+- [apps/start/src/routes/(ee)](./apps/start/src/routes/(ee))
+- [apps/start/src/ee](./apps/start/src/ee)
+
+Content outside of the above mentioned directories or restrictions above is
+available under the "AGPLv3" license as defined below.
+
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
 the Free Software Foundation, either version 3 of the License, or

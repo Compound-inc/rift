@@ -3,6 +3,7 @@ import {
   CHAT_AREA_KEY,
   getCurrentArea,
   NAV_AREAS,
+  SINGULARITY_AREA_KEY,
   SETTINGS_AREA_KEY,
 } from '@/components/layout/sidebar/app-sidebar-nav.config'
 import { SidebarAreaPanel } from '@/components/layout/sidebar/sidebar-area-panel'
@@ -16,6 +17,7 @@ import { SidebarGroupTooltip } from '@rift/ui/tooltip'
 import { cn } from '@rift/utils'
 import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 import { Link, useRouterState } from '@tanstack/react-router'
+import { isSingularityOrganizationId } from '@/ee/singularity/shared/singularity'
 import type { ComponentType } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { SidebarChatThreadPreloader } from './sidebar/sidebar-chat-thread-preloader'
@@ -85,9 +87,11 @@ export const AppSidebar: ComponentType = () => {
     user,
     loading,
     isAnonymous,
+    activeOrganizationId,
   } = useAppAuth()
   const { isChatPageSidebarCollapsed } = usePageSidebarVisibility()
   const direction = useDirection()
+  const canAccessSingularity = isSingularityOrganizationId(activeOrganizationId)
   // Keep non-chat areas unchanged. For chat routes, allow collapsing just the
   // area panel while keeping the primary icon rail visible.
   const showAreaPanel =
@@ -151,6 +155,9 @@ export const AppSidebar: ComponentType = () => {
               isOrgAreaActive={effectiveCurrentArea === ORG_SETTINGS_AREA_KEY}
             />
             {Object.entries(NAV_AREAS)
+              .filter(([key]) =>
+                key === SINGULARITY_AREA_KEY ? canAccessSingularity : true,
+              )
               .filter(
                 ([key]) =>
                   key !== SETTINGS_AREA_KEY && key !== ORG_SETTINGS_AREA_KEY,
