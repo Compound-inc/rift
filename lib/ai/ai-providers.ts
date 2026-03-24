@@ -1,4 +1,4 @@
-import { createGateway } from "@ai-sdk/gateway";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { OPENAI_MODELS } from "./providers/openai";
 import { XAI_MODELS } from "./providers/xai";
 import { ANTHROPIC_MODELS } from "./providers/anthropic";
@@ -50,15 +50,12 @@ export const getProviderDisplayName = (provider?: string) => {
   return PROVIDER_DISPLAY_NAMES[provider] ?? toTitleCase(provider);
 };
 
-// Configure gateway provider with app attribution headers
-export const gateway = createGateway({
-  headers: {
-    'http-referer': 'https://rift.mx',
-    'x-title': 'Rift',
-  },
+// Configure OpenRouter provider
+export const openrouter = createOpenRouter({
+  apiKey: process.env.OPENROUTER_API_KEY,
 });
 
-globalThis.AI_SDK_DEFAULT_PROVIDER = gateway;
+globalThis.AI_SDK_DEFAULT_PROVIDER = openrouter.chat;
 
 // Model resolution
 const SHORTCUTS: Record<string, string> = {
@@ -90,15 +87,15 @@ export const supportsReasoning = (id: string) =>
 export function getLanguageModel(modelId: string) {
   const resolved = resolveModel(modelId);
 
-  console.log(`Model via AI Gateway: ${resolved}`);
+  console.log(`Model via OpenRouter: ${resolved}`);
 
   try {
-    return gateway(resolved);
+    return openrouter.chat(resolved);
   } catch {
     console.warn(
       `Model ${modelId} not found in registry, using default default model`,
     );
-    return gateway(DEFAULT_MODEL);
+    return openrouter.chat(DEFAULT_MODEL);
   }
 }
 
@@ -166,4 +163,3 @@ export const getModelCapabilities = getCapabilities;
 export const isModelCapable = isCapable;
 export const getDefaultProviderOptions = getProviderOptions;
 export const getProviderName = getProviderDisplayName;
-

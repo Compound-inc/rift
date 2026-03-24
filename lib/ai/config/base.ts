@@ -58,10 +58,10 @@ export const DEFAULT_PROVIDER_SETTINGS: BaseProviderSettings = {
   timeout: 60000,
 };
 
-// Gateway configuration for AI SDK
-export const GATEWAY_CONFIG = {
-  apiKey: process.env.AI_GATEWAY_API_KEY,
-  baseURL: `https://ai-gateway.vercel.sh/v1`,
+// OpenRouter configuration for AI SDK
+export const OPENROUTER_CONFIG = {
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: `https://openrouter.ai/api/v1`,
 };
 
 // Tool types that can be used across providers
