@@ -24,6 +24,11 @@ interface NoSubscriptionDialogProps {
   subscriptionStatus?: string | null;
 }
 
+function getBasePlan(plan: string | null | undefined): string {
+  if (!plan) return "";
+  return plan.replace(/_api$/i, "");
+}
+
 function GradientBackground() {
   return (
     <svg
@@ -112,8 +117,10 @@ export function NoSubscriptionDialog({
   const idempotencyKey = useMemo(() => generateUUID(), []);
 
   const resolved = useMemo(() => {
-    const defaultOrgName = orgName ?? organizationInfo?.name ?? billingInfo?.name ?? null;
-    const defaultStripeCustomerId = stripeCustomerId ?? billingInfo?.stripeCustomerId ?? null;
+    const defaultOrgName =
+      orgName ?? organizationInfo?.name ?? billingInfo?.name ?? null;
+    const defaultStripeCustomerId =
+      stripeCustomerId ?? billingInfo?.stripeCustomerId ?? null;
     const defaultSubscriptionStatus =
       subscriptionStatus ??
       billingInfo?.subscriptionStatus ??
@@ -144,7 +151,7 @@ export function NoSubscriptionDialog({
 
   const orgLabel = resolved.orgName ?? "Tu organización";
   const isCanceled = resolved.subscriptionStatus === "canceled";
-  const isEnterprise = resolved.plan === "enterprise";
+  const isEnterprise = getBasePlan(resolved.plan) === "enterprise";
 
   const handleRenewPlan = async () => {
     if (isRenewing) return;
@@ -157,7 +164,9 @@ export function NoSubscriptionDialog({
     setPortalError(null);
     setIsRenewing(true);
     try {
-      const { url } = await createStripePortalSession(resolved.stripeCustomerId);
+      const { url } = await createStripePortalSession(
+        resolved.stripeCustomerId,
+      );
       if (url) {
         window.location.href = url;
       } else {
@@ -175,7 +184,10 @@ export function NoSubscriptionDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent showCloseButton={false} className="sm:max-w-lg border-none bg-transparent p-0 shadow-none">
+      <DialogContent
+        showCloseButton={false}
+        className="sm:max-w-lg border-none bg-transparent p-0 shadow-none"
+      >
         <div className="relative overflow-hidden rounded-3xl border border-zinc-200/80 bg-white/90 shadow-2xl dark:border-zinc-800/60 dark:bg-zinc-950/80">
           <GradientBackground />
 
@@ -189,17 +201,15 @@ export function NoSubscriptionDialog({
                   Suscripción requerida
                 </DialogTitle>
                 <DialogDescription className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
-                  {isEnterprise ? (
-                    "Por favor, contacta al soporte de Rift para reactivar tu suscripción Enterprise."
-                  ) : resolved.canManageBilling ? (
-                    `${orgLabel} no tiene una suscripción activa. ${
-                      isCanceled
-                        ? "Elige un nuevo plan para reactivar el acceso."
-                        : "Puedes reactivar el acceso desde aquí."
-                    }`
-                  ) : (
-                    `${orgLabel} no tiene una suscripción activa. Pídele a un administrador con permiso de facturación que reactive el plan.`
-                  )}
+                  {isEnterprise
+                    ? "Por favor, contacta al soporte de Rift para reactivar tu suscripción Enterprise."
+                    : resolved.canManageBilling
+                      ? `${orgLabel} no tiene una suscripción activa. ${
+                          isCanceled
+                            ? "Elige un nuevo plan para reactivar el acceso."
+                            : "Puedes reactivar el acceso desde aquí."
+                        }`
+                      : `${orgLabel} no tiene una suscripción activa. Pídele a un administrador con permiso de facturación que reactive el plan.`}
                 </DialogDescription>
               </div>
             </div>
@@ -234,7 +244,11 @@ export function NoSubscriptionDialog({
                     variant="outline"
                     className="w-full justify-center rounded-2xl border-zinc-200 bg-white/80 text-zinc-900 hover:bg-white dark:border-zinc-800 dark:bg-transparent dark:text-white dark:hover:bg-zinc-900/60 sm:w-auto"
                   >
-                    <Link href={`/subscribe?plan=free&cancel_existing_subscription=true&idempotency_key=${idempotencyKey}`}>Cambiar a plan gratuito</Link>
+                    <Link
+                      href={`/subscribe?plan=free&cancel_existing_subscription=true&idempotency_key=${idempotencyKey}`}
+                    >
+                      Cambiar a plan gratuito
+                    </Link>
                   </Button>
                   {isCanceled ? (
                     <Button
@@ -251,13 +265,7 @@ export function NoSubscriptionDialog({
                       variant="outline"
                       className="w-full justify-center rounded-2xl border-zinc-200 bg-white/80 text-zinc-900 hover:bg-white dark:border-zinc-800 dark:bg-transparent dark:text-white dark:hover:bg-zinc-900/60 sm:w-auto cursor-pointer"
                     >
-                      {isRenewing ? (
-                        <>
-                          Renovar Plan
-                        </>
-                      ) : (
-                        "Renovar Plan"
-                      )}
+                      {isRenewing ? <>Renovar Plan</> : "Renovar Plan"}
                     </Button>
                   )}
                 </>

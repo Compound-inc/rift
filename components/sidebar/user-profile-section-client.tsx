@@ -24,8 +24,18 @@ interface UserProfileSectionClientProps {
   serverSkeleton?: React.ReactNode;
 }
 
+function getBasePlan(plan: string): string {
+  return plan.replace(/_api$/i, "");
+}
+
+function capitalizePlan(plan: string): string {
+  const basePlan = getBasePlan(plan);
+  return basePlan.charAt(0).toUpperCase() + basePlan.slice(1);
+}
+
 function getPlanBadgeStyles(plan: string) {
-  switch (plan) {
+  const basePlan = getBasePlan(plan);
+  switch (basePlan) {
     case "free":
       return "border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 text-zinc-500 dark:text-zinc-400 group-hover:bg-zinc-100 group-hover:dark:bg-zinc-900/70";
     case "plus":
@@ -39,10 +49,15 @@ function getPlanBadgeStyles(plan: string) {
   }
 }
 
-export function UserProfileSectionClient({ serverSkeleton }: UserProfileSectionClientProps) {
+export function UserProfileSectionClient({
+  serverSkeleton,
+}: UserProfileSectionClientProps) {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useConvexAuth();
-  const user = useQuery(api.users.getCurrentUser, isAuthenticated ? {} : "skip");
+  const user = useQuery(
+    api.users.getCurrentUser,
+    isAuthenticated ? {} : "skip",
+  );
   const orgInfo = useQuery(
     api.organizations.getCurrentOrganizationInfo,
     isAuthenticated ? {} : "skip",
@@ -51,7 +66,9 @@ export function UserProfileSectionClient({ serverSkeleton }: UserProfileSectionC
   const isClient = useIsClient();
   const [initialUserKey] = useState<string | null>(() => getLastUserKey());
   const userKey = user?.workos_id ?? initialUserKey;
-  const [cachedProfile, setCachedProfile] = useState<SidebarProfile | null>(null);
+  const [cachedProfile, setCachedProfile] = useState<SidebarProfile | null>(
+    null,
+  );
   const [cacheLoaded, setCacheLoaded] = useState(false);
 
   useEffect(() => {
@@ -96,14 +113,15 @@ export function UserProfileSectionClient({ serverSkeleton }: UserProfileSectionC
   const optimisticPlan = cachedProfile?.plan;
   const canShowOptimistic = cacheLoaded && Boolean(optimisticDisplayName);
   const isLoadingIndexedDB = userKey && !cacheLoaded;
-  const shouldShowSkeleton = (isLoading && !canShowOptimistic) || isLoadingIndexedDB;
+  const shouldShowSkeleton =
+    (isLoading && !canShowOptimistic) || isLoadingIndexedDB;
 
   // Show skeleton during SSR and initial load
   // On server and initial client render, show skeleton to match SSR
   if (!isClient) {
     return <>{serverSkeleton || <ProfileSkeleton />}</>;
   }
-  
+
   // After mount, show skeleton if still loading
   if (shouldShowSkeleton) {
     return <ProfileSkeleton />;
@@ -118,7 +136,9 @@ export function UserProfileSectionClient({ serverSkeleton }: UserProfileSectionC
             {user?.profilePictureUrl || optimisticAvatarUrl ? (
               <Image
                 src={(user?.profilePictureUrl || optimisticAvatarUrl) as string}
-                alt={(user?.firstName || optimisticDisplayName || "User") as string}
+                alt={
+                  (user?.firstName || optimisticDisplayName || "User") as string
+                }
                 width={32}
                 height={32}
                 className="w-full h-full object-cover"
@@ -143,14 +163,16 @@ export function UserProfileSectionClient({ serverSkeleton }: UserProfileSectionC
                   : user?.firstName || optimisticDisplayName || "User"}
               </p>
               {(orgInfo?.plan || optimisticPlan) && (
-                <Badge 
-                  variant="outline" 
+                <Badge
+                  variant="outline"
                   className={cn(
                     "h-5 px-2 text-[10px] font-medium capitalize rounded-full shadow-none",
-                    getPlanBadgeStyles((orgInfo?.plan || optimisticPlan) as string)
+                    getPlanBadgeStyles(
+                      (orgInfo?.plan || optimisticPlan) as string,
+                    ),
                   )}
                 >
-                  {orgInfo?.plan || optimisticPlan}
+                  {capitalizePlan((orgInfo?.plan || optimisticPlan) as string)}
                 </Badge>
               )}
             </div>
@@ -167,12 +189,9 @@ export function UserProfileSectionClient({ serverSkeleton }: UserProfileSectionC
 
   return (
     <Link href="/sign-in" onMouseEnter={handleSignInHover} className="w-full">
-      <Button
-        className="w-full bg-accent hover:bg-accent/90 text-white rounded-lg font-medium"
-      >
+      <Button className="w-full bg-accent hover:bg-accent/90 text-white rounded-lg font-medium">
         Iniciar sesión
       </Button>
     </Link>
   );
 }
-

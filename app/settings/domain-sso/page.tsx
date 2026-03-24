@@ -12,6 +12,11 @@ import { useQuery, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { getWorkOSWidgetToken } from "@/actions/getWorkOSWidgetToken";
 
+function getBasePlan(plan: string | null | undefined): string {
+  if (!plan) return "";
+  return plan.replace(/_api$/i, "");
+}
+
 const UpgradeBanner = () => (
   <div className="p-6 bg-white dark:bg-popover-secondary rounded-lg border border-gray-200 dark:border-border shadow-sm">
     <p className="text-sm text-gray-500 dark:text-text-muted mb-4">
@@ -26,7 +31,6 @@ const UpgradeBanner = () => (
   </div>
 );
 
-
 export default function DomainSsoPage() {
   return (
     <div className="py-6 px-4 md:py-12 md:px-12 flex flex-col max-w-4xl min-w-0 md:min-w-[520px] w-full min-h-full box-border">
@@ -35,9 +39,7 @@ export default function DomainSsoPage() {
         title="Verificación de Dominio"
         description="Los usuarios que intenten registrarse desde un dominio verificado, podrán ser agregados a la organizacion automáticamente."
       >
-        <AuthLoading>
-          {null}
-        </AuthLoading>
+        <AuthLoading>{null}</AuthLoading>
 
         <Authenticated>
           <DomainVerificationContent />
@@ -58,9 +60,7 @@ export default function DomainSsoPage() {
           title="Conexiones SSO"
           description="Configura las conexiones de Inicio de Sesión Único (SSO) para permitir la autenticación segura a través de proveedores de identidad."
         >
-          <AuthLoading>
-            {null}
-          </AuthLoading>
+          <AuthLoading>{null}</AuthLoading>
 
           <Authenticated>
             <SsoConnectionsContent />
@@ -82,24 +82,28 @@ export default function DomainSsoPage() {
 function DomainVerificationContent() {
   const { user, organizationId } = useWorkOSAuth();
   const { isAuthenticated } = useConvexAuth();
-  const userHasPermission = useHasPermission("WIDGETS_DOMAIN_VERIFICATION_MANAGE");
-  const [authTokenPromise, setAuthTokenPromise] = useState<Promise<string | null> | null>(null);
+  const userHasPermission = useHasPermission(
+    "WIDGETS_DOMAIN_VERIFICATION_MANAGE",
+  );
+  const [authTokenPromise, setAuthTokenPromise] = useState<Promise<
+    string | null
+  > | null>(null);
 
   // Fetch plan info using useQuery
   const planInfo = useQuery(
     api.organizations.getCurrentOrganizationPlan,
-    isAuthenticated ? {} : "skip"
+    isAuthenticated ? {} : "skip",
   );
 
-  const isEnterprise = planInfo?.plan === "enterprise";
+  const isEnterprise = getBasePlan(planInfo?.plan) === "enterprise";
 
   // Load WorkOS widget token when enterprise plan is confirmed
   // This hook must be called before any conditional returns
   useEffect(() => {
     if (isEnterprise && user && organizationId && !authTokenPromise) {
-      const promise = getWorkOSWidgetToken(
-        ["widgets:domain-verification:manage"] as const
-      ).then((result) => {
+      const promise = getWorkOSWidgetToken([
+        "widgets:domain-verification:manage",
+      ] as const).then((result) => {
         if (result.success) {
           return result.token;
         } else {
@@ -150,26 +154,30 @@ function DomainVerificationContent() {
 function SsoConnectionsContent() {
   const { user, organizationId } = useWorkOSAuth();
   const { isAuthenticated } = useConvexAuth();
-  const userHasPermission = useHasPermission("WIDGETS_DOMAIN_VERIFICATION_MANAGE");
-  const [authTokenPromise, setAuthTokenPromise] = useState<Promise<string | null> | null>(null);
+  const userHasPermission = useHasPermission(
+    "WIDGETS_DOMAIN_VERIFICATION_MANAGE",
+  );
+  const [authTokenPromise, setAuthTokenPromise] = useState<Promise<
+    string | null
+  > | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Fetch plan info using useQuery
   const planInfo = useQuery(
     api.organizations.getCurrentOrganizationPlan,
-    isAuthenticated ? {} : "skip"
+    isAuthenticated ? {} : "skip",
   );
 
-  const isEnterprise = planInfo?.plan === "enterprise";
+  const isEnterprise = getBasePlan(planInfo?.plan) === "enterprise";
 
   // Load WorkOS widget token when enterprise plan is confirmed
   // These hooks must be called before any conditional returns
   useEffect(() => {
     if (isEnterprise && user && organizationId && !authTokenPromise) {
-      const promise = getWorkOSWidgetToken(
-        ["widgets:sso:manage"] as const
-      ).then((result) => {
+      const promise = getWorkOSWidgetToken([
+        "widgets:sso:manage",
+      ] as const).then((result) => {
         if (result.success) {
           return result.token;
         } else {

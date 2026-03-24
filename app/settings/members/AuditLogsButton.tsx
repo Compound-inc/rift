@@ -5,6 +5,11 @@ import { api } from "@/convex/_generated/api";
 import { getAuditLogPortalLink } from "@/actions/getAuditLogPortalLink";
 import { useState } from "react";
 
+function getBasePlan(plan: string | null | undefined): string {
+  if (!plan) return "";
+  return plan.replace(/_api$/i, "");
+}
+
 export function AuditLogsButton() {
   const { isAuthenticated } = useConvexAuth();
   const [auditLogsLink, setAuditLogsLink] = useState<string | null>(null);
@@ -13,9 +18,9 @@ export function AuditLogsButton() {
   // Fetch plan info using useQuery
   const planInfo = useQuery(
     api.organizations.getCurrentOrganizationPlan,
-    isAuthenticated ? {} : "skip"
+    isAuthenticated ? {} : "skip",
   );
-  
+
   const handleGetLink = async () => {
     if (auditLogsLink) {
       window.open(auditLogsLink, "_blank", "noopener,noreferrer");
@@ -42,14 +47,15 @@ export function AuditLogsButton() {
   }
 
   // Now we know the plan info has loaded - check if enterprise
-  const isEnterprise = planInfo?.plan === "enterprise";
+  const isEnterprise = getBasePlan(planInfo?.plan) === "enterprise";
 
   // Show upgrade banner if not enterprise (only after we know for sure)
   if (!isEnterprise) {
     return (
       <div className="p-6 bg-white dark:bg-popover-secondary rounded-lg border border-gray-200 dark:border-border shadow-sm">
         <p className="text-sm text-gray-500 dark:text-text-muted mb-4">
-          Si estás interesado en esta funcionalidad, contacta al soporte de Rift.
+          Si estás interesado en esta funcionalidad, contacta al soporte de
+          Rift.
         </p>
         <a
           href="mailto:features@rift.mx"
