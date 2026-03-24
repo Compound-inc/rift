@@ -1,4 +1,4 @@
-import { createGateway } from "@ai-sdk/gateway";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { OPENAI_MODELS } from "./providers/openai";
 import { XAI_MODELS } from "./providers/xai";
 import { ANTHROPIC_MODELS } from "./providers/anthropic";
@@ -50,19 +50,16 @@ export const getProviderDisplayName = (provider?: string) => {
   return PROVIDER_DISPLAY_NAMES[provider] ?? toTitleCase(provider);
 };
 
-// Configure gateway provider with app attribution headers
-export const gateway = createGateway({
-  headers: {
-    'http-referer': 'https://rift.mx',
-    'x-title': 'Rift',
-  },
+// Configure OpenRouter provider
+export const openrouter = createOpenRouter({
+  apiKey: process.env.OPENROUTER_API_KEY,
 });
 
-globalThis.AI_SDK_DEFAULT_PROVIDER = gateway;
+globalThis.AI_SDK_DEFAULT_PROVIDER = openrouter.chat;
 
 // Model resolution
 const SHORTCUTS: Record<string, string> = {
-  automatico: "openai/gpt-5.1-instant",
+  automatico: "openai/gpt-5.4-nano",
   problemas_dificiles: "openai/gpt-5.1-thinking",
   escritura: "moonshotai/kimi-k2",
   imagen: "google/gemini-2.5-flash-image",
@@ -100,20 +97,23 @@ export const supportsReasoning = (id: string) =>
 export function getLanguageModel(modelId: string) {
   const resolved = resolveModel(modelId);
 
-  console.log(`Model via AI Gateway: ${resolved}`);
+  console.log(`Model via OpenRouter: ${resolved}`);
 
   try {
-    return gateway(resolved);
+    return openrouter.chat(resolved);
   } catch {
     console.warn(
       `Model ${modelId} not found in registry, using default default model`,
     );
-    return gateway(DEFAULT_MODEL);
+    return openrouter.chat(DEFAULT_MODEL);
   }
 }
 
 // Default provider options for reasoning models
-export const getProviderOptions = (modelId: string, hasTools: boolean = false) => {
+export const getProviderOptions = (
+  modelId: string,
+  hasTools: boolean = false,
+) => {
   const baseOptions = {
     store: true,
     ...(hasTools ? { parallelToolCalls: true } : {}),
@@ -130,28 +130,31 @@ export const getProviderOptions = (modelId: string, hasTools: boolean = false) =
   };
 
   return {
-    openai: isOpenAIModel && supportsReasoning(modelId)
-      ? {
-          ...openaiBaseOptions,
-          reasoningSummary: "detailed" as const,
-        }
-      : openaiBaseOptions,
-    anthropic: isAnthropicModel && supportsReasoning(modelId)
-      ? {
-          ...baseOptions,
-          thinking: {
-            type: "enabled" as const,
-            budgetTokens: 3200,
-          },
-          effort: "low" as const,
-        }
-      : baseOptions,
-    google: isGoogleModel && supportsReasoning(modelId)
-      ? {
-          ...baseOptions,
-          ...getReasoningSettings(modelId),
-        }
-      : baseOptions,
+    openai:
+      isOpenAIModel && supportsReasoning(modelId)
+        ? {
+            ...openaiBaseOptions,
+            reasoningSummary: "detailed" as const,
+          }
+        : openaiBaseOptions,
+    anthropic:
+      isAnthropicModel && supportsReasoning(modelId)
+        ? {
+            ...baseOptions,
+            thinking: {
+              type: "enabled" as const,
+              budgetTokens: 3200,
+            },
+            effort: "low" as const,
+          }
+        : baseOptions,
+    google:
+      isGoogleModel && supportsReasoning(modelId)
+        ? {
+            ...baseOptions,
+            ...getReasoningSettings(modelId),
+          }
+        : baseOptions,
     moonshotai: baseOptions,
     zai: baseOptions,
   };
@@ -176,4 +179,3 @@ export const getModelCapabilities = getCapabilities;
 export const isModelCapable = isCapable;
 export const getDefaultProviderOptions = getProviderOptions;
 export const getProviderName = getProviderDisplayName;
-

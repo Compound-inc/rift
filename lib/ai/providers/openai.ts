@@ -73,8 +73,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     id: "openai/gpt-5.2",
     name: "GPT-5.2",
     provider: "openai",
-    description:
-      "GPT-5.2 es el modelo más avanzado e inteligente de OpenAI.",
+    description: "GPT-5.2 es el modelo más avanzado e inteligente de OpenAI.",
     contextWindow: 1000000,
     isPremium: true,
     capabilities: mergeCapabilities({
@@ -87,25 +86,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       maxTokens: 524288,
     }),
   },
-  {
-    id: "openai/gpt-5.1-instant",
-    name: "GPT-5.1 Instant",
-    provider: "openai",
-    description:
-      "Versión conversacional y cálida con razonamiento adaptativo y mejor seguimiento de instrucciones",
-    contextWindow: 128000,
-    isPremium: false,
-    capabilities: mergeCapabilities({
-      supportsTools: true,
-      supportsStreaming: true,
-      supportsReasoning: true,
-      supportsImageInput: true,
-      supportsImageOutput: false,
-      supportsPDFInput: false,
-      supportsObjectGeneration: true,
-      maxTokens: 131072,
-    }),
-  },
+
   {
     id: "openai/gpt-5.1-thinking",
     name: "GPT-5.1 Thinking",
@@ -129,8 +110,7 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     id: "openai/gpt-5",
     name: "GPT-5",
     provider: "openai",
-    description:
-      "Uno de los mejores modelo de OpenAI para tareas complejas",
+    description: "Uno de los mejores modelo de OpenAI para tareas complejas",
     contextWindow: 400000,
     isPremium: true,
     capabilities: mergeCapabilities({
@@ -312,7 +292,8 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
     id: "openai/gpt-oss-20b",
     name: "GPT OSS 20B",
     provider: "openai",
-    description: "Modelo de código abierto de tamaño medio optimizado para baja latencia",
+    description:
+      "Modelo de código abierto de tamaño medio optimizado para baja latencia",
     contextWindow: 131072,
     isPremium: false,
     capabilities: mergeCapabilities({
@@ -320,6 +301,94 @@ export const OPENAI_MODELS: BaseModelConfig[] = [
       supportsStreaming: true,
       supportsObjectGeneration: true,
       maxTokens: 131072,
+    }),
+  },
+
+  {
+    id: "openai/gpt-5.4-mini",
+    name: "GPT-5.4 Mini",
+    provider: "openai",
+    description: "Versión compacta y rápida de GPT-5.4 para tareas específicas",
+    contextWindow: 400000,
+    isPremium: false,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsPDFInput: true,
+      supportsObjectGeneration: true,
+      maxTokens: 16384,
+    }),
+  },
+  {
+    id: "openai/gpt-5.4-nano",
+    name: "GPT-5.4 Nano",
+    provider: "openai",
+    description: "Versión ultra-rápida y eficiente de GPT-5.4",
+    contextWindow: 400000,
+    isPremium: false,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsPDFInput: true,
+      supportsStreaming: true,
+      supportsObjectGeneration: true,
+      maxTokens: 16384,
+    }),
+  },
+  {
+    id: "openai/gpt-5.4-pro",
+    name: "GPT-5.4 Pro",
+    provider: "openai",
+    description:
+      "Versión profesional de GPT-5.4 con mayor capacidad y rendimiento",
+    contextWindow: 1050000,
+    isPremium: true,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsPDFInput: true,
+      supportsObjectGeneration: true,
+      maxTokens: 524288,
+    }),
+  },
+  {
+    id: "openai/gpt-5.3-chat",
+    name: "GPT-5.3 Chat",
+    provider: "openai",
+    description: "Modelo optimizado para conversación de la serie GPT-5.3",
+    contextWindow: 128000,
+    isPremium: false,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsPDFInput: true,
+      supportsObjectGeneration: true,
+      maxTokens: 131072,
+    }),
+  },
+  {
+    id: "openai/gpt-5.3-codex",
+    name: "GPT-5.3 Codex",
+    provider: "openai",
+    description:
+      "Modelo especializado en generación de código de la serie GPT-5.3",
+    contextWindow: 400000,
+    isPremium: false,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsPDFInput: true,
+      supportsObjectGeneration: true,
+      maxTokens: 16384,
     }),
   },
 ];
