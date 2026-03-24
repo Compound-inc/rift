@@ -700,7 +700,7 @@ const handleChatRequest = (
         const hasTools = Object.keys(tools).length > 0;
 
         const providerOptions = yield* Effect.try({
-          try: () => getProviderOptions(modelId, hasTools, auth.userId),
+          try: () => getProviderOptions(modelId, hasTools),
           catch: (error) =>
             new ModelError({
               message: "Failed to get provider options",

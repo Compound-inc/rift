@@ -55,8 +55,6 @@ export const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
 });
 
-globalThis.AI_SDK_DEFAULT_PROVIDER = openrouter.chat;
-
 // Model resolution
 const SHORTCUTS: Record<string, string> = {
   automatico: "openai/gpt-5.4-nano",
@@ -113,7 +111,6 @@ export function getLanguageModel(modelId: string) {
 export const getProviderOptions = (
   modelId: string,
   hasTools: boolean = false,
-  userId?: string,
 ) => {
   const baseOptions = {
     store: true,
@@ -131,7 +128,6 @@ export const getProviderOptions = (
   };
 
   return {
-    ...(userId ? { openrouter: { user: userId } } : {}),
     openai:
       isOpenAIModel && supportsReasoning(modelId)
         ? {
