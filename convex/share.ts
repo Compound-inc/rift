@@ -2,7 +2,7 @@ import { query, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { AuthMutation, AuthQuery } from "./helpers/authenticated";
-import { extractOrganizationIdFromJWT } from "./helpers/quota";
+import { extractOrganizationIdFromJWT } from "./helpers/identity";
 import { Data, Effect } from "effect";
 import { Id } from "./_generated/dataModel";
 import { threadInfoFields } from "./threads";

@@ -62,7 +62,7 @@ interface MembersListWithShellProps {
   currentUserId: string;
   seatQuantity?: number | null;
   totalMemberCount: number;
-  plan?: "free" | "plus" | "pro" | "enterprise" | null;
+  plan?: import("@/lib/plan-ids").PlanId | null;
 }
 
 

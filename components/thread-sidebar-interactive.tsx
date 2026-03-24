@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { useLocale } from "@/contexts/locale-context";
 import {
   usePaginatedQuery,
   useMutation,
   useConvexAuth,
-  useQuery,
   Authenticated,
   AuthLoading,
   Unauthenticated,
@@ -35,13 +35,7 @@ import { useThreadShare } from "@/lib/hooks/useThreadShare";
 import { ShareSettingsDialog } from "@/components/share/ShareSettingsDialog";
 import { prefetchCachedThreadMessages } from "@/lib/local-first/thread-messages-cache";
 import { useSelectedThreadStore } from "@/lib/stores/selected-thread-store";
-import {
-  getLastUserKey,
-  loadSidebarThreads,
-  saveSidebarThreads,
-  setLastUserKey,
-  type SidebarThread,
-} from "@/lib/local-first/sidebar-cache";
+import { useModel } from "@/contexts/model-context";
 
 interface Thread {
   threadId: string;
@@ -58,6 +52,7 @@ interface Thread {
   shareId?: string;
   shareStatus?: "active" | "revoked";
   sharedAt?: number;
+  model?: string;
 }
 
 const PAGE_SIZE = 20;
@@ -83,10 +78,14 @@ const sortThreads = (a: Thread, b: Thread) => {
 
 export function ThreadSidebarInteractive({
 }: {}) {
+  const lang = useLocale();
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const { closeSidebar, isMobile: isMobileViewport } = useChatSidebarControls();
   const selectedThreadId = useSelectedThreadStore((s) => s.selectedThreadId);
   const setSelectedThreadId = useSelectedThreadStore((s) => s.setSelectedThreadId);
+  const { setSelectedModel } = useModel();
+  const setSelectedModelRef = useRef(setSelectedModel);
+  setSelectedModelRef.current = setSelectedModel;
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -100,9 +99,6 @@ export function ThreadSidebarInteractive({
   const requestInFlightRef = useRef(false);
   const [optimisticTitles, setOptimisticTitles] = useState<Record<string, string>>({});
   const prefetchedThreadIdsRef = useRef<Set<string>>(new Set());
-  const [cachedThreads, setCachedThreads] = useState<Thread[] | null>(null);
-  const [cacheLoaded, setCacheLoaded] = useState(false);
-  const [userKey, setUserKey] = useState<string | null>(() => getLastUserKey());
   const {
     resolveShareState,
     handleToggleShare,
@@ -110,18 +106,6 @@ export function ThreadSidebarInteractive({
     handleUpdateShareSettings,
     handleRegenerateShareLink,
   } = useThreadShare();
-
-  const currentUser = useQuery(api.users.getCurrentUser, isAuthenticated ? {} : "skip");
-  useEffect(() => {
-    if (currentUser?.workos_id) {
-      if (userKey && userKey !== currentUser.workos_id) {
-        setCachedThreads(null);
-        setCacheLoaded(false);
-      }
-      setUserKey(currentUser.workos_id);
-      setLastUserKey(currentUser.workos_id);
-    }
-  }, [currentUser?.workos_id, userKey]);
 
   useEffect(() => {
     setHasHydrated(true);
@@ -202,34 +186,10 @@ export function ThreadSidebarInteractive({
     [paginated?.results],
   );
 
-  useEffect(() => {
-    if (!hasHydrated) return;
-    if (authLoading) return;
-    if (!userKey) return;
-    let cancelled = false;
-    setCacheLoaded(false);
-    void (async () => {
-      const cached = await loadSidebarThreads(userKey);
-      if (cancelled) return;
-      setCachedThreads((cached ?? null) as Thread[] | null);
-      setCacheLoaded(true);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [userKey, hasHydrated, authLoading]);
-
-  useEffect(() => {
-    if (!userKey) return;
-    if (!paginatedResults || paginatedResults.length === 0) return;
-    void saveSidebarThreads(userKey, paginatedResults as unknown as SidebarThread[], 15);
-  }, [userKey, paginatedResults]);
-
-  const baseThreads: Thread[] = useMemo(() => {
-    if (paginatedResults.length > 0) return paginatedResults;
-    if (cacheLoaded && cachedThreads && cachedThreads.length > 0) return cachedThreads;
-    return [];
-  }, [paginatedResults, cacheLoaded, cachedThreads]);
+  const baseThreads: Thread[] = useMemo(
+    () => paginatedResults ?? [],
+    [paginatedResults],
+  );
   const paginatedStatus = shouldUsePaginated
     ? paginated?.status ?? "LoadingFirstPage"
     : "Exhausted";
@@ -476,31 +436,27 @@ export function ThreadSidebarInteractive({
   }, []);
 
   const handleThreadNavigation = useCallback(
-    (threadId: string) => {
-      // Prefetch cached messages in parallel with route navigation (warms in-memory cache).
+    (threadId: string, model?: string) => {
+      // Restore active model to this thread's model when navigating (click path).
+      if (model) {
+        setSelectedModel(model);
+      }
       prefetchCachedThreadMessages(threadId);
-
-      // SPA thread switching: keep chat mounted and update URL via History API.
       setSelectedThreadId(threadId);
       if (isMobileViewport) {
         closeSidebar();
       }
     },
-    [closeSidebar, isMobileViewport, setSelectedThreadId],
+    [closeSidebar, isMobileViewport, setSelectedThreadId, setSelectedModel],
   );
 
   const handleThreadLinkClick = useCallback(
-    (threadId: string, event: React.MouseEvent<HTMLAnchorElement>) => {
-      if (editingThreadId === threadId) {
-        // While editing, clicking the row should focus the input (and never navigate).
+    (thread: Thread, event: React.MouseEvent<HTMLAnchorElement>) => {
+      if (editingThreadId === thread.threadId) {
         event.preventDefault();
         handleContainerClick(event as unknown as React.MouseEvent);
         return;
       }
-
-      // Allow normal link behavior for:
-      // - middle click / right click
-      // - cmd/ctrl/shift/alt modified clicks (open in new tab/window, etc.)
       if (
         event.button !== 0 ||
         event.metaKey ||
@@ -510,12 +466,27 @@ export function ThreadSidebarInteractive({
       ) {
         return;
       }
-
       event.preventDefault();
-      handleThreadNavigation(threadId);
+      handleThreadNavigation(thread.threadId, thread.model);
     },
     [editingThreadId, handleThreadNavigation, handleContainerClick],
   );
+
+  // Sync active model only when user navigates to a different thread (not when thread list refetches).
+  const previousSelectedThreadIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!selectedThreadId) {
+      previousSelectedThreadIdRef.current = null;
+      return;
+    }
+    const didNavigate = previousSelectedThreadIdRef.current !== selectedThreadId;
+    previousSelectedThreadIdRef.current = selectedThreadId;
+    if (!didNavigate) return;
+    const thread = combinedThreads.find((t) => t.threadId === selectedThreadId);
+    if (thread?.model) {
+      setSelectedModelRef.current(thread.model);
+    }
+  }, [selectedThreadId, combinedThreads]);
 
   // Idle prefetch: warm local-first cache (IndexedDB -> memory).
   useEffect(() => {
@@ -570,8 +541,8 @@ export function ThreadSidebarInteractive({
       <ContextMenu key={thread.threadId}>
         <ContextMenuTrigger>
           <a
-            href={`/chat/${thread.threadId}`}
-            onClick={(event) => handleThreadLinkClick(thread.threadId, event)}
+            href={`/${lang}/chat/${thread.threadId}`}
+            onClick={(event) => handleThreadLinkClick(thread, event)}
             onPointerEnter={() => {
               // Warm both the route and local-first cache on hover (mouse/pen).
               if (!prefetchedThreadIdsRef.current.has(thread.threadId)) {
@@ -767,25 +738,10 @@ export function ThreadSidebarInteractive({
     );
   };
 
-  const renderCachedOnlyList = () => {
-    if (!cacheLoaded || !cachedThreads || cachedThreads.length === 0) return null;
-    return (
-      <div
-        ref={scrollContainerRef}
-        className="sidebar-scroll-container h-full w-full overflow-y-auto"
-      >
-        {GROUP_ORDER.map((groupName) => renderThreadGroup(groupName, groupedThreads[groupName]))}
-        <div ref={sentinelRef} className="h-[1px] w-full" />
-      </div>
-    );
-  };
-
   return (
     <div className="flex h-full flex-col">
       <div className="flex-1 min-h-0">
-        <AuthLoading>
-          {renderCachedOnlyList()}
-        </AuthLoading>
+        <AuthLoading>{null}</AuthLoading>
         <Authenticated>
           {renderEmptyState() || (
             <div
@@ -799,9 +755,7 @@ export function ThreadSidebarInteractive({
             </div>
           )}
         </Authenticated>
-        <Unauthenticated>
-          {renderCachedOnlyList() || renderEmptyState()}
-        </Unauthenticated>
+        <Unauthenticated>{renderEmptyState()}</Unauthenticated>
       </div>
 
       {/* Button removed: automatic infinite scroll handles pagination */}

@@ -1,28 +1,15 @@
 import {
     internalQuery,
     internalMutation,
+    mutation,
   } from "../_generated/server";
   import { v } from "convex/values";
   import { internal } from "../_generated/api";
+  import { productStatusValidator, planValidator } from "../schema";
+  import { serverSecretArg, ensureServerSecret } from "../helpers/auth";
   
-  // Plan configurations for admin dashboard
-  const ADMIN_PLAN_CONFIGS = {
-    free: {
-      standardQuotaLimit: 20,
-      premiumQuotaLimit: 1,
-    },
-    plus: {
-      standardQuotaLimit: 1000,
-      premiumQuotaLimit: 100,
-    },
-    pro: {
-      standardQuotaLimit: 1500,
-      premiumQuotaLimit: 300,
-    },
-  } as const;
-    
   /**
-   * List all organizations with their data for admin dashboard
+   * List all organizations with their data for admin dashboard.
    */
   export const listAllOrganizations = internalQuery({
     args: {},
@@ -32,84 +19,16 @@ import {
         _creationTime: v.number(),
         workos_id: v.string(),
         name: v.string(),
-        plan: v.optional(v.union(v.literal("free"), v.literal("plus"), v.literal("pro"), v.literal("enterprise"))),
-        standardQuotaLimit: v.optional(v.number()),
-        premiumQuotaLimit: v.optional(v.number()),
-        billingCycleStart: v.optional(v.number()),
-        billingCycleEnd: v.optional(v.number()),
-        seatQuantity: v.optional(v.number()),
-        subscriptionStatus: v.optional(
-          v.union(
-            v.literal("active"),
-            v.literal("canceled"),
-            v.literal("incomplete"),
-            v.literal("incomplete_expired"),
-            v.literal("past_due"),
-            v.literal("trialing"),
-            v.literal("unpaid"),
-            v.literal("none"),
-          ),
-        ),
-        stripeCustomerId: v.optional(v.string()),
-        paymentMethodBrand: v.optional(v.string()),
-        paymentMethodLast4: v.optional(v.string()),
-        priceId: v.optional(v.string()),
-        subscriptionId: v.optional(v.string()),
-        cancelAtPeriodEnd: v.optional(v.boolean()),
+        plan: v.optional(v.union(planValidator, v.null())),
+        productStatus: v.optional(productStatusValidator),
       }),
     ),
     handler: async (ctx) => {
-      const organizations = await ctx.db.query("organizations").collect();
-      
-      return organizations;
+      return await ctx.db.query("organizations").collect();
     },
   });
   
-  /**
-   * Set organization plan and update quotas
-   */
-  export const setOrganizationPlan = internalMutation({
-    args: {
-      organizationId: v.id("organizations"),
-      plan: v.union(v.literal("free"), v.literal("plus"), v.literal("pro"), v.literal("enterprise")),
-      customStandardQuotaLimit: v.optional(v.number()),
-      customPremiumQuotaLimit: v.optional(v.number()),
-      seatQuantity: v.optional(v.number()),
-    },
-    returns: v.null(),
-    handler: async (ctx, args) => {
-      const organization = await ctx.db.get(args.organizationId);
-      
-      if (!organization) {
-        throw new Error(`Organization not found: ${args.organizationId}`);
-      }
-  
-      let standardQuotaLimit: number;
-      let premiumQuotaLimit: number;
 
-      if (args.plan === "enterprise") {
-        if (args.customStandardQuotaLimit === undefined || args.customPremiumQuotaLimit === undefined) {
-             throw new Error("Custom quotas required for enterprise plan");
-        }
-        standardQuotaLimit = args.customStandardQuotaLimit;
-        premiumQuotaLimit = args.customPremiumQuotaLimit;
-      } else {
-        const planConfig = ADMIN_PLAN_CONFIGS[args.plan];
-        standardQuotaLimit = planConfig.standardQuotaLimit;
-        premiumQuotaLimit = planConfig.premiumQuotaLimit;
-      }
-
-      await ctx.db.patch(args.organizationId, {
-        plan: args.plan,
-        standardQuotaLimit,
-        premiumQuotaLimit,
-        seatQuantity: args.seatQuantity,
-        subscriptionStatus: "active", // Set as active when admin assigns plan
-      });
-    },
-  });
-  
-  
   /**
    * Get organization by ID for admin operations
    */
@@ -123,30 +42,8 @@ import {
         _creationTime: v.number(),
         workos_id: v.string(),
         name: v.string(),
-        plan: v.optional(v.union(v.literal("free"), v.literal("plus"), v.literal("pro"), v.literal("enterprise"))),
-        standardQuotaLimit: v.optional(v.number()),
-        premiumQuotaLimit: v.optional(v.number()),
-        billingCycleStart: v.optional(v.number()),
-        billingCycleEnd: v.optional(v.number()),
-        seatQuantity: v.optional(v.number()),
-        subscriptionStatus: v.optional(
-          v.union(
-            v.literal("active"),
-            v.literal("canceled"),
-            v.literal("incomplete"),
-            v.literal("incomplete_expired"),
-            v.literal("past_due"),
-            v.literal("trialing"),
-            v.literal("unpaid"),
-            v.literal("none"),
-          ),
-        ),
-        stripeCustomerId: v.optional(v.string()),
-        paymentMethodBrand: v.optional(v.string()),
-        paymentMethodLast4: v.optional(v.string()),
-        priceId: v.optional(v.string()),
-        subscriptionId: v.optional(v.string()),
-        cancelAtPeriodEnd: v.optional(v.boolean()),
+        plan: v.optional(v.union(planValidator, v.null())),
+        productStatus: v.optional(productStatusValidator),
       }),
       v.null(),
     ),
@@ -180,15 +77,9 @@ import {
         throw new Error(`Organization not found: ${args.organizationId}`);
       }
 
-      // Update organization with cancellation data
       await ctx.db.patch(args.organizationId, {
-        subscriptionStatus: args.subscriptionStatus,
+        productStatus: args.subscriptionStatus,
         plan: undefined,
-        standardQuotaLimit: undefined,
-        premiumQuotaLimit: undefined,
-        billingCycleStart: undefined,
-        billingCycleEnd: undefined,
-        cancelAtPeriodEnd: undefined,
       });
     },
   });
@@ -218,13 +109,8 @@ import {
         throw new Error(`Organization not found: ${args.organizationId}`);
       }
 
-      if (!organization.billingCycleEnd) {
-        throw new Error(`Organization has no billing cycle end date: ${args.organizationId}`);
-      }
-
-      // Set cancelAtPeriodEnd flag
       await ctx.db.patch(args.organizationId, {
-        cancelAtPeriodEnd: true,
+        productStatus: args.subscriptionStatus,
       });
     },
   });

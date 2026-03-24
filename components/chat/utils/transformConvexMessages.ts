@@ -3,6 +3,7 @@ import type { UIMessage } from "ai";
 type ConvexThreadMessage = {
   messageId: string;
   role: "user" | "assistant" | "system";
+  model?: string;
   reasoning?: string;
   content?: string;
   attachments?: Array<{
@@ -27,6 +28,8 @@ export function transformConvexMessages(
   return messages.slice().reverse().map((m) => ({
     id: m.messageId,
     role: m.role,
+    metadata:
+      m.role === "assistant" && m.model ? { model: m.model } : undefined,
     parts: [
       ...(m.reasoning
         ? [{ type: "reasoning" as const, text: m.reasoning }]

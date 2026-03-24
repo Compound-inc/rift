@@ -2,29 +2,38 @@
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import { createStripePortalSession } from "@/actions/createStripePortalSession";
+import { useHasPermission } from "@/lib/permissions-client";
+import { getAutumnBillingPortalUrl } from "@/actions/getAutumnBillingPortalUrl";
 
-export function BillingButton({ stripeCustomerId }: { stripeCustomerId?: string }) {
+export function BillingButton({ workosId }: { workosId?: string }) {
   const [loading, setLoading] = useState(false);
+  const canManageBilling = useHasPermission("MANAGE_BILLING");
 
   const handleManageBilling = async () => {
-    if (!stripeCustomerId) return;
-    
+    if (!workosId || !canManageBilling) return;
+
     setLoading(true);
     try {
-      const { url } = await createStripePortalSession(stripeCustomerId);
-      if (url) {
-        window.location.href = url;
+      const returnUrl = typeof window !== "undefined" ? window.location.href : undefined;
+      const result = await getAutumnBillingPortalUrl(returnUrl);
+
+      if ("error" in result) {
+        console.error("Billing portal error:", result.error);
+        alert("No se pudo acceder al portal de facturación. Por favor intenta más tarde.");
+        return;
+      }
+      if (result.url) {
+        window.location.href = result.url;
       }
     } catch (error) {
-      console.error("Failed to redirect to billing portal:", error);
+      console.error("Failed to open billing portal:", error);
       alert("No se pudo acceder al portal de facturación. Por favor intenta más tarde.");
     } finally {
       setLoading(false);
     }
   };
 
-  if (!stripeCustomerId) return null;
+  if (!workosId || !canManageBilling) return null;
 
   return (
     <button

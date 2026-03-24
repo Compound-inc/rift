@@ -15,10 +15,6 @@ if (isProd) {
         path: '/api/generate-title',
         method: 'POST',
       },
-      {
-        path: '/api/subscribe',
-        method: 'POST',
-      },
     ],
   });
 

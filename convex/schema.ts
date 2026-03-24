@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { planValidator } from "./validators";
 
 export const providerMetadataValidor = v.optional(
   v.record(v.string(), v.any()),
@@ -16,6 +17,21 @@ export const MessagesStatusValidor = v.union(
   v.literal("cancelled"),
 );
 
+export const productStatusValidator = v.union(
+  v.literal("active"),
+  v.literal("expired"),
+  v.literal("scheduled"),
+  v.literal("trialing"),
+  v.literal("past_due"),
+  v.literal("canceled"),
+  v.literal("none"),
+  v.literal("incomplete"),
+  v.literal("incomplete_expired"),
+  v.literal("unpaid"),
+);
+
+export { planValidator } from "./validators";
+
 export default defineSchema({
   users: defineTable({
     email: v.string(),
@@ -23,42 +39,13 @@ export default defineSchema({
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     profilePictureUrl: v.optional(v.string()),
-    standardQuotaUsage: v.optional(v.number()),
-    premiumQuotaUsage: v.optional(v.number()),
-    lastQuotaResetAt: v.optional(v.number()),
   }).index("by_workos_id", ["workos_id"]),
   organizations: defineTable({
     workos_id: v.string(),
     name: v.string(),
-    stripeCustomerId: v.optional(v.string()),
-    billingCycleStart: v.optional(v.number()),
-    billingCycleEnd: v.optional(v.number()),
-    standardQuotaLimit: v.optional(v.number()),
-    premiumQuotaLimit: v.optional(v.number()),
-    // Plan field based on Stripe price lookup key
-    plan: v.optional(v.union(v.literal("free"), v.literal("plus"), v.literal("pro"), v.literal("enterprise"))),
-    seatQuantity: v.optional(v.number()),
-    // Stripe subscription data
-    subscriptionId: v.optional(v.string()),
-    subscriptionStatus: v.optional(
-      v.union(
-        v.literal("active"),
-        v.literal("canceled"),
-        v.literal("incomplete"),
-        v.literal("incomplete_expired"),
-        v.literal("past_due"),
-        v.literal("trialing"),
-        v.literal("unpaid"),
-        v.literal("none"),
-      ),
-    ),
-    priceId: v.optional(v.string()),
-    cancelAtPeriodEnd: v.optional(v.boolean()),
-    paymentMethodBrand: v.optional(v.string()),
-    paymentMethodLast4: v.optional(v.string()),
-  })
-    .index("by_workos_id", ["workos_id"])
-    .index("by_stripe_customer_id", ["stripeCustomerId"]),
+    plan: v.optional(v.union(planValidator, v.null())),
+    productStatus: v.optional(productStatusValidator),
+  }).index("by_workos_id", ["workos_id"]),
   threads: defineTable({
     threadId: v.string(), // User client Defined
     title: v.string(),
@@ -200,6 +187,7 @@ export default defineSchema({
   userConfiguration: defineTable({
     userId: v.string(),
     supermemoryEnabled: v.optional(v.boolean()),
+    onboardingCompleted: v.optional(v.boolean()),
   }).index("by_userId", ["userId"]),
 
   bugs: defineTable({

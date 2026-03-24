@@ -1,0 +1,272 @@
+{
+  "hero": {
+    "headline1": "All models,",
+    "headline2": "one platform",
+    "description": "Stop paying multiple subscriptions. RIFT unifies OpenAI, Anthropic, Google and more in one simple, powerful interface.",
+    "poweredBy": "Powered by the leaders",
+    "imageAlt": "RIFT Chat interface with multiple models",
+    "imageCaption": "View of the RIFT chat console combining leading models.",
+    "ctaChat": "Go to chat",
+    "ctaSubscribe": "Subscribe",
+    "ctaLoading": "Subscribe"
+  },
+  "skipToContent": "Skip to main content",
+  "chat": {
+    "title": "Chat",
+    "newChat": "New chat",
+    "placeholder": "New chat",
+    "send": "Send",
+    "inputPlaceholder": "Write a message..."
+  },
+  "navbar": {
+    "goHome": "Go to home",
+    "about": "About",
+    "pricing": "Pricing",
+    "models": "Models",
+    "mainNavLabel": "Main navigation",
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "goToChat": "Go to chat"
+  },
+  "footer": {
+    "tagline": "The best way to use Artificial Intelligence.",
+    "address": ["Av. Lago Zurich 219,", "Torre Carso II, Piso 12,", "Col. Ampliación Granada,", "Miguel Hidalgo, CDMX, MX. 11529"],
+    "product": "Product",
+    "company": "Company",
+    "support": "Support",
+    "features": "Features",
+    "availableModels": "Available models",
+    "pricing": "Pricing",
+    "integrations": "Integrations",
+    "updates": "Updates",
+    "about": "About",
+    "blog": "Blog",
+    "careers": "Careers",
+    "contact": "Contact",
+    "helpCenter": "Help center",
+    "documentation": "Documentation",
+    "status": "Service status",
+    "privacyPolicy": "Privacy policy",
+    "termsOfService": "Terms of service",
+    "copyright": "All rights reserved."
+  },
+  "whatIsRift": {
+    "label": "AI Platform?",
+    "heading": "What is RIFT?",
+    "body": "RIFT is our solution to the constant changes in the world of artificial intelligence, unifying all AI models in a single platform and giving users the opportunity not only to use one model but to access dozens of models, enabling users to grow, get better results and improve their experience."
+  },
+  "cta": {
+    "heading": "Ready to get started?",
+    "summary": "Start using RIFT for free and discover the power of AI.",
+    "signUp": "Sign up",
+    "signUpAria": "View pricing"
+  },
+  "pricing": {
+    "heading": "Simple, Transparent Plans",
+    "summary": "Choose the plan that best fits your needs. No hidden costs.",
+    "mostPopular": "Most Popular",
+    "promoFirstMonthFree": "First month free",
+    "promoFirstMonthPercentOff": "First month {percent}% off",
+    "promoThen": "then",
+    "featuresLabel": "Features of {planName}",
+    "customPrice": "Custom",
+    "plans": {
+      "plus": {
+        "description": "For users who want to try the power of AI.",
+        "buttonText": "Get started with Plus",
+        "features": ["1,000 standard messages", "100 premium messages", "Access to all models", "Limited chat history"]
+      },
+      "pro": {
+        "description": "For professionals who need more capacity.",
+        "buttonText": "Get Pro",
+        "features": ["2,700 standard messages", "270 premium messages", "Access to all models", "Priority support", "Unlimited chat history"]
+      },
+      "enterprise": {
+        "description": "For large teams with specific needs.",
+        "buttonText": "Contact Sales",
+        "features": ["Custom limits", "SSO (Single Sign-On)", "Audit logs", "SCIM integration", "Guaranteed SLA", "24/7 dedicated support"]
+      }
+    },
+    "button": {
+      "loading": "Subscribe",
+      "subscribe": "Subscribe",
+      "activeSubscription": "Active subscription",
+      "manage": "Manage",
+      "active": "Active",
+      "changeToPro": "Switch to Pro",
+      "changeToPlan": "Switch to {planName}"
+    }
+  },
+  "architecture": {
+    "label": "Architecture",
+    "heading": "Why we're different",
+    "fastResponses": "Fast responses",
+    "fastResponsesDesc": "When you send a message, RIFT finds the fastest available AI server and responds in milliseconds.",
+    "allModels": "All AI models in one place",
+    "allModelsDesc": "With RIFT you don't need to pay, manage or configure multiple AI services. Just use RIFT and enjoy a worry-free experience.",
+    "dataPrivacy": "Your data privacy",
+    "dataPrivacyDesc": "Unlike other free services, we take the security of your data seriously. We do not use your conversations or private data to train our models or sell them to third parties.",
+    "orgReady": "Ready for organizations",
+    "orgReadyDesc": "Give your organization members access in minutes by linking your Google Workspace, Microsoft Teams and many other platforms, with guides and tutorials.",
+    "advancedIntegrations": "Advanced integrations",
+    "advancedIntegrationsDesc": "We offer SCIM, JIT, Directory Sync, SSO/SAML/OIDC, audit logs and many other features for organizations."
+  },
+  "performance": {
+    "label": "Performance",
+    "heading": "Unmatched speed",
+    "intro": "Since creating RIFT, we knew speed was a key factor for team efficiency. That's why RIFT lets you work with models of up to 4,000 tokens per second, with no performance or latency issues.",
+    "oneSubscriptionHeading": "All models, one subscription",
+    "oneSubscription": "One subscription",
+    "oneSubscriptionDesc": "Access all AI models with a single subscription. No need for multiple accounts or separate payments.",
+    "chooseModels": "Choose from dozens of models",
+    "chooseModelsDesc": "Select the most suitable model for each task from our wide range of options.",
+    "noLimits": "No enterprise limitations",
+    "noLimitsDesc": "We don't limit you to one AI provider. Combine the best of each in a single platform.",
+    "bestResults": "Better results, faster and more secure",
+    "bestResultsDesc": "Get more accurate, faster and more secure answers by combining the best AI models on the market.",
+    "catalogHeading": "Explore our catalog",
+    "catalogSummary": "We have one of the most complete AI model libraries, constantly updated.",
+    "viewAllModels": "View all models",
+    "viewAllModelsAria": "View full model catalog",
+    "mockChatExamples": [
+      {
+        "user": "Explain quantum computing briefly",
+        "ai": "**Quantum computing** is a paradigm that leverages phenomena like *superposition* and *entanglement*.\n\nKey differences:\n- **Classical bits**: 0 or 1.\n- **Qubits**: 0, 1, or both at once.\n\nThis allows solving complex problems (e.g. cryptography) exponentially faster."
+      },
+      {
+        "user": "Generate a Fibonacci function in Python",
+        "ai": "Here's an optimized recursive implementation with memoization:\n\n```python\ndef fib(n, memo={}):\n    if n in memo: return memo[n]\n    if n <= 1: return n\n    memo[n] = fib(n-1, memo) + fib(n-2, memo)\n    return memo[n]\n```"
+      },
+      {
+        "user": "Study plan to learn classical physics in 1 month",
+        "ai": "### Week 1: Mechanics\n1. **Days 1-2**: Kinematics (linear and circular motion).\n2. **Days 3-4**: Dynamics (Newton's laws, forces).\n3. **Day 5**: Energy and work.\n\n### Week 2: Thermodynamics and Waves\n- **Thermodynamics**: Heat, temperature and laws.\n- **Waves**: Harmonic motion and mechanical waves.\n\n### Weeks 3-4: Electromagnetism\n- **Electrostatics**: Electric field and potential.\n- **Magnetism**: Magnetic field and Lorentz force.\n- **Induction**: Faraday's law and alternating currents."
+      }
+    ],
+    "modelDescriptions": {
+      "openai/gpt-5.2": "GPT-5.2 is OpenAI's most advanced and intelligent model.",
+      "openai/gpt-5.1-instant": "Conversational and responsive with adaptive reasoning and better instruction following.",
+      "openai/gpt-5.1-thinking": "Deep reasoning for complex problems with extended thinking.",
+      "openai/gpt-5": "Flagship model balancing intelligence and speed.",
+      "openai/gpt-5-mini": "A faster GPT-5 for specific tasks.",
+      "openai/gpt-5-nano": "Ultra-fast and efficient GPT-5 variant.",
+      "openai/o3": "Advanced reasoning model for difficult problems.",
+      "openai/o3-mini": "Compact reasoning model.",
+      "openai/o4-mini": "Efficient next-gen reasoning.",
+      "openai/gpt-4.1": "Most capable model without reasoning mode.",
+      "openai/gpt-4.1-mini": "Smaller, faster GPT-4.1.",
+      "openai/gpt-4o": "Fast, capable and flexible GPT model.",
+      "openai/gpt-4o-mini": "Compact and fast for targeted tasks.",
+      "openai/gpt-oss-120b": "OpenAI's most powerful open-source model.",
+      "openai/gpt-oss-20b": "Mid-size open-source model optimized for low latency.",
+      "anthropic/claude-opus-4.6": "Best model for coding and professional work.",
+      "anthropic/claude-opus-4.5": "Previous flagship. Most capable for complex problems, reasoning, and long context.",
+      "anthropic/claude-sonnet-4.5": "Latest in the Sonnet series with improvements over Sonnet 4.",
+      "anthropic/claude-sonnet-4": "Balances performance and efficiency with strong instruction following.",
+      "anthropic/claude-3.7-sonnet": "State-of-the-art for code, content, data analysis and planning.",
+      "anthropic/claude-3.5-sonnet": "Ideal balance of intelligence and speed.",
+      "anthropic/claude-haiku-4.5": "Haiku 4.5 matches Sonnet 4.5 intelligence with higher speed.",
+      "anthropic/claude-3.5-haiku": "Next-gen fastest Anthropic model.",
+      "anthropic/claude-3-haiku": "Quick analysis of large documents, reports and contracts.",
+      "google/gemini-3-flash": "Google's smartest model built for speed.",
+      "google/gemini-3-pro-preview": "Google's most capable model.",
+      "google/gemini-2.5-pro": "Google's most advanced reasoning Gemini.",
+      "google/gemini-2.5-flash": "Advanced thinking and full capabilities.",
+      "google/gemini-2.5-flash-image": "Fast image generation.",
+      "google/gemini-3-pro-image": "High-quality image generation.",
+      "google/gemini-2.0-flash": "Next-gen features and improved capabilities.",
+      "google/gemini-2.0-flash-lite": "Lightweight with optimized capabilities.",
+      "xai/grok-4.1-fast-non-reasoning": "Fast Grok for everyday use.",
+      "xai/grok-4-fast-non-reasoning": "Fast Grok 4 for general tasks.",
+      "xai/grok-code-fast-1": "Optimized for code.",
+      "xai/grok-3": "Powerful Grok model.",
+      "xai/grok-3-mini": "Compact Grok 3.",
+      "deepseek/deepseek-v3.1": "Latest flagship with advanced reasoning and multimodal support.",
+      "deepseek/deepseek-v3": "High performance across many domains.",
+      "mistral/mistral-medium": "Mistral's state-of-the-art model.",
+      "mistral/codestral": "Leading code model for low latency and high throughput.",
+      "moonshotai/kimi-k2.5": "Versatile 262K context with images, tools and reasoning.",
+      "moonshotai/kimi-k2": "Strong general and reasoning model.",
+      "moonshotai/kimi-k2-thinking": "Deep reasoning with long context.",
+      "zai/glm-4.6v": "Multimodal GLM 4.6.",
+      "zai/glm-4.6": "Latest GLM 4.6.",
+      "zai/glm-4.5v": "Multimodal GLM 4.5.",
+      "zai/glm-4.5": "Capable GLM 4.5.",
+      "zai/glm-4.5-air": "Lightweight GLM 4.5.",
+      "prime-intellect/intellect-3": "Prime Intellect flagship model."
+    }
+  },
+  "integrations": {
+    "label": "Integrations",
+    "heading": "Connect RIFT with your organization",
+    "intro": "Instant, friction-free implementation. Automatically sync users and groups with the tools you already use.",
+    "supportNote": "Support for SCIM, JIT, Directory Sync, SSO (SAML/OIDC), MFA policies and advanced audit logs."
+  },
+  "faq": {
+    "label": "FAQ",
+    "heading": "Frequently asked questions",
+    "summary": "We answer your questions about RIFT and how we can help you get the most out of AI.",
+    "items": [
+      {
+        "question": "What is RIFT?",
+        "answer": "RIFT is a web platform that gives you access to the world's most advanced AI models under one subscription, eliminating the need to manage and pay for multiple services separately."
+      },
+      {
+        "question": "What AI models are available?",
+        "answer": "We offer access to a wide range of leading models, including OpenAI's GPT family, Anthropic's Claude, Google's Gemini, xAI, DeepSeek and open-source models like Mistral. We constantly add the latest models as soon as they are released."
+      },
+      {
+        "question": "What's the difference between standard and premium messages?",
+        "answer": "The most advanced and powerful models use your 'premium' message quota, while lighter, faster models use the 'standard' quota. This lets you use the right model for each task."
+      },
+      {
+        "question": "How do plans and limits work?",
+        "answer": "The Plus plan includes 1,000 standard and 100 premium messages per month. The Pro plan increases this to 2,700 standard and 270 premium with priority support. If you need custom limits or corporate billing, the Enterprise plan is for you."
+      },
+      {
+        "question": "Do you offer enterprise integrations?",
+        "answer": "Yes, RIFT Enterprise integrates with your existing infrastructure. We support directory sync with Google Workspace, Microsoft 365 and Okta via SCIM, plus Single Sign-On (SSO) and advanced audit logs to meet your security requirements."
+      },
+      {
+        "question": "Can I cancel at any time?",
+        "answer": "Absolutely. You can cancel your subscription at any time from your dashboard. There are no mandatory terms or penalties for Plus and Pro plans."
+      },
+      {
+        "question": "How do you handle my data privacy?",
+        "answer": "Your privacy is fundamental. All data is encrypted at rest. Unlike free services, we do not use your conversations or private data to train our models."
+      }
+    ]
+  },
+  "modelsPage": {
+    "title": "Model Catalog",
+    "description": "Explore all AI models available on RIFT, from GPT-5.1 Thinking to Gemini 3 Pro and Mistral, on a single platform.",
+    "intro": "Explore our extensive library of artificial intelligence models. From advanced reasoning models to models specialized in code and creativity.",
+    "searchPlaceholder": "Search models (e.g. GPT-4, Claude, Gemini)...",
+    "noResults": "No models found matching your search.",
+    "capabilities": {
+      "supportsTools": "Tools",
+      "supportsReasoning": "Reasoning",
+      "supportsImageInput": "Vision",
+      "supportsPDFInput": "PDF"
+    }
+  },
+  "onboarding": {
+    "modelSelectorTitle": "Choose your AI model",
+    "modelSelectorBody": "Here you can select your preferred AI model for this conversation. We have GPT, Claude, Gemini and more available.",
+    "modelSelectorDialogTitle": "Select the AI model you prefer",
+    "modelSelectorDialogBody": "Choose from our recommended models or search for the one you want.",
+    "modelSelectorProvidersTitle": "Filter by provider",
+    "modelSelectorProvidersBody": "Click the provider you prefer and choose from all its models.",
+    "searchToggleTitle": "Web search",
+    "searchToggleBody": "Enable web search so the AI can look up up-to-date information, patents, papers, and documents.",
+    "attachFilesTitle": "Attach files",
+    "attachFilesBody": "You can attach images, PDFs and other files to your messages so the model can use them in its responses.",
+    "customInstructionsTitle": "Custom instructions",
+    "customInstructionsBody": "Add fixed instructions for this chat (tone, language, format) that the model will follow in every response.",
+    "doneTitle": "You're all set",
+    "doneBody": "You can start chatting. Type your message and pick the model you prefer.",
+    "next": "Next",
+    "previous": "Previous",
+    "skip": "Skip",
+    "done": "Done"
+  }
+}

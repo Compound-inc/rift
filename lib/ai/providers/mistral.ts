@@ -41,6 +41,20 @@ export const DEFAULT_MISTRAL_SETTINGS: MistralSettings = {
 // Mistral model configurations
 export const MISTRAL_MODELS: BaseModelConfig[] = [
   {
+    id: "mistral/devstral-2",
+    name: "Devstral 2",
+    provider: "mistral",
+    description: "Modelo empresarial optimizado para agentes de ingeniería de software con fuerte uso de herramientas.",
+    contextWindow: 128000,
+    isPremium: false,
+    capabilities: mergeCapabilities({
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsObjectGeneration: true,
+      maxTokens: 256000,
+    }),
+  },
+  {
     id: "mistral/mistral-medium",
     name: "Mistral Medium",
     provider: "mistral",

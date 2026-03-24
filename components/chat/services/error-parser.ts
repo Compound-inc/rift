@@ -2,6 +2,7 @@ import { Effect } from "effect";
 import {
   QuotaExceededError,
   NoSubscriptionError,
+  SeatLimitError,
   AbortError,
   NetworkError,
   ServerError,
@@ -18,6 +19,7 @@ type ErrorCode =
   | "AUTH_ERROR"
   | "NO_ORGANIZATION"
   | "NO_SUBSCRIPTION"
+  | "SEAT_LIMIT"
   | "QUOTA_EXCEEDED"
   | "ABORTED"
   | "MODEL_ERROR"
@@ -81,6 +83,7 @@ const tryParseJson = (message: string): ServerErrorResponse | null => {
 export type ParsedServerError =
   | QuotaExceededError
   | NoSubscriptionError
+  | SeatLimitError
   | AbortError
   | NetworkError
   | ServerError;
@@ -110,6 +113,13 @@ export const parseServerError = (
         case "NO_SUBSCRIPTION":
           return new NoSubscriptionError({
             message: response.message || "No active subscription",
+          });
+
+        case "SEAT_LIMIT":
+          return new SeatLimitError({
+            message:
+              response.message ||
+              "Su organización ha alcanzado el número máximo de usuarios. Pueden contactar a los administradores de la organización para aumentar el límite de usuarios.",
           });
 
         case "QUOTA_EXCEEDED":
@@ -182,6 +192,13 @@ export const isNoSubscriptionError = (
 ): error is NoSubscriptionError => error._tag === "NoSubscriptionError";
 
 /**
+ * Check if an error indicates the org seat limit was reached.
+ */
+export const isSeatLimitError = (
+  error: ChatError
+): error is SeatLimitError => error._tag === "SeatLimitError";
+
+/**
  * Check if an error was caused by user abort.
  */
 export const isAbortError = (error: ChatError): error is AbortError =>
@@ -202,7 +219,9 @@ export const shouldShowErrorToast = (error: ChatError): boolean => {
       return false; // Don't show toast for user-cancelled operations
     case "QuotaExceededError":
     case "NoSubscriptionError":
-      return false; // These show dialogs instead
+      return false;
+    case "SeatLimitError":
+      return true;
     case "ServerError":
     case "NetworkError":
     case "MessageSubmitError":

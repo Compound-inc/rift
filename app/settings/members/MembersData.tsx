@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getPaginatedOrganizationMembers, getOrganizationMemberCount, getOrganizationSeatsAndPlan } from "@/actions/getOrganizationMembers";
+import {
+  getPaginatedOrganizationMembers,
+  getOrganizationMemberCount,
+  getOrganizationPlanAndSeatLimit,
+  type OrganizationPlan,
+} from "@/actions/getOrganizationMembers";
 import { MembersContent } from "./MembersContent";
 import { MembersSkeleton } from "./MembersSkeleton";
 
@@ -13,7 +18,7 @@ export function MembersData({ currentUserId }: MembersDataProps) {
   const [initialData, setInitialData] = useState<Awaited<ReturnType<typeof getPaginatedOrganizationMembers>> | null>(null);
   const [totalMemberCount, setTotalMemberCount] = useState<number | null>(null);
   const [seatQuantity, setSeatQuantity] = useState<number | null>(null);
-  const [plan, setPlan] = useState<"free" | "plus" | "pro" | "enterprise" | null>(null);
+  const [plan, setPlan] = useState<OrganizationPlan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -25,7 +30,7 @@ export function MembersData({ currentUserId }: MembersDataProps) {
         const [data, count, seatsAndPlan] = await Promise.all([
           getPaginatedOrganizationMembers(50),
           getOrganizationMemberCount().catch(() => 0),
-          getOrganizationSeatsAndPlan().catch(() => ({ seatQuantity: null, plan: null })),
+          getOrganizationPlanAndSeatLimit().catch(() => ({ seatQuantity: null, plan: null })),
         ]);
         
         if (!cancelled) {

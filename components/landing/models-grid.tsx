@@ -18,9 +18,24 @@ import {
   FileIcon,
   SearchIcon,
 } from "lucide-react";
+import type { Dictionary } from "@/types/dictionary";
 
-export function ModelsGrid() {
+const DEFAULT_CAPABILITIES = {
+  supportsTools: "Tools",
+  supportsReasoning: "Reasoning",
+  supportsImageInput: "Vision",
+  supportsPDFInput: "PDF",
+} as const;
+
+type ModelsGridProps = {
+  dict: Dictionary;
+  modelDescriptions?: Record<string, string>;
+};
+
+export function ModelsGrid({ dict, modelDescriptions }: ModelsGridProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const m = dict.modelsPage;
+  const capabilityLabels = m.capabilities;
 
   // Provider icon mapping
   const providerIcons = {
@@ -44,14 +59,6 @@ export function ModelsGrid() {
     supportsPDFInput: FileIcon,
   } as const;
 
-  // Capability descriptions
-  const capabilityDescriptions = {
-    supportsTools: "Tools",
-    supportsReasoning: "Reasoning",
-    supportsImageInput: "Vision",
-    supportsPDFInput: "PDF",
-  } as const;
-
   // Provider display names
   const providerNames = {
     openai: "OpenAI",
@@ -65,12 +72,18 @@ export function ModelsGrid() {
     "prime-intellect": "Prime Intellect",
   } as const;
 
-  // Filter models based on search query
-  const filteredModels = MODELS.filter(model => 
-    model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    model.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    model.provider.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter models based on search query (include translated description when present)
+  const getModelDescription = (model: (typeof MODELS)[number]) =>
+    modelDescriptions?.[model.id] ?? model.description;
+  const filteredModels = MODELS.filter((model) => {
+    const q = searchQuery.toLowerCase();
+    const desc = getModelDescription(model);
+    return (
+      model.name.toLowerCase().includes(q) ||
+      desc.toLowerCase().includes(q) ||
+      model.provider.toLowerCase().includes(q)
+    );
+  });
 
   // Group filtered models by provider
   const groupedModels = filteredModels.reduce((acc, model) => {
@@ -89,7 +102,7 @@ export function ModelsGrid() {
           <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 size-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
           <input
             type="text"
-            placeholder="Buscar modelos (ej. GPT-4, Claude, Gemini)..."
+            placeholder={m.searchPlaceholder}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-3 border border-gray-200 dark:border-border rounded-xl bg-white/50 dark:bg-popover-secondary backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
@@ -139,7 +152,7 @@ export function ModelsGrid() {
                     </div>
                     
                     <p className="text-xs text-gray-600 dark:text-text-muted mb-3 line-clamp-2 flex-grow">
-                      {model.description}
+                      {getModelDescription(model)}
                     </p>
                     
                     {/* Capabilities Pills - Minimal */}
@@ -163,7 +176,7 @@ export function ModelsGrid() {
                             <div
                               key={capability}
                               className="inline-flex items-center justify-center size-6 rounded-full bg-gray-50 dark:bg-popover-secondary text-gray-600 dark:text-text-muted border border-gray-200 dark:border-border"
-                              title={capabilityDescriptions[capability as keyof typeof capabilityDescriptions]}
+                              title={capabilityLabels[capability as keyof typeof capabilityLabels] ?? DEFAULT_CAPABILITIES[capability as keyof typeof DEFAULT_CAPABILITIES]}
                             >
                               <IconComponent className="size-3" />
                             </div>
@@ -187,7 +200,7 @@ export function ModelsGrid() {
             <div className="inline-flex items-center justify-center size-12 rounded-full bg-gray-100 dark:bg-popover-secondary mb-4">
               <SearchIcon className="size-6 text-gray-400" />
             </div>
-            <p className="text-gray-500 dark:text-text-muted">No se encontraron modelos que coincidan con tu búsqueda.</p>
+            <p className="text-gray-500 dark:text-text-muted">{m.noResults}</p>
           </div>
         )}
       </div>

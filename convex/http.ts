@@ -4,81 +4,53 @@ import { internal } from "./_generated/api";
 
 const http = httpRouter();
 
-// Protected endpoint to sync Stripe customer ID to an organization by WorkOS ID
 http.route({
-  path: "/sync-stripe-customer",
+  path: "/autumn-webhook",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
-    const authHeader = request.headers.get("authorization") || "";
-    const expected = `Bearer ${process.env.CONVEX_SYNC_SECRET ?? ""}`;
-    if (!process.env.CONVEX_SYNC_SECRET || authHeader !== expected) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
+    if (!process.env.AUTUMN_WEBHOOK_SECRET) {
+      console.error("[Autumn webhook] AUTUMN_WEBHOOK_SECRET is not set");
+      return new Response(
+        JSON.stringify({ error: "AUTUMN_WEBHOOK_SECRET is not set" }),
+        { status: 500, headers: { "Content-Type": "application/json" } },
+      );
     }
 
-    const body = await request.json();
-    const { workos_id, stripeCustomerId } = body ?? {};
-    if (!workos_id || !stripeCustomerId) {
-      return new Response(JSON.stringify({ error: "Missing fields" }), {
-        status: 400,
+    const payload = await request.text();
+    const svixId = request.headers.get("svix-id") ?? "";
+    const svixTimestamp = request.headers.get("svix-timestamp") ?? "";
+    const svixSignature = request.headers.get("svix-signature") ?? "";
+
+    try {
+      const result = await ctx.runAction(internal.autumn.handleAutumnWebhook, {
+        payload,
+        svixId,
+        svixTimestamp,
+        svixSignature,
+      });
+
+      return new Response(JSON.stringify(result), {
+        status: 200,
         headers: { "Content-Type": "application/json" },
       });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Invalid webhook signature";
+      const msg = typeof message === "string" ? message : "";
+      const status =
+        msg === "Invalid webhook signature"
+          ? 401
+          : msg.includes("Organization not found")
+            ? 503
+            : 500;
+      console.error("[Autumn webhook] Failed:", message, "status:", status);
+      return new Response(
+        JSON.stringify({ error: message }),
+        {
+          status,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
-
-    await ctx.runMutation(
-      internal.organizations.setStripeCustomerIdByWorkOSId,
-      {
-        workos_id,
-        stripeCustomerId,
-      },
-    );
-
-    return new Response(JSON.stringify({ status: "ok" }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  }),
-});
-
-// Protected endpoint to get organization by WorkOS ID
-http.route({
-  path: "/get-organization-by-workos-id",
-  method: "POST",
-  handler: httpAction(async (ctx, request) => {
-    const authHeader = request.headers.get("authorization") || "";
-    const expected = `Bearer ${process.env.CONVEX_SYNC_SECRET ?? ""}`;
-    if (!process.env.CONVEX_SYNC_SECRET || authHeader !== expected) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    const body = await request.json();
-    const { workos_id } = body ?? {};
-    if (!workos_id) {
-      return new Response(JSON.stringify({ error: "Missing workos_id" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    const organization = await ctx.runQuery(
-      internal.organizations.getByWorkOSId,
-      { workos_id },
-    );
-
-    // Return only the stripeCustomerId to minimize data transfer
-    const response = {
-      stripeCustomerId: organization?.stripeCustomerId || null,
-    };
-
-    return new Response(JSON.stringify(response), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
   }),
 });
 
@@ -191,15 +163,18 @@ http.route({
           );
 
           if (!organization?._id) {
-            // TODO: compose more sophisticated error messaging?
-            throw new Error(
-              `Unhandled event type: organization not found: ${data.id}.`,
-            );
+            await ctx.runMutation(internal.organizations.createOrganization, {
+              name: data.name,
+              workos_id: data.id,
+            });
+            break;
           }
+
+          const patch = { name: data.name };
 
           await ctx.runMutation(internal.organizations.updateOrganization, {
             id: organization._id,
-            patch: { name: data.name },
+            patch,
           });
 
           break;
@@ -250,150 +225,6 @@ http.route({
   }),
 });
 
-// Stripe webhook endpoint
-http.route({
-  path: "/stripe-webhook",
-  method: "POST",
-  handler: httpAction(async (ctx, request) => {
-    const bodyText = await request.text();
-    const sigHeader = request.headers.get("stripe-signature");
-
-    if (!sigHeader) {
-      return new Response(
-        JSON.stringify({ error: "Missing stripe-signature header" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    try {
-      // Verify the webhook signature
-      const event = await ctx.runAction(internal.stripe.verifyStripeWebhook, {
-        payload: bodyText,
-        signature: sigHeader,
-      });
-
-      // Handle the webhook event
-      const result = await ctx.runAction(internal.stripe.processStripeEvent, {
-        event,
-      });
-
-      return new Response(
-        JSON.stringify({
-          status: "success",
-          eventType: result.eventType,
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    } catch (error) {
-      console.error("Stripe webhook error:", error);
-
-      return new Response(
-        JSON.stringify({ error: "Webhook processing failed" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-  }),
-});
-
-// Stripe success endpoint
-// Eagerly sync Stripe subscription data to minimize race with webhooks
-http.route({
-  path: "/stripe-success",
-  method: "POST",
-  handler: httpAction(async (ctx, request) => {
-    try {
-      // Protect with shared secret
-      const authHeader = request.headers.get("authorization") || "";
-      const expected = `Bearer ${process.env.CONVEX_SYNC_SECRET ?? ""}`;
-      if (!process.env.CONVEX_SYNC_SECRET || authHeader !== expected) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-
-      const body = await request.json();
-      const { workosOrganizationId } = body;
-
-      if (!workosOrganizationId) {
-        return new Response(
-          JSON.stringify({ error: "Missing workosOrganizationId" }),
-          {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          },
-        );
-      }
-
-      // Confirm the organization exists
-      const organization = await ctx.runQuery(
-        internal.organizations.getByWorkOSId,
-        {
-          workos_id: workosOrganizationId,
-        },
-      );
-
-      if (!organization) {
-        return new Response(
-          JSON.stringify({ error: "Organization not found" }),
-          {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          },
-        );
-      }
-
-      if (!organization.stripeCustomerId) {
-        return new Response(
-          JSON.stringify({
-            error: "Organization missing Stripe customer ID",
-          }),
-          {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          },
-        );
-      }
-
-      // Eagerly sync latest subscription snapshot from Stripe
-      const synced = await ctx.runAction(
-        internal.organizations.syncStripeDataWithPeriod,
-        {
-          stripeCustomerId: organization.stripeCustomerId,
-          // billingPeriod can be omitted; current period derived from Stripe
-        },
-      );
-
-      return new Response(
-        JSON.stringify({
-          status: "success",
-          synced,
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    } catch (error) {
-      console.error("Stripe success endpoint error:", error);
-
-      return new Response(JSON.stringify({ error: "Request failed" }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-  }),
-});
-
 // Admin endpoints - protected with CONVEX_ADMIN_TOKEN
 http.route({
   path: "/admin/organizations",
@@ -422,59 +253,6 @@ http.route({
     } catch (error) {
       console.error("Admin organizations list error:", error);
       return new Response(JSON.stringify({ error: "Failed to fetch organizations" }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-  }),
-});
-
-http.route({
-  path: "/admin/organizations/set-plan",
-  method: "POST",
-  handler: httpAction(async (ctx, request) => {
-    const authHeader = request.headers.get("authorization") || "";
-    const expected = `Bearer ${process.env.CONVEX_ADMIN_TOKEN ?? ""}`;
-    if (!process.env.CONVEX_ADMIN_TOKEN || authHeader !== expected) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    try {
-      const body = await request.json();
-      const { organizationId, plan, customStandardQuotaLimit, customPremiumQuotaLimit, seatQuantity } = body ?? {};
-      
-      if (!organizationId || !plan) {
-        return new Response(JSON.stringify({ error: "Missing organizationId or plan" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-
-      if (plan !== "plus" && plan !== "pro" && plan !== "enterprise") {
-        return new Response(JSON.stringify({ error: "Invalid plan. Must be 'plus', 'pro' or 'enterprise'" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-
-      await ctx.runMutation(internal.admin.organizations.setOrganizationPlan, {
-        organizationId,
-        plan,
-        customStandardQuotaLimit,
-        customPremiumQuotaLimit,
-        seatQuantity,
-      });
-
-      return new Response(JSON.stringify({ status: "success" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    } catch (error) {
-      console.error("Admin set plan error:", error);
-      return new Response(JSON.stringify({ error: "Failed to set organization plan" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
       });

@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       // Preserve plan parameter if present, so it can be handled by the router or subsequent page
       if (state.plan) {
           const separator = returnPathname.includes('?') ? '&' : '?';
-          returnPathname = `${returnPathname}${separator}plan=${state.plan}`;
+          returnPathname = `${returnPathname}${separator}plan=${encodeURIComponent(state.plan)}`;
       }
     } catch (e) {
     }

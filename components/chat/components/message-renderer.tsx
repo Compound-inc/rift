@@ -7,13 +7,6 @@ import {
   CheckIcon,
   EditIcon,
 } from "@/components/ui/icons/svg-icons";
-import {
-  Tool,
-  ToolHeader,
-  ToolContent,
-  ToolInput,
-  ToolOutput,
-} from "@/components/ai/tool";
 import { Message, MessageContent } from "@/components/ai/message";
 import { MemoResponse } from "@/components/ai/memo-response";
 import { Actions, Action } from "@/components/ai/actions";
@@ -29,7 +22,9 @@ import {
   SourcesTrigger,
 } from "@/components/ai/sources";
 import { Loader } from "@/components/ai/loader";
+import { getModel, getModelShortcutDisplayName } from "@/lib/ai/ai-providers";
 import type { UIMessage } from "ai";
+import { isToolUIPart } from "ai";
 import React, { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import Image from "next/image";
 
@@ -40,10 +35,30 @@ function useLatest<T>(value: T) {
   return ref;
 }
 
+// Cache resolved display names
+const modelDisplayNameCache = new Map<string, string>();
+
+function getModelDisplayName(value: string | undefined): string | null {
+  if (!value) return null;
+  const cached = modelDisplayNameCache.get(value);
+  if (cached !== undefined) return cached;
+  // Prefer shortcut label (e.g. "Automatico", "Problemas dificiles") when the model matches one
+  const shortcutLabel = getModelShortcutDisplayName(value);
+  if (shortcutLabel) {
+    modelDisplayNameCache.set(value, shortcutLabel);
+    return shortcutLabel;
+  }
+  // Otherwise show model name or id
+  const resolved = value.includes("/") ? getModel(value)?.name ?? value : value;
+  modelDisplayNameCache.set(value, resolved);
+  return resolved;
+}
+
 const MessageActions = React.memo(function MessageActions({
   messageId,
   messageRole,
   messageParts,
+  modelDisplayName,
   onRegenerateAssistantMessage,
   onRegenerateAfterUserMessage,
   onStartEdit,
@@ -52,6 +67,7 @@ const MessageActions = React.memo(function MessageActions({
   messageId: string;
   messageRole: "user" | "assistant" | "system";
   messageParts: UIMessage["parts"];
+  modelDisplayName?: string | null;
   onRegenerateAssistantMessage: (messageId: string) => void;
   onRegenerateAfterUserMessage: (messageId: string) => void;
   onStartEdit?: () => void;
@@ -91,7 +107,7 @@ const MessageActions = React.memo(function MessageActions({
 
   if (messageRole === "assistant") {
     return (
-      <div className="px-0">
+      <div className="px-0 flex items-center gap-2 flex-wrap">
         <Actions className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity justify-start">
           <Action
             onClick={handleRegenerateAssistant}
@@ -110,6 +126,14 @@ const MessageActions = React.memo(function MessageActions({
             {isCopied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
           </Action>
         </Actions>
+        {modelDisplayName ? (
+          <span
+            className="mt-1 text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+            aria-label={`Modelo: ${modelDisplayName}`}
+          >
+            {modelDisplayName}
+          </span>
+        ) : null}
       </div>
     );
   }
@@ -149,6 +173,17 @@ const MessageActions = React.memo(function MessageActions({
   }
 
   return null;
+}, (prevProps, nextProps) => {
+  // Uses ref pattern internally for callbacks, so only compare stable props.
+  // messageParts uses ref internally (useLatest), so skip reference comparison
+  // to avoid re-renders when server data replaces cache with same content.
+  return (
+    prevProps.messageId === nextProps.messageId &&
+    prevProps.messageRole === nextProps.messageRole &&
+    prevProps.disableRegenerate === nextProps.disableRegenerate &&
+    !!prevProps.onStartEdit === !!nextProps.onStartEdit &&
+    prevProps.modelDisplayName === nextProps.modelDisplayName
+  );
 });
 
 interface MessageRendererProps {
@@ -159,6 +194,7 @@ interface MessageRendererProps {
   onEditUserMessage?: (messageId: string, newText: string) => Promise<void> | void;
   disableRegenerate?: boolean;
   onResponseReady?: (messageId: string) => void;
+  embedInRow?: boolean;
 }
 
 export const MessageRenderer = React.memo(function MessageRenderer({
@@ -169,6 +205,7 @@ export const MessageRenderer = React.memo(function MessageRenderer({
   onEditUserMessage,
   disableRegenerate = false,
   onResponseReady,
+  embedInRow,
 }: MessageRendererProps) {
   const [isEditing, setIsEditing] = useState(false);
   const textValue = message.parts
@@ -245,7 +282,6 @@ export const MessageRenderer = React.memo(function MessageRenderer({
     ),
   }), [message.parts]);
 
-  // Direct render without useCallback - React Compiler will optimize this
   const messageContent = (
     <>
       {reasoningParts.length > 0 && (
@@ -271,18 +307,25 @@ export const MessageRenderer = React.memo(function MessageRenderer({
         </Reasoning>
       )}
 
-      {message.parts.map((part, partIdx: number) => {
+      {(() => {
+        let textIdx = 0;
+        return message.parts.map((part) => {
         if (part.type === "reasoning" || part.type === "source-url" || part.type === "file") {
           return null;
         }
 
+        if (isToolUIPart(part)) {
+          return null;
+        }
+
         if (part.type === "text" && "text" in part) {
+          const idx = textIdx++;
           if (message.role === "assistant") {
             return (
               <MemoResponse
-                key={`${message.id}-${partIdx}`}
+                key={`${message.id}-text-${idx}`}
                 messageId={message.id}
-                partIdx={partIdx}
+                partIdx={idx}
                 onReady={handleResponseReady}
                 text={part.text}
                 isStreaming={isStreaming}
@@ -291,102 +334,16 @@ export const MessageRenderer = React.memo(function MessageRenderer({
           }
           return (
             <div
-              key={`${message.id}-${partIdx}`}
+              key={`${message.id}-text-${idx}`}
               className="whitespace-pre-wrap break-words"
             >
               {part.text}
             </div>
           );
         }
-        if (part.type === "tool-call") {
-          const toolCall = part as {
-            toolName?: string;
-            args?: unknown;
-          };
-          const toolName = toolCall.toolName || "tool";
-
-          return (
-            <Tool
-              key={`${message.id}-${partIdx}`}
-              className="my-2 border-blue-200 bg-blue-50/50"
-            >
-              <ToolHeader
-                type={
-                  `tool-${toolName}` as `tool-${string}`
-                }
-                state="input-available"
-              />
-              <ToolContent>
-                <ToolInput input={toolCall.args || {}} />
-              </ToolContent>
-            </Tool>
-          );
-        }
-        if (part.type === "tool-result") {
-          const toolResult = part as {
-            toolName?: string;
-            result?: unknown;
-            isError?: boolean;
-          };
-          const toolName = toolResult.toolName || "tool";
-
-          return (
-            <Tool
-              key={`${message.id}-${partIdx}`}
-              className="my-2 border-green-200 bg-green-50/50"
-            >
-              <ToolHeader
-                type={
-                  `tool-${toolName}` as `tool-${string}`
-                }
-                state={
-                  toolResult.isError
-                    ? "output-error"
-                    : "output-available"
-                }
-              />
-              <ToolContent>
-                <ToolOutput
-                  output={
-                    toolName === "google_search" ||
-                    toolName === "url_context" ? (
-                      <div className="p-3 text-sm">
-                        <div className="text-green-700 font-medium mb-2">
-                          ✓ Información recuperada exitosamente
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          El contenido ha sido analizado e
-                          integrado en la respuesta anterior.
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-3">
-                        <pre className="whitespace-pre-wrap text-xs">
-                          {typeof toolResult.result ===
-                          "string"
-                            ? toolResult.result
-                            : JSON.stringify(
-                                toolResult.result,
-                                null,
-                                2,
-                              )}
-                        </pre>
-                      </div>
-                    )
-                  }
-                  errorText={
-                    toolResult.isError
-                      ? "Error al ejecutar la herramienta"
-                      : undefined
-                  }
-                />
-              </ToolContent>
-            </Tool>
-          );
-        }
-
         return null;
-      })}
+      });
+      })()}
 
       {fileParts.length > 0 && (
         <div className="space-y-3">
@@ -402,11 +359,11 @@ export const MessageRenderer = React.memo(function MessageRenderer({
                 
             if (attachmentType === "image" || mediaType.startsWith("image/")) {
               return (
-                <div key={`${message.id}-file-${i}`} className="rounded-lg overflow-hidden border">
+                <div key={`${message.id}-file-${i}`} className="inline-block max-w-full">
                   <img
                     src={url}
                     alt="Imagen subida"
-                    className="max-w-full h-auto max-h-96 object-contain"
+                    className="block max-w-full h-auto max-h-96 object-contain rounded-lg border"
                     loading="lazy"
                   />
                 </div>
@@ -535,6 +492,13 @@ export const MessageRenderer = React.memo(function MessageRenderer({
           messageId={message.id}
           messageRole={message.role}
           messageParts={message.parts}
+          modelDisplayName={
+            message.role === "assistant"
+              ? getModelDisplayName(
+                  (message.metadata as { model?: string } | undefined)?.model
+                )
+              : undefined
+          }
           onRegenerateAssistantMessage={onRegenerateAssistantMessage}
           onRegenerateAfterUserMessage={onRegenerateAfterUserMessage}
           disableRegenerate={disableRegenerate}
@@ -543,18 +507,53 @@ export const MessageRenderer = React.memo(function MessageRenderer({
       </div>
   );
 }, (prevProps, nextProps) => {
-  // For non-streaming messages, only re-render if message content changes
-  if (!prevProps.isStreaming && !nextProps.isStreaming) {
+  // For streaming messages, compare all relevant props by reference
+  if (prevProps.isStreaming || nextProps.isStreaming) {
     return (
-      prevProps.message.id === nextProps.message.id &&
-      prevProps.message.parts === nextProps.message.parts &&
+      prevProps.message === nextProps.message &&
+      prevProps.isStreaming === nextProps.isStreaming &&
       prevProps.disableRegenerate === nextProps.disableRegenerate
     );
   }
-  // For streaming messages, compare all relevant props
-  return (
-    prevProps.message === nextProps.message &&
-    prevProps.isStreaming === nextProps.isStreaming &&
-    prevProps.disableRegenerate === nextProps.disableRegenerate
-  );
+  // For non-streaming messages, deep-compare parts content to avoid
+  // unnecessary re-renders when server data replaces cache data with
+  // the same content but different object references. Prevents layout
+  // micro-shifts caused by browser style recalculation during re-renders.
+  if (prevProps.message.id !== nextProps.message.id) return false;
+  if (prevProps.disableRegenerate !== nextProps.disableRegenerate) return false;
+  // Re-render when assistant message metadata (e.g. model) changes
+  if (
+    prevProps.message.role === "assistant" &&
+    (prevProps.message.metadata as { model?: string } | undefined)?.model !==
+      (nextProps.message.metadata as { model?: string } | undefined)?.model
+  ) {
+    return false;
+  }
+  // Fast path: same reference means same content
+  if (prevProps.message.parts === nextProps.message.parts) return true;
+  // Deep compare parts by content
+  const prevParts = prevProps.message.parts;
+  const nextParts = nextProps.message.parts;
+  if (prevParts.length !== nextParts.length) return false;
+  for (let i = 0; i < prevParts.length; i++) {
+    const prev = prevParts[i]!;
+    const next = nextParts[i]!;
+    if (prev === next) continue;
+    if (prev.type !== next.type) return false;
+    if (prev.type === 'text' && 'text' in prev && 'text' in next) {
+      if ((prev as { text: string }).text !== (next as { text: string }).text) return false;
+      continue;
+    }
+    if (prev.type === 'reasoning' && 'text' in prev && 'text' in next) {
+      if ((prev as { text: string }).text !== (next as { text: string }).text) return false;
+      continue;
+    }
+    if (isToolUIPart(prev) && isToolUIPart(next)) {
+      if (prev.toolCallId !== next.toolCallId) return false;
+      if (prev.state !== next.state) return false;
+      continue;
+    }
+    return false;
+  }
+  return true;
 });

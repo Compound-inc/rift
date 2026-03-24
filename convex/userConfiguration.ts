@@ -8,6 +8,7 @@ export const getUserConfiguration = AuthQuery({
   returns: v.union(
     v.object({
       supermemoryEnabled: v.boolean(),
+      onboardingCompleted: v.boolean(),
     }),
     v.null()
   ),
@@ -17,9 +18,10 @@ export const getUserConfiguration = AuthQuery({
       .withIndex("by_userId", (q) => q.eq("userId", ctx.identity.subject))
       .unique();
 
-    // Default to true if not set (backward compatibility)
+    // Default to true if not set (backward compatibility); onboarding defaults to false
     return {
       supermemoryEnabled: config?.supermemoryEnabled ?? true,
+      onboardingCompleted: config?.onboardingCompleted ?? false,
     };
   },
 });
@@ -31,18 +33,20 @@ export const serverGetUserConfiguration = query({
   },
   returns: v.object({
     supermemoryEnabled: v.boolean(),
+    onboardingCompleted: v.boolean(),
   }),
   handler: async (ctx, args) => {
     ensureServerSecret(args.secret);
-    
+
     const config = await ctx.db
       .query("userConfiguration")
       .withIndex("by_userId", (q) => q.eq("userId", args.userId))
       .unique();
 
-    // Default to true if not set (backward compatibility)
+    // Default to true if not set (backward compatibility); onboarding defaults to false
     return {
       supermemoryEnabled: config?.supermemoryEnabled ?? true,
+      onboardingCompleted: config?.onboardingCompleted ?? false,
     };
   },
 });
@@ -73,10 +77,36 @@ export const updateSupermemoryPreference = AuthMutation({
   },
 });
 
+export const updateOnboardingCompleted = AuthMutation({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    const existing = await ctx.db
+      .query("userConfiguration")
+      .withIndex("by_userId", (q) => q.eq("userId", ctx.identity.subject))
+      .unique();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        onboardingCompleted: true,
+      });
+    } else {
+      await ctx.db.insert("userConfiguration", {
+        userId: ctx.identity.subject,
+        supermemoryEnabled: true,
+        onboardingCompleted: true,
+      });
+    }
+
+    return null;
+  },
+});
+
 export const createUserConfiguration = internalMutation({
   args: {
     userId: v.string(),
     supermemoryEnabled: v.optional(v.boolean()),
+    onboardingCompleted: v.optional(v.boolean()),
   },
   returns: v.id("userConfiguration"),
   handler: async (ctx, args) => {
@@ -87,11 +117,12 @@ export const createUserConfiguration = internalMutation({
       .unique();
 
     if (existing) {
-      // Update existing configuration if supermemoryEnabled is provided
-      if (args.supermemoryEnabled !== undefined) {
-        await ctx.db.patch(existing._id, {
-          supermemoryEnabled: args.supermemoryEnabled,
-        });
+      // Update existing configuration if supermemoryEnabled or onboardingCompleted is provided
+      const updates: { supermemoryEnabled?: boolean; onboardingCompleted?: boolean } = {};
+      if (args.supermemoryEnabled !== undefined) updates.supermemoryEnabled = args.supermemoryEnabled;
+      if (args.onboardingCompleted !== undefined) updates.onboardingCompleted = args.onboardingCompleted;
+      if (Object.keys(updates).length > 0) {
+        await ctx.db.patch(existing._id, updates);
       }
       return existing._id;
     } else {
@@ -99,6 +130,7 @@ export const createUserConfiguration = internalMutation({
       return await ctx.db.insert("userConfiguration", {
         userId: args.userId,
         supermemoryEnabled: args.supermemoryEnabled ?? true,
+        onboardingCompleted: args.onboardingCompleted ?? false,
       });
     }
   },

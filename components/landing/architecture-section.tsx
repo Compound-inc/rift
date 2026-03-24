@@ -5,32 +5,35 @@ import {
   TeamsIcon,
   SSOIcon,
 } from "@/components/ui/icons/landing-icons";
+import type { Dictionary } from "@/types/dictionary";
 
-export default function ArchitectureSection() {
+type ArchitectureSectionProps = {
+  dict: Dictionary["architecture"];
+};
+
+export default function ArchitectureSection({ dict }: ArchitectureSectionProps) {
   return (
     <section id="features" aria-labelledby="features-heading" className="pt-24 md:pt-0">
       <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-2 w-full -mb-4">
           <span className="text-landing-accent font-semibold gap-1.5 flex items-center transition-opacity duration-150">
-            Arquitectura
+            {dict.label}
           </span>
           <h2 id="features-heading" className="text-[40px] leading-[54.4px] tracking-[-0.5px] font-bold m-0">
-            Por que somos diferentes
+            {dict.heading}
           </h2>
         </div>
-        
+
         <article className="flex items-start gap-4" aria-labelledby="arquitectura-respuestas-rapidas">
           <div className="flex-shrink-0">
             <FastMessagesIcon className="w-12 h-12 text-amber-500" />
           </div>
           <div className="flex flex-col gap-2 w-full">
             <h3 id="arquitectura-respuestas-rapidas" className="tracking-[-0.5px] font-semibold text-xl leading-7 m-0">
-              Respuestas Rápidas
+              {dict.fastResponses}
             </h3>
             <p className="text-landing-text-secondary m-0">
-              Cuando tu mandas un mensaje, RIFT se encarga de buscar el servidor de
-              IA mas rapido disponible en el momento y responder a tu mensaje en
-              cuestión de milisegundos.
+              {dict.fastResponsesDesc}
             </p>
           </div>
         </article>
@@ -41,12 +44,10 @@ export default function ArchitectureSection() {
           </div>
           <div className="flex flex-col gap-2 w-full">
             <h3 id="arquitectura-todos-modelos" className="tracking-[-0.5px] font-semibold text-xl leading-7 m-0">
-              Todos los Modelos de IA en un solo lugar
+              {dict.allModels}
             </h3>
             <p className="text-landing-text-secondary m-0">
-              Con RIFT no necesitar preocuparte por tener que pagar, administrar y
-              configurar varias paginas de IA, simplemente usa RIFT y disfruta de una
-              experiencia sin preocupaciones.
+              {dict.allModelsDesc}
             </p>
           </div>
         </article>
@@ -57,10 +58,10 @@ export default function ArchitectureSection() {
           </div>
           <div className="flex flex-col gap-2 w-full">
             <h4 className="tracking-[-0.5px] font-semibold text-xl leading-7 m-0">
-              Privacidad de tus datos
+              {dict.dataPrivacy}
             </h4>
             <p className="text-landing-text-secondary m-0">
-              A diferencia de otros servicios gratuitos, nos tomamos la seguridad de tus datos muy en serio, por lo que no utilizamos tus conversaciones ni datos privados para entrenar a nuestros modelos ni vendelos a terceros.
+              {dict.dataPrivacyDesc}
             </p>
           </div>
         </div>
@@ -71,12 +72,10 @@ export default function ArchitectureSection() {
           </div>
           <div className="flex flex-col gap-2 w-full">
             <h3 id="arquitectura-listo-organizaciones" className="tracking-[-0.5px] font-semibold text-xl leading-7 m-0">
-              Listo para Organizaciones
+              {dict.orgReady}
             </h3>
             <p className="text-landing-text-secondary m-0">
-              Da acceso a los miembros de tu organizacion en cuestion de minutos
-              vinculando tu Google Workspace, Microsoft Teams y muchas otras plataformas,
-              mediante guias y tutoriales
+              {dict.orgReadyDesc}
             </p>
           </div>
         </article>
@@ -87,11 +86,10 @@ export default function ArchitectureSection() {
           </div>
           <div className="flex flex-col gap-2 w-full">
             <h3 id="arquitectura-integraciones-avanzadas" className="tracking-[-0.5px] font-semibold text-xl leading-7 m-0">
-              Integraciones Avanzadas
+              {dict.advancedIntegrations}
             </h3>
             <p className="text-landing-text-secondary m-0">
-              Contamos con SCIM, JIT, Directory Sync, SSO/SAML/OIDC, registros de auditoria y
-              muchas otras funcionalidades para organizaciones
+              {dict.advancedIntegrationsDesc}
             </p>
           </div>
         </article>

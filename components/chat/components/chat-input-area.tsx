@@ -1,10 +1,10 @@
 import { useMemo, useCallback } from "react";
+import { useChatTranslations } from "@/contexts/locale-context";
 import { NoSubscriptionDialog } from "@/components/ui/no-subscription-dialog";
 import {
   AttachmentsIcon,
   GlobeIcon,
 } from "@/components/ui/icons/svg-icons";
-import { ChevronDown } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -24,7 +24,7 @@ import { ChatErrorAlert } from "./chat-error-alert";
 import { ModelSelectorPanel } from "@/components/ai/model-selector-panel";
 import { InstructionSelector } from "@/components/custom-instructions/InstructionSelector";
 import { SelectedInstructionPill } from "@/components/custom-instructions/SelectedInstructionPill";
-import React from "react";
+import React, { forwardRef } from "react";
 type ChatStatus = "submitted" | "streaming" | "ready" | "error";
 import { useChatUIStore } from "../ui-store";
 import { Effect } from "effect";
@@ -41,25 +41,23 @@ interface ChatInputAreaProps {
   onSubmit: (e?: React.FormEvent) => void;
   onStop: () => void;
   threadId?: string;
-  isAtBottom?: boolean;
-  onScrollToBottom?: () => void;
-  showScrollToBottom?: boolean;
   // Pass status from parent to avoid duplicate subscriptions (5.1 Defer State Reads)
   status: ChatStatus;
 }
 
-export const ChatInputArea = React.memo(function ChatInputArea({
-  disableInput,
-  selectedModel,
-  onModelChange,
-  onSubmit,
-  onStop,
-  threadId,
-  isAtBottom,
-  onScrollToBottom,
-  showScrollToBottom,
-  status,
-}: ChatInputAreaProps) {
+const ChatInputAreaInner = forwardRef<HTMLDivElement, ChatInputAreaProps>(function ChatInputAreaInner(
+  {
+    disableInput,
+    selectedModel,
+    onModelChange,
+    onSubmit,
+    onStop,
+    threadId,
+    status,
+  },
+  ref,
+) {
+  const t = useChatTranslations();
   const input = useChatUIStore((s) => s.input);
   const isSearchEnabled = useChatUIStore((s) => s.isSearchEnabled);
   const quotaError = useChatUIStore((s) => s.quotaError);
@@ -179,6 +177,31 @@ export const ChatInputArea = React.memo(function ChatInputArea({
     void runUpload(fileArray);
   }, [runUpload]);
 
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      if (disableInput || isUploading) return;
+      const clipboardData = e.clipboardData;
+      if (!clipboardData?.files?.length) return;
+      const pastedFiles = Array.from(clipboardData.files).filter((file) =>
+        file.type.startsWith("image/")
+      );
+      if (pastedFiles.length === 0) return;
+      const currentTotal = uploadedAttachments.length + uploadingFiles.length;
+      const remainingSlots = Math.max(0, MAX_TOTAL_FILES - currentTotal);
+      if (remainingSlots <= 0) return;
+      e.preventDefault();
+      const toUpload = pastedFiles.slice(0, remainingSlots);
+      void runUpload(toUpload);
+    },
+    [
+      disableInput,
+      isUploading,
+      uploadedAttachments.length,
+      uploadingFiles.length,
+      runUpload,
+    ]
+  );
+
   const handleAttachmentClick = useCallback(() => {
     if (disableInput) return;
     const currentTotalFiles = uploadedAttachments.length + uploadingFiles.length;
@@ -198,25 +221,14 @@ export const ChatInputArea = React.memo(function ChatInputArea({
   }, [disableInput]);
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 md:pb-0 z-[20]">
+    <div ref={ref} className="absolute bottom-0 left-0 right-0 md:pb-0 z-[20]">
       <div className="mx-auto w-full max-w-full md:max-w-3xl px-0 md:px-2 pb-0 md:pb-0 relative">
-        {showScrollToBottom && (
-          <div className="absolute -top-12 left-0 right-0 flex justify-center pointer-events-none z-20">
-            <button
-              onClick={onScrollToBottom}
-              className="pointer-events-auto flex items-center justify-center size-9 bg-background dark:bg-[oklch(0.2046_0_0)] border border-border rounded-full cursor-pointer"
-              aria-label="Scroll to bottom"
-            >
-              <ChevronDown className="size-5" />
-            </button>
-          </div>
-        )}
         {/* No Subscription Dialog */}
         <NoSubscriptionDialog
           isOpen={showNoSubscriptionDialog}
           onClose={() => setShowNoSubscriptionDialog(false)}
         />
-        
+
         {/* Quota Error Message */}
         {quotaError && (
           <div className="mb-2 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/50 rounded-lg text-red-800 dark:text-red-200 text-sm shadow-sm">
@@ -282,7 +294,8 @@ export const ChatInputArea = React.memo(function ChatInputArea({
             onChange={handleInputChange}
             value={input}
             disabled={disableInput || isUploading}
-            placeholder="Escribe tu mensaje..."
+            placeholder={t.inputPlaceholder}
+            onPaste={handlePaste}
           />
           <PromptInputToolbar>
             <PromptInputTools>
@@ -291,14 +304,17 @@ export const ChatInputArea = React.memo(function ChatInputArea({
                 onFilesSelected={handleFilesSelected}
                 disabled={disableInput || isUploading}
               />
-              <InstructionSelector
-                selectedId={customInstructionId}
-                onSelect={handleInstructionChange}
-                disabled={disableInput}
-                open={instructionSelectorOpen}
-                onOpenChange={setInstructionSelectorOpen}
-              />
+              <div data-onboarding="custom-instructions">
+                <InstructionSelector
+                  selectedId={customInstructionId}
+                  onSelect={handleInstructionChange}
+                  disabled={disableInput}
+                  open={instructionSelectorOpen}
+                  onOpenChange={setInstructionSelectorOpen}
+                />
+              </div>
               <PromptInputButton
+                data-onboarding="attach-files"
                 onClick={handleAttachmentClick}
                 aria-label="Agregar archivos adjuntos"
                 disabled={disableInput || (uploadedAttachments.length + uploadingFiles.length) >= MAX_TOTAL_FILES}
@@ -313,13 +329,14 @@ export const ChatInputArea = React.memo(function ChatInputArea({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <PromptInputButton
+                    data-onboarding="search-toggle"
                     onClick={handleSearchToggle}
                     aria-label="Activar búsqueda web"
                     disabled={disableInput}
-                    variant={isSearchEnabled ? "default" : "ghost"}
+                    variant={isSearchEnabled ? "accent" : "ghost"}
                     className={
                       isSearchEnabled
-                        ? "bg-blue-600 hover:bg-blue-700 border-blue-600 text-white"
+                        ? "hover:bg-accent/50"
                         : undefined
                     }
                   >
@@ -337,10 +354,12 @@ export const ChatInputArea = React.memo(function ChatInputArea({
                 </TooltipContent>
               </Tooltip>
               <div className="flex items-center gap-1">
-                <ModelSelectorPanel
-                  value={selectedModel}
-                  onValueChange={onModelChange}
-                />
+                <div data-onboarding="model-selector">
+                  <ModelSelectorPanel
+                    value={selectedModel}
+                    onValueChange={onModelChange}
+                  />
+                </div>
                 <SelectedInstructionPill 
                   instructionId={customInstructionId}
                   onClick={handleInstructionPillClick}
@@ -359,3 +378,5 @@ export const ChatInputArea = React.memo(function ChatInputArea({
     </div>
   );
 });
+
+export const ChatInputArea = React.memo(ChatInputAreaInner);

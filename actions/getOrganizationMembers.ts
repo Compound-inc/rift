@@ -5,6 +5,10 @@ import { workos } from "@/app/api/workos";
 import { OrganizationMembership, User, Invitation } from "@workos-inc/node";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
+import { getAutumnSeatLimitForOrg } from "./getAutumnSeatLimit";
+import { PLANS_WITH_SEATS, type PlanId } from "@/lib/plan-ids";
+
+export type OrganizationPlan = PlanId;
 
 export interface OrganizationMembershipWithUser extends OrganizationMembership {
   user: User | null;
@@ -85,24 +89,30 @@ export async function getOrganizationMemberCount(): Promise<number> {
   return membershipCount + invitationCount;
 }
 
-export async function getOrganizationSeatsAndPlan(): Promise<{
+/** Returns plan from Convex and seat limit from Autumn */
+export async function getOrganizationPlanAndSeatLimit(): Promise<{
   seatQuantity: number | null;
-  plan: "free" | "plus" | "pro" | "enterprise" | null;
+  plan: PlanId | null;
 }> {
   try {
     const { organizationId } = await withAuth({ ensureSignedIn: true });
-    
     if (!organizationId) {
       throw new Error("No organization found in session");
     }
 
-    const result = await fetchQuery(api.organizations.getOrganizationSeatsAndPlan, {
+    const plan = await fetchQuery(api.organizations.getOrganizationPlan, {
       workos_id: organizationId,
       secret: process.env.CONVEX_SECRET_TOKEN!,
     });
-    return result;
+
+    const seatQuantity =
+      plan != null && PLANS_WITH_SEATS.has(plan)
+        ? await getAutumnSeatLimitForOrg(organizationId)
+        : null;
+
+    return { seatQuantity, plan };
   } catch (error) {
-    console.error("Error fetching seat quantity and plan:", error);
+    console.error("Error fetching plan and seat limit:", error);
     return { seatQuantity: null, plan: null };
   }
 }

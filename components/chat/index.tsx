@@ -4,34 +4,29 @@ import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import { DefaultChatTransport } from "ai";
 import { usePathname, useRouter } from "next/navigation";
+import { flushSync } from "react-dom";
 import { generateUUID } from "@/lib/utils";
 import { useModel } from "@/contexts/model-context";
+import { useLocale } from "@/contexts/locale-context";
 import { useInitialMessage } from "@/contexts/initial-message-context";
 import { useCallback, useEffect, useRef, useMemo, useState, useLayoutEffect } from "react";
 import { useRegeneration } from "./hooks/use-regeneration";
 import { ToolType, getDefaultTools } from "@/lib/ai/model-tools";
-import { resolveModel } from "@/lib/ai/ai-providers";
 import { useAuth } from "@workos-inc/authkit-nextjs/components";
-import { useConvex, useConvexAuth, useMutation } from "convex/react";
+import { useConvexAuth, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Loader } from "@/components/ai/loader";
 import { AttachmentsIcon } from "@/components/ui/icons/svg-icons";
-import {
-  Conversation,
-  ConversationContent,
-} from "@/components/ai/conversation";
-import { Message, MessageContent } from "@/components/ai/message";
 import { TooltipProvider } from "@/components/ai/ui/tooltip";
 
 import { useChatUIStore } from "./ui-store";
 import { WelcomeScreen } from "./components/welcome-screen";
-import { MessageRenderer } from "./components/message-renderer";
 import { ChatInputArea } from "./components/chat-input-area";
+import { useFirstMessageSendAnimation } from "./first-message-send-animation";
+import { RiftChatThread } from "./chat-thread";
 import type { ChatInterfaceProps } from "./types";
 import { ChatStoreProvider, useChatStateInstance } from "@/lib/stores/hooks";
 import { Effect } from "effect";
 import { saveCachedThreadMessages } from "@/lib/local-first/thread-messages-cache";
-import { useStickToBottom } from "@/lib/hooks/use-stick-to-bottom";
 
 import {
   updateMessageContentEffect,
@@ -44,35 +39,21 @@ import {
 } from "./services";
 import { uploadWithStateEffect } from "./services/upload-service";
 import { getErrorMessage } from "./errors";
-import { transformConvexMessages } from "./utils/transformConvexMessages";
-
-const HISTORY_PAGE_SIZE = 20;
-const HISTORY_ROOT_MARGIN = "200px 0px 0px 0px";
-const AUTOFILL_VIEWPORT_THRESHOLD_PX = 32;
-const AUTOFILL_MAX_PAGES_PER_THREAD = 10;
 
 function ChatInterfaceInternal({
   id,
   initialMessages,
   serverMessages,
-  initialHistoryCursor,
-  initialHistoryIsDone,
   disableInput = false,
   onInitialMessage,
   customInstructionId: initialCustomInstructionId,
 }: ChatInterfaceProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const convex = useConvex();
-
-  const {
-    scrollRef,
-    contentRef,
-    isAtBottom,
-    scrollToBottom,
-    markInitialScrollDone,
-    reset: resetStickToBottom,
-  } = useStickToBottom();
+  const lang = useLocale();
+  const firstMessageAnim = useFirstMessageSendAnimation();
+  const promptAnchorRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   const { selectedModel, setSelectedModel } = useModel();
   const { consumeInitialMessage } = useInitialMessage();
@@ -99,6 +80,8 @@ function ChatInterfaceInternal({
   const setCustomInstructionId = useChatUIStore((s) => s.setCustomInstructionId);
   const [isDragActive, setIsDragActive] = useState(false);
   const dragCounterRef = useRef(0);
+  const [scrollDoneForId, setScrollDoneForId] = useState<string | null>(null);
+  const scrollDoneTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleProcessFiles = useCallback(
     async (fileArray: File[]) => {
@@ -150,22 +133,6 @@ function ChatInterfaceInternal({
   // Server messages come from CachedChatWrapper's one-off fetch (no subscription needed)
   const historicalMessagesFromServer = serverMessages ?? [];
 
-  const topSentinelRef = useRef<HTMLDivElement | null>(null);
-  const requestInFlightRef = useRef(false);
-  const autoFillAttemptsRef = useRef(0);
-
-  const [olderEphemeralMessages, setOlderEphemeralMessages] = useState<UIMessage[]>([]);
-  const [historyCursor, setHistoryCursor] = useState<string | null>(
-    initialHistoryCursor ?? null,
-  );
-  const [historyIsDone, setHistoryIsDone] = useState<boolean>(
-    initialHistoryIsDone ?? true,
-  );
-  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
-  const pendingPrependScrollRef = useRef<null | { scrollTop: number; scrollHeight: number }>(
-    null,
-  );
-
   /**
    * If Convex only returns the most recent N messages (e.g. 5),
    * the local hook store may still contain older cached messages.
@@ -206,178 +173,10 @@ function ChatInterfaceInternal({
     return initialMessages ?? [];
   }, [isThread, historicalMessagesFromServer, initialMessages]);
 
-  // Combine ephemeral older pages (never cached) + base persisted history for UI + AI context.
-  const baseHistory: UIMessage[] = useMemo(() => {
-    if (!isThread) return [];
-    if (!olderEphemeralMessages || olderEphemeralMessages.length === 0) {
-      return historicalMessages;
-    }
-    return [...olderEphemeralMessages, ...historicalMessages];
-  }, [isThread, olderEphemeralMessages, historicalMessages]);
-
   // Keep ref in sync for use in closures (prepareSendMessagesRequest)
   useEffect(() => {
-    historicalMessagesRef.current = baseHistory;
-  }, [baseHistory]);
-
-  // Reset per-thread ephemeral pagination state; also keep cursor/isDone in sync with late-arriving server props.
-  useEffect(() => {
-    autoFillAttemptsRef.current = 0;
-    setOlderEphemeralMessages([]);
-    setHistoryCursor(initialHistoryCursor ?? null);
-    setHistoryIsDone(initialHistoryIsDone ?? true);
-  }, [id]);
-
-  useEffect(() => {
-    if (!isThread) return;
-    if (olderEphemeralMessages.length > 0) return;
-    setHistoryCursor(initialHistoryCursor ?? null);
-    setHistoryIsDone(initialHistoryIsDone ?? true);
-  }, [isThread, initialHistoryCursor, initialHistoryIsDone, olderEphemeralMessages.length]);
-
-  const loadOlderPage = useCallback(
-    async ({ preserveScroll }: { preserveScroll: boolean }) => {
-      if (!isThread) return;
-      if (historyIsDone) return;
-      if (requestInFlightRef.current) return;
-
-      const cursor = historyCursor && historyCursor.length > 0 ? historyCursor : null;
-      if (!cursor) {
-        setHistoryIsDone(true);
-        return;
-      }
-
-      const requestThreadId = id;
-      requestInFlightRef.current = true;
-      setIsLoadingOlder(true);
-
-      try {
-        if (preserveScroll) {
-          const el = scrollRef.current;
-          if (el) {
-            pendingPrependScrollRef.current = {
-              scrollTop: el.scrollTop,
-              scrollHeight: el.scrollHeight,
-            };
-          }
-        } else {
-          pendingPrependScrollRef.current = null;
-        }
-
-        const result = await convex.query(api.threads.getThreadMessagesPaginatedSafe, {
-          threadId: id,
-          paginationOpts: { numItems: HISTORY_PAGE_SIZE, cursor },
-        });
-
-        // Ignore late results if user navigated to a different thread mid-request.
-        if (activeThreadIdRef.current !== requestThreadId) {
-          pendingPrependScrollRef.current = null;
-          return;
-        }
-
-        const nextCursor =
-          typeof result.continueCursor === "string" && result.continueCursor.length > 0
-            ? result.continueCursor
-            : null;
-        const done = !!result.isDone || nextCursor === null;
-        setHistoryCursor(nextCursor);
-        setHistoryIsDone(done);
-
-        const page = result.page ?? [];
-        if (!page || page.length === 0) {
-          pendingPrependScrollRef.current = null;
-          return;
-        }
-
-        const transformed = transformConvexMessages(page);
-
-        // Dedupe against existing ephemeral + current persisted base history.
-        const baseIds = new Set(historicalMessages.map((m) => m.id));
-
-        setOlderEphemeralMessages((prev) => {
-          const seen = new Set<string>([...baseIds, ...prev.map((m) => m.id)]);
-          const newUnique = transformed.filter((m) => !seen.has(m.id));
-          if (newUnique.length === 0) {
-            pendingPrependScrollRef.current = null;
-            return prev;
-          }
-          return [...newUnique, ...prev];
-        });
-      } catch (error) {
-        console.error("Failed to load older messages:", error);
-      } finally {
-        requestInFlightRef.current = false;
-        setIsLoadingOlder(false);
-      }
-    },
-    [convex, historyCursor, historyIsDone, historicalMessages, id, isThread, scrollRef],
-  );
-
-  useEffect(() => {
-    const container = scrollRef.current;
-    const sentinel = topSentinelRef.current;
-    if (!container || !sentinel) return;
-    if (!isThread) return;
-    if (historyIsDone) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
-          void loadOlderPage({ preserveScroll: !isAtBottom });
-        }
-      },
-      {
-        root: container,
-        rootMargin: HISTORY_ROOT_MARGIN,
-        threshold: 0,
-      },
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [historyIsDone, isAtBottom, isThread, loadOlderPage, scrollRef]);
-
-  // Auto-fill: if content doesn't overflow, keep loading older pages (bounded) so users can scroll.
-  useEffect(() => {
-    const container = scrollRef.current;
-    if (!container) return;
-    if (!isThread) return;
-    if (historyIsDone) return;
-    if (requestInFlightRef.current || isLoadingOlder) return;
-    if (autoFillAttemptsRef.current >= AUTOFILL_MAX_PAGES_PER_THREAD) return;
-
-    if (container.scrollHeight <= container.clientHeight + AUTOFILL_VIEWPORT_THRESHOLD_PX) {
-      autoFillAttemptsRef.current += 1;
-      void loadOlderPage({ preserveScroll: false });
-    }
-  }, [
-    baseHistory.length,
-    historyIsDone,
-    isLoadingOlder,
-    isThread,
-    loadOlderPage,
-    scrollRef,
-  ]);
-
-  useLayoutEffect(() => {
-    const pending = pendingPrependScrollRef.current;
-    if (!pending) return;
-
-    const el = scrollRef.current;
-    if (!el) {
-      pendingPrependScrollRef.current = null;
-      return;
-    }
-
-    const nextScrollHeight = el.scrollHeight;
-    const delta = nextScrollHeight - pending.scrollHeight;
-    if (delta !== 0) {
-      el.scrollTop = pending.scrollTop + delta;
-    }
-
-    pendingPrependScrollRef.current = null;
-  }, [olderEphemeralMessages.length, scrollRef]);
+    historicalMessagesRef.current = historicalMessages;
+  }, [historicalMessages]);
 
   const chatStateInstance = useChatStateInstance();
 
@@ -399,8 +198,9 @@ function ChatInterfaceInternal({
         return {};
       })()),
       onFinish() {
-        if (pathname === "/") {
-          router.push(`/chat/${id}`);
+        const isChatHome = pathname === `/${lang}/chat` || pathname === `/${lang}/chat/`;
+        if (isChatHome) {
+          router.push(`/${lang}/chat/${id}`);
           router.refresh();
         }
       },
@@ -488,7 +288,7 @@ function ChatInterfaceInternal({
           return {
             body: {
               messages: requestMessages,
-              modelId: resolveModel(currentModel),
+              modelId: currentModel,
               threadId: id,
               enabledTools: currentEnabledTools,
               customInstructionId: currentCustomInstructionId,
@@ -563,9 +363,9 @@ function ChatInterfaceInternal({
 
     const regenAnchor = regenerateAnchorRef.current;
     const effectiveBaseHistory =
-      regenAnchor && baseHistory.length > 0
-        ? pruneAt(baseHistory, regenAnchor.id, regenAnchor.role)
-        : baseHistory;
+      regenAnchor && historicalMessages.length > 0
+        ? pruneAt(historicalMessages, regenAnchor.id, regenAnchor.role)
+        : historicalMessages;
 
     // During active generation, use server for history + hook for new/streaming messages
     if (isActivelyGenerating && messages.length > 0) {
@@ -612,12 +412,11 @@ function ChatInterfaceInternal({
       return messages;
     }
 
-    // Fresh navigation (no active session) - use base history (includes ephemeral older when present).
+    // Fresh navigation (no active session) - use server/cache history.
     if (effectiveBaseHistory.length > 0) return effectiveBaseHistory;
     return historicalMessages;
   }, [
     isThread,
-    baseHistory,
     historicalMessages,
     messages,
     initialMessages,
@@ -641,14 +440,17 @@ function ChatInterfaceInternal({
     return renderedMessages;
   }, [renderedMessages, isThread]);
 
-  const olderEphemeralIdSet = useMemo(() => {
-    return new Set(olderEphemeralMessages.map((m) => m.id));
-  }, [olderEphemeralMessages]);
-
-  // Track expected AI responses for layout shift prevention
+  // Track expected AI responses for layout shift prevention.
+  // Once the initial display is done, freeze the count so that server data
+  // prepending new messages doesn't flip allResponsesReady back to false
+  // (which would trigger unnecessary state cascades and re-renders).
+  const frozenExpectedCountRef = useRef<number | null>(null);
   const expectedResponseCount = useMemo(() => {
     if (!isThread || status === "streaming" || status === "submitted") {
       return 0; // Don't wait during streaming
+    }
+    if (frozenExpectedCountRef.current !== null) {
+      return frozenExpectedCountRef.current;
     }
     return displayMessages.filter(
       (m) => m.role === "assistant" && m.parts.some((p) => p.type === "text")
@@ -663,10 +465,18 @@ function ChatInterfaceInternal({
     readyResponseIdsRef.current.clear();
   }, [id]);
 
+  // Track whether initial display is done (ref avoids re-creating callbacks)
+  const initialDisplayDoneRef = useRef(false);
+
   const handleResponseReady = useCallback((messageId: string) => {
     if (!readyResponseIdsRef.current.has(messageId)) {
       readyResponseIdsRef.current.add(messageId);
-      setReadyResponseCount((prev) => prev + 1);
+      // Only update state before initial display is done.
+      // After that, skip state updates to avoid cascading re-renders
+      // when server data replaces cache data and new MemoResponses mount.
+      if (!initialDisplayDoneRef.current) {
+        setReadyResponseCount((prev) => prev + 1);
+      }
     }
   }, []);
 
@@ -695,6 +505,8 @@ function ChatInterfaceInternal({
   useEffect(() => {
     setForceShow(false);
     setHasEverShownMessages(false);
+    initialDisplayDoneRef.current = false;
+    frozenExpectedCountRef.current = null;
   }, [id]);
 
   const shouldShowMessages = allResponsesReady || forceShow || status === "streaming" || status === "submitted";
@@ -705,28 +517,13 @@ function ChatInterfaceInternal({
     if (!shouldShowMessages) return;
     if (displayMessages.length === 0) return;
     setHasEverShownMessages(true);
-  }, [displayMessages.length, hasEverShownMessages, isThread, shouldShowMessages]);
-
-  // Initial scroll to bottom (instant, then switch to smooth after 150ms)
-  const hasInitialScrolledRef = useRef(false);
-  const initialScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  useLayoutEffect(() => {
-    if (shouldShowMessages && displayMessages.length > 0 && !hasInitialScrolledRef.current) {
-      scrollToBottom("instant");
-      hasInitialScrolledRef.current = true;
-      if (initialScrollTimeoutRef.current) clearTimeout(initialScrollTimeoutRef.current);
-      initialScrollTimeoutRef.current = setTimeout(() => markInitialScrollDone(), 150);
-    }
-  }, [shouldShowMessages, displayMessages.length, scrollToBottom, markInitialScrollDone]);
-
-  useEffect(() => {
-    hasInitialScrolledRef.current = false;
-    if (initialScrollTimeoutRef.current) {
-      clearTimeout(initialScrollTimeoutRef.current);
-      initialScrollTimeoutRef.current = null;
-    }
-    resetStickToBottom();
-  }, [id, resetStickToBottom]);
+    // Mark initial display as done so handleResponseReady stops triggering
+    // state updates (avoids re-render cascades on server data arrival)
+    initialDisplayDoneRef.current = true;
+    // Freeze the expected response count so server data prepending new messages
+    // doesn't flip allResponsesReady back to false
+    frozenExpectedCountRef.current = expectedResponseCount;
+  }, [displayMessages.length, hasEverShownMessages, isThread, shouldShowMessages, expectedResponseCount]);
 
   // Persist to cache (debounced, skip while streaming)
   useEffect(() => {
@@ -735,14 +532,11 @@ function ChatInterfaceInternal({
     if (status === "streaming") return;
 
     const handle = setTimeout(() => {
-      // Do not persist older pages loaded via infinite scroll (ephemeral by design).
-      const persistable = displayMessages.filter((m) => !olderEphemeralIdSet.has(m.id));
-      if (persistable.length === 0) return;
-      void saveCachedThreadMessages(id, persistable);
+      void saveCachedThreadMessages(id, displayMessages);
     }, 750);
 
     return () => clearTimeout(handle);
-  }, [id, isThread, displayMessages, status, olderEphemeralIdSet]);
+  }, [id, isThread, displayMessages, status]);
 
   useEffect(() => {
     if (prevIdRef.current !== id) {
@@ -754,9 +548,43 @@ function ChatInterfaceInternal({
       setIsSendingMessage(false);
       setQuotaError(null);
       setShowNoSubscriptionDialog(false);
+      setScrollDoneForId(null);
       prevIdRef.current = id;
     }
   }, [id, setInput, setSelectedFiles, setUploadedAttachments, setUploadingFiles, setIsUploading, setIsSendingMessage, setQuotaError, setShowNoSubscriptionDialog]);
+
+  // When navigating to a different thread, scroll to bottom instantly (not pinned to last user message).
+  // Only run once per id when we have content, so we don't override the smooth scroll when the user sends a new message.
+  // Skip when the first-message send animation is running so we don't fight the fly-in and cause a teleport.
+  useEffect(() => {
+    if (!isThread) return;
+    if (firstMessageAnim.phase !== "idle") return;
+    if (displayMessages.length === 0) return;
+    if (scrollDoneForId === id) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const scrollToBottomInstant = () => {
+      el.scrollTop = el.scrollHeight - el.clientHeight;
+      // Delay marking initial load complete so a second batch of messages (e.g. server/cache)
+      // arriving within ~500ms does not trigger the pin-to-last-user-message effect.
+      if (scrollDoneTimeoutRef.current) clearTimeout(scrollDoneTimeoutRef.current);
+      scrollDoneTimeoutRef.current = setTimeout(() => {
+        setScrollDoneForId(id);
+        scrollDoneTimeoutRef.current = null;
+      }, 500);
+    };
+    // Double rAF so layout (including RiftChatThread spacer) is committed before we scroll.
+    const raf = requestAnimationFrame(() => {
+      requestAnimationFrame(scrollToBottomInstant);
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      if (scrollDoneTimeoutRef.current) {
+        clearTimeout(scrollDoneTimeoutRef.current);
+        scrollDoneTimeoutRef.current = null;
+      }
+    };
+  }, [id, isThread, firstMessageAnim.phase, displayMessages.length, scrollDoneForId]);
 
   // Use refs for callbacks that need access to latest renderedMessages
   // This prevents re-creating callbacks on every stream chunk (5.1 Defer State Reads)
@@ -829,11 +657,6 @@ function ChatInterfaceInternal({
   sendMessageRef.current = sendMessage;
 
 
-  const hasAssistantMessage = useMemo(
-    () => renderedMessages.some((m) => m.role === "assistant"),
-    [renderedMessages],
-  );
-
   useEffect(() => {
     if (isThread && isAuthenticated && !autoStartTriggeredRef.current) {
       const initialMessage = consumeInitialMessage(id);
@@ -891,6 +714,17 @@ function ChatInterfaceInternal({
 
       const messageContent = input.trim();
       const messageId = generateUUID();
+
+      // First-message send animation: when sending from welcome, capture source point so the
+      // thread view can animate the first user message flying in from the prompt.
+      if (id === "welcome" && displayMessages.length === 0) {
+        const anchor = promptAnchorRef.current;
+        if (anchor && typeof window !== "undefined") {
+          const r = anchor.getBoundingClientRect();
+          const sourcePoint = { x: r.left + 16, y: r.top + 18 };
+          flushSync(() => firstMessageAnim.begin(sourcePoint));
+        }
+      }
 
       // Do NOT clear regenerateAnchorRef here.
       // The base history can remain stale for a while (local-first, no live subscription),
@@ -965,6 +799,8 @@ function ChatInterfaceInternal({
       setIsUploading,
       triggerError,
       regenerateAnchorRef,
+      firstMessageAnim,
+      displayMessages.length,
     ]
   );
 
@@ -978,10 +814,6 @@ function ChatInterfaceInternal({
     setInput(prompt);
   }, [setInput]);
 
-
-  const handleScrollToBottom = useCallback(() => {
-    scrollToBottom("smooth");
-  }, [scrollToBottom]);
 
   // Memoize drag handlers to prevent re-renders
   const handleDragEnter = useCallback((e: React.DragEvent) => {
@@ -1031,70 +863,45 @@ function ChatInterfaceInternal({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <div className="flex-1 min-h-0">
-        <Conversation ref={scrollRef as React.RefObject<HTMLDivElement>}>
-          <ConversationContent ref={contentRef as React.RefObject<HTMLDivElement>} className="mx-auto w-full max-w-full md:max-w-3xl p-4 pb-[140px] md:pb-35">
-            
-            {!isThread && renderedMessages.length === 0 && (
-              <WelcomeScreen 
-                user={user} 
-                onSuggestionClick={handleSuggestionClick}
-              />
-            )}
-            {isThread && (
-              <div className="-mt-2 pb-2">
-                <div ref={topSentinelRef} className="h-[1px] w-full" />
-                {isLoadingOlder && (
-                  <div className="flex items-center justify-center py-2">
-                    <span className="text-xs text-muted-foreground">Cargando mensajes anteriores…</span>
-                  </div>
-                )}
-              </div>
-            )}
-            <div
-              className={!hasEverShownMessages && !shouldShowMessages ? "opacity-0" : ""}
-            >
-              {displayMessages.map((message, index) => {
-              const isLast = index === displayMessages.length - 1;
-              const isMessageStreaming = isLast && (status === "streaming");
-              return (
-                <MessageRenderer
-                  key={message.id}
-                  message={message}
-                  isStreaming={isMessageStreaming}
-                  disableRegenerate={status === "streaming"}
-                  onRegenerateAssistantMessage={onRegenerateAssistant}
-                  onRegenerateAfterUserMessage={onRegenerateAfterUser}
-                  onResponseReady={handleResponseReady}
-                  onEditUserMessage={onEditUserMessage}
-                />
-              );
-            })}
-            </div>
-            {(status === "submitted" || status === "streaming") &&
-              !hasAssistantMessage && (
-                <Message from={"assistant"}>
-                  <MessageContent from={"assistant"}>
-                    <div className="py-1">
-                      <Loader />
-                    </div>
-                  </MessageContent>
-                </Message>
-              )}
-          </ConversationContent>
-        </Conversation>
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 min-h-0 overflow-y-auto"
+        style={{ scrollbarGutter: "stable" }}
+      >
+        <div
+          className={[
+            "mx-auto w-full max-w-full md:max-w-3xl px-0 pl-9 pr-5 pb-0 md:pl-9 md:pr-5",
+            !hasEverShownMessages && !shouldShowMessages ? "opacity-0" : "",
+          ].join(" ")}
+        >
+          {!isThread && displayMessages.length === 0 ? (
+            <WelcomeScreen
+              user={user}
+              onSuggestionClick={handleSuggestionClick}
+            />
+          ) : (
+            <RiftChatThread
+              messages={displayMessages}
+              status={status}
+              onRegenerateAssistantMessage={onRegenerateAssistant}
+              onRegenerateAfterUserMessage={onRegenerateAfterUser}
+              onEditUserMessage={onEditUserMessage}
+              onResponseReady={handleResponseReady}
+              disableRegenerate={status === "streaming"}
+              initialLoadComplete={scrollDoneForId === id}
+            />
+          )}
+        </div>
       </div>
 
       <ChatInputArea
+        ref={promptAnchorRef}
         disableInput={promptDisabled}
         selectedModel={selectedModel}
         onModelChange={setSelectedModel}
         onSubmit={handleSubmit}
         onStop={handleStop}
         threadId={isThread ? id : undefined}
-        isAtBottom={isAtBottom}
-        onScrollToBottom={handleScrollToBottom}
-        showScrollToBottom={!isAtBottom && displayMessages.length > 0}
         status={status}
       />
 

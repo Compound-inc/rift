@@ -3,7 +3,7 @@ import { Effect, Data, Schedule, Duration } from "effect";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { fetchMutation } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { uploadObjectToR2, generateR2FileKey } from "@/lib/r2-upload";
 import { logAttachmentUploaded } from "@/actions/audit";
 import { checkRateLimit, getRateLimitErrorMessage } from "@/lib/rate-limit";
 
@@ -75,26 +75,6 @@ type UploadError =
   | DatabaseError
   | TimeoutError
   | RateLimitError;
-
-// ============================================================================
-// R2 Client (lazy initialization)
-// ============================================================================
-
-let _r2Client: S3Client | null = null;
-
-const getR2Client = (): S3Client => {
-  if (!_r2Client) {
-    _r2Client = new S3Client({
-      region: "auto",
-      endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-      credentials: {
-        accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-      },
-    });
-  }
-  return _r2Client;
-};
 
 // ============================================================================
 // Retry Schedules
@@ -215,13 +195,6 @@ const validateFile = (file: File): Effect.Effect<File, ValidationError> =>
     return file;
   });
 
-const generateFileKey = (userId: string, fileName: string): string => {
-  const fileExtension = fileName.split(".").pop() || "bin";
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 8);
-  return `uploads/${userId}/${timestamp}-${random}.${fileExtension}`;
-};
-
 const uploadToR2 = (
   file: File,
   fileKey: string,
@@ -234,16 +207,14 @@ const uploadToR2 = (
         new StorageError({ message: "Failed to read file data", cause: error }),
     });
 
-    const uploadCommand = new PutObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME!,
-      Key: fileKey,
-      Body: Buffer.from(arrayBuffer),
-      ContentType: file.type,
-      ContentDisposition: `inline; filename="${file.name}"`,
-    });
-
-    yield* Effect.tryPromise({
-      try: () => getR2Client().send(uploadCommand),
+    const publicUrl = yield* Effect.tryPromise({
+      try: () =>
+        uploadObjectToR2({
+          fileKey,
+          body: arrayBuffer,
+          contentType: file.type,
+          contentDisposition: `inline; filename="${file.name}"`,
+        }),
       catch: (error) =>
         new StorageError({ message: "No se pudo guardar el archivo. Por favor intenta de nuevo. Si el problema persiste, contacta con soporte.", cause: error }),
     }).pipe(
@@ -253,7 +224,6 @@ const uploadToR2 = (
       )
     );
 
-    const publicUrl = `${process.env.R2_PUBLIC_BASE_URL}/${fileKey}`;
     return publicUrl;
   });
 
@@ -409,7 +379,7 @@ const handleUpload = (req: NextRequest, requestId: string) =>
     yield* validateFile(file);
 
     // Generate unique file key
-    const fileKey = generateFileKey(auth.userId, file.name);
+    const fileKey = generateR2FileKey({ userId: auth.userId, fileName: file.name });
 
     // Upload to R2
     const publicUrl = yield* uploadToR2(file, fileKey, logContext);

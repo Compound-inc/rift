@@ -2,7 +2,11 @@ export type LandingPlan = {
   name: string;
   priceAmount: number | null;
   currency: "MXN" | "USD";
+  /** USD amount for English locale; when set, /en uses this with currency USD */
+  usdPriceAmount?: number | null;
   billingPeriodLabel?: string;
+  /** English billing period label (e.g. "mo") when showing USD */
+  billingPeriodLabelEn?: string;
   description: string;
   features: string[];
   buttonText: string;
@@ -16,7 +20,9 @@ export const landingPlans: LandingPlan[] = [
     name: "Plus",
     priceAmount: 190,
     currency: "MXN",
+    usdPriceAmount: 9,
     billingPeriodLabel: "mes",
+    billingPeriodLabelEn: "mo",
     description: "Para usuarios que quieren probar el poder de la IA.",
     features: ["1,000 mensajes estándar", "100 mensajes premium", "Acceso a todos los modelos", "Historial de chat limitado"],
     buttonText: "Comenzar con Plus",
@@ -27,7 +33,9 @@ export const landingPlans: LandingPlan[] = [
     name: "Pro",
     priceAmount: 490,
     currency: "MXN",
+    usdPriceAmount: 24,
     billingPeriodLabel: "mes",
+    billingPeriodLabelEn: "mo",
     description: "Para profesionales que necesitan más capacidad.",
     features: [
       "2,700 mensajes estándar",

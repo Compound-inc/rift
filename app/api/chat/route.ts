@@ -2,6 +2,7 @@ import { Cause, Duration, Effect, Fiber, Ref, Scope } from "effect";
 // import { checkBotId } from "botid/server";
 import {
   streamText,
+  generateText,
   convertToModelMessages,
   UIMessage,
   smoothStream,
@@ -11,14 +12,16 @@ import {
   createUIMessageStream,
   createUIMessageStreamResponse,
 } from "ai";
-import { fetchMutation } from "convex/nextjs";
+import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import { withTracing } from "@posthog/ai";
 import { PostHog } from "posthog-node";
 import * as Sentry from "@sentry/nextjs";
+import { withSupermemory, supermemoryTools } from "@supermemory/tools/ai-sdk";
 import {
   getLanguageModel,
   getModel,
+  getModelShortcutDisplayName,
   getProviderDisplayName,
   getProviderOptions,
   isPremium,
@@ -28,13 +31,14 @@ import { ToolType } from "@/lib/ai/config/base";
 import { Id } from "@/convex/_generated/dataModel";
 import { valyuSearchTools } from "@/lib/ai/tools/valyu-search";
 
-export const maxDuration = 300;
+export const maxDuration = 500;
 
 import {
   ValidationError,
   AuthenticationError,
   NoOrganizationError,
   NoSubscriptionError,
+  SeatLimitError,
   QuotaExceededError,
   DatabaseError,
   AbortError,
@@ -57,15 +61,16 @@ import {
   validateRegenerateRequest,
   filterMessagesForModel,
   getAuthContext,
-  checkUserQuota,
   handleRegeneration,
   sendUserMessage,
-  incrementUserQuota,
   startAssistantMessage,
   appendMessageDelta,
   finalizeAssistantMessage,
   addSourcesToMessage,
-  incrementToolCallQuota,
+  createAssistantAttachment,
+  attachAttachmentsToMessage,
+  UserQuota,
+  setThreadFailedToFailed,
   databaseRetrySchedule,
   classifyProviderError,
   generateIdempotencyKey,
@@ -76,6 +81,8 @@ import {
 } from "./services";
 import { buildSystemPrompt } from "./system-prompt";
 import { createDatabaseQueue } from "./database-queue";
+import { generateR2FileKey, uploadObjectToR2 } from "@/lib/r2-upload";
+import { PLANS_WITH_SEATS } from "@/lib/plan-ids";
 
 // ============================================================================
 // Request ID Generation
@@ -85,6 +92,21 @@ const generateRequestId = (): string => {
   const timestamp = Date.now().toString(36);
   const random = Math.random().toString(36).substring(2, 8);
   return `req_${timestamp}_${random}`;
+};
+
+const getImageExtension = (mediaType: string): string => {
+  if (mediaType.includes("png")) return "png";
+  if (mediaType.includes("jpeg") || mediaType.includes("jpg")) return "jpg";
+  if (mediaType.includes("webp")) return "webp";
+  if (mediaType.includes("gif")) return "gif";
+  return "png";
+};
+
+const getMessageCost = (modelId: string): number => {
+  if (modelId === "google/gemini-3-pro-image") {
+    return 2;
+  }
+  return 1;
 };
 
 // ============================================================================
@@ -173,6 +195,16 @@ const errorToResponse = (
         },
         403,
         "NO_SUBSCRIPTION"
+      );
+
+    case "SeatLimitError":
+      return makeResponse(
+        {
+          error: "Seat limit reached",
+          message: error.message,
+        },
+        403,
+        "SEAT_LIMIT"
       );
 
     case "QuotaExceededError":
@@ -379,8 +411,26 @@ const handleChatRequest = (
     const auth = yield* getAuthContext();
     logContext.userId = auth.userId;
 
+    // Fetch org plan to branch quota: Enterprise = entity-level; Plus/Pro/Free = customer-level
+    const plan = yield* Effect.tryPromise({
+      try: () =>
+        fetchQuery(api.organizations.getOrganizationPlan, {
+          workos_id: auth.orgId,
+          secret: process.env.CONVEX_SECRET_TOKEN!,
+        }),
+      catch: (error) =>
+        new DatabaseError({
+          message: "Failed to fetch organization plan",
+          operation: "getOrganizationPlan",
+          cause: error,
+        }),
+    }).pipe(Effect.catchAll(() => Effect.succeed(null)));
+    const usePerSeatEntity = plan != null && PLANS_WITH_SEATS.has(plan);
+
     logger.debug("Authentication complete", logContext, { 
-      timeMs: Date.now() - start 
+      timeMs: Date.now() - start,
+      plan: plan ?? null,
+      usePerSeatEntity,
     });
 
     // Validate thread ownership and custom instruction access
@@ -398,12 +448,22 @@ const handleChatRequest = (
       });
     }
 
+    const rest: Effect.Effect<Response, ChatRouteError, Scope.Scope> = Effect.gen(function* () {
     const customInstructionsContent = customInstruction?.instructions;
     const validatedCustomInstructionId = customInstruction ? customInstructionId : undefined;
 
     const lastUser = messages.filter((m) => m.role === "user").pop();
     const userText = lastUser?.parts?.find((part) => part.type === "text")?.text;
     const userFiles = lastUser?.parts?.filter((part) => part.type === "file") || [];
+    const modelConfig = getModel(modelId);
+    const supportsImageOutput = modelConfig?.capabilities.supportsImageOutput ?? false;
+
+    if (supportsImageOutput && (!userText || userText.trim().length === 0)) {
+      return yield* new ValidationError({
+        message: "Image generation requires a prompt",
+        field: "messages",
+      });
+    }
 
     const quotaType = isPremium(modelId) ? "premium" : "standard";
     const newMessageId = crypto.randomUUID();
@@ -420,18 +480,66 @@ const handleChatRequest = (
       });
 
     // Initialize model
-    const baseModel = yield* Effect.try({
-      try: () => getLanguageModel(modelId),
+    const baseModel = supportsImageOutput
+      ? null
+      : yield* Effect.try({
+          try: () => getLanguageModel(modelId),
+          catch: (error) =>
+            new ModelError({
+              message: `Failed to initialize model: ${modelId}`,
+              modelId,
+              cause: error,
+            }),
+        });
+
+    const baseModelProvider = supportsImageOutput
+      ? modelId.split("/")[0]
+      : typeof baseModel !== "string" && (baseModel as any).provider
+        ? (baseModel as any).provider
+        : (() => {
+            const fallbackProvider = modelId.split("/")[0];
+            logger.warn(
+              "Provider not found on gateway model, using fallback from modelId",
+              logContext,
+              { modelId, fallbackProvider }
+            );
+            return fallbackProvider;
+          })();
+
+    const userConfig = yield* Effect.tryPromise({
+      try: () =>
+        fetchQuery(api.userConfiguration.serverGetUserConfiguration, {
+          secret: process.env.CONVEX_SECRET_TOKEN!,
+          userId: auth.userId,
+        }),
       catch: (error) =>
-        new ModelError({
-          message: `Failed to initialize model: ${modelId}`,
-          modelId,
+        new DatabaseError({
+          message: "Failed to fetch user configuration",
+          operation: "serverGetUserConfiguration",
           cause: error,
         }),
     });
 
-    // Supermemory is explicitly disabled on the chat route.
-    const supermemoryEnabled = false;
+    // Determine if supermemory should be enabled
+    const supermemoryEnabled = Boolean(process.env.SUPERMEMORY_API_KEY) && userConfig.supermemoryEnabled;
+    const modelWithMemory = supportsImageOutput
+      ? null
+      : yield* Effect.try({
+          try: () =>
+            supermemoryEnabled
+              ? withSupermemory(baseModel as LanguageModel, auth.userId, {
+                  mode: "profile",
+                  verbose: process.env.NODE_ENV !== "production",
+                  conversationId: threadId,
+                })
+              : (baseModel as LanguageModel),
+          catch: (error) =>
+            new ModelError({
+              message: "Failed to initialize Supermemory integration",
+              modelId,
+              cause: error,
+            }),
+        });
 
     // PostHog client - handle gracefully
     const phClient = yield* Effect.try({
@@ -447,41 +555,63 @@ const handleChatRequest = (
 
     yield* Effect.addFinalizer(() => shutdownPostHog(phClient));
 
-    const modelWithProvider = baseModel as LanguageModel;
-
-    const model = yield* Effect.try({
-      try: () => {
-        if (phClient) {
-          return withTracing(modelWithProvider as any as Parameters<typeof withTracing>[0], phClient, {
-            posthogDistinctId: auth.userId,
-            posthogTraceId: newMessageId,
-            posthogProperties: {
-              threadId,
-              modelId,
-              quotaType,
-              orgId: auth.orgId || null,
-              trigger: trigger || "submit-message",
-              requestId,
+    const modelWithProvider = supportsImageOutput
+      ? null
+      : supermemoryEnabled
+        ? new Proxy(modelWithMemory as object, {
+            get(target, prop) {
+              if (prop === "provider") {
+                return baseModelProvider;
+              }
+              return (target as any)[prop];
             },
-            posthogPrivacyMode: false,
-            posthogGroups: auth.orgId ? { organization: auth.orgId } : undefined,
-          }) as unknown as LanguageModel;
-        }
-        return modelWithProvider as unknown as LanguageModel;
-      },
-      catch: (error) =>
-        new ModelError({
-          message: "Failed to setup model tracing",
-          modelId,
-          cause: error,
-        }),
-    });
+          }) as LanguageModel
+        : modelWithMemory;
 
-    const modelConfig = getModel(modelId);
+    const model = supportsImageOutput
+      ? null
+      : yield* Effect.try({
+          try: () => {
+            if (phClient) {
+              return withTracing(
+                modelWithProvider as any as Parameters<typeof withTracing>[0],
+                phClient,
+                {
+                  posthogDistinctId: auth.userId,
+                  posthogTraceId: newMessageId,
+                  posthogProperties: {
+                    threadId,
+                    modelId,
+                    quotaType,
+                    orgId: auth.orgId || null,
+                    trigger: trigger || "submit-message",
+                    requestId,
+                  },
+                  posthogPrivacyMode: false,
+                  posthogGroups: auth.orgId ? { organization: auth.orgId } : undefined,
+                }
+              ) as unknown as LanguageModel;
+            }
+            return modelWithProvider as unknown as LanguageModel;
+          },
+          catch: (error) =>
+            new ModelError({
+              message: "Failed to setup model tracing",
+              modelId,
+              cause: error,
+            }),
+        });
+
+    const fallbackProviderId = modelId.includes("/")
+      ? modelId.split("/")[0]
+      : undefined;
     const fallbackModelName = modelId.includes("/")
       ? modelId.split("/").pop() ?? modelId
       : modelId;
-    const modelDisplayName = modelConfig?.name ?? fallbackModelName;
+    const modelDisplayName =
+      getModelShortcutDisplayName(modelId) ??
+      modelConfig?.name ??
+      fallbackModelName;
 
     // Tools setup - run in parallel with quota check
     const [providerTools, _quotaResult] = yield* Effect.all([
@@ -497,7 +627,20 @@ const handleChatRequest = (
       }),
       // Quota check
       lastUser && (userText || userFiles.length > 0)
-        ? checkUserQuota(auth.userId, auth.orgId, modelId)
+        ? Effect.gen(function* () {
+            const quotaType = isPremium(modelId) ? "premium" : "standard";
+            const featureId = quotaType;
+            yield* UserQuota.check({
+              customer_id: auth.orgId,
+              feature_id: featureId,
+              ...(usePerSeatEntity
+                ? { entity_id: auth.userId, entity_name: auth.userName }
+                : {}),
+              quotaType,
+            });
+
+            return { allowed: true as const, quotaType };
+          })
         : Effect.succeed({ allowed: true as const, quotaType }),
     ], { concurrency: 2 });
 
@@ -505,6 +648,12 @@ const handleChatRequest = (
       try: () => ({
       ...providerTools,
       ...(enabledTools.includes("web_search") ? valyuSearchTools : {}),
+      // Only add supermemory tools if enabled
+      ...(supermemoryEnabled
+        ? supermemoryTools(process.env.SUPERMEMORY_API_KEY!, {
+            containerTags: auth.orgId ? [auth.userId, auth.orgId] : [auth.userId],
+          })
+        : {}),
       }),
       catch: (error) =>
         new ToolError({
@@ -549,8 +698,10 @@ const handleChatRequest = (
       
       if (trigger !== "regenerate-message") {
         const attachmentIds = userFiles
-          .filter((part) => part.attachmentId)
-          .map((part) => part.attachmentId! as Id<"attachments">);
+          .filter((part): part is typeof part & { attachmentId: string } =>
+            "attachmentId" in part && typeof (part as { attachmentId?: string }).attachmentId === "string"
+          )
+          .map((part) => (part as { attachmentId: string }).attachmentId as Id<"attachments">);
 
         // Run synchronously to ensure user message is saved before AI generation starts
         yield* sendUserMessage({
@@ -570,14 +721,6 @@ const handleChatRequest = (
           )
         );
       } else {
-        // Run synchronously for regeneration quota increment
-        yield* incrementUserQuota(auth.userId, auth.orgId, quotaType).pipe(
-          Effect.tapError((error) =>
-            Effect.sync(() => {
-              logger.error(`Failed to increment quota: ${idempotencyKey}`, logContext, error);
-            })
-          )
-        );
       }
     }
 
@@ -636,10 +779,14 @@ const handleChatRequest = (
 
     // Create the streaming response
     const stream = createUIMessageStream({
-      originalMessages: messages as UIMessage[],
+      originalMessages: messages,
       execute: async ({ writer }) => {
-        // Start assistant message with server-side generated id
-        writer.write({ type: "start", messageId: newMessageId });
+        // Start assistant message with server-side generated id and model for UI
+        writer.write({
+          type: "start",
+          messageId: newMessageId,
+          messageMetadata: { model: modelDisplayName },
+        });
 
         // Start assistant message in database (background)
         const startEffect = dbQueue.enqueue(
@@ -733,10 +880,15 @@ const handleChatRequest = (
               });
               try {
                 await Effect.runPromise(
-                  incrementToolCallQuota(auth.userId, finalState.searchToolCallCount)
+                  UserQuota.track({
+                    customer_id: auth.orgId,
+                    feature_id: quotaType,
+                    ...(usePerSeatEntity ? { entity_id: auth.userId } : {}),
+                    value: finalState.searchToolCallCount,
+                  })
                 );
               } catch (err) {
-                logger.error("Failed to increment tool quota", logContext, err);
+                logger.error("Failed to track tool quota (Autumn)", logContext, err);
               }
             }
 
@@ -753,11 +905,170 @@ const handleChatRequest = (
 
         logger.debug("Starting AI stream", logContext, { timeMs: Date.now() - start });
 
+        if (supportsImageOutput) {
+          try {
+            await Effect.runPromise(
+              UserQuota.track({
+                customer_id: auth.orgId,
+                feature_id: quotaType,
+                ...(usePerSeatEntity ? { entity_id: auth.userId } : {}),
+                value: getMessageCost(modelId),
+              })
+            );
+
+            const imageModel = phClient
+              ? (withTracing(
+                  getLanguageModel(modelId) as any as Parameters<typeof withTracing>[0],
+                  phClient,
+                  {
+                    posthogDistinctId: auth.userId,
+                    posthogTraceId: newMessageId,
+                    posthogProperties: {
+                      threadId,
+                      modelId,
+                      quotaType,
+                      orgId: auth.orgId || null,
+                      trigger: trigger || "submit-message",
+                      requestId,
+                    },
+                    posthogPrivacyMode: false,
+                    posthogGroups: auth.orgId ? { organization: auth.orgId } : undefined,
+                  }
+                ) as unknown as LanguageModel)
+              : (getLanguageModel(modelId) as LanguageModel);
+
+            const imageResult = await generateText({
+              model: imageModel,
+              messages: await convertToModelMessages(
+                filterMessagesForModel(messages, modelId)
+              ),
+              system: systemPrompt,
+              headers: getAttributionHeaders(),
+              providerOptions,
+              abortSignal: req.signal,
+            });
+            const generatedImage = imageResult.files.find((file) =>
+              file.mediaType?.startsWith("image/")
+            );
+            if (!generatedImage) {
+              throw new Error("No image generated");
+            }
+
+            const mediaType = generatedImage.mediaType || "image/png";
+            const imageBytes =
+              generatedImage.uint8Array ??
+              (generatedImage.base64
+                ? Buffer.from(
+                    generatedImage.base64.includes("base64,")
+                      ? generatedImage.base64.split("base64,")[1]
+                      : generatedImage.base64,
+                    "base64"
+                  )
+                : null);
+            if (!imageBytes) {
+              throw new Error("Generated image data missing");
+            }
+
+            const fileName = `image-${Date.now()}.${getImageExtension(mediaType)}`;
+            const fileKey = generateR2FileKey({
+              userId: auth.userId,
+              fileName,
+              prefix: "generated",
+            });
+
+            const publicUrl = await uploadObjectToR2({
+              fileKey,
+              body: imageBytes,
+              contentType: mediaType,
+              contentDisposition: `inline; filename="${fileName}"`,
+            });
+
+            const attachmentId = await Effect.runPromise(
+              createAssistantAttachment({
+                userId: auth.userId,
+                dataUrl: publicUrl,
+                fileName,
+                mimeType: mediaType,
+                fileSize: imageBytes.length.toString(),
+              })
+            );
+
+            await Effect.runPromise(
+              attachAttachmentsToMessage({
+                userId: auth.userId,
+                messageId: newMessageId,
+                attachmentIds: [attachmentId],
+              })
+            );
+
+            writer.write({
+              type: "file",
+              url: publicUrl,
+              mediaType,
+            });
+            writer.write({ type: "finish" });
+
+            await Effect.runPromise(
+              finalize({
+                ok: true,
+              })
+            );
+            cleanup();
+            await Effect.runPromise(shutdownQueue("image-finish"));
+          } catch (error) {
+            cleanup();
+            const errorObj = error instanceof Error ? error : new Error(String(error));
+            const classifiedError = classifyProviderError(errorObj);
+
+            logger.error("Image generation error", logContext, {
+              errorType: classifiedError.errorType,
+              retryable: classifiedError.retryable,
+              originalError: errorObj.message,
+            });
+
+            await Effect.runPromise(
+              finalize({
+                ok: false,
+                error: {
+                  type: classifiedError.errorType,
+                  message: classifiedError.message,
+                },
+              })
+            ).catch((finalizeErr) =>
+              logger.error("Failed to finalize image error", logContext, finalizeErr)
+            );
+
+            try {
+              writer.write({
+                type: "error",
+                errorText: classifiedError.retryable
+                  ? "Generation failed. Please try again."
+                  : classifiedError.message,
+              });
+            } catch {
+              // Stream might be closed
+            }
+
+            await Effect.runPromise(shutdownQueue("image-error"));
+          }
+          return;
+        }
+
         try {
+          // Track message usage (+1) whenever generation starts.
+          await Effect.runPromise(
+            UserQuota.track({
+              customer_id: auth.orgId,
+              feature_id: quotaType,
+              ...(usePerSeatEntity ? { entity_id: auth.userId } : {}),
+              value: getMessageCost(modelId),
+            })
+          );
+
           const result = streamText({
-            model,
+            model: model as LanguageModel,
             messages: await convertToModelMessages(
-              filterMessagesForModel(messages as UIMessage[], modelId)
+              filterMessagesForModel(messages, modelId)
             ),
             tools: toolSet,
             system: systemPrompt,
@@ -894,10 +1205,15 @@ const handleChatRequest = (
                 });
                 try {
                   await Effect.runPromise(
-                    incrementToolCallQuota(auth.userId, finalState.searchToolCallCount)
+                    UserQuota.track({
+                      customer_id: auth.orgId,
+                      feature_id: quotaType,
+                      ...(usePerSeatEntity ? { entity_id: auth.userId } : {}),
+                      value: finalState.searchToolCallCount,
+                    })
                   );
                 } catch (err) {
-                  logger.error("Failed to increment tool quota", logContext, err);
+                  logger.error("Failed to track tool quota (Autumn)", logContext, err);
                 }
               }
 
@@ -1032,6 +1348,15 @@ const handleChatRequest = (
         "X-Request-ID": requestId,
       },
     });
+    });
+    return yield* rest.pipe(
+      Effect.catchAll((err: ChatRouteError) =>
+        setThreadFailedToFailed({ userId: auth.userId, threadId }).pipe(
+          Effect.catchAll(() => Effect.succeed(undefined)),
+          Effect.flatMap(() => Effect.fail(err))
+        )
+      )
+    );
   });
 
 // ============================================================================
@@ -1083,6 +1408,7 @@ export async function POST(req: Request): Promise<Response> {
       // BotDetectionError: (e: BotDetectionError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
       NoOrganizationError: (e: NoOrganizationError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
       NoSubscriptionError: (e: NoSubscriptionError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
+      SeatLimitError: (e: SeatLimitError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
       QuotaExceededError: (e: QuotaExceededError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
       AbortError: (e: AbortError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),
       DatabaseError: (e: DatabaseError) => Effect.succeed(errorToResponse(e, start, requestId, logContext)),

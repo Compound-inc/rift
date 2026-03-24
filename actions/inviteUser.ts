@@ -5,11 +5,12 @@ import { workos } from "@/app/api/workos";
 import { getOrganizationMemberCount } from "./getOrganizationMembers";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
+import { PLANS_WITH_SEATS } from "@/lib/plan-ids";
+import { getAutumnSeatLimitForOrg } from "./getAutumnSeatLimit";
 
 export async function inviteUser(email: string, roleSlug?: string) {
   try {
     const { organizationId } = await withAuth({ ensureSignedIn: true });
-    
     if (!organizationId) {
       return { success: false, error: "No organization found in session" };
     }
@@ -19,24 +20,21 @@ export async function inviteUser(email: string, roleSlug?: string) {
       workos_id: organizationId,
       secret: process.env.CONVEX_SECRET_TOKEN!,
     });
-
-    if (plan !== "enterprise") {
-      return { success: false, error: "Solo las organizaciones con el plan Enterprise pueden invitar miembros." };
+    if (!plan || !PLANS_WITH_SEATS.has(plan)) {
+      return { success: false, error: "Solo las organizaciones con planes que incluyen asientos pueden invitar miembros." };
     }
 
     // Verify seat limits
-    const seatQuantity = await fetchQuery(api.organizations.getOrganizationSeats, {
-      workos_id: organizationId,
-      secret: process.env.CONVEX_SECRET_TOKEN!,
-    });
-    
-    if (seatQuantity !== null && seatQuantity !== undefined) {
-        const currentCount = await getOrganizationMemberCount();
-        // Check if adding 1 more would exceed limit (currentCount includes active + pending)
-        // So if currentCount >= seatQuantity, we cannot add more.
-        if (currentCount >= seatQuantity) {
-            return { success: false, error: `Has alcanzado el límite de ${seatQuantity} asientos de tu organización.` };
-        }
+    const seatQuantity = await getAutumnSeatLimitForOrg(organizationId);
+    if (seatQuantity == null) {
+      return {
+        success: false,
+        error: "No se pudo verificar el límite de asientos. Intenta más tarde o contacta a soporte.",
+      };
+    }
+    const currentCount = await getOrganizationMemberCount();
+    if (currentCount >= seatQuantity) {
+      return { success: false, error: `Has alcanzado el límite de ${seatQuantity} asientos de tu organización.` };
     }
 
     await workos.userManagement.sendInvitation({

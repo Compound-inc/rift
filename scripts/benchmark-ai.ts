@@ -179,6 +179,29 @@ const ask = (query: string): Promise<string> => {
   return new Promise(resolve => rl.question(query, resolve));
 };
 
+async function getGenerationDetails(generationId: string) {
+  if (!process.env.AI_GATEWAY_API_KEY) {
+    return null;
+  }
+  try {
+    const response = await fetch(
+      `https://ai-gateway.vercel.sh/v1/generation?id=${generationId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.AI_GATEWAY_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data;
+  } catch (e) {
+    console.error("Error fetching generation details:", e);
+    return null;
+  }
+}
+
 async function runBenchmarkForModel(modelConfig: typeof MODELS[0], promptSize: 'small' | 'medium' | 'big') {
   const prompt = PROMPTS[promptSize];
   console.log(`Running ${modelConfig.id} [${promptSize}]...`);
@@ -198,8 +221,46 @@ async function runBenchmarkForModel(modelConfig: typeof MODELS[0], promptSize: '
 
     const usage: any = result.usage;
     
-    const openrouterMetadata = result.providerMetadata?.openrouter as any;
-    let totalCost: number | string | undefined = openrouterMetadata?.cost;
+    // Extract info from providerMetadata as seen in debug logs
+    // The structure is result.providerMetadata.gateway.cost (string)
+    // and result.providerMetadata.gateway.generationId
+    const metadataGateway = result.providerMetadata?.gateway as any;
+    
+    let totalCost: number | string | undefined = metadataGateway?.cost;
+    let generationId = metadataGateway?.generationId;
+
+    // Fallback: Check usage.gateway if not found in metadata
+    if (!totalCost && !generationId) {
+         // @ts-ignore
+        const usageGateway = result.usage?.gateway;
+        if (usageGateway) {
+            if (!totalCost) totalCost = usageGateway.cost;
+            if (!generationId) generationId = usageGateway.generationId;
+        }
+    }
+
+    // Fallback: Check headers for generationId if still missing
+    if (!generationId && result.response?.headers) {
+        const headers = result.response.headers;
+        // Handle both Headers object (has get) and plain object
+        if (typeof (headers as any).get === 'function') {
+            generationId = (headers as any).get('x-ai-generation-id');
+        } else {
+            generationId = (headers as any)['x-ai-generation-id'];
+        }
+    }
+
+    let details: any = null;
+
+    if (generationId) {
+        details = await getGenerationDetails(generationId);
+        if (details) {
+            // details.data.total_cost
+            // details.data.tokens_prompt
+            // details.data.tokens_completion
+            if (totalCost === undefined) totalCost = details.data.total_cost;
+        }
+    }
 
     // Try to get cost from providerMetadata if available
     if (totalCost === undefined && result.providerMetadata?.aiSdk?.usage) {
@@ -268,10 +329,10 @@ async function saveResult(
 }
 
 async function main() {
-  if (!process.env.OPENROUTER_API_KEY) {
-    console.warn("Warning: OPENROUTER_API_KEY is not set.");
+  if (!process.env.AI_GATEWAY_API_KEY) {
+    console.warn("Warning: AI_GATEWAY_API_KEY is not set. Costs might not be tracked.");
   } else {
-    console.log("OPENROUTER_API_KEY is present.");
+    console.log("AI_GATEWAY_API_KEY is present.");
   }
 
   while (true) {
@@ -382,3 +443,4 @@ async function main() {
 }
 
 main();
+

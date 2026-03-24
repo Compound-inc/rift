@@ -4,6 +4,7 @@ import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { UIMessage } from "ai";
+import { Autumn } from "autumn-js";
 import { isCapable, isPremium } from "@/lib/ai/ai-providers";
 import { ToolType } from "@/lib/ai/config/base";
 import * as Sentry from "@sentry/nextjs";
@@ -12,7 +13,7 @@ import {
   ValidationError,
   AuthenticationError,
   NoOrganizationError,
-  NoSubscriptionError,
+  SeatLimitError,
   QuotaExceededError,
   DatabaseError,
   RegenerateError,
@@ -107,6 +108,7 @@ export const captureChatError = (error: ChatRouteError, logContext: LogContext):
       "AbortError",           // Client cancelled request
       "QuotaExceededError",   // Expected business logic
       "NoSubscriptionError",  // Expected business logic
+      "SeatLimitError",       // Expected business logic
     ].includes(error._tag);
 
     if (skipCapture) {
@@ -361,17 +363,7 @@ export const classifyProviderError = (error: unknown): ProviderError => {
 // ============================================================================
 
 export interface RequestBody {
-  messages: Array<{
-    id: string;
-    role: "user" | "assistant" | "system";
-    parts?: Array<{
-      type: string;
-      text?: string;
-      mediaType?: string;
-      url?: string;
-      attachmentId?: string;
-    }>;
-  }>;
+  messages: UIMessage[];
   modelId: string;
   threadId: string;
   enabledTools?: ToolType[];
@@ -384,6 +376,7 @@ export interface AuthContext {
   token: string;
   userId: string;
   orgId: string;
+  userName: string;
 }
 
 export interface QuotaCheckResult {
@@ -616,10 +609,16 @@ export const getAuthContext = (): Effect.Effect<
       });
     }
 
+    const userName =
+      [auth.user.firstName, auth.user.lastName].filter(Boolean).join(" ").trim() ||
+      auth.user.email ||
+      auth.user.id;
+
     return {
       token: auth.accessToken,
       userId: auth.user.id,
       orgId: auth.organizationId,
+      userName,
     };
   });
 
@@ -627,80 +626,211 @@ export const getAuthContext = (): Effect.Effect<
 // Quota Service
 // ============================================================================
 
-/**
- * Checks user quota and returns whether the request is allowed.
- */
-export const checkUserQuota = (
-  userId: string,
-  orgId: string,
-  modelId: string
-): Effect.Effect<
-  { allowed: true; quotaType: "standard" | "premium" },
-  NoSubscriptionError | QuotaExceededError | DatabaseError
-> =>
-  Effect.gen(function* () {
-    const quotaType = isPremium(modelId) ? "premium" : "standard";
+const AUTUMN_ENTITY_NOT_FOUND_ERROR_SNIPPET =
+  "not found. To automatically create this entity, please pass in 'feature_id' into the 'entity_data' field of the request body.";
 
-    const quotaCheck = yield* Effect.tryPromise({
-      try: () =>
-        fetchQuery(api.users.serverCheckUserQuota, {
-          secret: process.env.CONVEX_SECRET_TOKEN!,
-          userId,
-          orgId,
-          quotaType,
-        }),
-      catch: (error) =>
-        new DatabaseError({
-          message: "Failed to check user quota",
-          operation: "serverCheckUserQuota",
-          cause: error,
-        }),
-    });
+const isAutumnEntityNotFoundError = (message?: string): boolean =>
+  Boolean(message?.includes(AUTUMN_ENTITY_NOT_FOUND_ERROR_SNIPPET));
 
-    if (!quotaCheck.allowed) {
-      if (!quotaCheck.quotaConfigured) {
-        return yield* new NoSubscriptionError({
-          message: "Organization has no active subscription configured",
-          quotaType,
-        });
-      }
+/** Known Autumn API error codes for seat/entity balance limit (prefer over message matching). */
+const AUTUMN_SEAT_LIMIT_CODES = new Set([
+  "balance_exceeded",
+  "limit_exceeded",
+  "entity_limit",
+  "seat_limit",
+  "quota_exceeded",
+  "insufficient_balance",
+]);
 
-      // Fetch both quotas for detailed error
-      const bothQuotas = yield* Effect.tryPromise({
-        try: () =>
-          fetchQuery(api.users.serverGetUserBothQuotas, {
-            secret: process.env.CONVEX_SECRET_TOKEN!,
-            userId,
-            orgId,
-          }),
+const isAutumnSeatLimitError = (error: unknown): boolean =>
+  Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      typeof (error as { code: unknown }).code === "string" &&
+      AUTUMN_SEAT_LIMIT_CODES.has((error as { code: string }).code),
+  );
+
+export const UserQuota = {
+  check: (args: {
+    customer_id: string;
+    feature_id: string;
+    entity_id?: string;
+    entity_name?: string;
+    quotaType: "standard" | "premium";
+  }): Effect.Effect<void, QuotaExceededError | SeatLimitError | DatabaseError> =>
+    Effect.gen(function* () {
+      const useEntityLogic = Boolean(args.entity_id && args.entity_name);
+
+      const result = yield* Effect.tryPromise({
+        try: async () => {
+          const secretKey = process.env.AUTUMN_SECRET_KEY;
+          if (!secretKey) {
+            throw new Error("AUTUMN_SECRET_KEY is not set");
+          }
+
+          const autumn = new Autumn({ secretKey });
+
+          // Entity flow (Enterprise): we check plan quota (args.feature_id = "standard"|"premium")
+          // per entity. The entity is created with feature_id "seats" so Autumn can bill seat count;
+          // quota checks correctly use args.feature_id for that entity's message limit.
+          const runCheck = () =>
+            useEntityLogic
+              ? autumn.check({
+                  customer_id: args.customer_id,
+                  feature_id: args.feature_id,
+                  entity_id: args.entity_id!,
+                })
+              : autumn.check({
+                  customer_id: args.customer_id,
+                  feature_id: args.feature_id,
+                });
+
+          let createdSeatsEntity = false;
+          const ensureSeatsEntity = async () => {
+            if (createdSeatsEntity || !useEntityLogic) return;
+
+            // Customer-level seats capacity; then create entity under "seats" to record this user as one seat.
+            const seatsResponse = await autumn.check({
+              customer_id: args.customer_id,
+              feature_id: "seats",
+            });
+
+            const seatsData = (seatsResponse as any)?.data as unknown;
+            if (!seatsData || typeof (seatsData as any).allowed !== "boolean") {
+              const message = (seatsResponse as any)?.error?.message as string | undefined;
+              throw new Error(message ?? "Autumn seats check failed");
+            }
+
+            const seatsAllowed =
+              (seatsData as any).unlimited === true || (seatsData as any).allowed === true;
+
+            if (!seatsAllowed) {
+              return "no_seats" as const;
+            }
+
+            try {
+              createdSeatsEntity = true;
+              await autumn.entities.create(args.customer_id, {
+                id: args.entity_id!,
+                name: args.entity_name!,
+                feature_id: "seats",
+              });
+            } catch (error) {
+              if (isAutumnSeatLimitError(error)) return "no_seats" as const;
+              throw error;
+            }
+
+            return "ok" as const;
+          };
+
+          let response: Awaited<ReturnType<typeof runCheck>>;
+
+          if (useEntityLogic) {
+            // First runCheck may throw or return entity-not-found if this seat has no entity yet.
+            // ensureSeatsEntity creates the entity under "seats"; second runCheck uses args.feature_id (plan quota).
+            try {
+              response = await runCheck();
+            } catch (error) {
+              const message = error instanceof Error ? error.message : undefined;
+              if (!isAutumnEntityNotFoundError(message)) throw error;
+              const ensured = await ensureSeatsEntity();
+              if (ensured === "no_seats") return { kind: "no_seats" as const };
+              response = await runCheck();
+            }
+
+            if ((response as any)?.data == null) {
+              const message = (response as any)?.error?.message as string | undefined;
+              if (isAutumnEntityNotFoundError(message)) {
+                const ensured = await ensureSeatsEntity();
+                if (ensured === "no_seats") return { kind: "no_seats" as const };
+                response = await runCheck();
+              }
+            }
+          } else {
+            response = await runCheck();
+          }
+
+          const responseData = (response as any)?.data as unknown;
+          if (!responseData || typeof (responseData as any).allowed !== "boolean") {
+            const message = (response as any)?.error?.message as string | undefined;
+            throw new Error(message ?? "Autumn check failed");
+          }
+
+          return {
+            kind: "ok" as const,
+            data: responseData as {
+              allowed: boolean;
+              usage?: number;
+              included_usage?: number;
+              balance?: number;
+              unlimited?: boolean;
+            },
+          };
+        },
         catch: (error) =>
           new DatabaseError({
-            message: "Failed to get user quotas",
-            operation: "serverGetUserBothQuotas",
+            message: "Failed to check quota (Autumn)",
+            operation: "autumn.check",
             cause: error,
           }),
       });
 
-      return yield* new QuotaExceededError({
-        message: `Message quota exceeded. Usage: ${quotaCheck.currentUsage}/${quotaCheck.limit} messages`,
-        quotaType,
-        currentUsage: quotaCheck.currentUsage,
-        limit: quotaCheck.limit,
-        otherQuotaInfo: {
-          currentUsage:
-            quotaType === "standard"
-              ? bothQuotas.premium.currentUsage
-              : bothQuotas.standard.currentUsage,
-          limit:
-            quotaType === "standard"
-              ? bothQuotas.premium.limit
-              : bothQuotas.standard.limit,
-        },
-      });
-    }
+      if (result.kind === "no_seats") {
+        return yield* new SeatLimitError({
+          message: "Su organización ha alcanzado el número máximo de usuarios. Pueden contactar a los administradores de la organización para aumentar el límite.",
+        });
+      }
 
-    return { allowed: true as const, quotaType };
-  });
+      const data = result.data;
+
+      if (!data.allowed) {
+        return yield* new QuotaExceededError({
+          message: `Message quota exceeded (Autumn). Feature: ${args.feature_id}`,
+          quotaType: args.quotaType,
+          currentUsage: data.usage ?? 0,
+          limit: data.included_usage ?? 0,
+        });
+      }
+    }),
+
+  track: (args: {
+    customer_id: string;
+    feature_id: string;
+    entity_id?: string;
+    value: number;
+  }): Effect.Effect<void, DatabaseError> =>
+    Effect.tryPromise({
+      try: async () => {
+        const secretKey = process.env.AUTUMN_SECRET_KEY;
+        if (!secretKey) {
+          throw new Error("AUTUMN_SECRET_KEY is not set");
+        }
+
+        const autumn = new Autumn({ secretKey });
+        if (args.entity_id != null) {
+          await autumn.track({
+            customer_id: args.customer_id,
+            feature_id: args.feature_id,
+            entity_id: args.entity_id,
+            value: args.value,
+          });
+        } else {
+          await autumn.track({
+            customer_id: args.customer_id,
+            feature_id: args.feature_id,
+            value: args.value,
+          });
+        }
+      },
+      catch: (error) =>
+        new DatabaseError({
+          message: "Failed to track quota usage (Autumn)",
+          operation: "autumn.track",
+          cause: error,
+        }),
+    }),
+} as const;
 
 // ============================================================================
 // Database Operations
@@ -783,28 +913,29 @@ export const sendUserMessage = (params: {
   }).pipe(Effect.retry({ schedule: databaseRetrySchedule, while: isRetryableDatabaseError }));
 
 /**
- * Increments user quota (for regenerations).
+ * Sets thread generation status to "failed" when the chat route returns an error
+ * before or without finalizing (e.g. seat limit, quota, auth errors). Idempotent:
+ * Convex only updates if status is "pending" or "generation".
  */
-export const incrementUserQuota = (
-  userId: string,
-  orgId: string,
-  quotaType: "standard" | "premium"
-): Effect.Effect<void, DatabaseError> =>
+export const setThreadFailedToFailed = (params: {
+  userId: string;
+  threadId: string;
+}): Effect.Effect<void, DatabaseError> =>
   Effect.tryPromise({
     try: () =>
-      fetchMutation(api.users.serverIncrementUserQuota, {
+      fetchMutation(api.threads.serverSetThreadGenerationStatus, {
         secret: process.env.CONVEX_SECRET_TOKEN!,
-        userId,
-        orgId,
-        quotaType,
+        userId: params.userId,
+        threadId: params.threadId,
+        status: "failed",
       }),
     catch: (error) =>
       new DatabaseError({
-        message: "Failed to increment user quota",
-        operation: "serverIncrementUserQuota",
+        message: "Failed to set thread status to failed",
+        operation: "serverSetThreadGenerationStatus",
         cause: error,
       }),
-  }).pipe(Effect.retry({ schedule: databaseRetrySchedule, while: isRetryableDatabaseError }));
+  });
 
 /**
  * Saves an assistant message in the database.
@@ -903,28 +1034,50 @@ export const addSourcesToMessage = (params: {
   }).pipe(Effect.retry({ schedule: databaseRetrySchedule, while: isRetryableDatabaseError }));
 
 /**
- * Increments tool call quota.
+ * Create an attachment record for assistant-generated files.
  */
-export const incrementToolCallQuota = (
-  userId: string,
-  toolCallCount: number
-): Effect.Effect<void, DatabaseError> =>
+export const createAssistantAttachment = (params: {
+  userId: string;
+  dataUrl: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: string;
+}): Effect.Effect<Id<"attachments">, DatabaseError> =>
   Effect.tryPromise({
     try: () =>
-      fetchMutation(api.threads.serverIncrementToolCallQuota, {
+      fetchMutation(api.threads.serverCreateAttachment, {
         secret: process.env.CONVEX_SECRET_TOKEN!,
-        userId,
-        toolCallCount,
+        ...params,
       }),
     catch: (error) =>
       new DatabaseError({
-        message: `Failed to increment tool call quota: ${error instanceof Error ? error.message : String(error)}`,
-        operation: "serverIncrementToolCallQuota",
+        message: "Failed to create assistant attachment",
+        operation: "serverCreateAttachment",
         cause: error,
       }),
-  }).pipe(
-    Effect.retry({ schedule: databaseRetrySchedule, while: isRetryableDatabaseError }),
-  );
+  }).pipe(Effect.retry({ schedule: databaseRetrySchedule, while: isRetryableDatabaseError }));
+
+/**
+ * Attach existing attachments to an assistant message.
+ */
+export const attachAttachmentsToMessage = (params: {
+  userId: string;
+  messageId: string;
+  attachmentIds: Id<"attachments">[];
+}): Effect.Effect<void, DatabaseError> =>
+  Effect.tryPromise({
+    try: () =>
+      fetchMutation(api.threads.serverAttachAttachmentsToMessage, {
+        secret: process.env.CONVEX_SECRET_TOKEN!,
+        ...params,
+      }),
+    catch: (error) =>
+      new DatabaseError({
+        message: "Failed to attach attachments to message",
+        operation: "serverAttachAttachmentsToMessage",
+        cause: error,
+      }),
+  }).pipe(Effect.retry({ schedule: databaseRetrySchedule, while: isRetryableDatabaseError }));
 
 // ============================================================================
 // Abort Handling

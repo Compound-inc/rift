@@ -241,7 +241,7 @@ export function InstructionSelector({
           {!hasInstructions && (
             <Link
               href="/settings/custom-instructions"
-              className="flex items-center gap-2 px-2 py-1.5 mb-1 text-xs font-medium text-foreground transition-none rounded-sm "
+              className="flex items-center gap-2 px-2 py-1.5 mb-1 text-xs text-popover-text/80 hover:text-popover-text transition-colors rounded-sm"
               onClick={() => setOpen(false)}
             >
               <PlusIcon className="h-3.5 w-3.5" />
@@ -250,7 +250,7 @@ export function InstructionSelector({
           )}
           <Link
             href="/settings/custom-instructions"
-            className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground hover:text-popover-text transition-none rounded-sm"
+            className="flex items-center gap-2 px-2 py-1.5 text-xs text-popover-text/80 hover:text-popover-text transition-colors rounded-sm"
             onClick={() => setOpen(false)}
           >
             <Settings2 className="h-3.5 w-3.5" />

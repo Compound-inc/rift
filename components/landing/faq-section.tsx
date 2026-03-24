@@ -1,7 +1,10 @@
-import { faqs } from "./data/faqs";
+import type { Dictionary } from "@/types/dictionary";
 
-export default function FaqSection() {
+type FaqSectionProps = {
+  dict: Dictionary["faq"];
+};
 
+export default function FaqSection({ dict }: FaqSectionProps) {
   return (
     <section
       id="faq"
@@ -11,21 +14,21 @@ export default function FaqSection() {
       <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-2 w-full -mb-4">
           <span className="text-landing-accent font-semibold gap-1.5 flex items-center transition-opacity duration-150">
-            FAQ
+            {dict.label}
           </span>
           <h2
             id="faq-heading"
             className="text-[40px] leading-[54.4px] tracking-[-0.5px] font-bold m-0"
           >
-            Preguntas Frecuentes
+            {dict.heading}
           </h2>
           <p className="text-landing-text-secondary m-0 max-w-2xl">
-            Resolvemos tus dudas sobre RIFT y cómo podemos ayudarte a aprovechar al máximo la IA.
+            {dict.summary}
           </p>
         </div>
 
         <div className="w-full flex flex-col gap-2">
-            {faqs.map((faq, index) => (
+            {dict.items.map((faq, index) => (
               <article
                 key={index}
                 itemScope

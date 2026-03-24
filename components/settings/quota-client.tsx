@@ -1,54 +1,67 @@
 "use client";
 
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useCustomer, useEntity } from "autumn-js/react";
+import { useAuth } from "@/components/auth/auth-context";
+import { useOrgContext } from "@/contexts/org-context";
+import {
+  type QuotaInfo,
+  type AutumnFeature,
+  mapAutumnToQuotaInfo,
+  UNCONFIGURED_QUOTA_INFO,
+} from "@/lib/autumn-quota";
+import { PLANS_WITH_SEATS } from "@/lib/plan-ids";
 import { Progress } from "@/components/ai/ui/progress";
 import { Skeleton } from "@/components/ai/ui/skeleton";
 
-interface QuotaData {
-  currentUsage: number;
-  limit: number;
-  quotaConfigured: boolean;
+export type { QuotaInfo } from "@/lib/autumn-quota";
+
+function useAutumnQuotaInfo(): { quotaInfo: QuotaInfo | undefined; isLoading: boolean } {
+  const { orgInfo, isLoading: orgLoading } = useOrgContext();
+  const { user } = useAuth();
+  const plan = orgInfo?.plan ?? null;
+  const usePerSeatEntity = plan != null && PLANS_WITH_SEATS.has(plan);
+
+  const { customer, isLoading: customerLoading } = useCustomer();
+  const entityId = usePerSeatEntity && user?.id ? user.id : null;
+  const { entity: entityData, isLoading: entityLoading } = useEntity(entityId);
+
+  const loading =
+    orgLoading ||
+    (usePerSeatEntity && !user?.id) ||
+    (usePerSeatEntity ? entityLoading : customerLoading);
+
+  if (loading) {
+    return { quotaInfo: undefined, isLoading: true };
+  }
+
+  if (usePerSeatEntity && entityData) {
+    const features = entityData.features as Record<string, AutumnFeature> | undefined;
+    return { quotaInfo: mapAutumnToQuotaInfo(features), isLoading: false };
+  }
+
+  if (customer) {
+    const features = customer.features as Record<string, AutumnFeature> | undefined;
+    return { quotaInfo: mapAutumnToQuotaInfo(features), isLoading: false };
+  }
+
+  return { quotaInfo: UNCONFIGURED_QUOTA_INFO, isLoading: false };
 }
 
-type QuotaInfo = {
-  standard: QuotaData;
-  premium: QuotaData;
-  nextResetDate?: number;
-} | null;
-
-function getUnconfiguredQuota(): NonNullable<QuotaInfo> {
-  return {
-    standard: {
-      currentUsage: 0,
-      limit: 0,
-      quotaConfigured: false,
-    },
-    premium: {
-      currentUsage: 0,
-      limit: 0,
-      quotaConfigured: false,
-    },
-    nextResetDate: undefined,
-  };
-}
-
-export function QuotaUsageNumbers({ 
-  type, 
-  quotaInfo: propQuotaInfo 
-}: { 
+export function QuotaUsageNumbers({
+  type,
+  quotaInfo: propQuotaInfo,
+}: {
   type: "standard" | "premium";
   quotaInfo?: QuotaInfo;
 }) {
-  const queryQuotaInfo = useQuery(api.users.getUserFullQuotaInfo, {});
-  const quotaInfo = propQuotaInfo ?? queryQuotaInfo;
-  
-  if (quotaInfo === undefined) {
+  const { quotaInfo: autumnQuota, isLoading } = useAutumnQuotaInfo();
+  const quotaInfo = propQuotaInfo ?? autumnQuota;
+
+  if (isLoading || quotaInfo === undefined) {
     return <QuotaUsageSkeleton />;
   }
-  
-  const info = quotaInfo ?? getUnconfiguredQuota();
-  const data = info[type];
+
+  const data = quotaInfo[type];
   const { currentUsage, limit, quotaConfigured } = data;
   
   if (!quotaConfigured) {
@@ -76,22 +89,21 @@ export function QuotaUsageNumbers({
   );
 }
 
-export function QuotaRemaining({ 
-  type, 
-  quotaInfo: propQuotaInfo 
-}: { 
+export function QuotaRemaining({
+  type,
+  quotaInfo: propQuotaInfo,
+}: {
   type: "standard" | "premium";
   quotaInfo?: QuotaInfo;
 }) {
-  const queryQuotaInfo = useQuery(api.users.getUserFullQuotaInfo, {});
-  const quotaInfo = propQuotaInfo ?? queryQuotaInfo;
-  
-  if (quotaInfo === undefined) {
+  const { quotaInfo: autumnQuota, isLoading } = useAutumnQuotaInfo();
+  const quotaInfo = propQuotaInfo ?? autumnQuota;
+
+  if (isLoading || quotaInfo === undefined) {
     return <QuotaRemainingSkeleton />;
   }
-  
-  const info = quotaInfo ?? getUnconfiguredQuota();
-  const data = info[type];
+
+  const data = quotaInfo[type];
   const { currentUsage, limit, quotaConfigured } = data;
   
   if (!quotaConfigured) {
@@ -108,22 +120,21 @@ export function QuotaRemaining({
   );
 }
 
-export function QuotaProgress({ 
-  type, 
-  quotaInfo: propQuotaInfo 
-}: { 
+export function QuotaProgress({
+  type,
+  quotaInfo: propQuotaInfo,
+}: {
   type: "standard" | "premium";
   quotaInfo?: QuotaInfo;
 }) {
-  const queryQuotaInfo = useQuery(api.users.getUserFullQuotaInfo, {});
-  const quotaInfo = propQuotaInfo ?? queryQuotaInfo;
-  
-  if (quotaInfo === undefined) {
+  const { quotaInfo: autumnQuota, isLoading } = useAutumnQuotaInfo();
+  const quotaInfo = propQuotaInfo ?? autumnQuota;
+
+  if (isLoading || quotaInfo === undefined) {
     return <QuotaProgressSkeleton />;
   }
-  
-  const info = quotaInfo ?? getUnconfiguredQuota();
-  const data = info[type];
+
+  const data = quotaInfo[type];
   const { currentUsage, limit, quotaConfigured } = data;
   
   if (!quotaConfigured) {
@@ -151,19 +162,19 @@ export function QuotaProgress({
   );
 }
 
-export function ResetDateText({ 
-  quotaInfo: propQuotaInfo 
-}: { 
+export function ResetDateText({
+  quotaInfo: propQuotaInfo,
+}: {
   quotaInfo?: QuotaInfo;
 } = {}) {
-  const queryQuotaInfo = useQuery(api.users.getUserFullQuotaInfo, {});
-  const quotaInfo = propQuotaInfo ?? queryQuotaInfo;
-  
-  if (quotaInfo === undefined) {
+  const { quotaInfo: autumnQuota, isLoading } = useAutumnQuotaInfo();
+  const quotaInfo = propQuotaInfo ?? autumnQuota;
+
+  if (isLoading || quotaInfo === undefined) {
     return <ResetDateSkeleton />;
   }
-  
-  const info = quotaInfo ?? getUnconfiguredQuota();
+
+  const info = quotaInfo;
 
   const formatDate = (timestamp: number | undefined) => {
     if (!timestamp) return "No disponible";
@@ -177,7 +188,7 @@ export function ResetDateText({
 
   return (
     <p className="text-gray-500 dark:text-text-muted text-sm leading-5 mt-1">
-      {formatDate(info.nextResetDate)}
+      {formatDate(info?.nextResetDate)}
     </p>
   );
 }
