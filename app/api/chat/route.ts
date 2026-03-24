@@ -11,12 +11,11 @@ import {
   createUIMessageStream,
   createUIMessageStreamResponse,
 } from "ai";
-import { fetchMutation, fetchQuery } from "convex/nextjs";
+import { fetchMutation } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 import { withTracing } from "@posthog/ai";
 import { PostHog } from "posthog-node";
 import * as Sentry from "@sentry/nextjs";
-import { withSupermemory, supermemoryTools } from "@supermemory/tools/ai-sdk";
 import {
   getLanguageModel,
   getModel,
@@ -431,51 +430,8 @@ const handleChatRequest = (
         }),
     });
 
-    const baseModelProvider =
-      typeof baseModel !== "string" && (baseModel as any).provider
-        ? (baseModel as any).provider
-        : (() => {
-            const fallbackProvider = modelId.split("/")[0];
-            logger.warn(
-              "Provider not found on gateway model, using fallback from modelId",
-              logContext,
-              { modelId, fallbackProvider }
-            );
-            return fallbackProvider;
-          })();
-
-    const userConfig = yield* Effect.tryPromise({
-      try: () =>
-        fetchQuery(api.userConfiguration.serverGetUserConfiguration, {
-          secret: process.env.CONVEX_SECRET_TOKEN!,
-          userId: auth.userId,
-        }),
-      catch: (error) =>
-        new DatabaseError({
-          message: "Failed to fetch user configuration",
-          operation: "serverGetUserConfiguration",
-          cause: error,
-        }),
-    });
-
-    // Determine if supermemory should be enabled
-    const supermemoryEnabled = Boolean(process.env.SUPERMEMORY_API_KEY) && userConfig.supermemoryEnabled;
-    const modelWithMemory = yield* Effect.try({
-      try: () =>
-        supermemoryEnabled
-          ? withSupermemory(baseModel, auth.userId, {
-              mode: "profile",
-              verbose: process.env.NODE_ENV !== "production",
-              conversationId: threadId,
-            })
-          : baseModel,
-      catch: (error) =>
-        new ModelError({
-          message: "Failed to initialize Supermemory integration",
-          modelId,
-          cause: error,
-        }),
-    });
+    // Supermemory is explicitly disabled on the chat route.
+    const supermemoryEnabled = false;
 
     // PostHog client - handle gracefully
     const phClient = yield* Effect.try({
@@ -491,16 +447,7 @@ const handleChatRequest = (
 
     yield* Effect.addFinalizer(() => shutdownPostHog(phClient));
 
-    const modelWithProvider = supermemoryEnabled
-      ? new Proxy(modelWithMemory as object, {
-          get(target, prop) {
-            if (prop === "provider") {
-              return baseModelProvider;
-            }
-            return (target as any)[prop];
-          },
-        }) as LanguageModel
-      : modelWithMemory;
+    const modelWithProvider = baseModel as LanguageModel;
 
     const model = yield* Effect.try({
       try: () => {
@@ -531,9 +478,6 @@ const handleChatRequest = (
     });
 
     const modelConfig = getModel(modelId);
-    const fallbackProviderId = modelId.includes("/")
-      ? modelId.split("/")[0]
-      : undefined;
     const fallbackModelName = modelId.includes("/")
       ? modelId.split("/").pop() ?? modelId
       : modelId;
@@ -561,12 +505,6 @@ const handleChatRequest = (
       try: () => ({
       ...providerTools,
       ...(enabledTools.includes("web_search") ? valyuSearchTools : {}),
-      // Only add supermemory tools if enabled
-      ...(supermemoryEnabled
-        ? supermemoryTools(process.env.SUPERMEMORY_API_KEY!, {
-            containerTags: auth.orgId ? [auth.userId, auth.orgId] : [auth.userId],
-          })
-        : {}),
       }),
       catch: (error) =>
         new ToolError({
