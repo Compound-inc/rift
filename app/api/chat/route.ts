@@ -31,7 +31,7 @@ import { ToolType } from "@/lib/ai/config/base";
 import { Id } from "@/convex/_generated/dataModel";
 import { valyuSearchTools } from "@/lib/ai/tools/valyu-search";
 
-export const maxDuration = 500;
+export const maxDuration = 300;
 
 import {
   ValidationError,
