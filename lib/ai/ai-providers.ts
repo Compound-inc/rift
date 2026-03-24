@@ -59,7 +59,7 @@ globalThis.AI_SDK_DEFAULT_PROVIDER = openrouter.chat;
 
 // Model resolution
 const SHORTCUTS: Record<string, string> = {
-  automatico: "openai/gpt-5.1-instant",
+  automatico: "openai/gpt-5.4-nano",
   problemas_dificiles: "openai/gpt-5.1-thinking",
   escritura: "google/gemini-2.5-flash",
   sorpresa: "mistral/mistral-medium",
@@ -100,7 +100,10 @@ export function getLanguageModel(modelId: string) {
 }
 
 // Default provider options for reasoning models
-export const getProviderOptions = (modelId: string, hasTools: boolean = false) => {
+export const getProviderOptions = (
+  modelId: string,
+  hasTools: boolean = false,
+) => {
   const baseOptions = {
     store: true,
     ...(hasTools ? { parallelToolCalls: true } : {}),
@@ -117,28 +120,31 @@ export const getProviderOptions = (modelId: string, hasTools: boolean = false) =
   };
 
   return {
-    openai: isOpenAIModel && supportsReasoning(modelId)
-      ? {
-          ...openaiBaseOptions,
-          reasoningSummary: "detailed" as const,
-        }
-      : openaiBaseOptions,
-    anthropic: isAnthropicModel && supportsReasoning(modelId)
-      ? {
-          ...baseOptions,
-          thinking: {
-            type: "enabled" as const,
-            budgetTokens: 3200,
-          },
-          effort: "low" as const,
-        }
-      : baseOptions,
-    google: isGoogleModel && supportsReasoning(modelId)
-      ? {
-          ...baseOptions,
-          ...getReasoningSettings(modelId),
-        }
-      : baseOptions,
+    openai:
+      isOpenAIModel && supportsReasoning(modelId)
+        ? {
+            ...openaiBaseOptions,
+            reasoningSummary: "detailed" as const,
+          }
+        : openaiBaseOptions,
+    anthropic:
+      isAnthropicModel && supportsReasoning(modelId)
+        ? {
+            ...baseOptions,
+            thinking: {
+              type: "enabled" as const,
+              budgetTokens: 3200,
+            },
+            effort: "low" as const,
+          }
+        : baseOptions,
+    google:
+      isGoogleModel && supportsReasoning(modelId)
+        ? {
+            ...baseOptions,
+            ...getReasoningSettings(modelId),
+          }
+        : baseOptions,
     moonshotai: baseOptions,
     zai: baseOptions,
   };
