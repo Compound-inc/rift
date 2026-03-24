@@ -5,6 +5,7 @@ import { fetchMutation } from "convex/nextjs";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 // import { checkBotId } from "botid/server";
 import { api } from "@/convex/_generated/api";
+import { getLanguageModel } from "@/lib/ai/ai-providers";
 
 
 export const maxDuration = 80;
@@ -13,7 +14,7 @@ export const maxDuration = 80;
 // Configuration
 // ============================================================================
 
-const TITLE_GENERATION_MODEL = "google/gemini-2.0-flash-lite";
+const TITLE_GENERATION_MODEL = "meta-llama/llama-4-maverick";
 const ROUTE_TIMEOUT = Duration.seconds(60);
 
 // Retry with exponential backoff + jitter, up to 2 retries
@@ -176,7 +177,7 @@ const generateTitle = (trimmedMessage: string) =>
   Effect.tryPromise({
     try: () =>
       generateText({
-        model: TITLE_GENERATION_MODEL,
+        model: getLanguageModel(TITLE_GENERATION_MODEL),
         prompt: `You are an expert title generator. You are given a message and you need to generate a short title based on it.
         - you will generate a short 3-4 words title based on the first message a user begins a conversation with
         - the title should creative and unique
