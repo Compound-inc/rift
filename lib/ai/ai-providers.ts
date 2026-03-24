@@ -113,6 +113,7 @@ export function getLanguageModel(modelId: string) {
 export const getProviderOptions = (
   modelId: string,
   hasTools: boolean = false,
+  userId?: string,
 ) => {
   const baseOptions = {
     store: true,
@@ -130,6 +131,7 @@ export const getProviderOptions = (
   };
 
   return {
+    ...(userId ? { openrouter: { user: userId } } : {}),
     openai:
       isOpenAIModel && supportsReasoning(modelId)
         ? {
