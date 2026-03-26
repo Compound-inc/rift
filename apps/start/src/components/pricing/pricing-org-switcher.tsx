@@ -42,11 +42,14 @@ function PricingOrgSwitcherSkeleton({ className }: { className?: string }) {
 }
 
 export function PricingOrgSwitcher({ className }: PricingOrgSwitcherProps) {
-  const { user, activeOrganizationId, refetchSession } = useAppAuth()
+  const { user, activeOrganizationId, refetchSession, loading: authLoading } =
+    useAppAuth()
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [loading, setLoading] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [switchingId, setSwitchingId] = useState<string | null>(null)
+  const shouldShowSelector =
+    !authLoading && !!user && !loading && organizations.length > 0
 
   const loadOrganizations = useCallback(async () => {
     if (!user?.id) {
@@ -98,12 +101,12 @@ export function PricingOrgSwitcher({ className }: PricingOrgSwitcherProps) {
     }
   }
 
-  if (!user) {
-    return <PricingOrgSwitcherSkeleton className={className} />
-  }
-
-  if (!loading && organizations.length === 0) {
-    return null
+  if (!shouldShowSelector) {
+    return (
+      <div className={cn('h-10 min-h-10 w-full', className)} aria-hidden="true">
+        <PricingOrgSwitcherSkeleton className="invisible" />
+      </div>
+    )
   }
 
   return (
@@ -151,22 +154,20 @@ export function PricingOrgSwitcher({ className }: PricingOrgSwitcherProps) {
       />
       <DropdownMenuContent
         align="start"
-        className="w-72 min-w-72 rounded-xl border border-border-base bg-surface-base p-2"
+        sideOffset={8}
+        className="w-64 min-w-64 rounded-xl border border-border-light bg-surface-base p-1 text-foreground-primary shadow-lg ring-border-strong/10"
       >
-        <div className="px-2 py-1.5 text-xs font-medium uppercase tracking-wider text-foreground-secondary">
-          Switch organization
-        </div>
         {loading ? (
           <DropdownMenuItem
             disabled
-            className="text-sm text-foreground-secondary"
+            className="h-9 rounded-lg px-2 text-sm font-medium text-foreground-secondary focus:bg-surface-inverse/8"
           >
             Loading organizations...
           </DropdownMenuItem>
         ) : organizations.length === 0 ? (
           <DropdownMenuItem
             disabled
-            className="text-sm text-foreground-secondary"
+            className="h-9 rounded-lg px-2 text-sm font-medium text-foreground-secondary focus:bg-surface-inverse/8"
           >
             No organizations found
           </DropdownMenuItem>
@@ -178,8 +179,8 @@ export function PricingOrgSwitcher({ className }: PricingOrgSwitcherProps) {
               <DropdownMenuItem
                 key={org.id}
                 className={cn(
-                  'flex items-center gap-2.5 rounded-lg px-2 py-2',
-                  isCurrent && 'bg-surface-raised',
+                  'min-h-9 rounded-lg px-2 py-2 text-sm font-medium text-foreground-primary focus:bg-surface-inverse/8 data-[highlighted]:bg-surface-inverse/8',
+                  isCurrent && 'bg-surface-inverse/5',
                 )}
                 disabled={!!switchingId}
                 onClick={() => handleSwitch(org.id)}

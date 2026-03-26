@@ -22,22 +22,25 @@ import { m } from '@/paraglide/messages.js'
  */
 export function PricingPage() {
   const { user, activeOrganizationId } = useAppAuth()
-  const { subscription } = useOrgBillingSummary()
+  const { subscription, entitlement } = useOrgBillingSummary()
   const openPortal = useServerFn(openWorkspaceBillingPortal)
   const startCheckout = useServerFn(startWorkspaceSubscriptionCheckout)
   const [billingActionError, setBillingActionError] = useState<string | null>(
     null,
   )
   const [canManageBilling, setCanManageBilling] = useState(false)
+  const [billingRoleLoading, setBillingRoleLoading] = useState(false)
 
   useEffect(() => {
     let cancelled = false
 
     if (!user || !activeOrganizationId) {
       setCanManageBilling(false)
+      setBillingRoleLoading(false)
       return
     }
 
+    setBillingRoleLoading(true)
     void authClient.organization
       .getActiveMemberRole({
         query: {
@@ -53,6 +56,11 @@ export function PricingPage() {
 
         setCanManageBilling(isAdminRole(data.role))
       })
+      .finally(() => {
+        if (!cancelled) {
+          setBillingRoleLoading(false)
+        }
+      })
 
     return () => {
       cancelled = true
@@ -62,6 +70,7 @@ export function PricingPage() {
   const resolvePlanAction = useMemo(() => {
     const hasActiveWorkspace = Boolean(activeOrganizationId)
     const isSignedIn = Boolean(user)
+    const seatCount = subscription?.seatCount ?? entitlement?.seatCount ?? 1
     const stripePlanByName: Record<string, StripeManagedWorkspacePlanId> = {
       Plus: 'plus',
       Pro: 'pro',
@@ -85,9 +94,9 @@ export function PricingPage() {
         (isFreePlan &&
           (!subscription?.planId || subscription.planId === 'free'))
 
-      if (!isSignedIn || !hasActiveWorkspace) return undefined
-
       if (isFreePlan) {
+        if (!isSignedIn) return undefined
+
         const hasPaidPlan =
           subscription?.planId && subscription.planId !== 'free'
         if (hasPaidPlan) {
@@ -95,13 +104,17 @@ export function PricingPage() {
             disabled: true,
           }
         }
-        return undefined
+        return {
+          href: '/chat',
+        }
       }
+
+      if (!isSignedIn || !hasActiveWorkspace) return undefined
 
       if (!isStripeManagedPlan && !isEnterprisePlan) return undefined
 
       if (isCurrentPlan) {
-        if (!canManageBilling) {
+        if (!billingRoleLoading && !canManageBilling) {
           return {
             buttonText: m.pricing_manage_billing(),
             disabled: true,
@@ -126,16 +139,43 @@ export function PricingPage() {
         }
       }
 
-      return {
-        disabled: true,
+      if (isStripeManagedPlan) {
+        if (!billingRoleLoading && !canManageBilling) {
+          return {
+            disabled: true,
+          }
+        }
+
+        return {
+          onSelect: async () => {
+            setBillingActionError(null)
+            try {
+              const result = await startCheckout({
+                data: {
+                  planId: stripePlanId,
+                  seats: seatCount,
+                },
+              })
+              window.location.assign(result.url)
+            } catch (error) {
+              setBillingActionError(
+                error instanceof Error
+                  ? error.message
+                  : m.pricing_error_billing_portal(),
+              )
+            }
+          },
+        }
       }
     }
   }, [
     activeOrganizationId,
     canManageBilling,
+    billingRoleLoading,
     openPortal,
     startCheckout,
     subscription,
+    entitlement,
     user,
   ])
 

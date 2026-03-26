@@ -1,5 +1,3 @@
-'use client'
-
 import { Fragment } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Check } from 'lucide-react'

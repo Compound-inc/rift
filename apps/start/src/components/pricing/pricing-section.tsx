@@ -1,5 +1,3 @@
-'use client'
-
 import {
   mainPlans,
   enterprisePlan,
@@ -90,7 +88,7 @@ export function PricingSection({
         aria-labelledby="pricing-heading"
         aria-describedby="pricing-summary"
       >
-        <div className="mb-8 flex flex-col items-center justify-center space-y-4 px-4 text-center">
+        <div className="mb-0 flex flex-col items-center justify-center space-y-4 px-4 text-center">
           <h2
             id="pricing-heading"
             className="text-3xl font-bold tracking-tighter text-foreground-strong sm:text-4xl"

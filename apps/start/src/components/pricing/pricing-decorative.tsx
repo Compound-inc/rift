@@ -1,5 +1,3 @@
-'use client'
-
 /**
  * Decorative SVG elements for the pricing section: dashed borders and gradient
  * backgrounds. Keeps visual styling isolated from card layout logic.

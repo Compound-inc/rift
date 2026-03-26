@@ -141,13 +141,8 @@ export const AppSidebar: ComponentType = () => {
       >
         <nav
           className={cn(
-            'relative z-10 mr-0.5 flex h-full flex-col items-center justify-between p-2',
-            isTransitionReady
-              ? 'transition-[box-shadow] duration-300'
-              : 'transition-none',
-            showAreaPanel
-              ? 'shadow-[0_18px_36px_-12px_rgba(0,0,0,0.42)] dark:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.82)]'
-              : 'shadow-none dark:shadow-none',
+            'relative z-10 flex h-full flex-col items-center justify-between border-r-2 border-border-base p-2',
+            isTransitionReady ? 'transition-colors duration-300' : 'transition-none',
           )}
         >
           <div className="flex flex-col items-center gap-3 pt-1">
