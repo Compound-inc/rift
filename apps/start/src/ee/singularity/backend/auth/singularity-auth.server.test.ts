@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { requireSingularityAdminAuth } from './singularity-auth.server'
+import { SINGULARITY_ORG_ID } from '@/ee/singularity/shared/singularity'
 import {
   SingularityForbiddenError,
   SingularityMissingOrganizationError,
@@ -11,11 +12,11 @@ const mocks = vi.hoisted(() => ({
   isOrgMemberMock: vi.fn(),
 }))
 
-vi.mock('@/lib/backend/auth/server-session.server', () => ({
+vi.mock('@/lib/backend/auth/services/server-session.service', () => ({
   getSessionFromHeaders: mocks.getSessionFromHeadersMock,
 }))
 
-vi.mock('@/lib/backend/auth/organization-member-role.server', () => ({
+vi.mock('@/lib/backend/auth/services/organization-member-role.service', () => ({
   isOrgMember: mocks.isOrgMemberMock,
 }))
 
@@ -38,7 +39,7 @@ describe('requireSingularityAdminAuth', () => {
       session: {
         id: 'session-1',
         userId: 'user-1',
-        activeOrganizationId: '3Ji38HUiVnQrYwGRmYuAGvkjoKCkMRer',
+        activeOrganizationId: SINGULARITY_ORG_ID,
       },
       user: {
         id: 'user-1',
@@ -95,7 +96,7 @@ describe('requireSingularityAdminAuth', () => {
       session: {
         id: 'session-1',
         userId: 'user-1',
-        activeOrganizationId: '3Ji38HUiVnQrYwGRmYuAGvkjoKCkMRer',
+        activeOrganizationId: SINGULARITY_ORG_ID,
       },
       user: {
         id: 'user-1',
@@ -115,7 +116,7 @@ describe('requireSingularityAdminAuth', () => {
       session: {
         id: 'session-1',
         userId: 'user-1',
-        activeOrganizationId: '3Ji38HUiVnQrYwGRmYuAGvkjoKCkMRer',
+        activeOrganizationId: SINGULARITY_ORG_ID,
       },
       user: {
         id: 'user-1',
@@ -128,7 +129,7 @@ describe('requireSingularityAdminAuth', () => {
     await expect(requireSingularityAdminAuth(new Headers())).resolves.toEqual({
       userId: 'user-1',
       email: 'user@example.com',
-      organizationId: '3Ji38HUiVnQrYwGRmYuAGvkjoKCkMRer',
+      organizationId: SINGULARITY_ORG_ID,
     })
   })
 })

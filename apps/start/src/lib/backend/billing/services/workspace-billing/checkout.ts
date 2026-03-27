@@ -10,7 +10,7 @@ import {
 import { isScheduledDowngrade, requireStripeClient } from './shared'
 import type { WorkspaceSubscriptionRow } from './types'
 import type { StripeManagedWorkspacePlanId } from '@/lib/shared/access-control'
-import { isOrgAdmin } from '@/lib/backend/auth/organization-member-role.server'
+import { isOrgAdmin } from '@/lib/backend/auth/services/organization-member-role.service'
 
 async function assertActiveOrgAdmin(input: {
   headers: Headers
@@ -231,7 +231,7 @@ export async function startCheckoutOperation(input: {
         })
   }
 
-  const authModule: typeof import('@/lib/backend/auth/auth.server') = await import('@/lib/backend/auth/auth.server')
+  const authModule: typeof import('@/lib/backend/auth/services/auth.service') = await import('@/lib/backend/auth/services/auth.service')
   const result = await authModule.auth.api.upgradeSubscription({
     headers: input.headers,
     body: {
@@ -266,7 +266,7 @@ export async function openBillingPortalOperation(input: {
 }): Promise<{ url: string }> {
   await assertActiveOrgAdmin(input)
 
-  const authModule: typeof import('@/lib/backend/auth/auth.server') = await import('@/lib/backend/auth/auth.server')
+  const authModule: typeof import('@/lib/backend/auth/services/auth.service') = await import('@/lib/backend/auth/services/auth.service')
   const result = await authModule.auth.api.createBillingPortal({
     headers: input.headers,
     body: {

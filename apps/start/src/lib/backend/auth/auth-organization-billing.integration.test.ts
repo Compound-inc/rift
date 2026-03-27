@@ -10,8 +10,8 @@ const hasIntegrationEnv = Boolean(
 
 const describeIfDb = hasIntegrationEnv ? describe : describe.skip
 
-type AuthServerModule = typeof import('./auth.server')
-type AuthPoolModule = typeof import('./auth-pool')
+type AuthServerModule = typeof import('@/lib/backend/auth/services/auth.service')
+type AuthPoolModule = typeof import('@/lib/backend/auth/infra/auth-pool')
 
 type TestHelpers = {
   createUser: (overrides?: Record<string, unknown>) => Record<string, unknown>
@@ -60,8 +60,8 @@ function uniqueSuffix(): string {
 
 async function loadHarness() {
   if (!authModule || !authPoolModule || !testHelpers) {
-    authModule = await import('./auth.server')
-    authPoolModule = await import('./auth-pool')
+    authModule = await import('@/lib/backend/auth/services/auth.service')
+    authPoolModule = await import('@/lib/backend/auth/infra/auth-pool')
     const context = await authModule.auth.$context
     testHelpers = context.test as unknown as TestHelpers
   }

@@ -1,6 +1,6 @@
 import { PgClient } from '@effect/sql-pg'
 import { Effect } from 'effect'
-import { runUpstreamPostgresEffect } from '@/lib/backend/server-effect/runtime/upstream-postgres-runtime'
+import { runAuthRuntimeEffect } from '@/lib/backend/auth/runtime/auth-runtime'
 
 type InvitationLookupRow = {
   email: string
@@ -18,7 +18,7 @@ type UserLocaleRow = {
 export function runAuthSqlEffect<TValue>(
   effect: Effect.Effect<TValue, unknown, PgClient.PgClient>,
 ): Promise<TValue> {
-  return runUpstreamPostgresEffect(effect)
+  return runAuthRuntimeEffect(effect)
 }
 
 export const readInvitationLookupByIdEffect = Effect.fn(

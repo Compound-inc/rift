@@ -2,13 +2,13 @@ import {
   getDefaultAuthLocale,
   normalizeSupportedLocale,
   resolveLocaleFromAcceptLanguage,
-} from './auth-locale'
-import type { SupportedAuthLocale } from './auth-locale'
+} from '@/lib/backend/auth/domain/auth-locale'
+import type { SupportedAuthLocale } from '@/lib/backend/auth/domain/auth-locale'
 import {
   readStoredLocaleValueByUserIdEffect,
   runAuthSqlEffect,
   updateStoredLocaleValueEffect,
-} from './auth-sql.server'
+} from '@/lib/backend/auth/services/auth-sql.service'
 
 async function readStoredLocaleByUserId(userId: string): Promise<SupportedAuthLocale | null> {
   const locale = await runAuthSqlEffect(

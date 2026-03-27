@@ -26,7 +26,7 @@ import {
 } from '@/lib/backend/billing/domain/api-errors'
 import { isAdminRole } from '@/lib/shared/auth/roles'
 import { runUpstreamPostgresEffect } from '@/lib/backend/server-effect/runtime/upstream-postgres-runtime'
-import { authPool } from './auth-pool'
+import { authPool } from '@/lib/backend/auth/infra/auth-pool'
 import {
   buildDefaultOrganizationName,
   findFirstOrganizationForUserEffect,
@@ -35,17 +35,17 @@ import {
   findFirstOrganizationForUser,
   shouldProvisionDefaultOrganization,
   slugifyOrganizationName,
-} from './default-organization'
+} from '@/lib/backend/auth/services/default-organization.service'
 import {
   sendAuthOtpEmail,
   sendOrganizationInvitationEmail,
-} from './auth-email.server'
+} from '@/lib/backend/auth/services/auth-email.service'
 import type { Subscription as BetterAuthStripeSubscription } from '@better-auth/stripe'
 import {
   readOrganizationMemberRoleEffect,
   reassignAnonymousAppDataEffect,
   runAuthSqlEffect,
-} from './auth-sql.server'
+} from '@/lib/backend/auth/services/auth-sql.service'
 
 async function syncWorkspaceSubscription(input: {
   subscription: BetterAuthStripeSubscription

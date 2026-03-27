@@ -19,7 +19,7 @@ vi.mock('@/lib/backend/byok/byok-runner', () => ({
   runUpdateByok: mockRunUpdateByok,
 }))
 
-vi.mock('@/lib/backend/auth/auth-sql.server', () => ({
+vi.mock('@/lib/backend/auth/services/auth-sql.service', () => ({
   runAuthSqlEffect: mockRunAuthSqlEffect,
   readOrganizationMemberRoleEffect: mockReadOrganizationMemberRoleEffect,
 }))

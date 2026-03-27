@@ -2,7 +2,7 @@ import { PgClient } from '@effect/sql-pg'
 import { Effect } from 'effect'
 import {
   ensureOrganizationBillingBaselineEffect,
-} from '@/lib/backend/auth/default-organization'
+} from '@/lib/backend/auth/services/default-organization.service'
 import {
   readCurrentOrgSubscriptionEffect,
   readOrganizationMemberCountsEffect,

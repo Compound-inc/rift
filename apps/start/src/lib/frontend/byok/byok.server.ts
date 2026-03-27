@@ -9,7 +9,7 @@ import {
 import {
   readOrganizationMemberRoleEffect,
   runAuthSqlEffect,
-} from '@/lib/backend/auth/auth-sql.server'
+} from '@/lib/backend/auth/services/auth-sql.service'
 import { requireOrgAuth } from '@/lib/backend/server-effect/http/server-auth'
 import { isAdminRole } from '@/lib/shared/auth/roles'
 

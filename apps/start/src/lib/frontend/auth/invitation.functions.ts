@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { getInvitationEmailById } from '@/lib/backend/auth/invitation.server'
+import { getInvitationEmailById } from '@/lib/backend/auth/services/invitation.service'
 
 const InvitationLookupInputSchema = z.object({
   invitationId: z.string().trim().min(1).max(255),

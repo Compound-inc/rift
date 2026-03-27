@@ -1,10 +1,10 @@
 import { z } from 'zod'
 import { getRequestHeaders } from '@tanstack/react-start/server'
-import { auth } from '@/lib/backend/auth/auth.server'
+import { auth } from '@/lib/backend/auth/services/auth.service'
 import {
   resolveAccountLocaleByUserId,
-} from '@/lib/backend/auth/auth-locale.server'
-import { getSessionFromHeaders } from '@/lib/backend/auth/server-session.server'
+} from '@/lib/backend/auth/services/auth-locale.service'
+import { getSessionFromHeaders } from '@/lib/backend/auth/services/server-session.service'
 import { locales } from '@/paraglide/runtime.js'
 
 const UpdateProfileNameServerSchema = z.object({

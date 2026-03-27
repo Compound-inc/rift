@@ -14,7 +14,7 @@ vi.mock('@/lib/backend/server-effect/http/server-auth', () => ({
   requireOrgAuth: mockRequireOrgAuth,
 }))
 
-vi.mock('@/lib/backend/auth/organization-member-role.server', () => ({
+vi.mock('@/lib/backend/auth/services/organization-member-role.service', () => ({
   isOrgMember: mockIsOrgMember,
 }))
 

@@ -12,9 +12,9 @@ import {
   buildAuthActionLinkTemplate,
   buildOrganizationInvitationTemplate,
   buildOtpEmailTemplate,
-} from './auth-email.templates'
-import type { OtpEmailKind } from './auth-email.templates'
-import { resolveAccountLocale } from './auth-locale.server'
+} from '@/lib/backend/auth/services/auth-email.templates'
+import type { OtpEmailKind } from '@/lib/backend/auth/services/auth-email.templates'
+import { resolveAccountLocale } from '@/lib/backend/auth/services/auth-locale.service'
 
 function requireEmailEnv(name: string): string {
   const value = process.env[name]?.trim()

@@ -3,14 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   isOrgAdmin,
   isOrgMember,
-} from './organization-member-role.server'
+} from './services/organization-member-role.service'
 
 const mocks = vi.hoisted(() => ({
   hasPermissionMock: vi.fn(),
   readIsOrganizationMemberEffectMock: vi.fn(),
 }))
 
-vi.mock('./auth.server', () => ({
+vi.mock('@/lib/backend/auth/services/auth.service', () => ({
   auth: {
     api: {
       hasPermission: mocks.hasPermissionMock,
@@ -18,7 +18,7 @@ vi.mock('./auth.server', () => ({
   },
 }))
 
-vi.mock('./auth-sql.server', () => ({
+vi.mock('@/lib/backend/auth/services/auth-sql.service', () => ({
   runAuthSqlEffect: (effect: Promise<unknown>) => effect,
   readIsOrganizationMemberEffect: mocks.readIsOrganizationMemberEffectMock,
 }))

@@ -10,8 +10,8 @@ const hasIntegrationEnv = Boolean(
 
 const describeIfDb = hasIntegrationEnv ? describe : describe.skip
 
-type AuthServerModule = typeof import('@/lib/backend/auth/auth.server')
-type AuthPoolModule = typeof import('@/lib/backend/auth/auth-pool')
+type AuthServerModule = typeof import('@/lib/backend/auth/services/auth.service')
+type AuthPoolModule = typeof import('@/lib/backend/auth/infra/auth-pool')
 type UsagePersistenceModule = typeof import('./persistence')
 
 type TestHelpers = {
@@ -56,8 +56,8 @@ function uniqueSuffix(): string {
 
 async function loadHarness() {
   if (!authModule || !authPoolModule || !usagePersistenceModule || !testHelpers) {
-    authModule = await import('@/lib/backend/auth/auth.server')
-    authPoolModule = await import('@/lib/backend/auth/auth-pool')
+    authModule = await import('@/lib/backend/auth/services/auth.service')
+    authPoolModule = await import('@/lib/backend/auth/infra/auth-pool')
     usagePersistenceModule = await import('./persistence')
     const context = await authModule.auth.$context
     testHelpers = context.test as unknown as TestHelpers

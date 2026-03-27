@@ -1,10 +1,10 @@
 import { PgClient } from '@effect/sql-pg'
 import { Effect } from 'effect'
-import { runUpstreamPostgresEffect } from '@/lib/backend/server-effect/runtime/upstream-postgres-runtime'
+import { runAuthRuntimeEffect } from '@/lib/backend/auth/runtime/auth-runtime'
 import {
   buildDefaultOrganizationName,
   shouldProvisionDefaultOrganization,
-} from './default-organization.helpers'
+} from '@/lib/backend/auth/domain/default-organization.helpers'
 import { sqlJson } from '@/lib/backend/server-effect/services/upstream-postgres.service'
 
 type OrganizationCountsRow = {
@@ -12,11 +12,6 @@ type OrganizationCountsRow = {
   pendingInvitationCount: number
 }
 
-/**
- * Slug generation is intentionally conservative because Better Auth
- * organization slugs become stable identifiers used in links and billing
- * metadata. The helper keeps server hooks and future backfills consistent.
- */
 export function slugifyOrganizationName(input: string): string {
   return input
     .toLowerCase()
@@ -46,7 +41,7 @@ export const findFirstOrganizationForUserEffect = Effect.fn(
 export async function findFirstOrganizationForUser(
   userId: string,
 ): Promise<string | null> {
-  return runUpstreamPostgresEffect(findFirstOrganizationForUserEffect(userId))
+  return runAuthRuntimeEffect(findFirstOrganizationForUserEffect(userId))
 }
 
 const readOrganizationCountsEffect = Effect.fn(
@@ -154,7 +149,7 @@ export const ensureOrganizationBillingBaselineEffect = Effect.fn(
 export async function ensureOrganizationBillingBaseline(
   organizationId: string,
 ): Promise<void> {
-  await runUpstreamPostgresEffect(
+  await runAuthRuntimeEffect(
     ensureOrganizationBillingBaselineEffect(organizationId),
   )
 }
@@ -203,7 +198,7 @@ export async function ensureMemberAccessRecord(input: {
   organizationId: string
   userId: string
 }): Promise<void> {
-  await runUpstreamPostgresEffect(ensureMemberAccessRecordEffect(input))
+  await runAuthRuntimeEffect(ensureMemberAccessRecordEffect(input))
 }
 
 export {

@@ -1,7 +1,7 @@
 import {
   readIsOrganizationMemberEffect,
   runAuthSqlEffect,
-} from './auth-sql.server'
+} from '@/lib/backend/auth/services/auth-sql.service'
 
 export async function isOrgAdmin(input: {
   headers: Headers
@@ -14,7 +14,7 @@ export async function isOrgAdmin(input: {
   }
 
   try {
-    const { auth } = await import('./auth.server')
+    const { auth } = await import('@/lib/backend/auth/services/auth.service')
     const result = await auth.api.hasPermission({
       headers: input.headers,
       body: {

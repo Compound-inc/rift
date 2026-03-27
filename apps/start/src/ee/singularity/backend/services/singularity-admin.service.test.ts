@@ -52,7 +52,7 @@ vi.mock('./singularity-admin/queries', () => ({
     }),
 }))
 
-vi.mock('@/lib/backend/auth/default-organization', () => ({
+vi.mock('@/lib/backend/auth/services/default-organization.service', () => ({
   ensureOrganizationBillingBaselineEffect: (organizationId: string) =>
     Effect.tryPromise({
       try: () =>
@@ -139,7 +139,7 @@ vi.mock('@/lib/backend/billing/services/sql', () => ({
   },
 }))
 
-vi.mock('@/lib/backend/auth/auth.server', () => ({
+vi.mock('@/lib/backend/auth/services/auth.service', () => ({
   auth: {
     api: {
       createInvitation: mocks.createInvitationMock,

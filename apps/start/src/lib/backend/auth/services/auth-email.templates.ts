@@ -13,7 +13,7 @@ import {
   auth_mail_otp_preheader,
   auth_mail_otp_subtitle,
 } from '@/paraglide/messages'
-import type { SupportedAuthLocale } from './auth-locale'
+import type { SupportedAuthLocale } from '@/lib/backend/auth/domain/auth-locale'
 
 type AuthEmailTemplate = {
   html: string

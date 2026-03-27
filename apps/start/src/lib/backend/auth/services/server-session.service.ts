@@ -1,4 +1,4 @@
-import { auth } from './auth.server'
+import { auth } from '@/lib/backend/auth/services/auth.service'
 
 export type BetterAuthSessionContext = {
   session: {

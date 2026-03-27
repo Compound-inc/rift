@@ -1,7 +1,7 @@
 import { PgClient } from '@effect/sql-pg'
 import { Effect, Layer, ServiceMap } from 'effect'
-import { auth } from '@/lib/backend/auth/auth.server'
-import { ensureOrganizationBillingBaselineEffect } from '@/lib/backend/auth/default-organization'
+import { auth } from '@/lib/backend/auth/services/auth.service'
+import { ensureOrganizationBillingBaselineEffect } from '@/lib/backend/auth/services/default-organization.service'
 import {
   markOrgBillingAccountStatusEffect,
   markOrgSubscriptionCanceledEffect,

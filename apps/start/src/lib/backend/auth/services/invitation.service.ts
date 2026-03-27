@@ -2,7 +2,7 @@ import { normalizeEmailAddress } from '@/components/auth/auth-shared'
 import {
   readInvitationLookupByIdEffect,
   runAuthSqlEffect,
-} from './auth-sql.server'
+} from '@/lib/backend/auth/services/auth-sql.service'
 
 export async function getInvitationEmailById(
   invitationId: string,

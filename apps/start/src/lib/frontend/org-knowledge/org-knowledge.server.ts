@@ -1,7 +1,7 @@
 import { getRequestHeaders } from '@tanstack/react-start/server'
 import { Effect } from 'effect'
 import { requireOrgAuth } from '@/lib/backend/server-effect/http/server-auth'
-import { isOrgAdmin } from '@/lib/backend/auth/organization-member-role.server'
+import { isOrgAdmin } from '@/lib/backend/auth/services/organization-member-role.service'
 import { OrgKnowledgeUnauthorizedError } from '@/lib/backend/org-knowledge/domain/errors'
 import { OrgKnowledgeRuntime } from '@/lib/backend/org-knowledge/runtime/org-knowledge-runtime'
 import { OrgKnowledgeAdminService } from '@/lib/backend/org-knowledge/services/org-knowledge-admin.service'

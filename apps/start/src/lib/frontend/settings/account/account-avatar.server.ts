@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { getRequestHeaders } from '@tanstack/react-start/server'
-import { auth } from '@/lib/backend/auth/auth.server'
-import { getSessionFromHeaders } from '@/lib/backend/auth/server-session.server'
+import { auth } from '@/lib/backend/auth/services/auth.service'
+import { getSessionFromHeaders } from '@/lib/backend/auth/services/server-session.service'
 
 const SaveAvatarServerSchema = z.object({
   avatarUrl: z.string().trim().url().max(2048),

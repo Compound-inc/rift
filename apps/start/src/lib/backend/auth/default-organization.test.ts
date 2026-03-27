@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildDefaultOrganizationName,
   shouldProvisionDefaultOrganization,
-} from './default-organization.helpers'
+} from './domain/default-organization.helpers'
 
 describe('default organization provisioning', () => {
   it('skips provisioning for anonymous users', () => {

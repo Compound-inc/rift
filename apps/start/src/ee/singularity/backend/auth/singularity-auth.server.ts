@@ -1,5 +1,5 @@
-import { getSessionFromHeaders } from '@/lib/backend/auth/server-session.server'
-import { isOrgMember } from '@/lib/backend/auth/organization-member-role.server'
+import { getSessionFromHeaders } from '@/lib/backend/auth/services/server-session.service'
+import { isOrgMember } from '@/lib/backend/auth/services/organization-member-role.service'
 import { isSingularityOrganizationId } from '@/ee/singularity/shared/singularity'
 import {
   SingularityForbiddenError,

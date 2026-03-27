@@ -5,7 +5,7 @@ import {
   WorkspaceBillingMissingOrgContextError,
   WorkspaceBillingUnauthorizedError,
 } from '@/lib/backend/billing/domain/errors'
-import { isOrgMember } from '@/lib/backend/auth/organization-member-role.server'
+import { isOrgMember } from '@/lib/backend/auth/services/organization-member-role.service'
 import { WorkspaceBillingRuntime } from '@/lib/backend/billing/runtime/workspace-billing-runtime'
 import { materializeOrgUserUsageSummaryRecord } from '@/lib/backend/billing/services/workspace-usage/usage-summary-store'
 import { requireOrgAuth } from '@/lib/backend/server-effect/http/server-auth'
