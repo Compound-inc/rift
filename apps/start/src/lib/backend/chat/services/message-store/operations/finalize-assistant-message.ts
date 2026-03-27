@@ -2,6 +2,8 @@ import { PgClient } from '@effect/sql-pg'
 import { Effect } from 'effect'
 import type { ReadonlyJSONValue } from '@rocicorp/zero'
 import type { AiReasoningEffort } from '@/lib/shared/ai-catalog/types'
+import type { ChatErrorCode } from '@/lib/shared/chat-contracts/error-codes'
+import type { ChatErrorI18nKey } from '@/lib/shared/chat-contracts/error-i18n'
 import { MessagePersistenceError } from '@/lib/backend/chat/domain/errors'
 import {
   formatSqlClientCause,
@@ -16,7 +18,12 @@ import type { MessageStoreServiceShape } from '../../message-store.service'
 type JsonInput =
   | ReadonlyJSONValue
   | { readonly reasoningEffort?: AiReasoningEffort }
-  | { type: string; message: string }
+  | {
+      readonly type: string
+      readonly message: string
+      readonly code?: ChatErrorCode
+      readonly i18nKey?: ChatErrorI18nKey
+    }
   | undefined
 
 function serializeJson(input: JsonInput): string | null {
@@ -47,6 +54,8 @@ export const makeFinalizeAssistantMessageOperation =
         finalContent,
         reasoning,
         errorMessage,
+        errorCode,
+        errorI18nKey,
         modelParams,
         providerMetadata,
         generationAnalytics,
@@ -58,6 +67,8 @@ export const makeFinalizeAssistantMessageOperation =
             ? {
                 type: 'stream_error',
                 message: errorMessage ?? 'Assistant stream failed',
+                code: errorCode,
+                i18nKey: errorI18nKey,
               }
             : undefined
 

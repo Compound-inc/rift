@@ -66,6 +66,8 @@
     "motion": "^12.34.4",
     "next-themes": "^0.4.6",
     "pg": "^8.18.0",
+    "posthog-js": "^1.364.1",
+    "posthog-node": "^5.28.8",
     "qrcode": "^1.5.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -83,6 +85,7 @@
   "devDependencies": {
     "@better-auth/cli": "^1.4.21",
     "@inlang/paraglide-js": "^2.13.1",
+    "@posthog/rollup-plugin": "^1.3.3",
     "@tanstack/devtools-vite": "^0.3.11",
     "@tanstack/eslint-config": "^0.3.0",
     "@tanstack/router-cli": "^1.162.2",

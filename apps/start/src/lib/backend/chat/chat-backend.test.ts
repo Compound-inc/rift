@@ -11,6 +11,7 @@ import {
 } from '@/lib/backend/billing/services/workspace-usage-settlement.service'
 import {
   BranchVersionConflictError,
+  InvalidRequestError,
   QuotaExceededError,
   RateLimitExceededError,
 } from '@/lib/backend/chat/domain/errors'
@@ -18,6 +19,7 @@ import { ChatErrorCode } from '@/lib/backend/chat/domain/error-codes'
 import { toReadableErrorMessage } from '@/lib/backend/chat/domain/error-formatting'
 import { getMemoryState } from '@/lib/backend/chat/infra/memory/state'
 import { toErrorResponse } from '@/lib/backend/chat/http/error-response'
+import { ChatErrorI18nKey } from '@/lib/shared/chat-contracts/error-i18n'
 import { ChatOrchestratorService } from '@/lib/backend/chat/services/chat-orchestrator.service'
 import { FreeChatAllowanceService } from '@/lib/backend/chat/services/free-chat-allowance.service'
 import { MessageStoreService } from '@/lib/backend/chat/services/message-store.service'
@@ -422,8 +424,10 @@ describe('chat-backend scaffold', () => {
 
     expect(payload.ok).toBe(false)
     expect(payload.error.code).toBe(ChatErrorCode.RateLimited)
-    expect(payload.error.message).toBe('Too many requests. Please wait a moment and retry.')
+    expect(payload.error.i18nKey).toBe(ChatErrorI18nKey.RateLimited)
+    expect(payload.error.i18nParams).toEqual({ retryAfterSeconds: 2 })
     expect(payload.requestId).toBe('req-rate')
+    expect(payload.telemetry).toEqual({ owner: 'server' })
     expect(payload.error.retryable).toBe(true)
   })
 
@@ -442,6 +446,22 @@ describe('chat-backend scaffold', () => {
     expect(response.status).toBe(429)
     const payload = await response.json()
     expect(payload.error.code).toBe(ChatErrorCode.QuotaExceeded)
+    expect(payload.error.i18nKey).toBe(ChatErrorI18nKey.QuotaExceeded)
+  })
+
+  it('maps free-tier upload denials to a specific translation key', async () => {
+    const uploadDenied = toErrorResponse(
+      new InvalidRequestError({
+        message: 'File uploads are not available on the current plan',
+        requestId: 'req-upload',
+        issue: 'feature_denied:chat.fileUpload',
+      }),
+      'req-upload',
+    )
+
+    const payload = await uploadDenied.json()
+    expect(payload.error.code).toBe(ChatErrorCode.InvalidRequest)
+    expect(payload.error.i18nKey).toBe(ChatErrorI18nKey.FileUploadPlanRestricted)
   })
 
   it('normalizes nested gateway beta-flag errors into readable copy', () => {

@@ -1,8 +1,16 @@
 import { Effect } from 'effect'
+import {
+  classifyChatError,
+  classifyUnknownChatError,
+} from '../domain/error-classification'
 import { ChatErrorCode } from '../domain/error-codes'
 import { toReadableErrorMessage } from '../domain/error-formatting'
-import { getChatErrorMessage } from '../domain/error-messages'
-import { emitWideErrorEvent, getErrorTag } from '../observability/wide-event'
+import {
+  drainWideEvent,
+  finalizeWideEventFailure,
+  getErrorTag,
+} from '../observability/wide-event'
+import type { ChatRequestWideEvent } from '../observability/wide-event'
 import { jsonResponse, toErrorResponse } from './error-response'
 import type { ChatApiErrorEnvelope } from '@/lib/shared/chat-contracts/error-envelope'
 
@@ -13,6 +21,7 @@ export type RouteFailureInput = {
   readonly eventName: string
   readonly userId?: string
   readonly defaultMessage: string
+  readonly wideEvent?: ChatRequestWideEvent
 }
 
 /**
@@ -20,7 +29,7 @@ export type RouteFailureInput = {
  * Ensures consistent logging + transport error shapes across chat endpoints.
  */
 export async function handleRouteFailure(input: RouteFailureInput): Promise<Response> {
-  const { error, requestId, route, eventName, userId, defaultMessage } = input
+  const { error, requestId, defaultMessage, wideEvent } = input
   const errorTag = getErrorTag(error)
   const readableMessage = toReadableErrorMessage(error, defaultMessage)
   const isTaggedDomainError =
@@ -29,22 +38,33 @@ export async function handleRouteFailure(input: RouteFailureInput): Promise<Resp
     '_tag' in error &&
     typeof (error as { _tag?: unknown })._tag === 'string'
 
-  // Avoid duplicate wide events for domain-tagged failures already logged upstream.
-  if (!isTaggedDomainError) {
-    await Effect.runPromise(
-      emitWideErrorEvent({
-        eventName,
-        route,
-        requestId,
-        userId,
-        errorCode: undefined,
-        errorTag,
-        message: readableMessage,
-      }),
-    )
+  const classification =
+    isTaggedDomainError
+      ? classifyChatError(error as Parameters<typeof classifyChatError>[0])
+      : classifyUnknownChatError()
+
+  if (wideEvent) {
+    finalizeWideEventFailure(wideEvent, {
+      status: classification.status,
+      level: classification.severity,
+      captureMode: classification.captureMode,
+      retryable: classification.retryable,
+      errorTag,
+      message: readableMessage,
+      errorCode: classification.code,
+      cause:
+        typeof error === 'object' &&
+        error !== null &&
+        'cause' in error &&
+        typeof (error as { cause?: unknown }).cause === 'string'
+          ? (error as { cause: string }).cause
+          : undefined,
+      i18nKey: classification.i18nKey,
+      i18nParams: classification.i18nParams,
+    })
+    await Effect.runPromise(drainWideEvent(wideEvent)).catch(() => undefined)
   }
 
-  // Prefer domain errors so UI gets localized copy and codes.
   if (isTaggedDomainError) {
     return toErrorResponse(error, requestId)
   }
@@ -53,12 +73,14 @@ export async function handleRouteFailure(input: RouteFailureInput): Promise<Resp
     ok: false,
     error: {
       code: ChatErrorCode.Unknown,
-      message:
-        defaultMessage || getChatErrorMessage(ChatErrorCode.Unknown),
+      i18nKey: classification.i18nKey,
       requestId,
       retryable: false,
     },
     requestId,
+    telemetry: {
+      owner: 'server',
+    },
     details: {
       tag: errorTag,
       message: readableMessage,

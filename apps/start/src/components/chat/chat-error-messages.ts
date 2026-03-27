@@ -2,12 +2,14 @@
 import { ChatErrorCode } from '@/lib/shared/chat-contracts/error-codes'
 import type { ChatApiErrorEnvelope } from '@/lib/shared/chat-contracts/error-envelope'
 import type { ChatErrorCode as TChatErrorCode } from '@/lib/shared/chat-contracts/error-codes'
-import { getChatErrorMessage } from '@/lib/shared/chat-contracts/error-messages'
+import type { ChatErrorI18nKey } from '@/lib/shared/chat-contracts/error-i18n'
+import { resolveChatErrorMessage } from './chat-error-i18n'
 
 export type ParsedChatApiError = {
   readonly code?: TChatErrorCode
   readonly message: string
   readonly traceId?: string
+  readonly telemetryOwner?: 'server'
 }
 
 function isChatErrorCode(value: string): value is TChatErrorCode {
@@ -17,7 +19,7 @@ function isChatErrorCode(value: string): value is TChatErrorCode {
 export function parseChatApiError(input: unknown): ParsedChatApiError | null {
   const fallback = {
     code: ChatErrorCode.Unknown,
-    message: getChatErrorMessage(ChatErrorCode.Unknown),
+    message: resolveChatErrorMessage('error_chat_unknown'),
   } satisfies ParsedChatApiError
 
   const raw =
@@ -43,12 +45,14 @@ export function parseChatApiError(input: unknown): ParsedChatApiError | null {
       return {
         code,
         message:
-          typeof inlineEnvelope.error.message === 'string'
-            ? inlineEnvelope.error.message
-            : getChatErrorMessage(code),
+          resolveEnvelopeMessage(inlineEnvelope.error.i18nKey, inlineEnvelope.error.i18nParams),
         traceId:
           typeof inlineEnvelope.requestId === 'string'
             ? inlineEnvelope.requestId
+            : undefined,
+        telemetryOwner:
+          inlineEnvelope.telemetry?.owner === 'server'
+            ? 'server'
             : undefined,
       }
     }
@@ -86,23 +90,37 @@ export function parseChatApiError(input: unknown): ParsedChatApiError | null {
       typeof envelope.requestId === 'string' ? envelope.requestId : undefined
 
     const codeRaw = envelope.error?.code
-    const messageRaw = envelope.error?.message
-
     const code = typeof codeRaw === 'string' && isChatErrorCode(codeRaw)
       ? codeRaw
       : ChatErrorCode.Unknown
 
     const message =
-      typeof messageRaw === 'string'
-        ? messageRaw
-        : getChatErrorMessage(code)
+      resolveEnvelopeMessage(envelope.error?.i18nKey, envelope.error?.i18nParams)
 
     return {
       code,
       message,
       traceId: requestId,
+      telemetryOwner:
+        envelope.telemetry?.owner === 'server'
+          ? 'server'
+          : undefined,
     }
   } catch {
     return { ...fallback, message: raw }
   }
+}
+
+function resolveEnvelopeMessage(
+  key: unknown,
+  params: unknown,
+): string {
+  return typeof key === 'string'
+    ? resolveChatErrorMessage(
+        key as ChatErrorI18nKey,
+        typeof params === 'object' && params !== null
+          ? (params as Record<string, string | number | boolean>)
+          : undefined,
+      )
+    : resolveChatErrorMessage('error_chat_unknown')
 }

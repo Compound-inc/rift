@@ -16,10 +16,21 @@ import {
   ContextWindowExceededError,
 } from '../domain/errors'
 import { chatErrorCodeFromTag } from '../domain/error-codes'
+import { classifyUnknownChatError } from '../domain/error-classification'
 import { toReadableErrorMessage } from '../domain/error-formatting'
 import type { IncomingAttachment, IncomingUserMessage } from '../domain/schemas'
 import { getUserMessageText } from '../domain/schemas'
-import { emitWideErrorEvent, getErrorTag } from '../observability/wide-event'
+import {
+  addWideEventBreadcrumb,
+  drainWideEvent,
+  emitWideErrorEvent,
+  finalizeWideEventFailure,
+  finalizeWideEventSuccess,
+  getErrorTag,
+  setWideEventContext,
+} from '../observability/wide-event'
+import type { ChatRequestWideEvent } from '../observability/wide-event'
+import { buildChatApiErrorEnvelope } from '../http/error-response'
 import { canUseReasoningControls } from '@/utils/app-feature-flags'
 import type { OrgAiPolicy } from '@/lib/shared/model-policy/types'
 import { resolveEffectiveChatMode } from '@/lib/shared/chat-modes'
@@ -55,9 +66,15 @@ import {
 } from './chat-orchestrator/failure-telemetry'
 import { normalizeStreamCommand } from './chat-orchestrator/command'
 import { buildPersistedGenerationAnalytics } from '../domain/generation-metrics'
+import { nanoUsdToUsd } from '@/lib/backend/billing/services/workspace-usage/shared'
 import { writeFreeOrgUserUsageSummaryRecord } from '@/lib/backend/billing/services/workspace-usage/usage-summary-store'
 import { estimatePromptTokens } from '@/lib/shared/chat-contracts'
 import { toUserMessage } from './message-store/helpers'
+import { ChatErrorCode } from '@/lib/shared/chat-contracts/error-codes'
+import { ChatErrorI18nKey } from '@/lib/shared/chat-contracts/error-i18n'
+
+const GENERIC_ASSISTANT_FAILURE_MESSAGE =
+  'Something went wrong on our side while generating the response. Please try again.'
 
 function getResolvedCatalogModel(modelId: string) {
   const catalogModel = getCatalogModel(modelId)
@@ -129,6 +146,7 @@ export type ChatOrchestratorServiceShape = {
     readonly disabledToolKeys?: readonly string[]
     readonly createIfMissing?: boolean
     readonly route: string
+    readonly wideEvent?: ChatRequestWideEvent
   }) => Effect.Effect<Response, ChatDomainError>
 }
 
@@ -183,6 +201,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
         disabledToolKeys,
         createIfMissing,
         route,
+        wideEvent,
       }) => {
         const startedAt = Date.now()
         let currentStreamId: string | undefined
@@ -201,6 +220,21 @@ export class ChatOrchestratorService extends ServiceMap.Service<
           | 'regenerate-message'
           | 'edit-message' = trigger ?? 'submit-message'
         return Effect.gen(function* () {
+          if (wideEvent) {
+            setWideEventContext(wideEvent, {
+              thread: {
+                threadId,
+                createIfMissing,
+                expectedBranchVersion,
+                targetMessageId: messageId,
+              },
+              model: {
+                requestedModelId: modelId,
+                reasoningEffort,
+                contextWindowMode,
+              },
+            })
+          }
           const command = yield* normalizeStreamCommand({
             trigger,
             expectedBranchVersion,
@@ -210,6 +244,17 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             requestId,
           })
           requestTrigger = command.trigger
+          if (wideEvent) {
+            setWideEventContext(wideEvent, {
+              request: { trigger: requestTrigger },
+            })
+            addWideEventBreadcrumb(wideEvent, {
+              name: 'chat.command.normalized',
+              detail: {
+                trigger: requestTrigger,
+              },
+            })
+          }
 
           yield* rateLimit.assertAllowed({
             userId,
@@ -234,6 +279,27 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             requestModeId: modeId,
             threadModeId: threadAccess.modeId,
           })
+
+          if (
+            attachments &&
+            attachments.length > 0 &&
+            !accessPolicy.features['chat.fileUpload'].allowed
+          ) {
+            if (wideEvent) {
+              setWideEventContext(wideEvent, {
+                policy: {
+                  deniedFeature: 'chat.fileUpload',
+                },
+              })
+            }
+            return yield* Effect.fail(
+              new InvalidRequestError({
+                message: 'File uploads are not available on the current plan',
+                requestId,
+                issue: 'feature_denied:chat.fileUpload',
+              }),
+            )
+          }
 
           // Fire-and-forget title generation after the first message bootstrap path.
           if (createIfMissing && command.message) {
@@ -294,14 +360,21 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             skipProviderKeyResolution,
             requestId,
           })
-          if (attachments && attachments.length > 0 && !accessPolicy.features['chat.fileUpload'].allowed) {
-            return yield* Effect.fail(
-              new InvalidRequestError({
-                message: 'File uploads are not available on the current plan',
-                requestId,
-                issue: 'feature_denied:chat.fileUpload',
-              }),
-            )
+          if (wideEvent) {
+            setWideEventContext(wideEvent, {
+              actor: { organizationId },
+              model: {
+                resolvedModelId: modelResolution.modelId,
+                modelSource: modelResolution.source,
+                reasoningEffort: modelResolution.reasoningEffort,
+                providerOverride: Boolean(modelResolution.providerApiKeyOverride),
+              },
+              policy: {
+                zeroDataRetentionRequired: Boolean(
+                  orgPolicy?.complianceFlags.require_zdr,
+                ),
+              },
+            })
           }
           const allowance = accessPolicy.allowance
           if (allowance) {
@@ -376,6 +449,16 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             modelId: modelResolution.modelId,
             resolvedToolKeys: resolvedToolPolicy.activeToolKeys,
           })
+          if (wideEvent) {
+            setWideEventContext(wideEvent, {
+              policy: {
+                allowedToolKeys: resolvedToolPolicy.activeToolKeys,
+                deniedToolKeys: resolvedToolPolicy.toolEntries
+                  .filter((entry) => entry.reasons.length > 0)
+                  .map((entry) => entry.key),
+              },
+            })
+          }
 
           // Enforce one active stream per user/thread to avoid interleaved assistant writes.
           const existingStreamId = yield* streamResume.getActiveStreamId({
@@ -399,6 +482,11 @@ export class ChatOrchestratorService extends ServiceMap.Service<
           const streamId = crypto.randomUUID()
           currentStreamId = streamId
           const streamAbortController = new AbortController()
+          if (wideEvent) {
+            setWideEventContext(wideEvent, {
+              stream: { streamId, activePhase: 'registered' },
+            })
+          }
           yield* streamResume.registerActiveStream({
             userId,
             threadId,
@@ -490,6 +578,11 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             })
             const nextMessages = [...existingMessages, toUserMessage(command.message!)]
             const usedTokens = estimatePromptTokens(nextMessages)
+            if (wideEvent) {
+              setWideEventContext(wideEvent, {
+                usage: { promptTokens: usedTokens },
+              })
+            }
             if (usedTokens >= activeContextWindow) {
               return yield* Effect.fail(
                 new ContextWindowExceededError({
@@ -560,6 +653,17 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                   }),
             ),
           )
+          if (wideEvent) {
+            setWideEventContext(wideEvent, {
+              usage: {
+                reservationBypassed: quotaReservation.bypassed,
+                estimatedCostUsd:
+                  typeof quotaReservation.estimatedNanoUsd === 'number'
+                    ? nanoUsdToUsd(quotaReservation.estimatedNanoUsd)
+                    : undefined,
+              },
+            })
+          }
 
           // This ID is generated server-side so start/finalize writes are deterministic
           // and idempotent even when transport retries happen.
@@ -624,6 +728,8 @@ export class ChatOrchestratorService extends ServiceMap.Service<
           const finalizeAssistant = async (input: {
             ok: boolean
             errorMessage?: string
+            errorCode?: ChatErrorCode
+            errorI18nKey?: ChatErrorI18nKey
             providerMetadata?: ReadonlyJSONValue
             generationAnalytics?: ReturnType<
               typeof buildPersistedGenerationAnalytics
@@ -650,6 +756,8 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                       ? assistantBuffer.reasoning
                       : undefined,
                   errorMessage: input.errorMessage,
+                  errorCode: input.errorCode,
+                  errorI18nKey: input.errorI18nKey,
                   modelParams: {
                     reasoningEffort: modelResolution.reasoningEffort,
                   },
@@ -771,6 +879,11 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             },
             consumeSseStream: ({ stream }) => {
               let persistPhase = 'initializing'
+              if (wideEvent) {
+                setWideEventContext(wideEvent, {
+                  stream: { activePhase: persistPhase },
+                })
+              }
 
               runDetachedUnsafe({
                 effect: streamResume
@@ -780,6 +893,11 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                     stream,
                     onPhaseChange: (phase) => {
                       persistPhase = phase
+                      if (wideEvent) {
+                        setWideEventContext(wideEvent, {
+                          stream: { activePhase: phase },
+                        })
+                      }
                     },
                   })
                   .pipe(
@@ -840,31 +958,44 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                 error,
                 defaultStreamFailureMessage,
               )
+              const classification = classifyUnknownChatError()
+              if (wideEvent) {
+                finalizeWideEventFailure(wideEvent, {
+                  status: classification.status,
+                  level: classification.severity,
+                  captureMode: classification.captureMode,
+                  retryable: true,
+                  errorTag: getErrorTag(error),
+                  message: readableMessage,
+                  errorCode: chatErrorCodeFromTag(getErrorTag(error)),
+                  i18nKey: classification.i18nKey,
+                  cause:
+                    error instanceof Error
+                      ? error.message
+                      : undefined,
+                })
+                void Effect.runPromise(drainWideEvent(wideEvent)).catch(() => undefined)
+              }
               void finalizeAssistant({
                 ok: false,
-                errorMessage: readableMessage,
+                errorMessage: GENERIC_ASSISTANT_FAILURE_MESSAGE,
+                errorCode: ChatErrorCode.Unknown,
+                errorI18nKey: ChatErrorI18nKey.Unknown,
               })
               cleanupActiveStream()
 
-              // Fire-and-forget observability; do not block the stream response.
-              runDetachedUnsafe({
-                effect: emitWideErrorEvent({
-                  eventName: 'chat.stream.transport.failed',
-                  route,
+              return JSON.stringify(
+                buildChatApiErrorEnvelope({
                   requestId,
-                  userId,
+                  code: classification.code,
+                  i18nKey: classification.i18nKey,
+                  i18nParams: classification.i18nParams,
+                  retryable: classification.retryable,
+                  tag: getErrorTag(error),
+                  detailsMessage: readableMessage,
                   threadId,
-                  model: modelResolution.modelId,
-                  errorCode: chatErrorCodeFromTag(getErrorTag(error)),
-                  errorTag: getErrorTag(error),
-                  message: readableMessage,
-                  latencyMs: Date.now() - startedAt,
-                  retryable: true,
                 }),
-                onFailure: () => Effect.void,
-              })
-
-              return readableMessage
+              )
             },
             messageMetadata: ({ part }: { part: any }) => {
               // Metadata is attached only for lifecycle events consumed by the client.
@@ -928,16 +1059,50 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                 )
                 .catch(() => undefined)
 
-              await finalizeAssistant({
-                ok,
-                providerMetadata: persistedGeneration?.providerMetadata,
-                generationAnalytics: persistedGeneration,
-                errorMessage: isAborted
-                  ? 'Stream aborted before completion'
+              if (wideEvent) {
+                setWideEventContext(wideEvent, {
+                  usage: {
+                    totalTokens: persistedGeneration?.totalTokens,
+                    outputTokens: persistedGeneration?.outputTokens,
+                    actualCostUsd:
+                      persistedGeneration?.aiCost
+                      ?? persistedGeneration?.publicCost,
+                    usedByok: persistedGeneration?.usedByok,
+                  },
+                  stream: { aborted: isAborted, activePhase: 'finished' },
+                })
+                if (ok && !isAborted) {
+                  finalizeWideEventSuccess(wideEvent, { status: 200 })
+                } else if (!wideEvent.outcome) {
+                  const classification = classifyUnknownChatError()
+                  finalizeWideEventFailure(wideEvent, {
+                    status: 502,
+                    level: classification.severity,
+                    captureMode: classification.captureMode,
+                    retryable: true,
+                    errorTag: 'StreamFailed',
+                    errorCode: classification.code,
+                    message: isAborted
+                      ? 'Stream aborted before completion'
+                      : 'No assistant content generated',
+                    i18nKey: classification.i18nKey,
+                  })
+                }
+                await Effect.runPromise(drainWideEvent(wideEvent)).catch(() => undefined)
+              }
+
+                await finalizeAssistant({
+                  ok,
+                  providerMetadata: persistedGeneration?.providerMetadata,
+                  generationAnalytics: persistedGeneration,
+                  errorMessage: isAborted
+                  ? GENERIC_ASSISTANT_FAILURE_MESSAGE
                   : ok
                     ? undefined
-                    : 'No assistant content generated',
-              })
+                    : GENERIC_ASSISTANT_FAILURE_MESSAGE,
+                  errorCode: ok ? undefined : ChatErrorCode.Unknown,
+                  errorI18nKey: ok ? undefined : ChatErrorI18nKey.Unknown,
+                })
               cleanupActiveStream()
             },
           })
@@ -1000,35 +1165,18 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               yield* releaseQuotaReservation('request_failed').pipe(
                 Effect.catch(() => Effect.void),
               )
+              if (wideEvent) {
+                addWideEventBreadcrumb(wideEvent, {
+                  name: 'chat.request.failed.before_stream',
+                  detail: { errorTag },
+                })
+              }
 
               if (!currentStreamId) {
-                return yield* emitWideErrorEvent({
-                  eventName: 'chat.stream.request.failed',
-                  route,
-                  requestId,
-                  userId,
-                  threadId,
-                  errorCode: chatErrorCodeFromTag(errorTag),
-                  errorTag,
-                  message: error.message,
-                  latencyMs: Date.now() - startedAt,
-                  retryable: true,
-                })
+                return
               }
               const failedStreamId = currentStreamId
 
-              yield* emitWideErrorEvent({
-                eventName: 'chat.stream.request.failed',
-                route,
-                requestId,
-                userId,
-                threadId,
-                errorCode: chatErrorCodeFromTag(errorTag),
-                errorTag,
-                message: error.message,
-                latencyMs: Date.now() - startedAt,
-                retryable: true,
-              })
               yield* streamResume.clearActiveStream({
                 userId,
                 threadId,

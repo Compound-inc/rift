@@ -401,20 +401,27 @@ export class ModelPolicyService extends ServiceMap.Service<
       'ModelPolicyService.resolveThreadModelMemory',
     )(
       ({
+        threadId,
+        threadModel,
         requestedModelId,
         modeModelId,
         accessContext,
         requestedReasoningEffort,
+        requestId,
       }: {
+        readonly threadId: string
+        readonly threadModel?: string
         readonly requestedModelId?: string
         readonly modeModelId?: string
         readonly accessContext?: AccessContext
         readonly requestedReasoningEffort?: string
+        readonly requestId: string
       }) =>
         Effect.gen(function* () {
           const modelId =
             modeModelId?.trim() ||
             requestedModelId?.trim() ||
+            threadModel?.trim() ||
             'missing-model'
 
           const access = accessContext
@@ -427,8 +434,8 @@ export class ModelPolicyService extends ServiceMap.Service<
             return yield* Effect.fail(
               toPolicyDenied({
                 modelId,
-                threadId: 'memory-thread',
-                requestId: 'memory-request',
+                threadId,
+                requestId,
                 reason: `free_tier_model_denied:${modelId}`,
               }),
             )

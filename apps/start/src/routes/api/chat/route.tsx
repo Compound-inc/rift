@@ -18,6 +18,12 @@ import {
   UnauthorizedError,
 } from '@/lib/backend/chat'
 import { handleRouteFailure } from '@/lib/backend/chat/http/route-failure'
+import {
+  createChatWideEvent,
+  drainWideEvent,
+  finalizeWideEventSuccess,
+  setWideEventContext,
+} from '@/lib/backend/chat/observability/wide-event'
 
 /** Chat API route handling stream resume (GET) and new turns (POST). */
 export const Route = createFileRoute('/api/chat')({
@@ -25,6 +31,12 @@ export const Route = createFileRoute('/api/chat')({
     handlers: {
       GET: async ({ request }) => {
         const requestId = crypto.randomUUID()
+        const wideEvent = createChatWideEvent({
+          eventName: 'chat.resume.request',
+          requestId,
+          route: '/api/chat',
+          method: 'GET',
+        })
 
         const program = Effect.gen(function* () {
           const authContext = yield* requireUserAuth({
@@ -34,6 +46,13 @@ export const Route = createFileRoute('/api/chat')({
                 message: 'Unauthorized',
                 requestId,
               }),
+          })
+          setWideEventContext(wideEvent, {
+            actor: {
+              userId: authContext.userId,
+              organizationId: authContext.organizationId,
+              isAnonymous: authContext.isAnonymous,
+            },
           })
 
           const url = new URL(request.url)
@@ -47,6 +66,11 @@ export const Route = createFileRoute('/api/chat')({
               }),
             )
           }
+          setWideEventContext(wideEvent, {
+            request: { trigger: 'resume-stream' },
+            thread: { threadId },
+            stream: { resumed: true },
+          })
 
           const streamResume = yield* StreamResumeService
           const threads = yield* ThreadService
@@ -64,16 +88,25 @@ export const Route = createFileRoute('/api/chat')({
           })
 
           if (!stream) {
+            finalizeWideEventSuccess(wideEvent, {
+              status: 204,
+              suppressLog: true,
+            })
             return new Response(null, { status: 204 })
           }
 
+          finalizeWideEventSuccess(wideEvent, { status: 200 })
           return new Response(stream.pipeThrough(new TextEncoderStream()), {
             headers: UI_MESSAGE_STREAM_HEADERS,
           })
         })
 
         try {
-          return await ChatRuntime.run(program)
+          const response = await ChatRuntime.run(program)
+          if (wideEvent.outcome && !wideEvent._drained) {
+            await Effect.runPromise(drainWideEvent(wideEvent)).catch(() => undefined)
+          }
+          return response
         } catch (error) {
           const userId = await Effect.runPromise(
             getServerAuthContextFromHeaders(request.headers).pipe(
@@ -87,11 +120,18 @@ export const Route = createFileRoute('/api/chat')({
             eventName: 'chat.resume.route.failed',
             userId,
             defaultMessage: 'Chat stream resume failed unexpectedly',
+            wideEvent,
           })
         }
       },
       POST: async ({ request }) => {
         const requestId = crypto.randomUUID()
+        const wideEvent = createChatWideEvent({
+          eventName: 'chat.request',
+          requestId,
+          route: '/api/chat',
+          method: 'POST',
+        })
 
         // Build one Effect program so auth/validation/orchestration share the same error model.
         const program = Effect.gen(function* () {
@@ -102,6 +142,13 @@ export const Route = createFileRoute('/api/chat')({
                 message: 'Unauthorized',
                 requestId,
               }),
+          })
+          setWideEventContext(wideEvent, {
+            actor: {
+              userId: authContext.userId,
+              organizationId: authContext.organizationId,
+              isAnonymous: authContext.isAnonymous,
+            },
           })
 
           const rawBody = yield* Effect.tryPromise({
@@ -121,6 +168,20 @@ export const Route = createFileRoute('/api/chat')({
                 requestId,
                 issue: String(error),
               }),
+          })
+          setWideEventContext(wideEvent, {
+            request: { trigger: body.trigger ?? 'submit-message' },
+            thread: {
+              threadId: body.threadId,
+              createIfMissing: body.createIfMissing,
+              expectedBranchVersion: body.expectedBranchVersion,
+              targetMessageId: body.messageId,
+            },
+            model: {
+              requestedModelId: body.modelId,
+              reasoningEffort: body.reasoningEffort,
+              contextWindowMode: body.contextWindowMode,
+            },
           })
 
           const accessContext = yield* Effect.tryPromise({
@@ -176,12 +237,17 @@ export const Route = createFileRoute('/api/chat')({
             disabledToolKeys: body.disabledToolKeys,
             createIfMissing: body.createIfMissing,
             route: '/api/chat',
+            wideEvent,
           })
           return response
         })
 
         try {
-          return await ChatRuntime.run(program)
+          const response = await ChatRuntime.run(program)
+          if (wideEvent.outcome && !wideEvent._drained) {
+            await Effect.runPromise(drainWideEvent(wideEvent)).catch(() => undefined)
+          }
+          return response
         } catch (error) {
           const userId = await Effect.runPromise(
             getServerAuthContextFromHeaders(request.headers).pipe(
@@ -195,6 +261,7 @@ export const Route = createFileRoute('/api/chat')({
             eventName: 'chat.route.failed',
             userId,
             defaultMessage: 'Chat route failed unexpectedly',
+            wideEvent,
           })
         }
       },

@@ -8,6 +8,8 @@ import {
   enumeration,
   relationships,
 } from '@rocicorp/zero'
+import type { ChatErrorCode } from '@/lib/shared/chat-contracts/error-codes'
+import type { ChatErrorI18nKey } from '@/lib/shared/chat-contracts/error-i18n'
 
 // ---------------------------------------------------------------------------
 // Table definitions
@@ -263,7 +265,12 @@ const message = table('message')
       .optional(),
     role: enumeration<'user' | 'assistant' | 'system'>(),
     created_at: number(),
-    serverError: json<{ type: string; message: string }>()
+    serverError: json<{
+      type: string
+      message: string
+      code?: ChatErrorCode
+      i18nKey?: ChatErrorI18nKey
+    }>()
       .from('server_error')
       .optional(),
     model: string(),

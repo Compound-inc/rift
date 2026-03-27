@@ -61,15 +61,20 @@ import type {
   ChatAttachmentInput,
 } from '@/lib/shared/chat-contracts/attachments'
 import { estimatePromptTokens } from '@/lib/shared/chat-contracts'
+import type { ChatErrorI18nKey } from '@/lib/shared/chat-contracts/error-i18n'
 import type { ChatMessageMetadata } from '@/lib/shared/chat-contracts/message-metadata'
-import { getChatErrorMessage } from '@/lib/shared/chat-contracts/error-messages'
-import { ChatErrorCode } from '@/lib/shared/chat-contracts/error-codes'
+import { resolveChatErrorMessage } from './chat-error-i18n'
 import type {
   AiContextWindowMode,
   AiReasoningEffort,
 } from '@/lib/shared/ai-catalog/types'
 import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 import { useOrgBillingSummary } from '@/lib/frontend/billing/use-org-billing'
+import {
+  captureClientChatError,
+  setClientChatScope,
+} from '@/lib/frontend/observability/posthog'
+import { parseChatApiError } from './chat-error-messages'
 import {
   getThreadGenerationStatus,
   getThreadStatusesVersion,
@@ -637,7 +642,7 @@ export function ChatProvider({
 }) {
   const navigate = useNavigate()
   const z = useZero()
-  const { isAnonymous, activeOrganizationId } = useAppAuth()
+  const { user, isAnonymous, activeOrganizationId } = useAppAuth()
   const { entitlement } = useOrgBillingSummary()
   // Mutable refs avoid stale values inside async callbacks owned by the transport hook.
   const threadIdRef = useRef<string | undefined>(threadId)
@@ -1187,6 +1192,44 @@ export function ChatProvider({
   setMessagesRef.current = setMessages
 
   useEffect(() => {
+    setClientChatScope({
+      userId: isAnonymous ? undefined : user?.id,
+      organizationId: activeOrganizationId,
+      threadId: activeThreadId,
+      modelId: selectedModelId,
+      modeId: effectiveModeId,
+      contextWindowMode: effectiveSelectedContextWindowMode,
+      reasoningEffort: selectedReasoningEffort,
+      isAnonymous,
+    })
+  }, [
+    activeOrganizationId,
+    activeThreadId,
+    effectiveModeId,
+    effectiveSelectedContextWindowMode,
+    isAnonymous,
+    selectedModelId,
+    selectedReasoningEffort,
+    user?.id,
+  ])
+
+  useEffect(() => {
+    if (!localError) return
+    const parsed = parseChatApiError(localError)
+    captureClientChatError({
+      error: localError,
+      code: parsed?.code,
+      traceId: parsed?.traceId,
+      telemetryOwner: parsed?.telemetryOwner,
+      status,
+      threadId: activeThreadId,
+      details: {
+        parsedMessage: parsed?.message,
+      },
+    })
+  }, [activeThreadId, localError, status])
+
+  useEffect(() => {
     if (selectableModels.length === 0) return
     if (
       !activeThreadId &&
@@ -1499,15 +1542,29 @@ export function ChatProvider({
       latestAssistantFailure &&
       typeof latestAssistantFailure.serverError === 'object' &&
       latestAssistantFailure.serverError !== null &&
-      'message' in latestAssistantFailure.serverError &&
-      typeof latestAssistantFailure.serverError.message === 'string'
-        ? latestAssistantFailure.serverError.message
+      'i18nKey' in latestAssistantFailure.serverError &&
+      typeof latestAssistantFailure.serverError.i18nKey === 'string'
+        ? resolveChatErrorMessage(
+            latestAssistantFailure.serverError.i18nKey,
+          )
+        : undefined
+
+    const fallbackErrorMessage =
+      latestAssistantFailure &&
+      typeof latestAssistantFailure.serverError === 'object' &&
+      latestAssistantFailure.serverError !== null &&
+      'code' in latestAssistantFailure.serverError &&
+      typeof latestAssistantFailure.serverError.code === 'string'
+        ? resolveChatErrorMessage(
+            latestAssistantFailure.serverError.code as ChatErrorI18nKey,
+          )
         : undefined
 
     setLocalError(
       new Error(
         serverErrorMessage ??
-          getChatErrorMessage(ChatErrorCode.ModelNotAllowed),
+          fallbackErrorMessage ??
+          resolveChatErrorMessage('error_chat_unknown'),
       ),
     )
   }, [
@@ -1555,8 +1612,13 @@ export function ChatProvider({
         const message =
           effectiveContextWindowResolution.supportsDistinctMaxMode &&
           effectiveSelectedContextWindowMode === 'standard'
-            ? getChatErrorMessage(ChatErrorCode.ContextWindowExceeded)
-            : 'This conversation has reached its current context limit. Start a new chat to continue.'
+            ? resolveChatErrorMessage(
+                'error_chat_context_window_exceeded_max_available',
+                { maxTokens: activeContextWindow },
+              )
+            : resolveChatErrorMessage('error_chat_context_window_exceeded', {
+                maxTokens: activeContextWindow,
+              })
         setLocalError(new Error(message))
         throw new Error(message)
       }

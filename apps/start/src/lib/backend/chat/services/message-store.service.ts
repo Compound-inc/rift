@@ -5,6 +5,8 @@ import { Effect, Layer, ServiceMap } from 'effect'
 import type { AiReasoningEffort } from '@/lib/shared/ai-catalog/types'
 import type { PersistedGenerationAnalytics } from '@/lib/backend/chat/domain/generation-metrics'
 import type { ChatAttachmentInput } from '@/lib/shared/chat-contracts/attachments'
+import type { ChatErrorCode } from '@/lib/shared/chat-contracts/error-codes'
+import type { ChatErrorI18nKey } from '@/lib/shared/chat-contracts/error-i18n'
 import type { OrgAiPolicy } from '@/lib/shared/model-policy/types'
 import type {
   BranchVersionConflictError,
@@ -102,6 +104,8 @@ export type MessageStoreServiceShape = {
     readonly finalContent: string
     readonly reasoning?: string
     readonly errorMessage?: string
+    readonly errorCode?: ChatErrorCode
+    readonly errorI18nKey?: ChatErrorI18nKey
     readonly modelParams?: {
       readonly reasoningEffort?: AiReasoningEffort
     }

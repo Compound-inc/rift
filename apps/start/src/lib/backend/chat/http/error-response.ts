@@ -1,43 +1,50 @@
 import type { ChatDomainError } from '../domain/errors'
-import { ChatErrorCode, chatErrorCodeFromTag } from '../domain/error-codes'
-import { getChatErrorMessage } from '../domain/error-messages'
+import {
+  classifyChatError,
+  classifyUnknownChatError,
+} from '../domain/error-classification'
+import { ChatErrorCode } from '../domain/error-codes'
 import type { ChatApiErrorEnvelope } from '@/lib/shared/chat-contracts/error-envelope'
 
-function getInvalidRequestMessage(tagged: ChatDomainError): string | undefined {
-  if (tagged._tag !== 'InvalidRequestError') return undefined
-  if (tagged.issue === 'feature_denied:chat.fileUpload') {
-    return 'File uploads are available on paid plans only. Upgrade to attach files in chat.'
+export function buildChatApiErrorEnvelope(input: {
+  readonly requestId: string
+  readonly code: ChatErrorCode
+  readonly i18nKey: ChatApiErrorEnvelope['error']['i18nKey']
+  readonly i18nParams?: ChatApiErrorEnvelope['error']['i18nParams']
+  readonly retryable: boolean
+  readonly tag: string
+  readonly detailsMessage?: string
+  readonly threadId?: string
+}): ChatApiErrorEnvelope {
+  return {
+    ok: false,
+    error: {
+      code: input.code,
+      i18nKey: input.i18nKey,
+      i18nParams: input.i18nParams,
+      requestId: input.requestId,
+      retryable: input.retryable,
+    },
+    requestId: input.requestId,
+    telemetry: {
+      owner: 'server',
+    },
+    details: {
+      tag: input.tag,
+      message: input.detailsMessage,
+      threadId: input.threadId,
+    },
   }
-  return undefined
-}
-
-function getModelPolicyDeniedMessage(tagged: ChatDomainError): string | undefined {
-  if (tagged._tag !== 'ModelPolicyDeniedError') return undefined
-  if (tagged.reason.startsWith('free_tier_model_denied:')) {
-    return 'This model is visible in Rift, but it requires a paid plan to use.'
-  }
-  if (tagged.reason.includes('model_not_supported_for_provider_key')) {
-    return 'This model cannot be used with your organization provider API key. Choose another model from that provider or remove the provider key.'
-  }
-  if (tagged.reason.includes('missing_provider_api_key')) {
-    return 'This provider requires an organization API key, but no key is configured.'
-  }
-  return undefined
-}
-
-function getQuotaExceededMessage(tagged: ChatDomainError): string | undefined {
-  if (tagged._tag !== 'QuotaExceededError') return undefined
-  if (tagged.reasonCode === 'free_allowance_exhausted') {
-    return 'Your free chat allowance has been exhausted for the current window. Please wait for it to reset or upgrade for more access.'
-  }
-  return undefined
 }
 
 /**
  * Converts backend failures into the normalized error envelope consumed by
  * chat clients.
  */
-export function toErrorResponse(error: unknown, fallbackRequestId: string): Response {
+export function toErrorResponse(
+  error: unknown,
+  fallbackRequestId: string,
+): Response {
   if (
     typeof error === 'object' &&
     error !== null &&
@@ -45,13 +52,7 @@ export function toErrorResponse(error: unknown, fallbackRequestId: string): Resp
     typeof error._tag === 'string'
   ) {
     const tagged = error as ChatDomainError
-    const status = statusForTag(tagged._tag)
-    const errorCode = chatErrorCodeFromTag(tagged._tag)
-    const userMessage =
-      getInvalidRequestMessage(tagged)
-      ?? getModelPolicyDeniedMessage(tagged)
-      ?? getQuotaExceededMessage(tagged)
-      ?? getChatErrorMessage(errorCode)
+    const classification = classifyChatError(tagged)
     const requestId =
       'requestId' in tagged && typeof tagged.requestId === 'string'
         ? tagged.requestId
@@ -61,90 +62,35 @@ export function toErrorResponse(error: unknown, fallbackRequestId: string): Resp
         ? tagged.threadId
         : undefined
 
-    const payload: ChatApiErrorEnvelope = {
-      ok: false,
-      error: {
-        code: errorCode,
-        message: userMessage,
-        requestId,
-        retryable: isRetryable(tagged._tag),
-      },
+    const payload = buildChatApiErrorEnvelope({
       requestId,
-      details: {
-        tag: tagged._tag,
-        message:
-          'message' in tagged && typeof tagged.message === 'string'
-            ? tagged.message
-            : userMessage,
-        threadId,
-      },
-    }
+      code: classification.code,
+      i18nKey: classification.i18nKey,
+      i18nParams: classification.i18nParams,
+      retryable: classification.retryable,
+      tag: tagged._tag,
+      detailsMessage:
+        'message' in tagged && typeof tagged.message === 'string'
+          ? tagged.message
+          : undefined,
+      threadId,
+    })
 
-    return jsonResponse(payload, status)
+    return jsonResponse(payload, classification.status)
   }
 
+  const classification = classifyUnknownChatError()
   return jsonResponse(
-    {
-      ok: false,
-      error: {
-        code: ChatErrorCode.Unknown,
-        message: getChatErrorMessage(ChatErrorCode.Unknown),
-        requestId: fallbackRequestId,
-        retryable: false,
-      },
+    buildChatApiErrorEnvelope({
       requestId: fallbackRequestId,
-      details: {
-        tag: 'UnknownError',
-        message: 'Unexpected server error',
-      },
-    },
+      code: ChatErrorCode.Unknown,
+      i18nKey: classification.i18nKey,
+      retryable: false,
+      tag: 'UnknownError',
+      detailsMessage: 'Unexpected server error',
+    }),
     500,
   )
-}
-
-/** Maps domain error tags to transport HTTP status codes. */
-function statusForTag(tag: string): number {
-  switch (tag) {
-    case 'UnauthorizedError':
-      return 401
-    case 'InvalidRequestError':
-      return 400
-    case 'ThreadNotFoundError':
-      return 404
-    case 'ThreadForbiddenError':
-      return 403
-    case 'BranchVersionConflictError':
-      return 409
-    case 'InvalidEditTargetError':
-      return 400
-    case 'ModelPolicyDeniedError':
-      return 403
-    case 'RateLimitExceededError':
-    case 'QuotaExceededError':
-      return 429
-    case 'RateLimitPersistenceError':
-      return 500
-    case 'ModelProviderError':
-    case 'ToolExecutionError':
-    case 'MessagePersistenceError':
-    case 'StreamProtocolError':
-      return 500
-    default:
-      return 500
-  }
-}
-
-/** Marks errors that callers can retry safely. */
-function isRetryable(tag: string): boolean {
-  switch (tag) {
-    case 'RateLimitExceededError':
-    case 'QuotaExceededError':
-    case 'ModelProviderError':
-    case 'StreamProtocolError':
-      return true
-    default:
-      return false
-  }
 }
 
 /** JSON helper used by chat API routes for consistent response headers. */
