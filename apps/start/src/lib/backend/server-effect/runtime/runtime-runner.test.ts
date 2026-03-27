@@ -49,4 +49,32 @@ describe('makeRuntimeRunner', () => {
 
     await runner.dispose()
   })
+
+  it('reuses memoized layer resources across runtime runners', async () => {
+    let builds = 0
+    const layer = Layer.effect(RuntimeValueService, Effect.sync(() => {
+        builds += 1
+        return RuntimeValueService.of({ value: 'shared' })
+      }))
+    const runnerA = makeRuntimeRunner(layer)
+    const runnerB = makeRuntimeRunner(layer)
+
+    const [valueA, valueB] = await Promise.all([
+      runnerA.run(Effect.gen(function* () {
+        const service = yield* RuntimeValueService
+        return service.value
+      })),
+      runnerB.run(Effect.gen(function* () {
+        const service = yield* RuntimeValueService
+        return service.value
+      })),
+    ])
+
+    expect(valueA).toBe('shared')
+    expect(valueB).toBe('shared')
+    expect(builds).toBe(1)
+
+    await runnerA.dispose()
+    await runnerB.dispose()
+  })
 })

@@ -14,13 +14,13 @@ import { OrgKnowledgePersistenceError } from '../domain/errors'
 
 type OrgKnowledgeRow = {
   readonly id: string
-  readonly userId?: string
+  readonly userId: string
   readonly ownerOrgId?: string
-  readonly attachmentUrl?: string
-  readonly fileName?: string
-  readonly mimeType?: string
-  readonly fileSize?: number
-  readonly fileContent?: string
+  readonly attachmentUrl: string
+  readonly fileName: string
+  readonly mimeType: string
+  readonly fileSize: number
+  readonly fileContent: string
   readonly orgKnowledgeKind?: string
   readonly orgKnowledgeActive?: boolean
   readonly embeddingModel?: string

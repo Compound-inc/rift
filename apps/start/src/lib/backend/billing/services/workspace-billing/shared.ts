@@ -13,6 +13,7 @@ import {
   WorkspaceBillingConfigurationError,
   WorkspaceBillingPersistenceError,
 } from '../../domain/errors'
+import { formatBillingSqlCause } from '../sql'
 
 export const AUTO_RESTRICTION_STATUS = 'restricted'
 export const AUTO_RESTRICTION_REASON = 'seat_limit_downgrade'
@@ -100,7 +101,7 @@ export function toPersistenceError(
     message,
     organizationId: input?.organizationId,
     userId: input?.userId,
-    cause: input?.cause ? String(input.cause) : undefined,
+    cause: input?.cause ? formatBillingSqlCause(input.cause) : undefined,
   })
 }
 

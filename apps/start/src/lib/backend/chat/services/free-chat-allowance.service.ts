@@ -1,7 +1,11 @@
+import { PgClient } from '@effect/sql-pg'
 import { Effect, Layer, ServiceMap } from 'effect'
 import { QuotaExceededError, RateLimitPersistenceError } from '../domain/errors'
 import { getMemoryState } from '../infra/memory/state'
-import { authPool } from '@/lib/backend/auth/auth-pool'
+import { runDetachedObserved } from '@/lib/backend/server-effect/runtime/detached'
+import {
+  formatSqlClientCause,
+} from '@/lib/backend/server-effect/services/upstream-postgres.service'
 
 const RETENTION_WINDOWS = 2
 
@@ -31,67 +35,87 @@ export class FreeChatAllowanceService extends ServiceMap.Service<
   FreeChatAllowanceService,
   FreeChatAllowanceServiceShape
 >()('chat-backend/FreeChatAllowanceService') {
-  static readonly layer = Layer.succeed(this, {
-    assertAllowed: Effect.fn('FreeChatAllowanceService.assertAllowedLive')(
-      ({ userId, requestId, policyKey, windowMs, maxRequests }) =>
-        Effect.tryPromise({
-          try: async () => {
-            const now = Date.now()
-            const windowStartMs = Math.floor(now / windowMs) * windowMs
-            const result = await authPool.query<{ hits: number }>(
-              `insert into chat_free_allowance_window (
-                 user_id,
-                 policy_key,
-                 window_started_at,
-                 hits,
-                 updated_at
-               )
-               values ($1, $2, $3, 1, $4)
-               on conflict (user_id, policy_key, window_started_at) do update
-               set hits = chat_free_allowance_window.hits + 1,
-                   updated_at = excluded.updated_at
-               returning hits`,
-              [userId, policyKey, windowStartMs, now],
-            )
-            const hits = result.rows[0]?.hits ?? 1
+  static readonly layer = Layer.effect(
+    this,
+    Effect.gen(function* () {
+      const sql = yield* PgClient.PgClient
 
-            await authPool.query(
-              `delete from chat_free_allowance_window
-               where user_id = $1
-                 and policy_key = $2
-                 and window_started_at < $3`,
-              [userId, policyKey, windowStartMs - (windowMs * RETENTION_WINDOWS)],
-            )
+      return {
+        assertAllowed: Effect.fn('FreeChatAllowanceService.assertAllowedLive')(
+          ({ userId, requestId, policyKey, windowMs, maxRequests }) =>
+            Effect.gen(function* () {
+              const now = Date.now()
+              const windowStartMs = Math.floor(now / windowMs) * windowMs
+              const [counterRow] = yield* sql<{ hits: number }>`
+                insert into chat_free_allowance_window (
+                  user_id,
+                  policy_key,
+                  window_started_at,
+                  hits,
+                  updated_at
+                )
+                values (${userId}, ${policyKey}, ${windowStartMs}, 1, ${now})
+                on conflict (user_id, policy_key, window_started_at) do update
+                set hits = chat_free_allowance_window.hits + 1,
+                    updated_at = excluded.updated_at
+                returning hits
+              `
+              const hits = counterRow?.hits ?? 1
 
-            if (hits > maxRequests) {
-              throw new QuotaExceededError({
-                message: 'Free chat allowance exhausted',
-                requestId,
-                userId,
-                retryAfterMs: windowMs - (now - windowStartMs),
-                reasonCode: 'free_allowance_exhausted',
+              yield* runDetachedObserved({
+                effect: sql`
+                  delete from chat_free_allowance_window
+                  where user_id = ${userId}
+                    and policy_key = ${policyKey}
+                    and window_started_at < ${
+                      windowStartMs - (windowMs * RETENTION_WINDOWS)
+                    }
+                `,
+                onFailure: (error) =>
+                  Effect.logDebug('Failed to cleanup expired free-chat allowance windows').pipe(
+                    Effect.annotateLogs({
+                      userId,
+                      requestId,
+                      policyKey,
+                      cause: formatSqlClientCause(error),
+                    }),
+                  ),
               })
-            }
 
-            return {
-              allowed: true as const,
-              remaining: maxRequests - hits,
-              hits,
-              evaluatedAt: now,
-            }
-          },
-          catch: (error) =>
-            error instanceof QuotaExceededError
-              ? error
-              : new RateLimitPersistenceError({
-                  message: 'Failed to evaluate free chat allowance',
-                  requestId,
-                  userId,
-                  cause: error instanceof Error ? error.message : String(error),
-                }),
-        }),
-    ),
-  })
+              if (hits > maxRequests) {
+                return yield* Effect.fail(
+                  new QuotaExceededError({
+                    message: 'Free chat allowance exhausted',
+                    requestId,
+                    userId,
+                    retryAfterMs: windowMs - (now - windowStartMs),
+                    reasonCode: 'free_allowance_exhausted',
+                  }),
+                )
+              }
+
+              return {
+                allowed: true as const,
+                remaining: maxRequests - hits,
+                hits,
+                evaluatedAt: now,
+              }
+            }).pipe(
+              Effect.mapError((error) =>
+                error instanceof QuotaExceededError
+                  ? error
+                  : new RateLimitPersistenceError({
+                      message: 'Failed to evaluate free chat allowance',
+                      requestId,
+                      userId,
+                      cause: formatSqlClientCause(error),
+                    }),
+              ),
+            ),
+        ),
+      }
+    }),
+  )
 
   static readonly layerMemory = Layer.succeed(this, {
     assertAllowed: Effect.fn('FreeChatAllowanceService.assertAllowedMemory')(

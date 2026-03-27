@@ -53,6 +53,11 @@ export function getZeroUpstreamPool(): Pool | null {
   }
 
   zeroUpstreamPool = new Pool({ connectionString })
+  if (typeof zeroUpstreamPool.on === 'function') {
+    zeroUpstreamPool.on('error', (error) => {
+      console.error('Unexpected upstream Postgres pool error', error)
+    })
+  }
   registerShutdownHooks()
   return zeroUpstreamPool
 }

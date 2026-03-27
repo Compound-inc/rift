@@ -6,6 +6,12 @@ import {
 } from './server-observability.layer'
 
 /**
+ * Reuse one memo map across all runtimes so shared layers such as database
+ * clients are initialized once per process instead of once per domain runtime.
+ */
+const sharedRuntimeMemoMap = Layer.makeMemoMapUnsafe()
+
+/**
  * Shared helper for running Effect programs from framework edges.
  *
  * The runner provides a single `ManagedRuntime` for a layer and standardizes
@@ -16,6 +22,7 @@ export function makeRuntimeRunner<TServices, TLayerError>(
 ) {
   const runtime = ManagedRuntime.make(
     Layer.mergeAll(layer, ServerObservabilityLayer),
+    { memoMap: sharedRuntimeMemoMap },
   )
 
   const runExit = <TValue, TError>(

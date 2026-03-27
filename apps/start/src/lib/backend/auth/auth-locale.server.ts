@@ -1,28 +1,19 @@
-import { authPool } from './auth-pool'
 import {
   getDefaultAuthLocale,
   normalizeSupportedLocale,
   resolveLocaleFromAcceptLanguage,
 } from './auth-locale'
 import type { SupportedAuthLocale } from './auth-locale'
-
-type UserLocaleRow = {
-  preferredLocale: string | null
-}
+import {
+  readStoredLocaleValueByUserIdEffect,
+  runAuthSqlEffect,
+  updateStoredLocaleValueEffect,
+} from './auth-sql.server'
 
 async function readStoredLocaleByUserId(userId: string): Promise<SupportedAuthLocale | null> {
-  const normalizedUserId = userId.trim()
-  if (!normalizedUserId) return null
-
-  const result = await authPool.query<UserLocaleRow>(
-    `select "preferredLocale"
-     from "user"
-     where id = $1
-     limit 1`,
-    [normalizedUserId],
+  const locale = await runAuthSqlEffect(
+    readStoredLocaleValueByUserIdEffect(userId),
   )
-
-  const locale = result.rows[0]?.preferredLocale
   return normalizeSupportedLocale(locale)
 }
 
@@ -56,10 +47,10 @@ export async function updateAccountLocale(input: {
   userId: string
   locale: SupportedAuthLocale
 }): Promise<void> {
-  await authPool.query(
-    `update "user"
-     set "preferredLocale" = $2
-     where id = $1`,
-    [input.userId, input.locale],
+  await runAuthSqlEffect(
+    updateStoredLocaleValueEffect({
+      userId: input.userId,
+      locale: input.locale,
+    }),
   )
 }

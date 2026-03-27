@@ -1,8 +1,11 @@
-import { authPool } from './auth-pool'
+import { PgClient } from '@effect/sql-pg'
+import { Effect } from 'effect'
+import { runUpstreamPostgresEffect } from '@/lib/backend/server-effect/runtime/upstream-postgres-runtime'
 import {
   buildDefaultOrganizationName,
   shouldProvisionDefaultOrganization,
 } from './default-organization.helpers'
+import { sqlJson } from '@/lib/backend/server-effect/services/upstream-postgres.service'
 
 type OrganizationCountsRow = {
   activeMemberCount: number
@@ -22,83 +25,137 @@ export function slugifyOrganizationName(input: string): string {
     .slice(0, 40)
 }
 
-export async function findFirstOrganizationForUser(userId: string): Promise<string | null> {
-  const result = await authPool.query<{ organizationId: string }>(
-    `select "organizationId" as "organizationId"
-     from member
-     where "userId" = $1
-     order by "createdAt" asc
-     limit 1`,
-    [userId],
-  )
+export const findFirstOrganizationForUserEffect = Effect.fn(
+  'DefaultOrganization.findFirstOrganizationForUser',
+)(
+  (userId: string): Effect.Effect<string | null, unknown, PgClient.PgClient> =>
+    Effect.gen(function* () {
+      const sql = yield* PgClient.PgClient
+      const [row] = yield* sql<{ organizationId: string }>`
+        select "organizationId" as "organizationId"
+        from member
+        where "userId" = ${userId}
+        order by "createdAt" asc
+        limit 1
+      `
 
-  return result.rows[0]?.organizationId ?? null
+      return row?.organizationId ?? null
+    }),
+)
+
+export async function findFirstOrganizationForUser(
+  userId: string,
+): Promise<string | null> {
+  return runUpstreamPostgresEffect(findFirstOrganizationForUserEffect(userId))
 }
 
-async function readOrganizationCounts(
-  organizationId: string,
-): Promise<OrganizationCountsRow> {
-  const result = await authPool.query<OrganizationCountsRow>(
-    `select
-       (select count(*)::int from member where "organizationId" = $1) as "activeMemberCount",
-       (select count(*)::int from invitation where "organizationId" = $1 and status = 'pending') as "pendingInvitationCount"`,
-    [organizationId],
-  )
+const readOrganizationCountsEffect = Effect.fn(
+  'DefaultOrganization.readOrganizationCounts',
+)(
+  (
+    organizationId: string,
+  ): Effect.Effect<OrganizationCountsRow, unknown, PgClient.PgClient> =>
+    Effect.gen(function* () {
+      const sql = yield* PgClient.PgClient
+      const [row] = yield* sql<OrganizationCountsRow>`
+        select
+          (select count(*)::int from member where "organizationId" = ${organizationId}) as "activeMemberCount",
+          (select count(*)::int from invitation where "organizationId" = ${organizationId} and status = 'pending') as "pendingInvitationCount"
+      `
 
-  return (
-    result.rows[0] ?? {
-      activeMemberCount: 0,
-      pendingInvitationCount: 0,
-    }
-  )
-}
+      return row ?? {
+        activeMemberCount: 0,
+        pendingInvitationCount: 0,
+      }
+    }),
+)
 
 /**
  * Billing defaults are stored for every organization so the app can enforce
  * seat limits and render billing state before a paid subscription exists.
  */
+export const ensureOrganizationBillingBaselineEffect = Effect.fn(
+  'DefaultOrganization.ensureOrganizationBillingBaseline',
+)(
+  (
+    organizationId: string,
+  ): Effect.Effect<void, unknown, PgClient.PgClient> =>
+    Effect.gen(function* () {
+      const sql = yield* PgClient.PgClient
+      const now = Date.now()
+      const billingAccountId = `billing_${organizationId}`
+
+      yield* sql.withTransaction(
+        Effect.gen(function* () {
+          const counts = yield* readOrganizationCountsEffect(organizationId)
+
+          yield* sql`
+            insert into org_billing_account (
+              id,
+              organization_id,
+              provider,
+              status,
+              created_at,
+              updated_at
+            )
+            values (
+              ${billingAccountId},
+              ${organizationId},
+              'manual',
+              'active',
+              ${now},
+              ${now}
+            )
+            on conflict (organization_id) do update
+            set updated_at = excluded.updated_at
+          `
+
+          yield* sql`
+            insert into org_entitlement_snapshot (
+              organization_id,
+              plan_id,
+              billing_provider,
+              subscription_status,
+              seat_count,
+              active_member_count,
+              pending_invitation_count,
+              is_over_seat_limit,
+              effective_features,
+              usage_policy,
+              usage_sync_status,
+              usage_sync_error,
+              computed_at,
+              version
+            )
+            values (
+              ${organizationId},
+              'free',
+              'manual',
+              'inactive',
+              1,
+              ${counts.activeMemberCount},
+              ${counts.pendingInvitationCount},
+              ${counts.activeMemberCount > 1
+                || (counts.activeMemberCount + counts.pendingInvitationCount) > 1},
+              ${sqlJson(sql, {})},
+              ${sqlJson(sql, {})},
+              'ok',
+              null,
+              ${now},
+              1
+            )
+            on conflict (organization_id) do nothing
+          `
+        }),
+      )
+    }),
+)
+
 export async function ensureOrganizationBillingBaseline(
   organizationId: string,
 ): Promise<void> {
-  const now = Date.now()
-  const billingAccountId = `billing_${organizationId}`
-  const counts = await readOrganizationCounts(organizationId)
-
-  await authPool.query(
-    `insert into org_billing_account (
-       id,
-       organization_id,
-       provider,
-       status,
-       created_at,
-       updated_at
-     )
-     values ($1, $2, 'manual', 'active', $3, $3)
-     on conflict (organization_id) do update
-     set updated_at = excluded.updated_at`,
-    [billingAccountId, organizationId, now],
-  )
-
-  await authPool.query(
-    `insert into org_entitlement_snapshot (
-       organization_id,
-       plan_id,
-       billing_provider,
-       subscription_status,
-       seat_count,
-       active_member_count,
-       pending_invitation_count,
-       is_over_seat_limit,
-       effective_features,
-       usage_policy,
-       usage_sync_status,
-       usage_sync_error,
-       computed_at,
-       version
-     )
-     values ($1, 'free', 'manual', 'inactive', 1, $2, $3, ($2 > 1 or ($2 + $3) > 1), '{}'::jsonb, '{}'::jsonb, 'ok', null, $4, 1)
-     on conflict (organization_id) do nothing`,
-    [organizationId, counts.activeMemberCount, counts.pendingInvitationCount, now],
+  await runUpstreamPostgresEffect(
+    ensureOrganizationBillingBaselineEffect(organizationId),
   )
 }
 
@@ -107,32 +164,46 @@ export async function ensureOrganizationBillingBaseline(
  * without rewriting the authorization model again. For now every new member
  * starts active.
  */
+export const ensureMemberAccessRecordEffect = Effect.fn(
+  'DefaultOrganization.ensureMemberAccessRecord',
+)(
+  (input: {
+    organizationId: string
+    userId: string
+  }): Effect.Effect<void, unknown, PgClient.PgClient> =>
+    Effect.gen(function* () {
+      const sql = yield* PgClient.PgClient
+      const now = Date.now()
+
+      yield* sql`
+        insert into org_member_access (
+          id,
+          organization_id,
+          user_id,
+          status,
+          created_at,
+          updated_at
+        )
+        values (
+          ${`member_access_${input.organizationId}_${input.userId}`},
+          ${input.organizationId},
+          ${input.userId},
+          'active',
+          ${now},
+          ${now}
+        )
+        on conflict (organization_id, user_id) do update
+        set status = 'active',
+            updated_at = excluded.updated_at
+      `
+    }),
+)
+
 export async function ensureMemberAccessRecord(input: {
   organizationId: string
   userId: string
 }): Promise<void> {
-  const now = Date.now()
-
-  await authPool.query(
-    `insert into org_member_access (
-       id,
-       organization_id,
-       user_id,
-       status,
-       created_at,
-       updated_at
-     )
-     values ($1, $2, $3, 'active', $4, $4)
-     on conflict (organization_id, user_id) do update
-     set status = 'active',
-         updated_at = excluded.updated_at`,
-    [
-      `member_access_${input.organizationId}_${input.userId}`,
-      input.organizationId,
-      input.userId,
-      now,
-    ],
-  )
+  await runUpstreamPostgresEffect(ensureMemberAccessRecordEffect(input))
 }
 
 export {

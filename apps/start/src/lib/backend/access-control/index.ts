@@ -1,3 +1,4 @@
+import { Effect } from 'effect'
 import type {
   AccessContext,
   FeatureAccessState,
@@ -8,7 +9,8 @@ import {
   getFeatureAccessState,
   isFreeTierContext,
 } from '@/lib/shared/access-control'
-import { readEntitlementSnapshot } from '@/lib/backend/billing/services/workspace-billing/persistence'
+import { runBillingSqlEffect } from '@/lib/backend/billing/services/sql'
+import { readEntitlementSnapshotEffect } from '@/lib/backend/billing/services/workspace-billing/persistence'
 
 export type ResolvedAccessContext = AccessContext & {
   userId?: string
@@ -52,27 +54,37 @@ function readPositiveIntegerEnv(name: string, fallback: number): number {
  * Resolves the active plan from the request-scoped organization context.
  * Anonymous or no-org requests remain fully in-memory and default to `free`.
  */
+export const resolveAccessContextEffect = Effect.fn(
+  'AccessControl.resolveAccessContext',
+)((input: { userId?: string; isAnonymous: boolean; organizationId?: string }) =>
+  Effect.gen(function* () {
+    if (!input.organizationId) {
+      return {
+        userId: input.userId,
+        isAnonymous: input.isAnonymous,
+        organizationId: undefined,
+        planId: 'free' as const,
+      }
+    }
+
+    const snapshot = yield* readEntitlementSnapshotEffect({
+      organizationId: input.organizationId,
+    })
+    return {
+      userId: input.userId,
+      isAnonymous: input.isAnonymous,
+      organizationId: input.organizationId,
+      planId: coerceWorkspacePlanId(snapshot?.planId),
+    }
+  }),
+)
+
 export async function resolveAccessContext(input: {
   userId?: string
   isAnonymous: boolean
   organizationId?: string
 }): Promise<ResolvedAccessContext> {
-  if (!input.organizationId) {
-    return {
-      userId: input.userId,
-      isAnonymous: input.isAnonymous,
-      organizationId: undefined,
-      planId: 'free',
-    }
-  }
-
-  const snapshot = await readEntitlementSnapshot(input.organizationId)
-  return {
-    userId: input.userId,
-    isAnonymous: input.isAnonymous,
-    organizationId: input.organizationId,
-    planId: coerceWorkspacePlanId(snapshot?.planId),
-  }
+  return runBillingSqlEffect(resolveAccessContextEffect(input))
 }
 
 /**

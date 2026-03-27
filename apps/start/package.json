@@ -35,6 +35,7 @@
     "@ai-sdk/xai": "^3.0.57",
     "@better-auth/core": "1.5.2",
     "@better-auth/stripe": "^1.5.4",
+    "@effect/sql-pg": "4.0.0-beta.21",
     "@elysiajs/eden": "^1.4.8",
     "@json-render/core": "^0.11.0",
     "@json-render/react": "^0.11.0",

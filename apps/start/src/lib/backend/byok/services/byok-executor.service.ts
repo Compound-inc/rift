@@ -6,9 +6,9 @@ import {
 } from '@/lib/backend/model-policy/repository'
 import type { ByokSupportedProviderId } from '@/lib/shared/model-policy/provider-keys'
 import {
-  deleteOrgProviderApiKey,
-  readOrgProviderApiKeyStatus,
-  upsertOrgProviderApiKey,
+  deleteOrgProviderApiKeyEffect,
+  readOrgProviderApiKeyStatusEffect,
+  upsertOrgProviderApiKeyEffect,
 } from '@/lib/backend/byok/infra/provider-key-store'
 import {
   DEFAULT_ORG_TOOL_POLICY,
@@ -115,26 +115,15 @@ const tryUpsertKey = (params: {
   organizationId: string
   providerId: ByokSupportedProviderId
   apiKey: string
-}) =>
-  Effect.tryPromise({
-    try: () => upsertOrgProviderApiKey(params),
-    catch: toPersistenceError,
-  })
+}) => upsertOrgProviderApiKeyEffect(params).pipe(Effect.mapError(toPersistenceError))
 
 const tryDeleteKey = (params: {
   organizationId: string
   providerId: ByokSupportedProviderId
-}) =>
-  Effect.tryPromise({
-    try: () => deleteOrgProviderApiKey(params),
-    catch: toPersistenceError,
-  })
+}) => deleteOrgProviderApiKeyEffect(params).pipe(Effect.mapError(toPersistenceError))
 
 const tryReadStatus = (organizationId: string) =>
-  Effect.tryPromise({
-    try: () => readOrgProviderApiKeyStatus(organizationId),
-    catch: toPersistenceError,
-  })
+  readOrgProviderApiKeyStatusEffect(organizationId).pipe(Effect.mapError(toPersistenceError))
 
 /** Runs set_provider_api_key branch. */
 const runSet = (

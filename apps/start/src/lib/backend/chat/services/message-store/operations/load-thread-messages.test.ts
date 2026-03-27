@@ -29,8 +29,8 @@ describe('makeLoadThreadMessagesOperation', () => {
         getOrFail: Effect.succeed({
           run,
         } as never),
-        withDatabase: (run) =>
-          run({
+        withDatabase: (withDatabaseRun: (db: { run: typeof run }) => unknown) =>
+          withDatabaseRun({
             run,
           } as never),
       } as never,

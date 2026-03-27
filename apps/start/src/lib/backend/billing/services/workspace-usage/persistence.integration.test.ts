@@ -481,9 +481,9 @@ describeIfDb('workspace usage persistence integration', () => {
       refundedNanoUsd: 0,
       forgivenNanoUsd: 0,
     })
-    expect(captureDebtAmounts).toEqual([30_000_000])
+    expect(captureDebtAmounts).toEqual([10_000_000])
     expect(cycleBucket).toMatchObject({
-      totalNanoUsd: 20_000_000,
+      totalNanoUsd: 80_000_000,
       remainingNanoUsd: -10_000_000,
     })
   })

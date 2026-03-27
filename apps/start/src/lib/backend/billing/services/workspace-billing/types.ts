@@ -1,9 +1,9 @@
 import type { Subscription as BetterAuthStripeSubscription } from '@better-auth/stripe'
 import type { Effect } from 'effect'
-import type { Pool, PoolClient } from 'pg'
 import type Stripe from 'stripe'
 import { getPlanEffectiveFeatures } from '@/lib/shared/access-control'
 import type { UsagePolicySnapshot } from '../workspace-usage/shared'
+import type { BillingClientInput } from '../sql'
 import type { OrgSubscriptionBillingInterval } from './shared'
 import type {
   WorkspaceBillingConfigurationError,
@@ -64,7 +64,7 @@ export type OrgSeatAvailability = OrgMemberCounts & {
   usageSyncError: string | null
 }
 
-export type BillingPersistenceClient = PoolClient | Pool
+export type BillingPersistenceClient = BillingClientInput
 
 export type WorkspaceBillingServiceShape = {
   readonly recomputeEntitlementSnapshot: (input: {

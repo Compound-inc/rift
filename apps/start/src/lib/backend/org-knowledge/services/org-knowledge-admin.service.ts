@@ -95,21 +95,8 @@ export class OrgKnowledgeAdminService extends ServiceMap.Service<
                * Text and markdown uploads already contain the content we want to
                * embed, so bypass conversion and index their original text.
                */
-              const markdownRaw = yield* Effect.tryPromise({
-                try: async () => {
-                  const directTextContent = await readDirectTextFileContent(file)
-                  if (directTextContent != null) return directTextContent
-
-                  const conversion = await Effect.runPromise(
-                    markdownConversion
-                      .convertFromUrl({
-                        fileUrl: uploaded.url,
-                        fileName: uploaded.name,
-                        requestId,
-                      }),
-                  )
-                  return conversion.markdown
-                },
+              const directTextContent = yield* Effect.tryPromise({
+                try: () => readDirectTextFileContent(file),
                 catch: (error) =>
                   new OrgKnowledgePersistenceError({
                     message:
@@ -121,6 +108,27 @@ export class OrgKnowledgeAdminService extends ServiceMap.Service<
                     cause: String(error),
                   }),
               })
+              const markdownRaw = directTextContent ?? (yield* markdownConversion
+                .convertFromUrl({
+                  fileUrl: uploaded.url,
+                  fileName: uploaded.name,
+                  requestId,
+                })
+                .pipe(
+                  Effect.map((conversion) => conversion.markdown),
+                  Effect.mapError(
+                    (error) =>
+                      new OrgKnowledgePersistenceError({
+                        message:
+                          error instanceof Error
+                            ? error.message
+                            : 'Failed to extract organization knowledge content',
+                        requestId,
+                        organizationId,
+                        cause: String(error),
+                      }),
+                  ),
+                ))
               const markdown = normalizeMarkdownForStorage(markdownRaw)
               const chunkBuild = yield* Effect.tryPromise({
                 try: () =>

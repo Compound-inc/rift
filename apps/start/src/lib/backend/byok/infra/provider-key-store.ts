@@ -1,5 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
-import { Pool } from 'pg'
+import { PgClient } from '@effect/sql-pg'
+import { Effect } from 'effect'
+import { runUpstreamPostgresEffect } from '@/lib/backend/server-effect/runtime/upstream-postgres-runtime'
 import {
   validateProviderApiKeyFormat,
 } from '@/lib/shared/model-policy/provider-keys'
@@ -10,7 +12,7 @@ import type {
 
 /**
  * Server-only encrypted storage adapter for organization provider API keys.
- * This module must never be imported by client-reachable code.
+ * Plaintext keys only exist in memory long enough to encrypt/decrypt them.
  */
 type EncryptedKeyRow = {
   providerId: ByokSupportedProviderId
@@ -26,140 +28,167 @@ const ENCRYPTION_IV_BYTES = 12
 const KEY_VERSION = 1
 
 let encryptionKeyCache: Buffer | undefined
-let poolCache: Pool | undefined
 
-/**
- * Decrypts and returns an org provider API key if one exists.
- * The returned plaintext is only used in-memory for request routing.
- */
+export const readOrgProviderApiKeyEffect = Effect.fn(
+  'ProviderKeyStore.readOrgProviderApiKey',
+)(
+  (input: {
+    readonly organizationId: string
+    readonly providerId: ByokSupportedProviderId
+  }): Effect.Effect<string | undefined, unknown, PgClient.PgClient> =>
+    Effect.gen(function* () {
+      const sql = yield* PgClient.PgClient
+      const [row] = yield* sql<EncryptedKeyRow>`
+        select
+          provider_id as "providerId",
+          ciphertext,
+          iv,
+          auth_tag as "authTag",
+          key_version as "keyVersion"
+        from org_provider_api_key
+        where organization_id = ${input.organizationId}
+          and provider_id = ${input.providerId}
+        limit 1
+      `
+
+      if (!row) {
+        return undefined
+      }
+
+      return decryptApiKey({
+        ciphertextB64: row.ciphertext,
+        ivB64: row.iv,
+        authTagB64: row.authTag,
+        keyVersion: row.keyVersion,
+      })
+    }),
+)
+
 export async function readOrgProviderApiKey(input: {
   readonly organizationId: string
   readonly providerId: ByokSupportedProviderId
 }): Promise<string | undefined> {
-  const pool = getPool()
-  const result = await pool.query<EncryptedKeyRow>(
-    `select
-       provider_id as "providerId",
-       ciphertext,
-       iv,
-       auth_tag as "authTag",
-       key_version as "keyVersion"
-     from org_provider_api_key
-     where organization_id = $1
-       and provider_id = $2
-     limit 1`,
-    [input.organizationId, input.providerId],
-  )
-
-  const row = result.rows[0]
-  if (!row) return undefined
-
-  return decryptApiKey({
-    ciphertextB64: row.ciphertext,
-    ivB64: row.iv,
-    authTagB64: row.authTag,
-    keyVersion: row.keyVersion,
-  })
+  return runUpstreamPostgresEffect(readOrgProviderApiKeyEffect(input))
 }
 
-/**
- * Returns per-provider key presence used by policy snapshots and short-circuit checks.
- */
+export const readOrgProviderApiKeyStatusEffect = Effect.fn(
+  'ProviderKeyStore.readOrgProviderApiKeyStatus',
+)(
+  (
+    organizationId: string,
+  ): Effect.Effect<OrgProviderKeyStatus, unknown, PgClient.PgClient> =>
+    Effect.gen(function* () {
+      const sql = yield* PgClient.PgClient
+      const rows = yield* sql<{ providerId: string }>`
+        select provider_id as "providerId"
+        from org_provider_api_key
+        where organization_id = ${organizationId}
+      `
+      const configured = new Set<string>(rows.map((row) => row.providerId))
+
+      return {
+        openai: configured.has('openai'),
+        anthropic: configured.has('anthropic'),
+      }
+    }),
+)
+
 export async function readOrgProviderApiKeyStatus(
   organizationId: string,
 ): Promise<OrgProviderKeyStatus> {
-  const pool = getPool()
-  const result = await pool.query<{ providerId: string }>(
-    `select provider_id as "providerId"
-     from org_provider_api_key
-     where organization_id = $1`,
-    [organizationId],
+  return runUpstreamPostgresEffect(
+    readOrgProviderApiKeyStatusEffect(organizationId),
   )
-
-  const configured = new Set<string>(result.rows.map((row) => row.providerId))
-
-  return {
-    openai: configured.has('openai'),
-    anthropic: configured.has('anthropic'),
-  }
 }
 
-/**
- * Encrypts and stores an org provider API key.
- * The plaintext is never persisted.
- */
+export const upsertOrgProviderApiKeyEffect = Effect.fn(
+  'ProviderKeyStore.upsertOrgProviderApiKey',
+)(
+  (input: {
+    readonly organizationId: string
+    readonly providerId: ByokSupportedProviderId
+    readonly apiKey: string
+  }): Effect.Effect<void, unknown, PgClient.PgClient> =>
+    Effect.gen(function* () {
+      const validation = validateProviderApiKeyFormat({
+        providerId: input.providerId,
+        apiKey: input.apiKey,
+      })
+
+      if (!validation.ok) {
+        return yield* Effect.fail(
+          new Error(validation.message ?? 'Invalid provider API key'),
+        )
+      }
+
+      const encrypted = encryptApiKey(validation.normalizedApiKey)
+      const sql = yield* PgClient.PgClient
+      const now = Date.now()
+
+      yield* sql`
+        insert into org_provider_api_key (
+          id,
+          organization_id,
+          provider_id,
+          ciphertext,
+          iv,
+          auth_tag,
+          key_version,
+          created_at,
+          updated_at
+        )
+        values (
+          ${crypto.randomUUID()},
+          ${input.organizationId},
+          ${input.providerId},
+          ${encrypted.ciphertextB64},
+          ${encrypted.ivB64},
+          ${encrypted.authTagB64},
+          ${KEY_VERSION},
+          ${now},
+          ${now}
+        )
+        on conflict (organization_id, provider_id) do update
+        set ciphertext = excluded.ciphertext,
+            iv = excluded.iv,
+            auth_tag = excluded.auth_tag,
+            key_version = excluded.key_version,
+            updated_at = excluded.updated_at
+      `
+    }),
+)
+
 export async function upsertOrgProviderApiKey(input: {
   readonly organizationId: string
   readonly providerId: ByokSupportedProviderId
   readonly apiKey: string
 }): Promise<void> {
-  const validation = validateProviderApiKeyFormat({
-    providerId: input.providerId,
-    apiKey: input.apiKey,
-  })
-
-  if (!validation.ok) {
-    throw new Error(validation.message ?? 'Invalid provider API key')
-  }
-
-  const encrypted = encryptApiKey(validation.normalizedApiKey)
-  const pool = getPool()
-  const now = Date.now()
-
-  await pool.query(
-    `insert into org_provider_api_key (
-       id,
-       organization_id,
-       provider_id,
-       ciphertext,
-       iv,
-       auth_tag,
-       key_version,
-       created_at,
-       updated_at
-     )
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $8)
-     on conflict (organization_id, provider_id) do update
-     set ciphertext = excluded.ciphertext,
-         iv = excluded.iv,
-         auth_tag = excluded.auth_tag,
-         key_version = excluded.key_version,
-         updated_at = excluded.updated_at`,
-    [
-      crypto.randomUUID(),
-      input.organizationId,
-      input.providerId,
-      encrypted.ciphertextB64,
-      encrypted.ivB64,
-      encrypted.authTagB64,
-      KEY_VERSION,
-      now,
-    ],
-  )
+  await runUpstreamPostgresEffect(upsertOrgProviderApiKeyEffect(input))
 }
+
+export const deleteOrgProviderApiKeyEffect = Effect.fn(
+  'ProviderKeyStore.deleteOrgProviderApiKey',
+)(
+  (input: {
+    readonly organizationId: string
+    readonly providerId: ByokSupportedProviderId
+  }): Effect.Effect<void, unknown, PgClient.PgClient> =>
+    Effect.gen(function* () {
+      const sql = yield* PgClient.PgClient
+
+      yield* sql`
+        delete from org_provider_api_key
+        where organization_id = ${input.organizationId}
+          and provider_id = ${input.providerId}
+      `
+    }),
+)
 
 export async function deleteOrgProviderApiKey(input: {
   readonly organizationId: string
   readonly providerId: ByokSupportedProviderId
 }): Promise<void> {
-  const pool = getPool()
-  await pool.query(
-    `delete from org_provider_api_key
-     where organization_id = $1
-       and provider_id = $2`,
-    [input.organizationId, input.providerId],
-  )
-}
-
-function getPool(): Pool {
-  if (poolCache) return poolCache
-  const raw = process.env.ZERO_UPSTREAM_DB?.trim()
-  if (!raw) {
-    throw new Error('Missing required environment variable ZERO_UPSTREAM_DB.')
-  }
-
-  poolCache = new Pool({ connectionString: raw })
-  return poolCache
+  await runUpstreamPostgresEffect(deleteOrgProviderApiKeyEffect(input))
 }
 
 /**
@@ -245,10 +274,6 @@ function decryptApiKey(input: {
  */
 export function __resetByokKeyModuleForTests() {
   encryptionKeyCache = undefined
-  if (poolCache) {
-    void poolCache.end().catch(() => undefined)
-  }
-  poolCache = undefined
 }
 
 /**

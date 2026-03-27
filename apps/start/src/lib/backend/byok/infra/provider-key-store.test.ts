@@ -16,64 +16,153 @@ function rowKey(organizationId: string, providerId: string) {
 }
 
 vi.mock('pg', () => {
+  const executeQuery = async <T = unknown>(
+    text: string,
+    values: readonly unknown[] = [],
+  ) => {
+    if (text.includes('insert into org_provider_api_key')) {
+      const organizationId = String(values[1])
+      const providerId = String(values[2]) as 'openai' | 'anthropic'
+      rows.set(rowKey(organizationId, providerId), {
+        organizationId,
+        providerId,
+        ciphertext: String(values[3]),
+        iv: String(values[4]),
+        authTag: String(values[5]),
+        keyVersion: Number(values[6]),
+      })
+      return { rows: [] as T[] }
+    }
+
+    if (
+      text.includes('from org_provider_api_key')
+      && text.includes('provider_id = $2')
+      && text.includes('limit 1')
+    ) {
+      const organizationId = String(values[0])
+      const providerId = String(values[1])
+      const row = rows.get(rowKey(organizationId, providerId))
+      return {
+        rows: row
+          ? [
+              {
+                providerId: row.providerId,
+                ciphertext: row.ciphertext,
+                iv: row.iv,
+                authTag: row.authTag,
+                keyVersion: row.keyVersion,
+              },
+            ]
+          : [],
+      } as { rows: T[] }
+    }
+
+    if (
+      text.includes('select provider_id as "providerId"')
+      && text.includes('where organization_id = $1')
+    ) {
+      const organizationId = String(values[0])
+      const providerRows = [...rows.values()]
+        .filter((row) => row.organizationId === organizationId)
+        .map((row) => ({ providerId: row.providerId }))
+      return { rows: providerRows as T[] }
+    }
+
+    if (text.includes('delete from org_provider_api_key')) {
+      const organizationId = String(values[0])
+      const providerId = String(values[1])
+      rows.delete(rowKey(organizationId, providerId))
+      return { rows: [] as T[] }
+    }
+
+    throw new Error(`Unexpected query: ${text}`)
+  }
+
+  class MockPoolClient {
+    query<T = unknown>(
+      textOrConfig: string | { text: string; values?: readonly unknown[] },
+      valuesOrCallback?:
+        | readonly unknown[]
+        | ((error: Error | null, result?: { rows: T[] }) => void),
+      callback?: (error: Error | null, result?: { rows: T[] }) => void,
+    ) {
+      const text =
+        typeof textOrConfig === 'string' ? textOrConfig : textOrConfig.text
+      const values = Array.isArray(valuesOrCallback)
+        ? valuesOrCallback
+        : (textOrConfig as { values?: readonly unknown[] }).values ?? []
+      const done =
+        typeof valuesOrCallback === 'function' ? valuesOrCallback : callback
+
+      const promise = executeQuery<T>(text, values)
+
+      if (done) {
+        void promise.then(
+          (result) => done(null, result),
+          (error) => done(error instanceof Error ? error : new Error(String(error))),
+        )
+        return
+      }
+
+      return promise
+    }
+
+    once() {
+      return this
+    }
+
+    on() {
+      return this
+    }
+
+    off() {
+      return this
+    }
+
+    release() {
+      return
+    }
+  }
+
   class MockPool {
-    async query<T = unknown>(text: string, values: readonly unknown[] = []) {
-      if (text.includes('insert into org_provider_api_key')) {
-        const organizationId = String(values[1])
-        const providerId = String(values[2]) as 'openai' | 'anthropic'
-        rows.set(rowKey(organizationId, providerId), {
-          organizationId,
-          providerId,
-          ciphertext: String(values[3]),
-          iv: String(values[4]),
-          authTag: String(values[5]),
-          keyVersion: Number(values[6]),
-        })
-        return { rows: [] as T[] }
+    readonly options = {
+      connectionString: process.env.ZERO_UPSTREAM_DB,
+      host: 'example.local',
+      port: 5432,
+      database: 'rift',
+      user: 'test-user',
+      application_name: 'vitest',
+      types: undefined,
+    }
+
+    query<T = unknown>(
+      text: string,
+      values: readonly unknown[] = [],
+      callback?: (error: Error | null, result?: { rows: T[] }) => void,
+    ) {
+      const promise = executeQuery<T>(text, values)
+
+      if (callback) {
+        void promise.then(
+          (result) => callback(null, result),
+          (error) =>
+            callback(error instanceof Error ? error : new Error(String(error))),
+        )
+        return
       }
 
-      if (
-        text.includes('from org_provider_api_key')
-        && text.includes('provider_id = $2')
-        && text.includes('limit 1')
-      ) {
-        const organizationId = String(values[0])
-        const providerId = String(values[1])
-        const row = rows.get(rowKey(organizationId, providerId))
-        return {
-          rows: row
-            ? [
-                {
-                  providerId: row.providerId,
-                  ciphertext: row.ciphertext,
-                  iv: row.iv,
-                  authTag: row.authTag,
-                  keyVersion: row.keyVersion,
-                },
-              ]
-            : [],
-        } as { rows: T[] }
-      }
+      return promise
+    }
 
-      if (
-        text.includes('select provider_id as "providerId"')
-        && text.includes('where organization_id = $1')
-      ) {
-        const organizationId = String(values[0])
-        const providerRows = [...rows.values()]
-          .filter((row) => row.organizationId === organizationId)
-          .map((row) => ({ providerId: row.providerId }))
-        return { rows: providerRows as T[] }
-      }
-
-      if (text.includes('delete from org_provider_api_key')) {
-        const organizationId = String(values[0])
-        const providerId = String(values[1])
-        rows.delete(rowKey(organizationId, providerId))
-        return { rows: [] as T[] }
-      }
-
-      throw new Error(`Unexpected query: ${text}`)
+    connect(
+      callback: (
+        error: Error | null,
+        client?: MockPoolClient,
+        release?: (error?: Error) => void,
+      ) => void,
+    ) {
+      const client = new MockPoolClient()
+      callback(null, client, () => undefined)
     }
 
     async end() {

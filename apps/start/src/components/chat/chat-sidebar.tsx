@@ -412,7 +412,7 @@ function ChatSidebarHistory({
   const [optimisticThreads, setOptimisticThreads] = useState<
     readonly OptimisticThread[]
   >([])
-  const [historyRevision, setHistoryRevision] = useState(0)
+  const [historyRevision] = useState(0)
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
   const [contextMenuResetToken, setContextMenuResetToken] = useState(0)

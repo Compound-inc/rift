@@ -4,7 +4,8 @@ import { Effect } from 'effect'
 const mockGetRequestHeaders = vi.fn(() => new Headers())
 const mockRequireOrgAuth = vi.fn()
 const mockRunUpdateByok = vi.fn()
-const mockAuthPoolQuery = vi.fn()
+const mockRunAuthSqlEffect = vi.fn((effect: Promise<unknown>) => effect)
+const mockReadOrganizationMemberRoleEffect = vi.fn()
 
 vi.mock('@tanstack/react-start/server', () => ({
   getRequestHeaders: mockGetRequestHeaders,
@@ -18,10 +19,9 @@ vi.mock('@/lib/backend/byok/byok-runner', () => ({
   runUpdateByok: mockRunUpdateByok,
 }))
 
-vi.mock('@/lib/backend/auth/auth-pool', () => ({
-  authPool: {
-    query: mockAuthPoolQuery,
-  },
+vi.mock('@/lib/backend/auth/auth-sql.server', () => ({
+  runAuthSqlEffect: mockRunAuthSqlEffect,
+  readOrganizationMemberRoleEffect: mockReadOrganizationMemberRoleEffect,
 }))
 
 describe('updateByokAction', () => {
@@ -30,10 +30,10 @@ describe('updateByokAction', () => {
     mockGetRequestHeaders.mockReturnValue(new Headers())
     mockRequireOrgAuth.mockReset()
     mockRunUpdateByok.mockReset()
-    mockAuthPoolQuery.mockReset()
-    mockAuthPoolQuery.mockResolvedValue({
-      rows: [{ role: 'admin' }],
-    })
+    mockRunAuthSqlEffect.mockReset()
+    mockRunAuthSqlEffect.mockImplementation((effect: Promise<unknown>) => effect)
+    mockReadOrganizationMemberRoleEffect.mockReset()
+    mockReadOrganizationMemberRoleEffect.mockResolvedValue('admin')
   })
 
   it('fails when org auth is missing', async () => {
@@ -108,10 +108,10 @@ describe('updateByokAction', () => {
         apiKey: 'sk-valid',
       },
     })
-    expect(mockAuthPoolQuery).toHaveBeenCalledWith(
-      expect.stringContaining('from member'),
-      ['org-123', 'user-1'],
-    )
+    expect(mockReadOrganizationMemberRoleEffect).toHaveBeenCalledWith({
+      organizationId: 'org-123',
+      userId: 'user-1',
+    })
     expect(result).toEqual({
       providerKeyStatus: {
         openai: true,
@@ -131,9 +131,7 @@ describe('updateByokAction', () => {
         isAnonymous: false,
       }),
     )
-    mockAuthPoolQuery.mockResolvedValue({
-      rows: [{ role: 'member' }],
-    })
+    mockReadOrganizationMemberRoleEffect.mockResolvedValue('member')
 
     await expect(
       updateByokAction({

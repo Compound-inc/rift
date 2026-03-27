@@ -6,7 +6,10 @@ import {
   ByokMissingOrgContextError,
   ByokUnauthorizedError,
 } from '@/lib/backend/byok/domain/errors'
-import { authPool } from '@/lib/backend/auth/auth-pool'
+import {
+  readOrganizationMemberRoleEffect,
+  runAuthSqlEffect,
+} from '@/lib/backend/auth/auth-sql.server'
 import { requireOrgAuth } from '@/lib/backend/server-effect/http/server-auth'
 import { isAdminRole } from '@/lib/shared/auth/roles'
 
@@ -31,16 +34,12 @@ export async function updateByokAction(input: {
     }),
   )
 
-  const memberResult = await authPool.query<{ role: string }>(
-    `select role
-     from member
-     where "organizationId" = $1
-       and "userId" = $2
-     limit 1`,
-    [authContext.organizationId, authContext.userId],
+  const role = await runAuthSqlEffect(
+    readOrganizationMemberRoleEffect({
+      organizationId: authContext.organizationId,
+      userId: authContext.userId,
+    }),
   )
-
-  const role = memberResult.rows[0]?.role
   if (!role || !isAdminRole(role)) {
     throw new ByokForbiddenError({
       message: 'Only workspace owners or admins can manage BYOK keys.',

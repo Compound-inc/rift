@@ -1,18 +1,27 @@
+import { Effect } from 'effect'
 import type { Subscription as BetterAuthStripeSubscription } from '@better-auth/stripe'
 import type Stripe from 'stripe'
 import { WorkspaceBillingSeatLimitExceededError } from '../domain/errors'
-import { recomputeEntitlementSnapshotRecord } from '../services/workspace-billing/entitlement'
+import { runBillingSqlEffect } from '../services/sql'
+import { recomputeEntitlementSnapshotEffect } from '../services/workspace-billing/entitlement'
 import {
-  readCurrentOrgSubscription,
-  readOrganizationMemberCounts,
+  readCurrentOrgSubscriptionEffect,
+  readOrganizationMemberCountsEffect,
 } from '../services/workspace-billing/persistence'
-import { markWorkspaceSubscriptionCanceledRecord, syncWorkspaceSubscriptionRecord } from '../services/workspace-billing/subscription-sync'
+import {
+  markWorkspaceSubscriptionCanceledRecordEffect,
+  syncWorkspaceSubscriptionRecordEffect,
+} from '../services/workspace-billing/subscription-sync'
 import type { OrgSeatAvailability } from '../services/workspace-billing/types'
 
 export async function recomputeOrgEntitlementSnapshot(
   organizationId: string,
 ): Promise<OrgSeatAvailability> {
-  return recomputeEntitlementSnapshotRecord(organizationId)
+  return runBillingSqlEffect(
+    recomputeEntitlementSnapshotEffect({
+      organizationId,
+    }),
+  )
 }
 
 /**
@@ -24,7 +33,7 @@ export async function syncWorkspaceSubscriptionFromAuth(input: {
   stripeSubscription?: Stripe.Subscription
   billingProvider?: 'stripe' | 'manual'
 }): Promise<void> {
-  await syncWorkspaceSubscriptionRecord(input)
+  await runBillingSqlEffect(syncWorkspaceSubscriptionRecordEffect(input))
 }
 
 /**
@@ -38,9 +47,11 @@ export async function markWorkspaceSubscriptionCanceledFromAuth(input: {
   status: BetterAuthStripeSubscription['status']
   cancelAtPeriodEnd?: boolean
 }): Promise<void> {
-  await markWorkspaceSubscriptionCanceledRecord({
-    subscription: input,
-  })
+  await runBillingSqlEffect(
+    markWorkspaceSubscriptionCanceledRecordEffect({
+      subscription: input,
+    }),
+  )
 }
 
 /**
@@ -50,7 +61,11 @@ export async function markWorkspaceSubscriptionCanceledFromAuth(input: {
 export async function getOrganizationSeatLimit(
   organizationId: string,
 ): Promise<number> {
-  const snapshot = await recomputeEntitlementSnapshotRecord(organizationId)
+  const snapshot = await runBillingSqlEffect(
+    recomputeEntitlementSnapshotEffect({
+      organizationId,
+    }),
+  )
   return snapshot.seatCount
 }
 
@@ -62,16 +77,26 @@ export async function assertInvitationCapacity(input: {
   organizationId: string
   inviteCount: number
 }): Promise<void> {
-  const counts = await readOrganizationMemberCounts(input.organizationId)
-  const currentSubscription = await readCurrentOrgSubscription(input.organizationId)
-  const seatCount = Math.max(1, currentSubscription?.seatCount ?? 1)
-  const reservedSeats = counts.activeMemberCount + counts.pendingInvitationCount
+  await runBillingSqlEffect(
+    Effect.gen(function* () {
+      const counts = yield* readOrganizationMemberCountsEffect({
+        organizationId: input.organizationId,
+      })
+      const currentSubscription = yield* readCurrentOrgSubscriptionEffect({
+        organizationId: input.organizationId,
+      })
+      const seatCount = Math.max(1, currentSubscription?.seatCount ?? 1)
+      const reservedSeats = counts.activeMemberCount + counts.pendingInvitationCount
 
-  if (reservedSeats + input.inviteCount > seatCount) {
-    throw new WorkspaceBillingSeatLimitExceededError({
-      message: `This workspace only has ${seatCount} seat${seatCount === 1 ? '' : 's'} available. Remove pending invites or upgrade seats before inviting more members.`,
-      organizationId: input.organizationId,
-      seatCount,
-    })
-  }
+      if (reservedSeats + input.inviteCount > seatCount) {
+        return yield* Effect.fail(
+          new WorkspaceBillingSeatLimitExceededError({
+            message: `This workspace only has ${seatCount} seat${seatCount === 1 ? '' : 's'} available. Remove pending invites or upgrade seats before inviting more members.`,
+            organizationId: input.organizationId,
+            seatCount,
+          }),
+        )
+      }
+    }),
+  )
 }

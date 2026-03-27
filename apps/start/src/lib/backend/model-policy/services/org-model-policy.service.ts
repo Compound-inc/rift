@@ -60,6 +60,7 @@ export type OrgModelPolicyPayload = {
     readonly disabledProviderIds: readonly string[]
     readonly disabledModelIds: readonly string[]
     readonly complianceFlags: Readonly<Record<string, boolean>>
+    readonly orgKnowledgeEnabled: boolean
     readonly toolPolicy: {
       readonly providerNativeToolsEnabled: boolean
       readonly externalToolsEnabled: boolean

@@ -1,4 +1,7 @@
-import { authPool } from './auth-pool'
+import {
+  readIsOrganizationMemberEffect,
+  runAuthSqlEffect,
+} from './auth-sql.server'
 
 export async function isOrgAdmin(input: {
   headers: Headers
@@ -39,15 +42,10 @@ export async function isOrgMember(input: {
     return false
   }
 
-  const result = await authPool.query<{ isMember: boolean }>(
-    `select exists (
-       select 1
-       from member
-       where "organizationId" = $1
-         and "userId" = $2
-     ) as "isMember"`,
-    [organizationId, userId],
+  return runAuthSqlEffect(
+    readIsOrganizationMemberEffect({
+      organizationId,
+      userId,
+    }),
   )
-
-  return Boolean(result.rows[0]?.isMember)
 }

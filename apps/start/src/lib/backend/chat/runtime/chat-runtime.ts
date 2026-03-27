@@ -6,6 +6,7 @@ import {
   WorkspaceUsageSettlementService,
 } from '@/lib/backend/billing/services/workspace-usage-settlement.service'
 import { makeRuntimeRunner } from '@/lib/backend/server-effect'
+import { UpstreamPostgresLayer } from '@/lib/backend/server-effect/services/upstream-postgres.service'
 import { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
 import { OrgKnowledgeRepositoryService } from '@/lib/backend/org-knowledge/services/org-knowledge-repository.service'
 import { isRedisDisabled } from '@/utils/app-feature-flags'
@@ -55,6 +56,7 @@ const dependencyLayer = Layer.mergeAll(
   WorkspaceUsageSettlementService.layer,
 ).pipe(
   // Provide shared infra dependencies into service layers that require them.
+  Layer.provideMerge(UpstreamPostgresLayer),
   Layer.provideMerge(ZeroDatabaseService.layer),
   Layer.provideMerge(AttachmentRagService.layer),
   Layer.provideMerge(OrgKnowledgeRagService.layer),

@@ -19,6 +19,10 @@ function toMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Request failed'
 }
 
+function toOrgKnowledgeStatus(value: unknown): OrgKnowledgeListItem['status'] {
+  return value === 'deleted' || value === 'uploaded' ? value : undefined
+}
+
 function normalizeItems(rows: readonly unknown[]): readonly OrgKnowledgeListItem[] {
   return rows
     .filter((row): row is Record<string, unknown> => !!row && typeof row === 'object')
@@ -27,10 +31,7 @@ function normalizeItems(rows: readonly unknown[]): readonly OrgKnowledgeListItem
       fileName: typeof row.fileName === 'string' ? row.fileName : 'Untitled file',
       mimeType: typeof row.mimeType === 'string' ? row.mimeType : 'application/octet-stream',
       fileSize: typeof row.fileSize === 'number' ? row.fileSize : 0,
-      status:
-        row.status === 'deleted' || row.status === 'uploaded'
-          ? row.status
-          : undefined,
+      status: toOrgKnowledgeStatus(row.status),
       orgKnowledgeActive:
         typeof row.orgKnowledgeActive === 'boolean'
           ? row.orgKnowledgeActive

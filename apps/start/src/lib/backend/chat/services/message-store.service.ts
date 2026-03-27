@@ -1,3 +1,4 @@
+import { PgClient } from '@effect/sql-pg'
 import type { UIMessage } from 'ai'
 import type { ReadonlyJSONValue } from '@rocicorp/zero'
 import { Effect, Layer, ServiceMap } from 'effect'
@@ -10,9 +11,7 @@ import type {
   InvalidEditTargetError,
   InvalidRequestError,
 } from '@/lib/backend/chat/domain/errors'
-import {
-  MessagePersistenceError,
-} from '@/lib/backend/chat/domain/errors'
+import { MessagePersistenceError } from '@/lib/backend/chat/domain/errors'
 import { OrgKnowledgeRepositoryService } from '@/lib/backend/org-knowledge/services/org-knowledge-repository.service'
 import type { IncomingUserMessage } from '@/lib/backend/chat/domain/schemas'
 import { getMemoryState } from '@/lib/backend/chat/infra/memory/state'
@@ -118,31 +117,34 @@ export class MessageStoreService extends ServiceMap.Service<
 >()('chat-backend/MessageStoreService') {
   /** Production message store implementation. */
   static readonly layer = Layer.effect(
-  MessageStoreService,
-  Effect.gen(function* () {
-    const attachmentRecord = yield* AttachmentRecordService
-    const attachmentRag = yield* AttachmentRagService
-    const orgKnowledgeRag = yield* OrgKnowledgeRagService
-    const orgKnowledgeRepository = yield* OrgKnowledgeRepositoryService
-    const zeroDatabase = yield* ZeroDatabaseService
+    MessageStoreService,
+    Effect.gen(function* () {
+      const attachmentRecord = yield* AttachmentRecordService
+      const attachmentRag = yield* AttachmentRagService
+      const orgKnowledgeRag = yield* OrgKnowledgeRagService
+      const orgKnowledgeRepository = yield* OrgKnowledgeRepositoryService
+      const sql = yield* PgClient.PgClient
+      const zeroDatabase = yield* ZeroDatabaseService
 
-    return {
-      loadThreadMessages: makeLoadThreadMessagesOperation({
-        zeroDatabase,
-        attachmentRecord,
-        attachmentRag,
-        orgKnowledgeRag,
-        orgKnowledgeRepository,
-      }),
-      appendUserMessage: makeAppendUserMessageOperation({
-        zeroDatabase,
-        attachmentRag,
-      }),
-      prepareRegeneration: makePrepareRegenerationOperation({ zeroDatabase }),
-      prepareEdit: makePrepareEditOperation({ zeroDatabase }),
-      finalizeAssistantMessage: makeFinalizeAssistantMessageOperation(),
-    }
-  }),
+      return {
+        loadThreadMessages: makeLoadThreadMessagesOperation({
+          zeroDatabase,
+          attachmentRecord,
+          attachmentRag,
+          orgKnowledgeRag,
+          orgKnowledgeRepository,
+        }),
+        appendUserMessage: makeAppendUserMessageOperation({
+          zeroDatabase,
+          attachmentRag,
+        }),
+        prepareRegeneration: makePrepareRegenerationOperation({ zeroDatabase }),
+        prepareEdit: makePrepareEditOperation({ zeroDatabase }),
+        finalizeAssistantMessage: makeFinalizeAssistantMessageOperation({
+          sql,
+        }),
+      }
+    }),
   )
 
   /** Test-only adapter retained for deterministic unit tests. */

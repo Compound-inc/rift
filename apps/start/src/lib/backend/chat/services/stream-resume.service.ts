@@ -283,21 +283,29 @@ class StreamResumeRuntimeService extends ServiceMap.Service<
         catch: (error) => error,
       }),
       (runtime) =>
-        Effect.promise(async () => {
-          runtime.localHandles.clear()
-          for (const local of runtime.localStreams.values()) {
-            closeLocalLiveStream(local)
-          }
-          runtime.localStreams.clear()
-          const closers: Promise<unknown>[] = []
-          if (runtime.subscriber.isOpen) {
-            closers.push(runtime.subscriber.quit())
-          }
-          if (runtime.publisher.isOpen) {
-            closers.push(runtime.publisher.quit())
-          }
-          await Promise.allSettled(closers)
-        }),
+        Effect.tryPromise({
+          /**
+           * Shutdown should never fail the layer release path. We still await
+           * Redis client quits so the process does not leak sockets, but any
+           * close error is reduced to the release boundary and then dropped.
+           */
+          try: async () => {
+            runtime.localHandles.clear()
+            for (const local of runtime.localStreams.values()) {
+              closeLocalLiveStream(local)
+            }
+            runtime.localStreams.clear()
+            const closers: Promise<unknown>[] = []
+            if (runtime.subscriber.isOpen) {
+              closers.push(runtime.subscriber.quit())
+            }
+            if (runtime.publisher.isOpen) {
+              closers.push(runtime.publisher.quit())
+            }
+            await Promise.allSettled(closers)
+          },
+          catch: (error) => error,
+        }).pipe(Effect.orDie),
     ),
   )
 }
@@ -458,119 +466,118 @@ export class StreamResumeService extends ServiceMap.Service<
 
       const persistSseStream = Effect.fn(
         'StreamResumeService.persistSseStream',
-      )(
-        ({
-          streamId,
-          requestId,
-          stream,
-          onPhaseChange,
-        }: {
-          readonly streamId: string
-          readonly requestId: string
-          readonly stream: ReadableStream<string>
-          readonly onPhaseChange?: (phase: string) => void
-        }) => {
-          let currentPhase = 'initializing'
-          return Effect.tryPromise({
-            try: async () => {
-              const setPhase = (phase: string) => {
-                currentPhase = phase
-                onPhaseChange?.(phase)
-              }
+      )(({
+        streamId,
+        requestId,
+        stream,
+        onPhaseChange,
+      }: {
+        readonly streamId: string
+        readonly requestId: string
+        readonly stream: ReadableStream<string>
+        readonly onPhaseChange?: (phase: string) => void
+      }) => {
+        let currentPhase = 'initializing'
+        return Effect.tryPromise({
+          try: async () => {
+            const setPhase = (phase: string) => {
+              currentPhase = phase
+              onPhaseChange?.(phase)
+            }
 
-              setPhase('batch_sse_stream')
-              const batchedStream = batchSseStream(stream, {
-                maxChars: RESUME_BATCH_MAX_CHARS,
-                maxDelayMs: RESUME_BATCH_MAX_DELAY_MS,
-              })
-              const [redisStream, localStream] = batchedStream.tee()
+            setPhase('batch_sse_stream')
+            const batchedStream = batchSseStream(stream, {
+              maxChars: RESUME_BATCH_MAX_CHARS,
+              maxDelayMs: RESUME_BATCH_MAX_DELAY_MS,
+            })
+            const [redisStream, localStream] = batchedStream.tee()
 
-              const local = runtime.localStreams.get(streamId)
-              if (local) {
-                setPhase('mirror_local_stream')
-                void (async () => {
-                  const localReader = localStream.getReader()
-                  try {
-                    for (;;) {
-                      const { done, value } = await localReader.read()
-                      if (done) break
-                      if (local.released) {
-                        await localReader.cancel()
-                        break
-                      }
-                      pushLocalReplayChunk(local, value)
-                      for (const listener of Array.from(local.listeners)) {
-                        try {
-                          listener.enqueue(value)
-                        } catch {
-                          local.listeners.delete(listener)
-                        }
-                      }
-                    }
-                  } catch {
-                    if (!local.released) {
-                      for (const listener of Array.from(local.listeners)) {
-                        try {
-                          listener.error(
-                            new Error('Local replay stream failed unexpectedly'),
-                          )
-                        } catch {
-                          // ignore
-                        }
-                      }
-                    }
-                  } finally {
-                    local.done = true
+            const local = runtime.localStreams.get(streamId)
+            if (local) {
+              setPhase('mirror_local_stream')
+              void (async () => {
+                const localReader = localStream.getReader()
+                try {
+                  for (;;) {
+                    const { done, value } = await localReader.read()
+                    if (done) break
                     if (local.released) {
-                      local.bufferedChars = 0
-                      local.chunks.length = 0
-                    } else {
-                      for (const listener of Array.from(local.listeners)) {
-                        try {
-                          listener.close()
-                        } catch {
-                          // ignore
-                        }
-                      }
-                      local.listeners.clear()
+                      await localReader.cancel()
+                      break
                     }
-                    localReader.releaseLock()
+                    pushLocalReplayChunk(local, value)
+                    for (const listener of Array.from(local.listeners)) {
+                      try {
+                        listener.enqueue(value)
+                      } catch {
+                        local.listeners.delete(listener)
+                      }
+                    }
                   }
-                })().catch(() => undefined)
-              }
-
-              setPhase('create_resumable_stream')
-              const resumableStream =
-                await runtime.streamContext.createNewResumableStream(
-                  streamId,
-                  () => redisStream,
-                )
-
-              if (!resumableStream) return
-
-              // Drain the internal stream so the resumable context never stalls on backpressure.
-              setPhase('drain_resumable_stream')
-              const reader = resumableStream.getReader()
-              try {
-                for (;;) {
-                  const { done } = await reader.read()
-                  if (done) break
+                } catch {
+                  if (!local.released) {
+                    for (const listener of Array.from(local.listeners)) {
+                      try {
+                        listener.error(
+                          new Error('Local replay stream failed unexpectedly'),
+                        )
+                      } catch {
+                        // ignore
+                      }
+                    }
+                  }
+                } finally {
+                  local.done = true
+                  if (local.released) {
+                    local.bufferedChars = 0
+                    local.chunks.length = 0
+                  } else {
+                    for (const listener of Array.from(local.listeners)) {
+                      try {
+                        listener.close()
+                      } catch {
+                        // ignore
+                      }
+                    }
+                    local.listeners.clear()
+                  }
+                  localReader.releaseLock()
                 }
-              } finally {
-                reader.releaseLock()
-              }
+              })().catch(() => undefined)
+            }
 
-              setPhase('completed')
-            },
-            catch: (error) =>
-              toProtocolError({
-                requestId,
-                message: 'Failed to persist resumable stream during detached persistence',
-                error: `phase=${currentPhase}; ${String(error)}`,
-              }),
-          })
-        },
-      )
+            setPhase('create_resumable_stream')
+            const resumableStream =
+              await runtime.streamContext.createNewResumableStream(
+                streamId,
+                () => redisStream,
+              )
+
+            if (!resumableStream) return
+
+            // Drain the internal stream so the resumable context never stalls on backpressure.
+            setPhase('drain_resumable_stream')
+            const reader = resumableStream.getReader()
+            try {
+              for (;;) {
+                const { done } = await reader.read()
+                if (done) break
+              }
+            } finally {
+              reader.releaseLock()
+            }
+
+            setPhase('completed')
+          },
+          catch: (error) =>
+            toProtocolError({
+              requestId,
+              message:
+                'Failed to persist resumable stream during detached persistence',
+              error: `phase=${currentPhase}; ${String(error)}`,
+            }),
+        })
+      })
 
       const resumeStream = Effect.fn('StreamResumeService.resumeStream')(
         ({
@@ -793,9 +800,9 @@ export class StreamResumeService extends ServiceMap.Service<
     registerActiveStream: Effect.fn(
       'StreamResumeService.registerActiveStreamDisabled',
     )(() => Effect.void),
-    persistSseStream: Effect.fn(
-      'StreamResumeService.persistSseStreamDisabled',
-    )(() => Effect.void),
+    persistSseStream: Effect.fn('StreamResumeService.persistSseStreamDisabled')(
+      () => Effect.void,
+    ),
     resumeStream: Effect.fn('StreamResumeService.resumeStreamDisabled')(() =>
       Effect.succeed(null),
     ),

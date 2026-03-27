@@ -1,24 +1,15 @@
 import { normalizeEmailAddress } from '@/components/auth/auth-shared'
-import { authPool } from './auth-pool'
-
-type InvitationLookupRow = {
-  email: string
-  status: string
-  expiresAt: Date | string | null
-}
+import {
+  readInvitationLookupByIdEffect,
+  runAuthSqlEffect,
+} from './auth-sql.server'
 
 export async function getInvitationEmailById(
   invitationId: string,
 ): Promise<string | null> {
-  const result = await authPool.query<InvitationLookupRow>(
-    `select email, status, "expiresAt"
-     from invitation
-     where id = $1
-     limit 1`,
-    [invitationId],
+  const invitation = await runAuthSqlEffect(
+    readInvitationLookupByIdEffect(invitationId),
   )
-
-  const invitation = result.rows[0]
 
   if (!invitation) {
     return null

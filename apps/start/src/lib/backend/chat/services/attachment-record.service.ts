@@ -1,3 +1,4 @@
+import { PgClient } from '@effect/sql-pg'
 import { Effect, Layer, ServiceMap } from 'effect'
 import type {
   AttachmentContentRow,
@@ -5,9 +6,9 @@ import type {
   OrgKnowledgeAttachmentRecord,
 } from '@/lib/backend/chat/infra/attachment-records'
 import {
-  getOrgKnowledgeAttachmentRecord as loadOrgKnowledgeAttachmentRecord,
-  insertAttachmentRecord as persistAttachmentRecord,
-  listAttachmentContentRowsByThread as loadAttachmentContentRowsByThread,
+  getOrgKnowledgeAttachmentRecordEffect,
+  insertAttachmentRecordEffect,
+  listAttachmentContentRowsByThreadEffect,
 } from '@/lib/backend/chat/infra/attachment-records'
 
 export type AttachmentRecordServiceShape = {
@@ -31,33 +32,36 @@ export class AttachmentRecordService extends ServiceMap.Service<
   AttachmentRecordService,
   AttachmentRecordServiceShape
 >()('chat-backend/AttachmentRecordService') {
-  static readonly layer = Layer.succeed(this, {
-    insertAttachmentRecord: Effect.fn(
-      'AttachmentRecordService.insertAttachmentRecord',
-    )((input: AttachmentPersistenceRow) =>
-      Effect.tryPromise({
-        try: () => persistAttachmentRecord(input),
-        catch: (error) => error,
-      }),
-    ),
-    listAttachmentContentRowsByThread: Effect.fn(
-      'AttachmentRecordService.listAttachmentContentRowsByThread',
-    )((threadId: string) =>
-      Effect.tryPromise({
-        try: () => loadAttachmentContentRowsByThread(threadId),
-        catch: (error) => error,
-      }),
-    ),
-    getOrgKnowledgeAttachmentRecord: Effect.fn(
-      'AttachmentRecordService.getOrgKnowledgeAttachmentRecord',
-    )(({ organizationId, attachmentId }: {
-      readonly organizationId: string
-      readonly attachmentId: string
-    }) =>
-      Effect.tryPromise({
-        try: () => loadOrgKnowledgeAttachmentRecord(organizationId, attachmentId),
-        catch: (error) => error,
-      }),
-    ),
-  })
+  static readonly layer = Layer.effect(
+    this,
+    Effect.gen(function* () {
+      const client = yield* PgClient.PgClient
+      const provideUpstream = <TValue, TError>(
+        effect: Effect.Effect<TValue, TError, PgClient.PgClient>,
+      ): Effect.Effect<TValue, TError> =>
+        Effect.provideService(effect, PgClient.PgClient, client)
+
+      return {
+        insertAttachmentRecord: Effect.fn(
+          'AttachmentRecordService.insertAttachmentRecord',
+        )((input: AttachmentPersistenceRow) =>
+          provideUpstream(insertAttachmentRecordEffect(input)),
+        ),
+        listAttachmentContentRowsByThread: Effect.fn(
+          'AttachmentRecordService.listAttachmentContentRowsByThread',
+        )((threadId: string) =>
+          provideUpstream(listAttachmentContentRowsByThreadEffect(threadId)),
+        ),
+        getOrgKnowledgeAttachmentRecord: Effect.fn(
+          'AttachmentRecordService.getOrgKnowledgeAttachmentRecord',
+        )(({ organizationId, attachmentId }: {
+          readonly organizationId: string
+          readonly attachmentId: string
+        }) =>
+          provideUpstream(
+            getOrgKnowledgeAttachmentRecordEffect(organizationId, attachmentId),
+          )),
+      }
+    }),
+  )
 }

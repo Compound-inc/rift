@@ -1,46 +1,59 @@
-import { authPool } from '@/lib/backend/auth/auth-pool'
+import { PgClient } from '@effect/sql-pg'
+import { Effect } from 'effect'
 import {
-  ensureCurrentCycleSeatScaffolding,
-  readCurrentUsageSubscription,
-  resolveEffectiveUsagePolicyRecord,
+  ensureCurrentCycleSeatScaffoldingEffect,
+  readCurrentUsageSubscriptionEffect,
+  resolveEffectiveUsagePolicyRecordEffect,
 } from './policy-store'
 import { ensureSeatAssignmentWithClient } from './seat-store'
 import type { SeatQuotaState } from './types'
+import { runBillingSqlEffect } from '../sql'
+
+export const ensureSeatAssignmentRecordEffect = Effect.fn(
+  'WorkspaceUsageSeatAssignment.ensureSeatAssignmentRecord',
+)(
+  (input: {
+    readonly organizationId: string
+    readonly userId: string
+  }): Effect.Effect<SeatQuotaState | null, unknown, PgClient.PgClient> =>
+    Effect.gen(function* () {
+      const sql = yield* PgClient.PgClient
+      const now = Date.now()
+
+      return yield* sql.withTransaction(
+        Effect.gen(function* () {
+          const currentSubscription = yield* readCurrentUsageSubscriptionEffect(
+            sql,
+            input.organizationId,
+          )
+          const usagePolicy = yield* resolveEffectiveUsagePolicyRecordEffect({
+            organizationId: input.organizationId,
+            currentSubscription,
+            client: sql,
+          })
+
+          yield* ensureCurrentCycleSeatScaffoldingEffect(sql, {
+            organizationId: input.organizationId,
+            currentSubscription,
+            usagePolicy,
+            now,
+          })
+
+          return yield* ensureSeatAssignmentWithClient(sql, {
+            organizationId: input.organizationId,
+            userId: input.userId,
+            currentSubscription,
+            usagePolicy,
+            now,
+          })
+        }),
+      )
+    }),
+)
 
 export async function ensureSeatAssignmentRecord(input: {
   readonly organizationId: string
   readonly userId: string
 }): Promise<SeatQuotaState | null> {
-  const client = await authPool.connect()
-  const now = Date.now()
-
-  try {
-    await client.query('BEGIN')
-    const currentSubscription = await readCurrentUsageSubscription(client, input.organizationId)
-    const usagePolicy = await resolveEffectiveUsagePolicyRecord({
-      organizationId: input.organizationId,
-      currentSubscription,
-      client,
-    })
-    await ensureCurrentCycleSeatScaffolding(client, {
-      organizationId: input.organizationId,
-      currentSubscription,
-      usagePolicy,
-      now,
-    })
-    const assigned = await ensureSeatAssignmentWithClient(client, {
-      organizationId: input.organizationId,
-      userId: input.userId,
-      currentSubscription,
-      usagePolicy,
-      now,
-    })
-    await client.query('COMMIT')
-    return assigned
-  } catch (error) {
-    await client.query('ROLLBACK')
-    throw error
-  } finally {
-    client.release()
-  }
+  return runBillingSqlEffect(ensureSeatAssignmentRecordEffect(input))
 }

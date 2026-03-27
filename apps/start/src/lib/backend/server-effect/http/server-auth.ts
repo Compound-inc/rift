@@ -17,10 +17,13 @@ export const getServerAuthContext = Effect.fn(
   'ServerAuth.getServerAuthContext',
 )(
   () =>
-    Effect.promise(async () => {
-      const headers = new Headers()
-      return extractServerAuthContext(await getSessionFromHeaders(headers))
-    }),
+    Effect.tryPromise({
+      try: async () => {
+        const headers = new Headers()
+        return extractServerAuthContext(await getSessionFromHeaders(headers))
+      },
+      catch: (error) => error,
+    }).pipe(Effect.orDie),
 )
 
 /**
@@ -29,9 +32,10 @@ export const getServerAuthContext = Effect.fn(
 export const getServerAuthContextFromHeaders = Effect.fn(
   'ServerAuth.getServerAuthContextFromHeaders',
 )((headers: Headers) =>
-  Effect.promise(async () =>
-    extractServerAuthContext(await getSessionFromHeaders(headers)),
-  ),
+  Effect.tryPromise({
+    try: () => getSessionFromHeaders(headers).then(extractServerAuthContext),
+    catch: (error) => error,
+  }).pipe(Effect.orDie),
 )
 
 /**

@@ -1,13 +1,15 @@
+import { PgClient } from '@effect/sql-pg'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { Effect } from 'effect'
+import { Effect, Layer } from 'effect'
 import { SingularityAdminService } from './singularity-admin.service'
 import { SingularityValidationError } from '../domain/errors'
 
 const mocks = vi.hoisted(() => ({
-  authPoolQueryMock: vi.fn(),
-  authPoolConnectMock: vi.fn(),
-  clientQueryMock: vi.fn(),
-  clientReleaseMock: vi.fn(),
+  readOrganizationMemberRoleMock: vi.fn(),
+  readOrganizationExistsMock: vi.fn(),
+  listOrganizationsMock: vi.fn(),
+  getOrganizationProfileMock: vi.fn(),
+  withBillingTransactionMock: vi.fn(),
   ensureOrganizationBillingBaselineMock: vi.fn(),
   readCurrentOrgSubscriptionMock: vi.fn(),
   readOrganizationMemberCountsMock: vi.fn(),
@@ -23,30 +25,118 @@ const mocks = vi.hoisted(() => ({
   cancelInvitationMock: vi.fn(),
 }))
 
-vi.mock('@/lib/backend/auth/auth-pool', () => ({
-  authPool: {
-    query: mocks.authPoolQueryMock,
-    connect: mocks.authPoolConnectMock,
-  },
+vi.mock('./singularity-admin/queries', () => ({
+  listOrganizationsEffect: () =>
+    Effect.tryPromise({
+      try: () => Promise.resolve(mocks.listOrganizationsMock()),
+      catch: (cause) => cause,
+    }),
+  getOrganizationProfileEffect: (input: { organizationId: string }) =>
+    Effect.tryPromise({
+      try: () => Promise.resolve(mocks.getOrganizationProfileMock(input)),
+      catch: (cause) => cause,
+    }),
+  readOrganizationMemberRoleEffect: (input: {
+    organizationId: string
+    memberId: string
+  }) =>
+    Effect.tryPromise({
+      try: () => Promise.resolve(mocks.readOrganizationMemberRoleMock(input)),
+      catch: (cause) => cause,
+    }),
+  readOrganizationExistsEffect: (organizationId: string) =>
+    Effect.tryPromise({
+      try: () =>
+        Promise.resolve(mocks.readOrganizationExistsMock(organizationId)),
+      catch: (cause) => cause,
+    }),
 }))
 
 vi.mock('@/lib/backend/auth/default-organization', () => ({
-  ensureOrganizationBillingBaseline: mocks.ensureOrganizationBillingBaselineMock,
+  ensureOrganizationBillingBaselineEffect: (organizationId: string) =>
+    Effect.tryPromise({
+      try: () =>
+        Promise.resolve(
+          mocks.ensureOrganizationBillingBaselineMock(organizationId),
+        ),
+      catch: (cause) => cause,
+    }),
 }))
 
 vi.mock('@/lib/backend/billing/services/workspace-billing/persistence', () => ({
-  readCurrentOrgSubscription: mocks.readCurrentOrgSubscriptionMock,
-  readOrganizationMemberCounts: mocks.readOrganizationMemberCountsMock,
-  upsertEntitlementSnapshot: mocks.upsertEntitlementSnapshotMock,
-  upsertOrgBillingAccount: mocks.upsertOrgBillingAccountMock,
-  upsertOrgSubscription: mocks.upsertOrgSubscriptionMock,
-  markOrgBillingAccountStatus: mocks.markOrgBillingAccountStatusMock,
-  markOrgSubscriptionCanceled: mocks.markOrgSubscriptionCanceledMock,
+  readCurrentOrgSubscriptionEffect: (input: {
+    organizationId: string
+    client?: unknown
+  }) =>
+    Effect.tryPromise({
+      try: () =>
+        Promise.resolve(
+          mocks.readCurrentOrgSubscriptionMock(
+            input.organizationId,
+            input.client,
+          ),
+        ),
+      catch: (cause) => cause,
+    }),
+  readOrganizationMemberCountsEffect: (input: {
+    organizationId: string
+    client?: unknown
+  }) =>
+    Effect.tryPromise({
+      try: () =>
+        Promise.resolve(
+          mocks.readOrganizationMemberCountsMock(
+            input.organizationId,
+            input.client,
+          ),
+        ),
+      catch: (cause) => cause,
+    }),
+  upsertEntitlementSnapshotEffect: (input: unknown) =>
+    Effect.tryPromise({
+      try: () => Promise.resolve(mocks.upsertEntitlementSnapshotMock(input)),
+      catch: (cause) => cause,
+    }),
+  upsertOrgBillingAccountEffect: (input: unknown) =>
+    Effect.tryPromise({
+      try: () => Promise.resolve(mocks.upsertOrgBillingAccountMock(input)),
+      catch: (cause) => cause,
+    }),
+  upsertOrgSubscriptionEffect: (input: unknown) =>
+    Effect.tryPromise({
+      try: () => Promise.resolve(mocks.upsertOrgSubscriptionMock(input)),
+      catch: (cause) => cause,
+    }),
+  markOrgBillingAccountStatusEffect: (input: unknown) =>
+    Effect.tryPromise({
+      try: () => Promise.resolve(mocks.markOrgBillingAccountStatusMock(input)),
+      catch: (cause) => cause,
+    }),
+  markOrgSubscriptionCanceledEffect: (input: unknown) =>
+    Effect.tryPromise({
+      try: () => Promise.resolve(mocks.markOrgSubscriptionCanceledMock(input)),
+      catch: (cause) => cause,
+    }),
 }))
 
 vi.mock('@/lib/backend/billing/services/workspace-usage/persistence', () => ({
-  upsertOrganizationUsagePolicyOverrideRecord:
-    mocks.upsertOrganizationUsagePolicyOverrideRecordMock,
+  upsertOrganizationUsagePolicyOverrideRecordEffect: (input: unknown) =>
+    Effect.tryPromise({
+      try: () =>
+        Promise.resolve(
+          mocks.upsertOrganizationUsagePolicyOverrideRecordMock(input),
+        ),
+      catch: (cause) => cause,
+    }),
+}))
+
+vi.mock('@/lib/backend/billing/services/sql', () => ({
+  withBillingTransactionEffect: (
+    operation: (client: unknown) => Effect.Effect<unknown>,
+  ) => {
+    mocks.withBillingTransactionMock(operation)
+    return operation({})
+  },
 }))
 
 vi.mock('@/lib/backend/auth/auth.server', () => ({
@@ -60,12 +150,19 @@ vi.mock('@/lib/backend/auth/auth.server', () => ({
   },
 }))
 
+const SingularityTestLayer = SingularityAdminService.layer.pipe(
+  Layer.provide(
+    Layer.succeed(PgClient.PgClient, {} as unknown as PgClient.PgClient),
+  ),
+)
+
 describe('SingularityAdminService', () => {
   beforeEach(() => {
-    mocks.authPoolQueryMock.mockReset()
-    mocks.authPoolConnectMock.mockReset()
-    mocks.clientQueryMock.mockReset()
-    mocks.clientReleaseMock.mockReset()
+    mocks.readOrganizationMemberRoleMock.mockReset()
+    mocks.readOrganizationExistsMock.mockReset()
+    mocks.listOrganizationsMock.mockReset()
+    mocks.getOrganizationProfileMock.mockReset()
+    mocks.withBillingTransactionMock.mockReset()
     mocks.ensureOrganizationBillingBaselineMock.mockReset()
     mocks.readCurrentOrgSubscriptionMock.mockReset()
     mocks.readOrganizationMemberCountsMock.mockReset()
@@ -79,11 +176,6 @@ describe('SingularityAdminService', () => {
     mocks.removeMemberMock.mockReset()
     mocks.updateMemberRoleMock.mockReset()
     mocks.cancelInvitationMock.mockReset()
-    mocks.authPoolConnectMock.mockResolvedValue({
-      query: mocks.clientQueryMock,
-      release: mocks.clientReleaseMock,
-    })
-    mocks.clientQueryMock.mockResolvedValue({ rows: [] })
     mocks.readOrganizationMemberCountsMock.mockResolvedValue({
       activeMemberCount: 2,
       pendingInvitationCount: 0,
@@ -123,9 +215,7 @@ describe('SingularityAdminService', () => {
   })
 
   it('refuses to demote or promote owner rows through Singularity', async () => {
-    mocks.authPoolQueryMock.mockResolvedValue({
-      rows: [{ role: 'owner' }],
-    })
+    mocks.readOrganizationMemberRoleMock.mockResolvedValue('owner')
 
     await expect(
       Effect.runPromise(
@@ -137,16 +227,14 @@ describe('SingularityAdminService', () => {
             memberId: 'member-1',
             role: 'member',
           })
-        }).pipe(Effect.provide(SingularityAdminService.layer)),
+        }).pipe(Effect.provide(SingularityTestLayer)),
       ),
     ).rejects.toBeInstanceOf(SingularityValidationError)
     expect(mocks.updateMemberRoleMock).not.toHaveBeenCalled()
   })
 
   it('applies a manual plan override transactionally', async () => {
-    mocks.authPoolQueryMock.mockResolvedValue({
-      rows: [{ id: 'org-1' }],
-    })
+    mocks.readOrganizationExistsMock.mockResolvedValue(true)
     mocks.readCurrentOrgSubscriptionMock.mockResolvedValue({
       id: 'workspace_subscription_org-1',
       planId: 'pro',
@@ -177,7 +265,7 @@ describe('SingularityAdminService', () => {
             singleSignOn: true,
           },
         })
-      }).pipe(Effect.provide(SingularityAdminService.layer)),
+      }).pipe(Effect.provide(SingularityTestLayer)),
     )
 
     expect(mocks.ensureOrganizationBillingBaselineMock).toHaveBeenCalledWith(
@@ -200,7 +288,9 @@ describe('SingularityAdminService', () => {
         seatCount: 12,
       }),
     )
-    expect(mocks.upsertOrganizationUsagePolicyOverrideRecordMock).toHaveBeenCalledWith(
+    expect(
+      mocks.upsertOrganizationUsagePolicyOverrideRecordMock,
+    ).toHaveBeenCalledWith(
       expect.objectContaining({
         organizationId: 'org-1',
         override: expect.objectContaining({
@@ -209,14 +299,11 @@ describe('SingularityAdminService', () => {
       }),
     )
     expect(mocks.upsertEntitlementSnapshotMock).toHaveBeenCalled()
-    expect(mocks.clientQueryMock).toHaveBeenCalledWith('BEGIN')
-    expect(mocks.clientQueryMock).toHaveBeenCalledWith('COMMIT')
+    expect(mocks.withBillingTransactionMock).toHaveBeenCalledTimes(1)
   })
 
   it('clears active paid state when overriding back to free', async () => {
-    mocks.authPoolQueryMock.mockResolvedValue({
-      rows: [{ id: 'org-1' }],
-    })
+    mocks.readOrganizationExistsMock.mockResolvedValue(true)
 
     await Effect.runPromise(
       Effect.gen(function* () {
@@ -233,7 +320,7 @@ describe('SingularityAdminService', () => {
           billingReference: null,
           featureOverrides: {},
         })
-      }).pipe(Effect.provide(SingularityAdminService.layer)),
+      }).pipe(Effect.provide(SingularityTestLayer)),
     )
 
     expect(mocks.markOrgSubscriptionCanceledMock).toHaveBeenCalledWith(
@@ -267,18 +354,16 @@ describe('SingularityAdminService', () => {
             billingReference: null,
             featureOverrides: {},
           })
-        }).pipe(Effect.provide(SingularityAdminService.layer)),
+        }).pipe(Effect.provide(SingularityTestLayer)),
       ),
     ).rejects.toBeInstanceOf(SingularityValidationError)
 
-    expect(mocks.authPoolQueryMock).not.toHaveBeenCalled()
-    expect(mocks.authPoolConnectMock).not.toHaveBeenCalled()
+    expect(mocks.readOrganizationExistsMock).not.toHaveBeenCalled()
+    expect(mocks.withBillingTransactionMock).not.toHaveBeenCalled()
   })
 
   it('rolls back the transaction when a write fails', async () => {
-    mocks.authPoolQueryMock.mockResolvedValue({
-      rows: [{ id: 'org-1' }],
-    })
+    mocks.readOrganizationExistsMock.mockResolvedValue(true)
     mocks.upsertOrgSubscriptionMock.mockRejectedValue(new Error('write failed'))
 
     await expect(
@@ -297,12 +382,10 @@ describe('SingularityAdminService', () => {
             billingReference: 'PO-42',
             featureOverrides: {},
           })
-        }).pipe(Effect.provide(SingularityAdminService.layer)),
+        }).pipe(Effect.provide(SingularityTestLayer)),
       ),
     ).rejects.toThrow('Failed to apply the organization plan override.')
 
-    expect(mocks.clientQueryMock).toHaveBeenCalledWith('BEGIN')
-    expect(mocks.clientQueryMock).toHaveBeenCalledWith('ROLLBACK')
-    expect(mocks.clientQueryMock).not.toHaveBeenCalledWith('COMMIT')
+    expect(mocks.withBillingTransactionMock).toHaveBeenCalledTimes(1)
   })
 })

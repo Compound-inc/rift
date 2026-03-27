@@ -1,6 +1,7 @@
 import { Layer } from 'effect'
 import { makeRuntimeRunner } from '@/lib/backend/server-effect'
 import { AttachmentRecordService } from '@/lib/backend/chat/services/attachment-record.service'
+import { UpstreamPostgresLayer } from '@/lib/backend/server-effect/services/upstream-postgres.service'
 import { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
 import { OrgKnowledgeRagService } from '@/lib/backend/chat/services/rag'
 import { MarkdownConversionService } from '@/lib/backend/file/services/markdown-conversion.service'
@@ -15,7 +16,10 @@ const dependencyLayer = Layer.mergeAll(
   repositoryLayer,
   MarkdownConversionService.layer,
   OrgKnowledgeRagService.layer,
-).pipe(Layer.provideMerge(ZeroDatabaseService.layer))
+).pipe(
+  Layer.provideMerge(UpstreamPostgresLayer),
+  Layer.provideMerge(ZeroDatabaseService.layer),
+)
 
 const layer = OrgKnowledgeAdminService.layer.pipe(
   Layer.provideMerge(dependencyLayer),

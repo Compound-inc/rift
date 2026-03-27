@@ -12,7 +12,7 @@ import type {AccessContext} from '@/lib/shared/access-control';
 import {
   isByokSupportedProviderId,
 } from '@/lib/shared/model-policy/provider-keys'
-import { readOrgProviderApiKey } from '@/lib/backend/byok/infra/provider-key-store'
+import { readOrgProviderApiKeyEffect } from '@/lib/backend/byok/infra/provider-key-store'
 import { getOrgAiPolicy } from '@/lib/backend/model-policy/repository'
 import type {
   EffectiveModelResolution,
@@ -330,21 +330,21 @@ export class ModelPolicyService extends ServiceMap.Service<
                   if (!providerRoute) continue
                   lastRoutableProviderId = providerId
 
-                  const providerApiKey = yield* Effect.tryPromise({
-                    try: () =>
-                      readOrgProviderApiKey({
-                        organizationId,
-                        providerId,
-                      }),
-                    catch: (error) =>
-                      new MessagePersistenceError({
-                        message:
-                          'Failed to resolve organization provider API key',
-                        requestId,
-                        threadId,
-                        cause: String(error),
-                      }),
-                  })
+                  const providerApiKey = yield* readOrgProviderApiKeyEffect({
+                    organizationId,
+                    providerId,
+                  }).pipe(
+                    Effect.mapError(
+                      (error) =>
+                        new MessagePersistenceError({
+                          message:
+                            'Failed to resolve organization provider API key',
+                          requestId,
+                          threadId,
+                          cause: String(error),
+                        }),
+                    ),
+                  )
 
                   if (!providerApiKey) {
                     continue

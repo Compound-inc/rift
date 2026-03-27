@@ -7,7 +7,8 @@ import { organization as organizationPlugin } from 'better-auth/plugins/organiza
 import { twoFactor } from 'better-auth/plugins/two-factor'
 import { tanstackStartCookies } from 'better-auth/tanstack-start'
 import Stripe from 'stripe'
-import type { PoolClient } from 'pg'
+import { PgClient } from '@effect/sql-pg'
+import { Effect } from 'effect'
 import {
   isStripeManagedWorkspacePlan,
   WORKSPACE_PLANS,
@@ -24,9 +25,11 @@ import {
   toInvitationSeatLimitApiError,
 } from '@/lib/backend/billing/domain/api-errors'
 import { isAdminRole } from '@/lib/shared/auth/roles'
+import { runUpstreamPostgresEffect } from '@/lib/backend/server-effect/runtime/upstream-postgres-runtime'
 import { authPool } from './auth-pool'
 import {
   buildDefaultOrganizationName,
+  findFirstOrganizationForUserEffect,
   ensureMemberAccessRecord,
   ensureOrganizationBillingBaseline,
   findFirstOrganizationForUser,
@@ -38,6 +41,11 @@ import {
   sendOrganizationInvitationEmail,
 } from './auth-email.server'
 import type { Subscription as BetterAuthStripeSubscription } from '@better-auth/stripe'
+import {
+  readOrganizationMemberRoleEffect,
+  reassignAnonymousAppDataEffect,
+  runAuthSqlEffect,
+} from './auth-sql.server'
 
 async function syncWorkspaceSubscription(input: {
   subscription: BetterAuthStripeSubscription
@@ -107,16 +115,12 @@ const stripePlugin
               priceId: resolveStripePlanPriceId(plan.id),
             })),
           authorizeReference: async ({ user, referenceId, action }) => {
-            const membership = await authPool.query<{ role: string }>(
-              `select role
-               from member
-               where "organizationId" = $1
-                 and "userId" = $2
-               limit 1`,
-              [referenceId, user.id],
+            const role = await runAuthSqlEffect(
+              readOrganizationMemberRoleEffect({
+                organizationId: referenceId,
+                userId: user.id,
+              }),
             )
-
-            const role = membership.rows[0]?.role
             if (!role) {
               return false
             }
@@ -159,98 +163,94 @@ const stripePlugin
  * A transaction-scoped advisory lock keeps concurrent auth hooks from racing
  * and accidentally issuing duplicate organization creation attempts.
  */
+const withUserProvisioningLockEffect = Effect.fn(
+  'Auth.withUserProvisioningLock',
+)(
+  <T>(
+    userId: string,
+    operation: Effect.Effect<T, unknown, PgClient.PgClient>,
+  ): Effect.Effect<T, unknown, PgClient.PgClient> =>
+    Effect.gen(function* () {
+      const lockKey = `auth-user-provision:${userId}`
+      const sql = yield* PgClient.PgClient
+
+      return yield* sql.withTransaction(
+        Effect.gen(function* () {
+          yield* sql`select pg_advisory_xact_lock(hashtext(${lockKey}))`
+          return yield* operation
+        }),
+      )
+    }),
+)
+
 async function withUserProvisioningLock<T>(
   userId: string,
-  operation: (lockClient: PoolClient) => Promise<T>,
+  operation: Effect.Effect<T, unknown, PgClient.PgClient>,
 ): Promise<T> {
-  const lockKey = `auth-user-provision:${userId}`
-  const client = await authPool.connect()
-
-  try {
-    await client.query('BEGIN')
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [lockKey])
-    const result = await operation(client)
-    await client.query('COMMIT')
-    return result
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined)
-    throw error
-  } finally {
-    client.release()
-  }
-}
-
-async function readFirstOrganizationForUserWithClient(
-  client: PoolClient,
-  userId: string,
-): Promise<string | null> {
-  const result = await client.query<{ organizationId: string }>(
-    `select "organizationId" as "organizationId"
-     from member
-     where "userId" = $1
-     order by "createdAt" asc
-     limit 1`,
-    [userId],
+  return runUpstreamPostgresEffect(
+    withUserProvisioningLockEffect(userId, operation),
   )
-
-  return result.rows[0]?.organizationId ?? null
 }
 
 /**
  * Idempotently ensures the persisted user has a default organization.
  * Must be called while holding `withUserProvisioningLock`.
  */
-async function ensureDefaultOrganizationForUserWithinLock(input: {
-  lockClient: PoolClient
-  userId: string
-  name: string
-  email: string
-}): Promise<string> {
-  const existingOrganizationId = await readFirstOrganizationForUserWithClient(
-    input.lockClient,
-    input.userId,
-  )
-  if (existingOrganizationId) {
-    return existingOrganizationId
-  }
+const ensureDefaultOrganizationForUserWithinLockEffect = Effect.fn(
+  'Auth.ensureDefaultOrganizationForUserWithinLock',
+)(
+  (input: {
+    userId: string
+    name: string
+    email: string
+  }): Effect.Effect<string, unknown, PgClient.PgClient> =>
+    Effect.gen(function* () {
+      const existingOrganizationId = yield* findFirstOrganizationForUserEffect(input.userId)
+      if (existingOrganizationId) {
+        return existingOrganizationId
+      }
 
-  const workspaceName = buildDefaultOrganizationName({
-    name: input.name,
-    email: input.email,
-  })
+      const workspaceName = buildDefaultOrganizationName({
+        name: input.name,
+        email: input.email,
+      })
 
-  await auth.api.createOrganization({
-    body: {
-      userId: input.userId,
-      name: workspaceName,
-      slug: buildOrganizationSlug({
-        name: workspaceName,
-        userId: input.userId,
-      }),
-    },
-  })
+      yield* Effect.tryPromise({
+        try: () =>
+          auth.api.createOrganization({
+            body: {
+              userId: input.userId,
+              name: workspaceName,
+              slug: buildOrganizationSlug({
+                name: workspaceName,
+                userId: input.userId,
+              }),
+            },
+          }),
+        catch: (error) => error,
+      })
 
-  const createdOrganizationId = await readFirstOrganizationForUserWithClient(
-    input.lockClient,
-    input.userId,
-  )
-  if (!createdOrganizationId) {
-    throw new Error(
-      `Default organization was not found after provisioning for user ${input.userId}`,
-    )
-  }
+      const createdOrganizationId = yield* findFirstOrganizationForUserEffect(input.userId)
+      if (!createdOrganizationId) {
+        return yield* Effect.fail(
+          new Error(
+            `Default organization was not found after provisioning for user ${input.userId}`,
+          ),
+        )
+      }
 
-  return createdOrganizationId
-}
+      return createdOrganizationId
+    }),
+)
 
 async function ensureDefaultOrganizationForUser(input: {
   userId: string
   name: string
   email: string
 }): Promise<string> {
-  return withUserProvisioningLock(input.userId, (lockClient) =>
-    ensureDefaultOrganizationForUserWithinLock({
-      lockClient,
+  return withUserProvisioningLock(
+    input.userId,
+    ensureDefaultOrganizationForUserWithinLockEffect({
       userId: input.userId,
       name: input.name,
       email: input.email,
@@ -429,63 +429,22 @@ const auth = betterAuth({
          */
         const fromUserId = anonymousUser.user.id
         const toUserId = newUser.user.id
-        await withUserProvisioningLock(toUserId, async (lockClient) => {
-          const targetOrganizationId = await ensureDefaultOrganizationForUserWithinLock({
-            lockClient,
-            userId: toUserId,
-            name: newUser.user.name,
-            email: newUser.user.email,
-          })
+        await withUserProvisioningLock(
+          toUserId,
+          Effect.gen(function* () {
+            const targetOrganizationId = yield* ensureDefaultOrganizationForUserWithinLockEffect({
+              userId: toUserId,
+              name: newUser.user.name,
+              email: newUser.user.email,
+            })
 
-          await lockClient.query(
-            `UPDATE threads
-             SET user_id = $1,
-                 owner_org_id = COALESCE(owner_org_id, $3)
-             WHERE user_id = $2`,
-            [toUserId, fromUserId, targetOrganizationId],
-          )
-          await lockClient.query(
-            'UPDATE messages SET user_id = $1 WHERE user_id = $2',
-            [toUserId, fromUserId],
-          )
-          await lockClient.query(
-            `UPDATE attachments
-             SET user_id = $1,
-                 owner_org_id = COALESCE(owner_org_id, $3)
-             WHERE user_id = $2`,
-            [toUserId, fromUserId, targetOrganizationId],
-          )
-          await lockClient.query(
-            'UPDATE chat_request_rate_limit_window SET user_id = $1 WHERE user_id = $2',
-            [toUserId, fromUserId],
-          )
-          await lockClient.query(
-            'UPDATE chat_free_allowance_window SET user_id = $1 WHERE user_id = $2',
-            [toUserId, fromUserId],
-          )
-          await lockClient.query(
-            `delete from org_user_usage_summary target
-             using org_user_usage_summary source
-             where target.user_id = $1
-               and source.user_id = $2
-               and target.organization_id = source.organization_id
-               and target.updated_at <= source.updated_at`,
-            [toUserId, fromUserId],
-          )
-          await lockClient.query(
-            `delete from org_user_usage_summary source
-             using org_user_usage_summary target
-             where source.user_id = $2
-               and target.user_id = $1
-               and source.organization_id = target.organization_id
-               and source.updated_at < target.updated_at`,
-            [toUserId, fromUserId],
-          )
-          await lockClient.query(
-            'UPDATE org_user_usage_summary SET user_id = $1 WHERE user_id = $2',
-            [toUserId, fromUserId],
-          )
-        })
+            yield* reassignAnonymousAppDataEffect({
+              fromUserId,
+              toUserId,
+              targetOrganizationId,
+            })
+          })
+        )
       },
     }),
     multiSession({
