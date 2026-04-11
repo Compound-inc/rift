@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SetupRouteRouteImport } from './routes/setup/route'
 import { Route as PricingRouteRouteImport } from './routes/pricing/route'
+import { Route as HealthRouteRouteImport } from './routes/health/route'
 import { Route as AuthRouteRouteImport } from './routes/auth/route'
 import { Route as AuthSignUpRouteRouteImport } from './routes/auth/sign-up/route'
 import { Route as AuthSignInRouteRouteImport } from './routes/auth/sign-in/route'
@@ -58,6 +59,11 @@ const SetupRouteRoute = SetupRouteRouteImport.update({
 const PricingRouteRoute = PricingRouteRouteImport.update({
   id: '/pricing',
   path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HealthRouteRoute = HealthRouteRouteImport.update({
+  id: '/health',
+  path: '/health',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRouteRoute = AuthRouteRouteImport.update({
@@ -273,6 +279,7 @@ const appLayoutOrganizationSettingsModelsProviderIdRouteRoute =
 
 export interface FileRoutesByFullPath {
   '/auth': typeof AuthRouteRouteWithChildren
+  '/health': typeof HealthRouteRoute
   '/pricing': typeof PricingRouteRoute
   '/setup': typeof SetupRouteRoute
   '/api/chat': typeof ApiChatRouteRoute
@@ -314,6 +321,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRouteRouteWithChildren
+  '/health': typeof HealthRouteRoute
   '/pricing': typeof PricingRouteRoute
   '/setup': typeof SetupRouteRoute
   '/api/chat': typeof ApiChatRouteRoute
@@ -351,6 +359,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/auth': typeof AuthRouteRouteWithChildren
+  '/health': typeof HealthRouteRoute
   '/pricing': typeof PricingRouteRoute
   '/setup': typeof SetupRouteRoute
   '/(app)/_layout': typeof appLayoutRouteRouteWithChildren
@@ -395,6 +404,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/auth'
+    | '/health'
     | '/pricing'
     | '/setup'
     | '/api/chat'
@@ -436,6 +446,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
+    | '/health'
     | '/pricing'
     | '/setup'
     | '/api/chat'
@@ -472,6 +483,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/auth'
+    | '/health'
     | '/pricing'
     | '/setup'
     | '/(app)/_layout'
@@ -515,6 +527,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AuthRouteRoute: typeof AuthRouteRouteWithChildren
+  HealthRouteRoute: typeof HealthRouteRoute
   PricingRouteRoute: typeof PricingRouteRoute
   SetupRouteRoute: typeof SetupRouteRoute
   appLayoutRouteRoute: typeof appLayoutRouteRouteWithChildren
@@ -542,6 +555,13 @@ declare module '@tanstack/react-router' {
       path: '/pricing'
       fullPath: '/pricing'
       preLoaderRoute: typeof PricingRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/health': {
+      id: '/health'
+      path: '/health'
+      fullPath: '/health'
+      preLoaderRoute: typeof HealthRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -975,6 +995,7 @@ const eeSingularityLayoutRouteRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   AuthRouteRoute: AuthRouteRouteWithChildren,
+  HealthRouteRoute: HealthRouteRoute,
   PricingRouteRoute: PricingRouteRoute,
   SetupRouteRoute: SetupRouteRoute,
   appLayoutRouteRoute: appLayoutRouteRouteWithChildren,
