@@ -42,9 +42,9 @@ const buttonVariants = cva(
         iconSmall: 
           "aspect-square h-7.5 w-7.5",
         iconSidebar:
-          "size-11 rounded-lg transition-colors duration-150 [&_svg:not([class*='size-'])]:size-5 hover:bg-red-500",
+          "size-11 rounded-lg transition-colors duration-150 [&_svg:not([class*='size-'])]:size-5",
         sidebarNavItem:
-         "min-h-8 shrink-0 hover:bg-blue-500",
+         "min-h-8 shrink-0",
       },
     },
     defaultVariants: {
