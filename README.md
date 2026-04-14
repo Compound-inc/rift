@@ -56,7 +56,7 @@ Additional platform technologies:
 
 Rift will be deployable via a Railway template.
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/qMdv3A?referralCode=0pCHYK&utm_medium=integration&utm_source=template&utm_campaign=generic)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/rift-1?referralCode=0pCHYK&utm_medium=integration&utm_source=template&utm_campaign=github)
 
 More self-hosting deployment options will be documented soon.
 
