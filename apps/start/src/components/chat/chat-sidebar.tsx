@@ -11,7 +11,7 @@ import {
 import { useZero } from '@rocicorp/zero/react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { Button, buttonVariants } from '@rift/ui/button'
-import { cn, copyToClipboard } from '@rift/utils'
+import { copyToClipboard } from '@rift/utils'
 import AlertTriangle from 'lucide-react/dist/esm/icons/alert-triangle'
 import Copy from 'lucide-react/dist/esm/icons/copy'
 import Globe from 'lucide-react/dist/esm/icons/globe'
@@ -832,14 +832,8 @@ export function ChatSidebarContent({ pathname }: { pathname: string }) {
     })
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
-      <div
-        className={cn(
-          'flex min-h-0 flex-1 flex-col',
-          // Reserve space so bottom-pinned auth/upgrade actions do not cover thread rows.
-          shouldShowBottomPanel ? 'pb-48' : undefined,
-        )}
-      >
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <SidebarAreaLayout
           title={CHAT_SIDEBAR_TITLE()}
           sections={staticSections}
@@ -856,7 +850,7 @@ export function ChatSidebarContent({ pathname }: { pathname: string }) {
         </div>
       </div>
       {shouldShowBottomPanel ? (
-        <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-surface-overlay via-surface-overlay to-transparent px-3 pb-1 pt-8">
+        <div className="flex-shrink-0 bg-surface-overlay px-3 py-3">
           {shouldShowLoginButton ? (
             <Button asChild size="default" className="w-full">
               <Link to="/auth/sign-in" preload="intent">
