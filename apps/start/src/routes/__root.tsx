@@ -11,6 +11,7 @@ import appCss from '../styles.css?url'
 import { getLocale } from '@/paraglide/runtime.js'
 import { PostHogClientBootstrap } from '@/components/app/posthog-client-bootstrap'
 import { getPublicPostHogConfigFn } from '@/lib/frontend/observability/posthog.functions'
+import { getAppOrigin } from '@/lib/frontend/metadata/metadata.functions'
 
 /**
  * Applies the stored or system theme before the stylesheet paints.
@@ -40,30 +41,102 @@ const THEME_INIT_SCRIPT = `
 })();
 `
 
+const DEFAULT_META = {
+  title: 'Rift',
+  description: 'Chat with ever AI Model',
+} as const
+
 export const Route = createRootRoute({
   loader: async () => ({
     posthog: await getPublicPostHogConfigFn(),
+    origin: await getAppOrigin(),
   }),
-  head: () => ({
-    meta: [
-      {
-        charSet: 'utf-8',
-      },
-      {
-        name: 'viewport',
-        content: 'width=device-width, initial-scale=1',
-      },
-      {
-        title: 'Rift',
-      },
-    ],
-    links: [
-      {
-        rel: 'stylesheet',
-        href: appCss,
-      },
-    ],
-  }),
+  head: ({ loaderData }) => {
+    const origin = loaderData!.origin
+    const ogImageUrl = `${origin}/og.webp`
+    const canonicalUrl = origin
+
+    return {
+      meta: [
+        {
+          charSet: 'utf-8',
+        },
+        {
+          name: 'viewport',
+          content: 'width=device-width, initial-scale=1',
+        },
+        {
+          title: DEFAULT_META.title,
+        },
+        {
+          name: 'description',
+          content: DEFAULT_META.description,
+        },
+        {
+          property: 'og:title',
+          content: DEFAULT_META.title,
+        },
+        {
+          property: 'og:description',
+          content: DEFAULT_META.description,
+        },
+        {
+          property: 'og:type',
+          content: 'website',
+        },
+        {
+          property: 'og:site_name',
+          content: DEFAULT_META.title,
+        },
+        {
+          property: 'og:url',
+          content: canonicalUrl,
+        },
+        {
+          property: 'og:image',
+          content: ogImageUrl,
+        },
+        {
+          property: 'og:image:type',
+          content: 'image/webp',
+        },
+        {
+          property: 'og:image:width',
+          content: '1200',
+        },
+        {
+          property: 'og:image:height',
+          content: '630',
+        },
+        {
+          property: 'twitter:card',
+          content: 'summary_large_image',
+        },
+        {
+          property: 'twitter:title',
+          content: DEFAULT_META.title,
+        },
+        {
+          property: 'twitter:description',
+          content: DEFAULT_META.description,
+        },
+        {
+          property: 'twitter:image',
+          content: ogImageUrl,
+        },
+      ],
+      links: [
+        {
+          rel: 'stylesheet',
+          href: appCss,
+        },
+        {
+          rel: 'canonical',
+          href: canonicalUrl,
+        },
+      ],
+    }
+  },
   shellComponent: RootDocument,
 })
 
