@@ -14,7 +14,6 @@ import { Button, buttonVariants } from '@rift/ui/button'
 import { copyToClipboard } from '@rift/utils'
 import AlertTriangle from 'lucide-react/dist/esm/icons/alert-triangle'
 import Copy from 'lucide-react/dist/esm/icons/copy'
-import Globe from 'lucide-react/dist/esm/icons/globe'
 import Link2 from 'lucide-react/dist/esm/icons/link-2'
 import MessageCircle from 'lucide-react/dist/esm/icons/message-circle'
 import Pencil from 'lucide-react/dist/esm/icons/pencil'
@@ -136,11 +135,6 @@ function getStaticSections(): NavSection[] {
           href: CHAT_HREF,
           icon: Link2,
           exact: true,
-        },
-        {
-          name: m.chat_sidebar_projects(),
-          href: `${CHAT_HREF}/projects`,
-          icon: Globe,
         },
         {
           name: m.chat_search_trigger_label(),
