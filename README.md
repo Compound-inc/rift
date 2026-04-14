@@ -14,7 +14,7 @@ Rift is a Bun + TanStack platform designed to make AI chat feel instant.
 
 The core product goal is simple: maximize responsiveness and quality-of-life while preserving native provider behavior and enterprise-grade workspace controls.
 
-Rift is built around TanStack Start for full-stack delivery, Rocicorp Zero for sync-first state and realtime updates, and the AI SDK for multi-provider support.
+Rift is built around TanStack Start, Rocicorp Zero for sync-first state and realtime updates, and the AI SDK for multi-provider support.
 
 ![Rift chat app screenshot](https://github.com/user-attachments/assets/3b5adbbd-06ef-4e8b-b6ae-7bafc5afdc61)
 
@@ -39,7 +39,8 @@ Rift is centered around this stack:
 
 - [Bun](https://bun.sh/) - runtime, package management, and scripts
 - [TanStack Start](https://tanstack.com/start) + [TanStack Router](https://tanstack.com/router) - full-stack React architecture
-- [Rocicorp Zero](https://zero.rocicorp.dev/) - sync-based data model and realtime cache layer
+- [Rocicorp Zero](https://zero.rocicorp.dev/) - Sync-based data model and realtime cache layer
+- [Effect] (https://effect.website/) - For all the Backend Logic and Services
 - [Vercel AI SDK](https://ai-sdk.dev/) - multi-provider AI primitives and streaming
 - [Railway](https://railway.com/) - default deployment target
 
