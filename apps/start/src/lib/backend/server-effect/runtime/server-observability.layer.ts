@@ -4,7 +4,7 @@ import * as Observability from 'effect/unstable/observability'
 
 const DEFAULT_SERVICE_NAME = 'rift'
 const DEFAULT_SERVICE_VERSION = '0.0.0'
-const DEFAULT_MIN_LOG_LEVEL = 'Info'
+const DEFAULT_MIN_LOG_LEVEL = 'Warn'
 
 type LogLevel =
   | 'All'
@@ -53,7 +53,9 @@ function parseLogFormat(input: string | undefined): LogFormat {
   }
 }
 
-function parseHeadersJson(input: string | undefined): Record<string, string> | undefined {
+function parseHeadersJson(
+  input: string | undefined,
+): Record<string, string> | undefined {
   if (!input) return undefined
   try {
     const parsed = JSON.parse(input) as unknown
@@ -61,7 +63,9 @@ function parseHeadersJson(input: string | undefined): Record<string, string> | u
       return undefined
     }
     const entries = Object.entries(parsed)
-      .filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+      .filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string',
+      )
       .map(([key, value]) => [key.trim(), value.trim()] as const)
       .filter(([key, value]) => key.length > 0 && value.length > 0)
 
