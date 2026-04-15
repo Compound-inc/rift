@@ -13,6 +13,9 @@ import { Route as SetupRouteRouteImport } from './routes/setup/route'
 import { Route as PricingRouteRouteImport } from './routes/pricing/route'
 import { Route as HealthRouteRouteImport } from './routes/health/route'
 import { Route as AuthRouteRouteImport } from './routes/auth/route'
+import { Route as LegalTermsRouteRouteImport } from './routes/legal/terms/route'
+import { Route as LegalPrivacyRouteRouteImport } from './routes/legal/privacy/route'
+import { Route as LegalAcceptableUseRouteRouteImport } from './routes/legal/acceptable-use/route'
 import { Route as AuthSignUpRouteRouteImport } from './routes/auth/sign-up/route'
 import { Route as AuthSignInRouteRouteImport } from './routes/auth/sign-in/route'
 import { Route as ApiChatRouteRouteImport } from './routes/api/chat/route'
@@ -71,6 +74,21 @@ const HealthRouteRoute = HealthRouteRouteImport.update({
 const AuthRouteRoute = AuthRouteRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalTermsRouteRoute = LegalTermsRouteRouteImport.update({
+  id: '/legal/terms',
+  path: '/legal/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalPrivacyRouteRoute = LegalPrivacyRouteRouteImport.update({
+  id: '/legal/privacy',
+  path: '/legal/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalAcceptableUseRouteRoute = LegalAcceptableUseRouteRouteImport.update({
+  id: '/legal/acceptable-use',
+  path: '/legal/acceptable-use',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthSignUpRouteRoute = AuthSignUpRouteRouteImport.update({
@@ -297,6 +315,9 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRouteRoute
   '/auth/sign-in': typeof AuthSignInRouteRoute
   '/auth/sign-up': typeof AuthSignUpRouteRoute
+  '/legal/acceptable-use': typeof LegalAcceptableUseRouteRoute
+  '/legal/privacy': typeof LegalPrivacyRouteRoute
+  '/legal/terms': typeof LegalTermsRouteRoute
   '/chat': typeof appLayoutChatRouteRouteWithChildren
   '/organization': typeof appLayoutOrganizationRouteRouteWithChildren
   '/settings': typeof appLayoutSettingsRouteRouteWithChildren
@@ -341,6 +362,9 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRouteRoute
   '/auth/sign-in': typeof AuthSignInRouteRoute
   '/auth/sign-up': typeof AuthSignUpRouteRoute
+  '/legal/acceptable-use': typeof LegalAcceptableUseRouteRoute
+  '/legal/privacy': typeof LegalPrivacyRouteRoute
+  '/legal/terms': typeof LegalTermsRouteRoute
   '/organization': typeof appLayoutOrganizationRouteRouteWithChildren
   '/api/files/markdown': typeof ApiFilesMarkdownRouteRoute
   '/api/files/object': typeof ApiFilesObjectRouteRoute
@@ -382,6 +406,9 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRouteRoute
   '/auth/sign-in': typeof AuthSignInRouteRoute
   '/auth/sign-up': typeof AuthSignUpRouteRoute
+  '/legal/acceptable-use': typeof LegalAcceptableUseRouteRoute
+  '/legal/privacy': typeof LegalPrivacyRouteRoute
+  '/legal/terms': typeof LegalTermsRouteRoute
   '/(app)/_layout/chat': typeof appLayoutChatRouteRouteWithChildren
   '/(app)/_layout/organization': typeof appLayoutOrganizationRouteRouteWithChildren
   '/(app)/_layout/settings': typeof appLayoutSettingsRouteRouteWithChildren
@@ -428,6 +455,9 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/auth/sign-in'
     | '/auth/sign-up'
+    | '/legal/acceptable-use'
+    | '/legal/privacy'
+    | '/legal/terms'
     | '/chat'
     | '/organization'
     | '/settings'
@@ -472,6 +502,9 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/auth/sign-in'
     | '/auth/sign-up'
+    | '/legal/acceptable-use'
+    | '/legal/privacy'
+    | '/legal/terms'
     | '/organization'
     | '/api/files/markdown'
     | '/api/files/object'
@@ -512,6 +545,9 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/auth/sign-in'
     | '/auth/sign-up'
+    | '/legal/acceptable-use'
+    | '/legal/privacy'
+    | '/legal/terms'
     | '/(app)/_layout/chat'
     | '/(app)/_layout/organization'
     | '/(app)/_layout/settings'
@@ -556,6 +592,9 @@ export interface RootRouteChildren {
   SetupRouteRoute: typeof SetupRouteRoute
   appLayoutRouteRoute: typeof appLayoutRouteRouteWithChildren
   ApiChatRouteRoute: typeof ApiChatRouteRoute
+  LegalAcceptableUseRouteRoute: typeof LegalAcceptableUseRouteRoute
+  LegalPrivacyRouteRoute: typeof LegalPrivacyRouteRoute
+  LegalTermsRouteRoute: typeof LegalTermsRouteRoute
   eeSingularityLayoutRouteRoute: typeof eeSingularityLayoutRouteRouteWithChildren
   ApiFilesMarkdownRouteRoute: typeof ApiFilesMarkdownRouteRoute
   ApiFilesObjectRouteRoute: typeof ApiFilesObjectRouteRoute
@@ -595,6 +634,27 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/terms': {
+      id: '/legal/terms'
+      path: '/legal/terms'
+      fullPath: '/legal/terms'
+      preLoaderRoute: typeof LegalTermsRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/privacy': {
+      id: '/legal/privacy'
+      path: '/legal/privacy'
+      fullPath: '/legal/privacy'
+      preLoaderRoute: typeof LegalPrivacyRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/acceptable-use': {
+      id: '/legal/acceptable-use'
+      path: '/legal/acceptable-use'
+      fullPath: '/legal/acceptable-use'
+      preLoaderRoute: typeof LegalAcceptableUseRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/sign-up': {
@@ -1040,6 +1100,9 @@ const rootRouteChildren: RootRouteChildren = {
   SetupRouteRoute: SetupRouteRoute,
   appLayoutRouteRoute: appLayoutRouteRouteWithChildren,
   ApiChatRouteRoute: ApiChatRouteRoute,
+  LegalAcceptableUseRouteRoute: LegalAcceptableUseRouteRoute,
+  LegalPrivacyRouteRoute: LegalPrivacyRouteRoute,
+  LegalTermsRouteRoute: LegalTermsRouteRoute,
   eeSingularityLayoutRouteRoute: eeSingularityLayoutRouteRouteWithChildren,
   ApiFilesMarkdownRouteRoute: ApiFilesMarkdownRouteRoute,
   ApiFilesObjectRouteRoute: ApiFilesObjectRouteRoute,

@@ -11,6 +11,6 @@ zero.db*
 effect-smol/
 next/
 zbugs/
-
+rift-main/
 # Sentry Config File
 .env.sentry-build-plugin
