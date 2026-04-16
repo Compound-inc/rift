@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { z } from 'zod'
 import { SignInPage, getRedirectTarget } from '@/components/auth/sign-in'
+import { buildPageMetadata } from '@/lib/frontend/metadata/metadata.functions'
 import { isSelfHosted } from '@/utils/app-feature-flags'
 
 export const Route = createFileRoute('/auth/sign-in')({
@@ -20,6 +21,13 @@ export const Route = createFileRoute('/auth/sign-in')({
   },
   validateSearch: z.object({
     redirect: z.string().optional(),
+  }),
+  head: () => ({
+    meta: buildPageMetadata({
+      title: 'Sign In',
+      description: 'Sign in to Rift to continue your chats, teams, and model workspace.',
+      robots: 'noindex,follow',
+    }),
   }),
   component: SignInRouteComponent,
 })

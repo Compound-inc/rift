@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { PricingPageLayout } from '@/components/pricing/pricing-page-layout'
 import { PricingPage } from '@/components/pricing/pricing-page'
+import { buildPageMetadata } from '@/lib/frontend/metadata/metadata.functions'
 import { isSelfHosted } from '@/utils/app-feature-flags'
 import { m } from '@/paraglide/messages.js'
 
@@ -13,6 +14,13 @@ export const Route = createFileRoute('/pricing')({
     checkoutPlan: z.enum(['plus', 'pro', 'scale']).optional(),
     checkoutSeats: z.coerce.number().int().min(1).max(500).optional(),
     resumeCheckout: z.literal('1').optional(),
+  }),
+  head: () => ({
+    meta: buildPageMetadata({
+      title: 'Pricing',
+      description:
+        'Compare Rift plans and pricing to chat with top AI models in one workspace.',
+    }),
   }),
   component: PricingRouteComponent,
 })

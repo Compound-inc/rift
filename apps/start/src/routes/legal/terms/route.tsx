@@ -1,9 +1,17 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { buildPageMetadata } from '@/lib/frontend/metadata/metadata.functions'
 
 /**
  * Terms of Service legal page.
  */
 export const Route = createFileRoute('/legal/terms')({
+  head: () => ({
+    meta: buildPageMetadata({
+      title: 'Terms of Service',
+      description:
+        'Read Rift\'s terms of service covering eligibility, account responsibilities, payments, and use of AI-powered features.',
+    }),
+  }),
   component: TermsOfServicePage,
 })
 
@@ -12,9 +20,12 @@ function TermsOfServicePage() {
     <div className="min-h-screen bg-surface-base dark:bg-surface-raised">
       <div className="fixed top-0 left-0 right-0 z-50 bg-surface-base/80 dark:bg-surface-raised/80 backdrop-blur-sm border-b border-border-base">
         <div className="max-w-4xl mx-auto px-6 py-4 flex justify-between items-center">
-          <h1 className="font-semibold text-lg text-foreground-primary dark:text-foreground-primary">
+          <p
+            className="font-semibold text-lg text-foreground-primary dark:text-foreground-primary"
+            aria-hidden="true"
+          >
             Terms of Service
-          </h1>
+          </p>
         </div>
       </div>
 

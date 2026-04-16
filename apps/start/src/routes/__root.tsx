@@ -11,7 +11,13 @@ import appCss from '../styles.css?url'
 import { getLocale } from '@/paraglide/runtime.js'
 import { PostHogClientBootstrap } from '@/components/app/posthog-client-bootstrap'
 import { getPublicPostHogConfigFn } from '@/lib/frontend/observability/posthog.functions'
-import { getAppOrigin } from '@/lib/frontend/metadata/metadata.functions'
+import {
+  buildAbsoluteMetadataUrl,
+  buildRootLinks,
+  buildRootMetadata,
+  DEFAULT_SITE_METADATA,
+  getAppOrigin,
+} from '@/lib/frontend/metadata/metadata.functions'
 
 /**
  * Applies the stored or system theme before the stylesheet paints.
@@ -59,126 +65,29 @@ function setFavicon(isDark) {
 }
 `
 
-const DEFAULT_META = {
-  title: 'Rift',
-  description: 'Chat with ever AI Model',
-} as const
-
 export const Route = createRootRoute({
   loader: async () => ({
     posthog: await getPublicPostHogConfigFn(),
     origin: await getAppOrigin(),
   }),
-  head: ({ loaderData }) => {
+  head: ({ loaderData, matches, match }) => {
     const origin = loaderData!.origin
-    const ogImageUrl = `${origin}/og.webp`
-    const canonicalUrl = origin
+    const currentPathname = match.pathname || matches.at(-1)?.pathname || '/'
+    const canonicalUrl = buildAbsoluteMetadataUrl(currentPathname, origin)
+    const socialImageUrl = buildAbsoluteMetadataUrl(
+      DEFAULT_SITE_METADATA.socialImagePath,
+      origin
+    )
 
     return {
-      meta: [
-        {
-          charSet: 'utf-8',
-        },
-        {
-          name: 'viewport',
-          content: 'width=device-width, initial-scale=1',
-        },
-        {
-          title: DEFAULT_META.title,
-        },
-        {
-          name: 'description',
-          content: DEFAULT_META.description,
-        },
-        {
-          property: 'og:title',
-          content: DEFAULT_META.title,
-        },
-        {
-          property: 'og:description',
-          content: DEFAULT_META.description,
-        },
-        {
-          property: 'og:type',
-          content: 'website',
-        },
-        {
-          property: 'og:site_name',
-          content: DEFAULT_META.title,
-        },
-        {
-          property: 'og:url',
-          content: canonicalUrl,
-        },
-        {
-          property: 'og:image',
-          content: ogImageUrl,
-        },
-        {
-          property: 'og:image:type',
-          content: 'image/webp',
-        },
-        {
-          property: 'og:image:width',
-          content: '1200',
-        },
-        {
-          property: 'og:image:height',
-          content: '630',
-        },
-        {
-          property: 'twitter:card',
-          content: 'summary_large_image',
-        },
-        {
-          property: 'twitter:title',
-          content: DEFAULT_META.title,
-        },
-        {
-          property: 'twitter:description',
-          content: DEFAULT_META.description,
-        },
-        {
-          property: 'twitter:image',
-          content: ogImageUrl,
-        },
-      ],
-      links: [
-        {
-          rel: 'stylesheet',
-          href: appCss,
-        },
-        {
-          rel: 'canonical',
-          href: canonicalUrl,
-        },
-        {
-          rel: 'icon',
-          type: 'image/x-icon',
-          href: '/favicon.ico',
-        },
-        {
-          rel: 'icon',
-          type: 'image/png',
-          sizes: '32x32',
-          href: '/favicon-32x32.png',
-        },
-        {
-          rel: 'icon',
-          type: 'image/png',
-          sizes: '16x16',
-          href: '/favicon-16x16.png',
-        },
-        {
-          rel: 'apple-touch-icon',
-          sizes: '180x180',
-          href: '/apple-touch-icon.png',
-        },
-        {
-          rel: 'manifest',
-          href: '/manifest.json',
-        },
-      ],
+      meta: buildRootMetadata({
+        canonicalUrl,
+        socialImageUrl,
+      }),
+      links: buildRootLinks({
+        appCssHref: appCss,
+        canonicalUrl,
+      }),
     }
   },
   shellComponent: RootDocument,

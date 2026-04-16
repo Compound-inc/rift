@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { AuthPageLayout } from '@/components/auth/auth-page-layout'
 import { SetupPage } from '@/components/auth/setup'
+import { buildPageMetadata } from '@/lib/frontend/metadata/metadata.functions'
 import { isSelfHosted } from '@/utils/app-feature-flags'
 
 export const Route = createFileRoute('/setup')({
@@ -20,6 +21,13 @@ export const Route = createFileRoute('/setup')({
 
     return snapshot
   },
+  head: () => ({
+    meta: buildPageMetadata({
+      title: 'Setup',
+      description: 'Configure the initial Rift self-hosted environment before signing in.',
+      robots: 'noindex,nofollow',
+    }),
+  }),
   component: SetupRouteComponent,
 })
 

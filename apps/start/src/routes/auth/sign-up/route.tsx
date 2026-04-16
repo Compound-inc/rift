@@ -1,6 +1,7 @@
 import { Navigate, createFileRoute, redirect } from '@tanstack/react-router'
 import { z } from 'zod'
 import { SignInPage, getRedirectTarget } from '@/components/auth/sign-in'
+import { buildPageMetadata } from '@/lib/frontend/metadata/metadata.functions'
 import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 import { isSelfHosted } from '@/utils/app-feature-flags'
 
@@ -20,6 +21,13 @@ export const Route = createFileRoute('/auth/sign-up')({
   validateSearch: z.object({
     redirect: z.string().optional(),
     invitationId: z.string().optional(),
+  }),
+  head: () => ({
+    meta: buildPageMetadata({
+      title: 'Sign Up',
+      description: 'Create a Rift account to start chatting with multiple AI models in one place.',
+      robots: 'noindex,follow',
+    }),
   }),
   component: SignUpRouteComponent,
 })
