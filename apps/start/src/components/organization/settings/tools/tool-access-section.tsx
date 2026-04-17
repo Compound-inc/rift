@@ -5,13 +5,13 @@ import { Form } from '@rift/ui/form'
 import type { WorkspaceFeatureAccessState } from '@/lib/shared/access-control'
 import { getFeatureAccessFormProps } from '@/components/organization/settings/feature-access-form-helpers'
 import { m } from '@/paraglide/messages.js'
-import type { PolicyPayload } from '@/components/organization/settings/model-policy/types'
-import type { useProviderPolicy } from '@/components/organization/settings/model-policy/use-provider-policy'
+import type { ChatPolicySettingsPayload } from '@/components/organization/settings/chat-policy/types'
+import type { useChatPolicySettings } from '@/components/organization/settings/chat-policy/use-chat-policy-settings'
 
 type ToolAccessSectionProps = {
-  payload: PolicyPayload
+  payload: ChatPolicySettingsPayload
   updating: boolean
-  update: ReturnType<typeof useProviderPolicy>['update']
+  update: ReturnType<typeof useChatPolicySettings>['update']
   featureAccess?: WorkspaceFeatureAccessState & { loading: boolean }
 }
 

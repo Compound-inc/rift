@@ -2,6 +2,7 @@
  * Decorative SVG elements for the pricing section: dashed borders and gradient
  * backgrounds. Keeps visual styling isolated from card layout logic.
  */
+import { cn } from '@rift/utils'
 
 /** Shared line props for dashed strokes matching strokeDasharray 4 6. */
 const dashedLineProps = {
@@ -117,23 +118,49 @@ function DashedLineVertical({ className }: { className?: string }) {
  * Frame with dashed borders around the pricing card grid. Renders top, left,
  * right, and bottom SVG lines with responsive positioning.
  */
-export function DashedBorderFrame({ children }: { children: React.ReactNode }) {
+export function DashedBorderFrame({
+  children,
+  frameClassName,
+}: {
+  children: React.ReactNode
+  frameClassName?: string
+}) {
   return (
     <>
       {/* Top border */}
-      <div className="max-lg:top-3.5 absolute inset-x-0 top-12 flex w-full items-center justify-center">
+      <div
+        className={cn(
+          'max-lg:top-3.5 absolute inset-x-0 top-12 flex w-full items-center justify-center',
+          frameClassName,
+        )}
+      >
         <DashedLineHorizontal className="inline-block h-auto w-full will-change-transform max-w-[1400px]" />
       </div>
       {/* Left border */}
-      <div className="max-lg:left-3.5 absolute inset-y-0 left-12 flex h-full items-center justify-center">
+      <div
+        className={cn(
+          'max-lg:left-3.5 absolute inset-y-0 left-12 flex h-full items-center justify-center',
+          frameClassName,
+        )}
+      >
         <DashedLineVertical className="inline-block h-full max-w-full will-change-transform" />
       </div>
       {/* Right border */}
-      <div className="max-lg:top-0 max-lg:right-4 max-lg:bottom-auto max-lg:z-[11] absolute inset-y-0 right-12 flex h-full items-center justify-center">
+      <div
+        className={cn(
+          'max-lg:top-0 max-lg:right-4 max-lg:bottom-auto max-lg:z-[11] absolute inset-y-0 right-12 flex h-full items-center justify-center',
+          frameClassName,
+        )}
+      >
         <DashedLineVertical className="inline-block h-full max-w-full will-change-transform" />
       </div>
       {/* Bottom border */}
-      <div className="max-lg:bottom-3.5 absolute inset-x-0 bottom-12 flex w-full items-center justify-center">
+      <div
+        className={cn(
+          'max-lg:bottom-3.5 absolute inset-x-0 bottom-12 flex w-full items-center justify-center',
+          frameClassName,
+        )}
+      >
         <DashedLineHorizontal className="inline-block h-auto w-full will-change-transform max-w-[1400px]" />
       </div>
       {children}

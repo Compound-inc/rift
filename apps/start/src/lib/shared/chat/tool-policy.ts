@@ -7,7 +7,7 @@ import {
 import type {ToolCatalogEntry} from '@/lib/shared/ai-catalog/tool-catalog';
 import type { ResolvedChatMode } from '@/lib/shared/chat-modes'
 import { hasActiveOrgProviderKey } from '@/lib/shared/model-policy/provider-keys'
-import type { OrgAiPolicy } from '@/lib/shared/model-policy/types'
+import type { OrgPolicy } from '@/lib/shared/model-policy/types'
 import { canUseAdvancedProviderTools } from '@/utils/app-feature-flags'
 
 export type ToolAvailabilityReason =
@@ -68,7 +68,7 @@ export function isToolAllowedByMode(input: {
 export function resolveToolPolicy(input: {
   readonly modelId: string
   readonly mode?: ResolvedChatMode
-  readonly orgPolicy?: OrgAiPolicy
+  readonly orgPolicy?: OrgPolicy
   readonly threadDisabledToolKeys?: readonly string[]
 }): ResolvedToolPolicy {
   const modelToolKeys = TOOL_KEYS_BY_MODEL_ID.get(input.modelId) ?? []
@@ -155,7 +155,7 @@ export function resolveToolPolicy(input: {
 export function sanitizeThreadDisabledToolKeys(input: {
   readonly modelId: string
   readonly mode?: ResolvedChatMode
-  readonly orgPolicy?: OrgAiPolicy
+  readonly orgPolicy?: OrgPolicy
   readonly disabledToolKeys?: readonly string[]
 }): readonly string[] {
   const resolved = resolveToolPolicy({

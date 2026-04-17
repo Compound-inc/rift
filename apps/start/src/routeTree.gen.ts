@@ -32,10 +32,12 @@ import { Route as ApiFilesUploadRouteRouteImport } from './routes/api/files/uplo
 import { Route as ApiFilesObjectRouteRouteImport } from './routes/api/files/object/route'
 import { Route as ApiFilesMarkdownRouteRouteImport } from './routes/api/files/markdown/route'
 import { Route as eeSingularityLayoutRouteRouteImport } from './routes/(ee)/singularity/_layout/route'
+import { Route as appLayoutWritingRouteRouteImport } from './routes/(app)/_layout/writing/route'
 import { Route as appLayoutSettingsRouteRouteImport } from './routes/(app)/_layout/settings/route'
 import { Route as appLayoutOrganizationRouteRouteImport } from './routes/(app)/_layout/organization/route'
 import { Route as appLayoutChatRouteRouteImport } from './routes/(app)/_layout/chat/route'
 import { Route as eeSingularityLayoutIndexRouteImport } from './routes/(ee)/singularity/_layout/index'
+import { Route as appLayoutWritingIndexRouteImport } from './routes/(app)/_layout/writing/index'
 import { Route as appLayoutSettingsIndexRouteImport } from './routes/(app)/_layout/settings/index'
 import { Route as appLayoutChatIndexRouteImport } from './routes/(app)/_layout/chat/index'
 import { Route as appLayoutSettingsSecurityRouteRouteImport } from './routes/(app)/_layout/settings/security/route'
@@ -172,6 +174,11 @@ const eeSingularityLayoutRouteRoute =
     path: '/singularity',
     getParentRoute: () => rootRouteImport,
   } as any)
+const appLayoutWritingRouteRoute = appLayoutWritingRouteRouteImport.update({
+  id: '/writing',
+  path: '/writing',
+  getParentRoute: () => appLayoutRouteRoute,
+} as any)
 const appLayoutSettingsRouteRoute = appLayoutSettingsRouteRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -194,6 +201,11 @@ const eeSingularityLayoutIndexRoute =
     path: '/',
     getParentRoute: () => eeSingularityLayoutRouteRoute,
   } as any)
+const appLayoutWritingIndexRoute = appLayoutWritingIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => appLayoutWritingRouteRoute,
+} as any)
 const appLayoutSettingsIndexRoute = appLayoutSettingsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -321,6 +333,7 @@ export interface FileRoutesByFullPath {
   '/chat': typeof appLayoutChatRouteRouteWithChildren
   '/organization': typeof appLayoutOrganizationRouteRouteWithChildren
   '/settings': typeof appLayoutSettingsRouteRouteWithChildren
+  '/writing': typeof appLayoutWritingRouteRouteWithChildren
   '/singularity': typeof eeSingularityLayoutRouteRouteWithChildren
   '/api/files/markdown': typeof ApiFilesMarkdownRouteRoute
   '/api/files/object': typeof ApiFilesObjectRouteRoute
@@ -338,6 +351,7 @@ export interface FileRoutesByFullPath {
   '/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/chat/': typeof appLayoutChatIndexRoute
   '/settings/': typeof appLayoutSettingsIndexRoute
+  '/writing/': typeof appLayoutWritingIndexRoute
   '/singularity/': typeof eeSingularityLayoutIndexRoute
   '/organization/settings/analytics': typeof appLayoutOrganizationSettingsAnalyticsRouteRoute
   '/organization/settings/billing': typeof appLayoutOrganizationSettingsBillingRouteRoute
@@ -381,6 +395,7 @@ export interface FileRoutesByTo {
   '/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/chat': typeof appLayoutChatIndexRoute
   '/settings': typeof appLayoutSettingsIndexRoute
+  '/writing': typeof appLayoutWritingIndexRoute
   '/singularity': typeof eeSingularityLayoutIndexRoute
   '/organization/settings/analytics': typeof appLayoutOrganizationSettingsAnalyticsRouteRoute
   '/organization/settings/billing': typeof appLayoutOrganizationSettingsBillingRouteRoute
@@ -412,6 +427,7 @@ export interface FileRoutesById {
   '/(app)/_layout/chat': typeof appLayoutChatRouteRouteWithChildren
   '/(app)/_layout/organization': typeof appLayoutOrganizationRouteRouteWithChildren
   '/(app)/_layout/settings': typeof appLayoutSettingsRouteRouteWithChildren
+  '/(app)/_layout/writing': typeof appLayoutWritingRouteRouteWithChildren
   '/(ee)/singularity/_layout': typeof eeSingularityLayoutRouteRouteWithChildren
   '/api/files/markdown': typeof ApiFilesMarkdownRouteRoute
   '/api/files/object': typeof ApiFilesObjectRouteRoute
@@ -429,6 +445,7 @@ export interface FileRoutesById {
   '/(app)/_layout/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/(app)/_layout/chat/': typeof appLayoutChatIndexRoute
   '/(app)/_layout/settings/': typeof appLayoutSettingsIndexRoute
+  '/(app)/_layout/writing/': typeof appLayoutWritingIndexRoute
   '/(ee)/singularity/_layout/': typeof eeSingularityLayoutIndexRoute
   '/(app)/_layout/organization/settings/analytics': typeof appLayoutOrganizationSettingsAnalyticsRouteRoute
   '/(app)/_layout/organization/settings/billing': typeof appLayoutOrganizationSettingsBillingRouteRoute
@@ -461,6 +478,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/organization'
     | '/settings'
+    | '/writing'
     | '/singularity'
     | '/api/files/markdown'
     | '/api/files/object'
@@ -478,6 +496,7 @@ export interface FileRouteTypes {
     | '/settings/security'
     | '/chat/'
     | '/settings/'
+    | '/writing/'
     | '/singularity/'
     | '/organization/settings/analytics'
     | '/organization/settings/billing'
@@ -521,6 +540,7 @@ export interface FileRouteTypes {
     | '/settings/security'
     | '/chat'
     | '/settings'
+    | '/writing'
     | '/singularity'
     | '/organization/settings/analytics'
     | '/organization/settings/billing'
@@ -551,6 +571,7 @@ export interface FileRouteTypes {
     | '/(app)/_layout/chat'
     | '/(app)/_layout/organization'
     | '/(app)/_layout/settings'
+    | '/(app)/_layout/writing'
     | '/(ee)/singularity/_layout'
     | '/api/files/markdown'
     | '/api/files/object'
@@ -568,6 +589,7 @@ export interface FileRouteTypes {
     | '/(app)/_layout/settings/security'
     | '/(app)/_layout/chat/'
     | '/(app)/_layout/settings/'
+    | '/(app)/_layout/writing/'
     | '/(ee)/singularity/_layout/'
     | '/(app)/_layout/organization/settings/analytics'
     | '/(app)/_layout/organization/settings/billing'
@@ -769,6 +791,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof eeSingularityLayoutRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/(app)/_layout/writing': {
+      id: '/(app)/_layout/writing'
+      path: '/writing'
+      fullPath: '/writing'
+      preLoaderRoute: typeof appLayoutWritingRouteRouteImport
+      parentRoute: typeof appLayoutRouteRoute
+    }
     '/(app)/_layout/settings': {
       id: '/(app)/_layout/settings'
       path: '/settings'
@@ -796,6 +825,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/singularity/'
       preLoaderRoute: typeof eeSingularityLayoutIndexRouteImport
       parentRoute: typeof eeSingularityLayoutRouteRoute
+    }
+    '/(app)/_layout/writing/': {
+      id: '/(app)/_layout/writing/'
+      path: '/'
+      fullPath: '/writing/'
+      preLoaderRoute: typeof appLayoutWritingIndexRouteImport
+      parentRoute: typeof appLayoutWritingRouteRoute
     }
     '/(app)/_layout/settings/': {
       id: '/(app)/_layout/settings/'
@@ -1056,10 +1092,24 @@ const appLayoutSettingsRouteRouteWithChildren =
     appLayoutSettingsRouteRouteChildren,
   )
 
+interface appLayoutWritingRouteRouteChildren {
+  appLayoutWritingIndexRoute: typeof appLayoutWritingIndexRoute
+}
+
+const appLayoutWritingRouteRouteChildren: appLayoutWritingRouteRouteChildren = {
+  appLayoutWritingIndexRoute: appLayoutWritingIndexRoute,
+}
+
+const appLayoutWritingRouteRouteWithChildren =
+  appLayoutWritingRouteRoute._addFileChildren(
+    appLayoutWritingRouteRouteChildren,
+  )
+
 interface appLayoutRouteRouteChildren {
   appLayoutChatRouteRoute: typeof appLayoutChatRouteRouteWithChildren
   appLayoutOrganizationRouteRoute: typeof appLayoutOrganizationRouteRouteWithChildren
   appLayoutSettingsRouteRoute: typeof appLayoutSettingsRouteRouteWithChildren
+  appLayoutWritingRouteRoute: typeof appLayoutWritingRouteRouteWithChildren
   appLayoutSplatRoute: typeof appLayoutSplatRoute
   appLayoutIndexRoute: typeof appLayoutIndexRoute
 }
@@ -1068,6 +1118,7 @@ const appLayoutRouteRouteChildren: appLayoutRouteRouteChildren = {
   appLayoutChatRouteRoute: appLayoutChatRouteRouteWithChildren,
   appLayoutOrganizationRouteRoute: appLayoutOrganizationRouteRouteWithChildren,
   appLayoutSettingsRouteRoute: appLayoutSettingsRouteRouteWithChildren,
+  appLayoutWritingRouteRoute: appLayoutWritingRouteRouteWithChildren,
   appLayoutSplatRoute: appLayoutSplatRoute,
   appLayoutIndexRoute: appLayoutIndexRoute,
 }

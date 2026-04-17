@@ -10,7 +10,7 @@ import {
   EMPTY_ORG_PROVIDER_KEY_STATUS
   
 } from '@/lib/shared/model-policy/types'
-import type {OrgAiPolicy} from '@/lib/shared/model-policy/types';
+import type {OrgPolicy} from '@/lib/shared/model-policy/types';
 import { buildBootstrapThreadRecord } from '@/lib/shared/chat'
 import { zql } from '../zql'
 import {
@@ -104,7 +104,7 @@ function buildOrgToolPolicy(input: {
     enforcedModeId?: string | null
     updatedAt?: number
   } | null
-}): OrgAiPolicy | undefined {
+}): OrgPolicy | undefined {
   const organizationId =
     input.organizationId?.trim() ??
     input.policyRow?.organizationId?.trim()
@@ -298,7 +298,7 @@ export const chatMutatorDefinitions = {
 
       const orgPolicyRow = ctx.organizationId
         ? await tx.run(
-            zql.orgAiPolicy.where('organizationId', ctx.organizationId).one(),
+            zql.orgPolicy.where('organizationId', ctx.organizationId).one(),
           )
         : undefined
       const orgPolicy = buildOrgToolPolicy({
@@ -626,7 +626,7 @@ export const chatMutatorDefinitions = {
 
         const orgPolicyRow = ctx.organizationId
           ? await tx.run(
-              zql.orgAiPolicy.where('organizationId', ctx.organizationId).one(),
+              zql.orgPolicy.where('organizationId', ctx.organizationId).one(),
             )
           : undefined
         const orgPolicy = buildOrgToolPolicy({

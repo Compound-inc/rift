@@ -88,7 +88,7 @@ async function main(): Promise<void> {
     console.log('  Creating publication for zero-cache replication...')
     await runSql(
       pool,
-      `CREATE PUBLICATION zero_data FOR TABLE "user", organization, member, threads, messages, org_ai_policy, attachments, org_billing_account, org_subscription, org_entitlement_snapshot, org_member_access`,
+      `CREATE PUBLICATION zero_data FOR TABLE "user", organization, member, threads, messages, org_policy, org_product_config, org_product_policy, attachments, org_billing_account, org_subscription, org_entitlement_snapshot, org_member_access`,
       'CREATE PUBLICATION zero_data',
     )
 

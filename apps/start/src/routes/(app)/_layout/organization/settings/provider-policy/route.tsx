@@ -1,17 +1,20 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { ContentPage } from '@/components/layout'
-import { ProviderPolicyPage } from '@/components/organization/settings/model-policy'
+import { ChatPolicySettingsPage } from '@/components/organization/settings/chat-policy'
 import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 import { m } from '@/paraglide/messages.js'
 
-/** Organization settings: provider and model policy. Path: /organization/settings/provider-policy */
+/**
+ * Legacy route path kept for compatibility while the underlying implementation
+ * and component naming use the newer chat policy terminology.
+ */
 export const Route = createFileRoute(
   '/(app)/_layout/organization/settings/provider-policy',
 )({
-  component: ProviderPolicyRoutePage,
+  component: ChatPolicySettingsRoutePage,
 })
 
-function ProviderPolicyRoutePage() {
+function ChatPolicySettingsRoutePage() {
   const { activeOrganizationId } = useAppAuth()
 
   if (!activeOrganizationId) {
@@ -27,5 +30,5 @@ function ProviderPolicyRoutePage() {
     )
   }
 
-  return <ProviderPolicyPage />
+  return <ChatPolicySettingsPage />
 }

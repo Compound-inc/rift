@@ -243,13 +243,13 @@ export class OrgKnowledgeRepositoryService extends ServiceMap.Service<
                   )
                   const activeCount = activeRows.length
                   const existingPolicy = await db.run(
-                    zql.orgAiPolicy.where('organizationId', organizationId).one(),
+                    zql.orgPolicy.where('organizationId', organizationId).one(),
                   )
                   const updatedAt = Date.now()
 
                   await db.transaction(async (tx) => {
                     if (existingPolicy) {
-                      await tx.mutate.orgAiPolicy.update({
+                      await tx.mutate.orgPolicy.update({
                         id: existingPolicy.id,
                         orgKnowledgeEnabled: activeCount > 0,
                         updatedAt,
@@ -257,7 +257,7 @@ export class OrgKnowledgeRepositoryService extends ServiceMap.Service<
                       return
                     }
 
-                    await tx.mutate.orgAiPolicy.insert({
+                    await tx.mutate.orgPolicy.insert({
                       id: crypto.randomUUID(),
                       organizationId,
                       disabledProviderIds: [],

@@ -2,7 +2,7 @@
 
 import { ContentPage } from '@/components/layout'
 import { m } from '@/paraglide/messages.js'
-import { useProviderPolicy } from '@/components/organization/settings/model-policy/use-provider-policy'
+import { useChatPolicySettings } from '@/components/organization/settings/chat-policy/use-chat-policy-settings'
 import { useOrgFeatureAccess } from '@/lib/frontend/billing/use-org-billing'
 import { ToolAccessSection } from './tool-access-section'
 import { ProviderToolsSection } from './provider-tools-section'
@@ -13,7 +13,7 @@ import { ProviderToolsSection } from './provider-tools-section'
  * page since tool policy is stored in the org policy row.
  */
 export function ToolsPage() {
-  const { payload, loading, error, updating, update } = useProviderPolicy()
+  const { payload, loading, error, updating, update } = useChatPolicySettings()
   const featureAccess = useOrgFeatureAccess('toolPolicy')
   const busy = loading || updating
 

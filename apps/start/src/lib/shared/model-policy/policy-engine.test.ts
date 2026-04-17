@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { getCatalogModelById, evaluateModelAvailability } from './policy-engine'
-import type { OrgAiPolicy } from './types'
+import type { OrgPolicy } from './types'
 
 function buildPolicy(input?: {
   readonly requireZdr?: boolean
   readonly openaiKey?: boolean
   readonly anthropicKey?: boolean
-}): OrgAiPolicy {
+}): OrgPolicy {
   return {
     organizationId: 'org-policy-test',
     disabledProviderIds: [],

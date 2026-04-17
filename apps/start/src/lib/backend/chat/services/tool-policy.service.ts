@@ -1,6 +1,6 @@
 import { Effect, Layer, ServiceMap } from 'effect'
 import type { ResolvedChatMode } from '@/lib/shared/chat-modes'
-import type { OrgAiPolicy } from '@/lib/shared/model-policy/types'
+import type { OrgPolicy } from '@/lib/shared/model-policy/types'
 import type { ChatDomainError } from '../domain/errors'
 import type {
   ResolvedToolPolicy,
@@ -22,13 +22,13 @@ export type ToolPolicyServiceShape = {
     readonly requestId: string
     readonly modelId: string
     readonly mode?: ResolvedChatMode
-    readonly orgPolicy?: OrgAiPolicy
+    readonly orgPolicy?: OrgPolicy
     readonly threadDisabledToolKeys?: readonly string[]
   }) => Effect.Effect<ResolvedToolPolicy, ChatDomainError>
   readonly sanitizeThreadDisabledToolKeys: (input: {
     readonly modelId: string
     readonly mode?: ResolvedChatMode
-    readonly orgPolicy?: OrgAiPolicy
+    readonly orgPolicy?: OrgPolicy
     readonly disabledToolKeys?: readonly string[]
   }) => Effect.Effect<readonly string[]>
 }

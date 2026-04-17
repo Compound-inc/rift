@@ -3,15 +3,15 @@
 import { ContentPage } from '@/components/layout'
 import { useOrgFeatureAccess } from '@/lib/frontend/billing/use-org-billing'
 import { m } from '@/paraglide/messages.js'
-import { ComplianceFlagsSection } from '../model-policy/compliance-flags-section'
-import { useProviderPolicy } from '../model-policy/use-provider-policy'
+import { ComplianceFlagsSection } from '../chat-policy/compliance-flags-section'
+import { useChatPolicySettings } from '../chat-policy/use-chat-policy-settings'
 
 /**
  * Compliance & Policy settings page.
  * Contains compliance flags and policy configuration.
  */
 export function CompliancePolicyPage() {
-  const { payload, loading, error, updating, update } = useProviderPolicy()
+  const { payload, loading, error, updating, update } = useChatPolicySettings()
   const featureAccess = useOrgFeatureAccess('compliancePolicy')
   const busy = loading || updating
 

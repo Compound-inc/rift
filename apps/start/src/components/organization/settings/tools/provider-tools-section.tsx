@@ -10,15 +10,15 @@ import {
   getToolUiGroupKey,
 } from '@/lib/shared/ai-catalog/tool-ui'
 import type { CatalogProviderId } from '@/lib/shared/ai-catalog/provider-tools'
-import { PROVIDER_NAMES } from '@/components/organization/settings/model-policy/provider-constants'
+import { PROVIDER_NAMES } from '@/components/organization/settings/chat-policy/provider-constants'
 import { m } from '@/paraglide/messages.js'
-import type { PolicyPayload } from '@/components/organization/settings/model-policy/types'
-import type { useProviderPolicy } from '@/components/organization/settings/model-policy/use-provider-policy'
+import type { ChatPolicySettingsPayload } from '@/components/organization/settings/chat-policy/types'
+import type { useChatPolicySettings } from '@/components/organization/settings/chat-policy/use-chat-policy-settings'
 
 type ProviderToolsSectionProps = {
-  payload: PolicyPayload
+  payload: ChatPolicySettingsPayload
   updating: boolean
-  update: ReturnType<typeof useProviderPolicy>['update']
+  update: ReturnType<typeof useChatPolicySettings>['update']
   featureAccess?: WorkspaceFeatureAccessState & { loading: boolean }
 }
 
@@ -26,7 +26,7 @@ type ToolSettingsGroup = {
   readonly id: string
   readonly label: string
   readonly description: string
-  readonly tools: PolicyPayload['tools']
+  readonly tools: ChatPolicySettingsPayload['tools']
 }
 
 /**
@@ -37,7 +37,7 @@ type ToolSettingsGroup = {
  * differentiates a variant such as "Dynamic Filtering".
  */
 function groupToolsForDisplay(
-  tools: ReadonlyArray<PolicyPayload['tools'][number]>,
+  tools: ReadonlyArray<ChatPolicySettingsPayload['tools'][number]>,
 ): ReadonlyMap<string, readonly ToolSettingsGroup[]> {
   const groupsByProvider = new Map<string, ToolSettingsGroup[]>()
 

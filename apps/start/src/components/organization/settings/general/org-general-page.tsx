@@ -4,11 +4,14 @@ import { useState } from 'react'
 import { Form } from '@rift/ui/form'
 import { ContentPage } from '@/components/layout'
 import { AvatarUploadField } from '@/components/settings/avatar-upload'
+import { useOrgProductFeatures } from '@/lib/frontend/organizations/use-org-product-features'
 import { m } from '@/paraglide/messages.js'
 import { useOrgGeneralPageLogic } from './org-general-page.logic'
 
 export function OrgGeneralPage() {
   const [avatarError, setAvatarError] = useState<string | null>(null)
+  const { states, updatingKey, error: productFeatureError, setFeatureEnabled } =
+    useOrgProductFeatures()
   const {
     name,
     savedName,
@@ -83,6 +86,23 @@ export function OrgGeneralPage() {
         buttonText={m.common_save()}
         buttonDisabled={!canEdit || loading || name.trim().length === 0}
         handleSubmit={submitName}
+      />
+
+      <Form
+        title={m.org_settings_general_witting_title()}
+        description={m.org_settings_general_witting_description()}
+        error={productFeatureError ?? undefined}
+        helpText={
+          <p className="text-sm text-foreground-tertiary">
+            {m.org_settings_general_witting_help()}
+          </p>
+        }
+        headerToggle={{
+          checked: states.writing,
+          onCheckedChange: (enabled) =>
+            void setFeatureEnabled('writing', enabled),
+          disabled: !canEdit || loading || updatingKey === 'writing',
+        }}
       />
     </ContentPage>
   )

@@ -1,5 +1,9 @@
 import { Effect, Layer, ServiceMap } from 'effect'
 import {
+  CHAT_PRODUCT_KEY,
+  resolveEffectiveChatOrgPolicy,
+} from '@/lib/shared/model-policy/chat-product-policy'
+import {
   getCatalogModelProviderRoute,
 } from '@/lib/shared/ai-catalog'
 import type { AiReasoningEffort } from '@/lib/shared/ai-catalog/types'
@@ -12,11 +16,12 @@ import type {AccessContext} from '@/lib/shared/access-control';
 import {
   isByokSupportedProviderId,
 } from '@/lib/shared/model-policy/provider-keys'
-import { readOrgProviderApiKeyEffect } from '@/lib/backend/byok/infra/provider-key-store'
-import { getOrgAiPolicy } from '@/lib/backend/model-policy/repository'
+import { readOrgProviderApiKey } from '@/lib/backend/byok/infra/provider-key-store'
+import { getOrgPolicy } from '@/lib/backend/org-policy/repository'
+import { getOrgProductPolicy } from '@/lib/backend/org-product-policy/repository'
 import type {
   EffectiveModelResolution,
-  OrgAiPolicy,
+  OrgPolicy,
 } from '@/lib/shared/model-policy/types'
 import { canUseOrganizationProviderKeys } from '@/utils/app-feature-flags'
 import {
@@ -62,11 +67,11 @@ export type ModelPolicyServiceShape = {
   readonly getOrgPolicy: (input: {
     readonly organizationId?: string
     readonly requestId: string
-  }) => Effect.Effect<OrgAiPolicy | undefined, MessagePersistenceError>
+  }) => Effect.Effect<OrgPolicy | undefined, MessagePersistenceError>
   readonly resolveThreadModel: (input: {
     readonly threadId: string
     readonly organizationId?: string
-    readonly orgPolicy?: OrgAiPolicy
+    readonly orgPolicy?: OrgPolicy
     readonly threadModel?: string
     readonly threadReasoningEffort?: AiReasoningEffort
     readonly requestedModelId?: string
@@ -105,7 +110,14 @@ export class ModelPolicyService extends ServiceMap.Service<
         Effect.tryPromise({
           try: async () => {
             if (!organizationId) return undefined
-            return getOrgAiPolicy(organizationId)
+            const [orgPolicy, chatProductPolicy] = await Promise.all([
+              getOrgPolicy(organizationId),
+              getOrgProductPolicy(organizationId, CHAT_PRODUCT_KEY),
+            ])
+            return resolveEffectiveChatOrgPolicy({
+              orgPolicy,
+              productPolicy: chatProductPolicy,
+            })
           },
           catch: (error) =>
             new MessagePersistenceError({
@@ -132,7 +144,7 @@ export class ModelPolicyService extends ServiceMap.Service<
       }: {
         readonly threadId: string
         readonly organizationId?: string
-        readonly orgPolicy?: OrgAiPolicy
+        readonly orgPolicy?: OrgPolicy
         readonly threadModel?: string
         readonly threadReasoningEffort?: AiReasoningEffort
         readonly requestedModelId?: string
@@ -148,7 +160,14 @@ export class ModelPolicyService extends ServiceMap.Service<
             (yield* Effect.tryPromise({
               try: async () => {
                 if (!organizationId) return undefined
-                return getOrgAiPolicy(organizationId)
+                const [loadedOrgPolicy, chatProductPolicy] = await Promise.all([
+                  getOrgPolicy(organizationId),
+                  getOrgProductPolicy(organizationId, CHAT_PRODUCT_KEY),
+                ])
+                return resolveEffectiveChatOrgPolicy({
+                  orgPolicy: loadedOrgPolicy,
+                  productPolicy: chatProductPolicy,
+                })
               },
               catch: (error) =>
                 new MessagePersistenceError({
@@ -330,21 +349,21 @@ export class ModelPolicyService extends ServiceMap.Service<
                   if (!providerRoute) continue
                   lastRoutableProviderId = providerId
 
-                  const providerApiKey = yield* readOrgProviderApiKeyEffect({
-                    organizationId,
-                    providerId,
-                  }).pipe(
-                    Effect.mapError(
-                      (error) =>
-                        new MessagePersistenceError({
-                          message:
-                            'Failed to resolve organization provider API key',
-                          requestId,
-                          threadId,
-                          cause: String(error),
-                        }),
-                    ),
-                  )
+                  const providerApiKey = yield* Effect.tryPromise({
+                    try: () =>
+                      readOrgProviderApiKey({
+                        organizationId,
+                        providerId,
+                      }),
+                    catch: (error) =>
+                      new MessagePersistenceError({
+                        message:
+                          'Failed to resolve organization provider API key',
+                        requestId,
+                        threadId,
+                        cause: String(error),
+                      }),
+                  })
 
                   if (!providerApiKey) {
                     continue

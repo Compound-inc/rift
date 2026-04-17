@@ -48,14 +48,18 @@ import {
 } from '@/lib/shared/chat-modes'
 import type {ChatModeId} from '@/lib/shared/chat-modes';
 import { resolveToolPolicy } from '@/lib/shared/chat/tool-policy'
+import {
+  CHAT_PRODUCT_KEY,
+  resolveEffectiveChatOrgPolicy,
+} from '@/lib/shared/model-policy/chat-product-policy'
 import { evaluateModelAvailability } from '@/lib/shared/model-policy/policy-engine'
 import { hasActiveOrgProviderKeyForModel } from '@/lib/shared/model-policy/provider-keys'
 import {
   DEFAULT_ORG_TOOL_POLICY,
-  EMPTY_ORG_PROVIDER_KEY_STATUS
-  
+  EMPTY_ORG_PROVIDER_KEY_STATUS,
+  normalizeOrgPolicy,
 } from '@/lib/shared/model-policy/types'
-import type {OrgAiPolicy} from '@/lib/shared/model-policy/types';
+import type {OrgPolicy} from '@/lib/shared/model-policy/types';
 import type {
   ChatAttachment,
   ChatAttachmentInput,
@@ -70,6 +74,7 @@ import type {
 } from '@/lib/shared/ai-catalog/types'
 import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 import { useOrgBillingSummary } from '@/lib/frontend/billing/use-org-billing'
+import { readOrgProductPolicy } from '@/lib/frontend/organizations/use-org-product-policy'
 import {
   captureClientChatError,
   setClientChatScope,
@@ -236,19 +241,14 @@ type PendingOptimisticAttachmentManifest = {
  * surface aligned with the server-side policy shape and avoids repeating
  * defensive property checks across model/tool selectors.
  */
-function toOrgAiPolicy(row: unknown): OrgAiPolicy | undefined {
+function toOrgPolicy(row: unknown): OrgPolicy | undefined {
   if (!row || typeof row !== 'object') return undefined
-  if (!('organizationId' in row) || typeof row.organizationId !== 'string') {
-    return undefined
-  }
 
-  const enforcedModeId =
-    'enforcedModeId' in row && typeof row.enforcedModeId === 'string'
-      ? row.enforcedModeId
-      : undefined
-
-  return {
-    organizationId: row.organizationId,
+  return normalizeOrgPolicy({
+    organizationId:
+      'organizationId' in row && typeof row.organizationId === 'string'
+        ? row.organizationId
+        : undefined,
     disabledProviderIds:
       'disabledProviderIds' in row && Array.isArray(row.disabledProviderIds)
         ? row.disabledProviderIds
@@ -289,9 +289,7 @@ function toOrgAiPolicy(row: unknown): OrgAiPolicy | undefined {
       row.providerKeyStatus &&
       'providers' in row.providerKeyStatus &&
       typeof row.providerKeyStatus.providers === 'object' &&
-      row.providerKeyStatus.providers &&
-      'openai' in row.providerKeyStatus.providers &&
-      'anthropic' in row.providerKeyStatus.providers
+      row.providerKeyStatus.providers
         ? {
             syncedAt:
               'syncedAt' in row.providerKeyStatus &&
@@ -299,23 +297,33 @@ function toOrgAiPolicy(row: unknown): OrgAiPolicy | undefined {
                 ? row.providerKeyStatus.syncedAt
                 : EMPTY_ORG_PROVIDER_KEY_STATUS.syncedAt,
             hasAnyProviderKey:
-              Boolean(row.providerKeyStatus.providers.openai) ||
-              Boolean(row.providerKeyStatus.providers.anthropic),
+              'hasAnyProviderKey' in row.providerKeyStatus &&
+              typeof row.providerKeyStatus.hasAnyProviderKey === 'boolean'
+                ? row.providerKeyStatus.hasAnyProviderKey
+                : undefined,
             providers: {
-              openai: Boolean(row.providerKeyStatus.providers.openai),
-              anthropic: Boolean(row.providerKeyStatus.providers.anthropic),
+              openai:
+                'openai' in row.providerKeyStatus.providers
+                  ? Boolean(row.providerKeyStatus.providers.openai)
+                  : false,
+              anthropic:
+                'anthropic' in row.providerKeyStatus.providers
+                  ? Boolean(row.providerKeyStatus.providers.anthropic)
+                  : false,
             },
           }
         : undefined,
     enforcedModeId:
-      enforcedModeId && isChatModeId(enforcedModeId)
-        ? enforcedModeId
+      'enforcedModeId' in row &&
+      typeof row.enforcedModeId === 'string' &&
+      isChatModeId(row.enforcedModeId)
+        ? row.enforcedModeId
         : undefined,
     updatedAt:
       'updatedAt' in row && typeof row.updatedAt === 'number'
         ? row.updatedAt
         : Date.now(),
-  }
+  })
 }
 
 function toUIMessageFromStoredMessage(message: {
@@ -596,6 +604,9 @@ export function ChatProvider({
     useState<Record<string, OptimisticThreadBranchState>>({})
   const activeThreadId = threadId ?? provisionalThreadId
   const [orgPolicyRow] = useQuery(queries.orgPolicy.current())
+  const [chatProductPolicyRow] = useQuery(
+    queries.orgProductPolicy.current({ productKey: CHAT_PRODUCT_KEY }),
+  )
   const [threadRow] = useQuery(
     queries.threads.byId({
       threadId: activeThreadId ?? '',
@@ -751,7 +762,14 @@ export function ChatProvider({
     () => buildBranchCost(canonicalStoredMessages),
     [canonicalStoredMessages],
   )
-  const orgPolicy = useMemo(() => toOrgAiPolicy(orgPolicyRow), [orgPolicyRow])
+  const orgPolicy = useMemo(
+    () =>
+      resolveEffectiveChatOrgPolicy({
+        orgPolicy: toOrgPolicy(orgPolicyRow),
+        productPolicy: readOrgProductPolicy({ row: chatProductPolicyRow }),
+      }),
+    [chatProductPolicyRow, orgPolicyRow],
+  )
   const accessContext = useMemo<AccessContext>(
     () => ({
       isAnonymous,

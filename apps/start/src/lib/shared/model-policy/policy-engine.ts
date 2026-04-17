@@ -7,7 +7,7 @@ import { hasActiveOrgProviderKeyForModel } from './provider-keys'
 import type { AiModelCatalogEntry } from '@/lib/shared/ai-catalog/types'
 import type {
   ModelAvailabilityDecision,
-  OrgAiPolicy,
+  OrgPolicy,
 } from './types'
 
 /** Default allow when no org policy exists yet. */
@@ -21,7 +21,7 @@ function emptyDecision(): ModelAvailabilityDecision {
  */
 export function evaluateModelAvailability(input: {
   readonly model: AiModelCatalogEntry
-  readonly policy?: OrgAiPolicy
+  readonly policy?: OrgPolicy
 }): ModelAvailabilityDecision {
   const { model, policy } = input
   if (!policy) return emptyDecision()
@@ -54,7 +54,7 @@ export function evaluateModelAvailability(input: {
 }
 
 /** Returns catalog models visible to an org after policy filtering. */
-export function listAllowedCatalogModels(policy?: OrgAiPolicy): readonly AiModelCatalogEntry[] {
+export function listAllowedCatalogModels(policy?: OrgPolicy): readonly AiModelCatalogEntry[] {
   return AI_CATALOG.filter(
     (model) => evaluateModelAvailability({ model, policy }).allowed,
   )

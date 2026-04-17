@@ -32,7 +32,7 @@ import {
 import type { ChatRequestWideEvent } from '../observability/wide-event'
 import { buildChatApiErrorEnvelope } from '../http/error-response'
 import { canUseReasoningControls } from '@/utils/app-feature-flags'
-import type { OrgAiPolicy } from '@/lib/shared/model-policy/types'
+import type { OrgPolicy } from '@/lib/shared/model-policy/types'
 import { isChatModeId, resolveEffectiveChatMode } from '@/lib/shared/chat-modes'
 import type {ResolvedChatAccessPolicy} from '@/lib/backend/access-control';
 import {
@@ -87,7 +87,7 @@ function getResolvedCatalogModel(modelId: string) {
 
 function withGatewayComplianceProviderOptions(input: {
   readonly providerOptions?: Record<string, unknown>
-  readonly orgPolicy?: OrgAiPolicy
+  readonly orgPolicy?: OrgPolicy
   readonly hasProviderKeyOverride?: boolean
 }): Record<string, unknown> | undefined {
   const gatewayOptions =
@@ -127,7 +127,7 @@ export type ChatOrchestratorServiceShape = {
     readonly threadId: string
     readonly organizationId?: string
     readonly accessPolicy: ResolvedChatAccessPolicy
-    readonly orgPolicy?: OrgAiPolicy
+    readonly orgPolicy?: OrgPolicy
     readonly skipProviderKeyResolution?: boolean
     readonly requestId: string
     readonly trigger?: 'submit-message' | 'regenerate-message' | 'edit-message'

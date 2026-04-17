@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { ModelsPage } from '@/components/organization/settings/model-policy'
+import { ModelsPage } from '@/components/organization/settings/chat-policy'
 
 /**
  * Organization settings: provider and model list (exact path /organization/settings/models).

@@ -8,6 +8,7 @@ import {
   NAV_AREAS,
   SINGULARITY_AREA_KEY,
   SETTINGS_AREA_KEY,
+  WRITING_AREA_KEY,
 } from '@/components/layout/sidebar/app-sidebar-nav.config'
 import { SidebarAreaPanel } from '@/components/layout/sidebar/sidebar-area-panel'
 import { ORG_SETTINGS_AREA_KEY } from '@/routes/(app)/_layout/organization/settings/-organization-settings-nav'
@@ -17,6 +18,7 @@ import { directionClass, useDirection } from '@rift/ui/direction'
 import { SidebarGroupTooltip } from '@rift/ui/tooltip'
 import { cn } from '@rift/utils'
 import { useAppAuth } from '@/lib/frontend/auth/use-auth'
+import { useOrgProductFeatureAccess } from '@/lib/frontend/organizations/use-org-product-features'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { isSingularityOrganizationId } from '@/ee/singularity/shared/singularity'
 import { waitForPageSettled } from '@/lib/frontend/performance/page-settled'
@@ -113,6 +115,7 @@ export const AppSidebar: ComponentType = () => {
     }
   }, [effectiveCurrentArea, isTransitionReady])
   const { user, loading, isAnonymous, activeOrganizationId } = useAppAuth()
+  const { enabled: isWittingEnabled } = useOrgProductFeatureAccess('writing')
   const { isChatPageSidebarCollapsed } = usePageSidebarVisibility()
   const direction = useDirection()
   const canAccessSingularity = isSingularityOrganizationId(activeOrganizationId)
@@ -183,6 +186,9 @@ export const AppSidebar: ComponentType = () => {
             {Object.entries(NAV_AREAS)
               .filter(([key]) =>
                 key === SINGULARITY_AREA_KEY ? canAccessSingularity : true,
+              )
+              .filter(([key]) =>
+                key === WRITING_AREA_KEY ? isWittingEnabled : true,
               )
               .filter(
                 ([key]) =>

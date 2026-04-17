@@ -14,6 +14,11 @@ import {
   settingsNavArea,
   SETTINGS_AREA_KEY,
 } from '@/routes/(app)/_layout/settings/-settings-nav'
+import {
+  isWritingPath,
+  writingNavArea,
+  WRITING_AREA_KEY,
+} from '@/routes/(app)/_layout/writing/-writing-nav'
 import type { ComponentType, SVGProps } from 'react'
 
 export type SidebarNavData = {
@@ -63,6 +68,7 @@ export type SidebarNavAreas = Record<
 export const NAV_AREAS: SidebarNavAreas = {
   [SINGULARITY_AREA_KEY]: singularityNavArea,
   [ORG_SETTINGS_AREA_KEY]: orgSettingsNavArea,
+  [WRITING_AREA_KEY]: writingNavArea,
   [CHAT_AREA_KEY]: chatNavArea,
   [SETTINGS_AREA_KEY]: settingsNavArea,
 }
@@ -70,6 +76,7 @@ export const NAV_AREAS: SidebarNavAreas = {
 export { CHAT_AREA_KEY }
 export { SETTINGS_AREA_KEY }
 export { SINGULARITY_AREA_KEY }
+export { WRITING_AREA_KEY }
 
 /**
  * Resolve current area from pathname.
@@ -77,6 +84,7 @@ export { SINGULARITY_AREA_KEY }
 export function getCurrentArea(pathname: string): string | null {
   if (isSingularityPath(pathname)) return SINGULARITY_AREA_KEY
   if (isOrgSettingsPath(pathname)) return ORG_SETTINGS_AREA_KEY
+  if (isWritingPath(pathname)) return WRITING_AREA_KEY
   if (isSettingsPath(pathname)) return SETTINGS_AREA_KEY
   if (isChatPath(pathname)) return CHAT_AREA_KEY
   return null

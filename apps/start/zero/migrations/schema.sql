@@ -207,8 +207,8 @@ CREATE INDEX IF NOT EXISTS messages_user_thread_search_scope
   ON messages (user_id, thread_id, created_at DESC)
   WHERE status = 'done' AND role IN ('user', 'assistant');
 
--- org_ai_policy
-CREATE TABLE IF NOT EXISTS org_ai_policy (
+-- org_policy
+CREATE TABLE IF NOT EXISTS org_policy (
   id TEXT PRIMARY KEY,
   organization_id TEXT NOT NULL UNIQUE,
   disabled_provider_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -224,22 +224,103 @@ CREATE TABLE IF NOT EXISTS org_ai_policy (
   version BIGINT NOT NULL DEFAULT 1,
   updated_at BIGINT NOT NULL
 );
-ALTER TABLE org_ai_policy
+ALTER TABLE org_policy
 ADD COLUMN IF NOT EXISTS provider_key_status JSONB NOT NULL DEFAULT '{"syncedAt": 0, "hasAnyProviderKey": false, "providers": {"openai": false, "anthropic": false}}'::jsonb;
-ALTER TABLE org_ai_policy
+ALTER TABLE org_policy
 ADD COLUMN IF NOT EXISTS enforced_mode_id TEXT;
-ALTER TABLE org_ai_policy
+ALTER TABLE org_policy
 ADD COLUMN IF NOT EXISTS provider_native_tools_enabled BOOLEAN NOT NULL DEFAULT TRUE;
-ALTER TABLE org_ai_policy
+ALTER TABLE org_policy
 ADD COLUMN IF NOT EXISTS external_tools_enabled BOOLEAN NOT NULL DEFAULT TRUE;
-ALTER TABLE org_ai_policy
+ALTER TABLE org_policy
 ADD COLUMN IF NOT EXISTS disabled_tool_keys JSONB NOT NULL DEFAULT '[]'::jsonb;
-ALTER TABLE org_ai_policy
+ALTER TABLE org_policy
 ADD COLUMN IF NOT EXISTS org_knowledge_enabled BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE org_ai_policy
+ALTER TABLE org_policy
 ADD COLUMN IF NOT EXISTS active_org_knowledge_count BIGINT NOT NULL DEFAULT 0;
-CREATE INDEX IF NOT EXISTS org_ai_policy_organization_id ON org_ai_policy (organization_id);
-CREATE INDEX IF NOT EXISTS org_ai_policy_updated_at ON org_ai_policy (updated_at);
+CREATE INDEX IF NOT EXISTS org_policy_organization_id ON org_policy (organization_id);
+CREATE INDEX IF NOT EXISTS org_policy_updated_at ON org_policy (updated_at);
+
+-- org_product_config
+CREATE TABLE IF NOT EXISTS org_product_config (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL UNIQUE,
+  feature_states JSONB NOT NULL DEFAULT '{}'::jsonb,
+  version BIGINT NOT NULL DEFAULT 1,
+  updated_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS org_product_config_organization_id ON org_product_config (organization_id);
+CREATE INDEX IF NOT EXISTS org_product_config_updated_at ON org_product_config (updated_at);
+
+-- org_product_policy
+CREATE TABLE IF NOT EXISTS org_product_policy (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL REFERENCES organization(id) ON DELETE CASCADE,
+  product_key TEXT NOT NULL,
+  capabilities JSONB NOT NULL DEFAULT '{}'::jsonb,
+  settings JSONB NOT NULL DEFAULT '{}'::jsonb,
+  disabled_provider_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+  disabled_model_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+  disabled_tool_keys JSONB NOT NULL DEFAULT '[]'::jsonb,
+  compliance_flags JSONB NOT NULL DEFAULT '{}'::jsonb,
+  version INTEGER NOT NULL DEFAULT 1,
+  updated_at BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS org_product_policy_org_product_key
+  ON org_product_policy (organization_id, product_key);
+CREATE INDEX IF NOT EXISTS org_product_policy_updated_at ON org_product_policy (updated_at);
+
+INSERT INTO org_product_policy (
+  id,
+  organization_id,
+  product_key,
+  capabilities,
+  settings,
+  disabled_provider_ids,
+  disabled_model_ids,
+  disabled_tool_keys,
+  compliance_flags,
+  version,
+  updated_at
+)
+SELECT
+  'chat-policy:' || organization_id AS id,
+  organization_id,
+  'chat' AS product_key,
+  '{}'::jsonb AS capabilities,
+  jsonb_strip_nulls(
+    jsonb_build_object(
+      'providerNativeToolsEnabled',
+      CASE
+        WHEN COALESCE(provider_native_tools_enabled, true) IS DISTINCT FROM true
+          THEN COALESCE(provider_native_tools_enabled, true)
+        ELSE NULL
+      END,
+      'externalToolsEnabled',
+      CASE
+        WHEN COALESCE(external_tools_enabled, true) IS DISTINCT FROM true
+          THEN COALESCE(external_tools_enabled, true)
+        ELSE NULL
+      END
+    )
+  ) AS settings,
+  COALESCE(disabled_provider_ids, '[]'::jsonb) AS disabled_provider_ids,
+  COALESCE(disabled_model_ids, '[]'::jsonb) AS disabled_model_ids,
+  COALESCE(disabled_tool_keys, '[]'::jsonb) AS disabled_tool_keys,
+  '{}'::jsonb AS compliance_flags,
+  1 AS version,
+  COALESCE(
+    updated_at,
+    FLOOR(EXTRACT(EPOCH FROM NOW()) * 1000)::bigint
+  ) AS updated_at
+FROM org_policy
+WHERE
+  COALESCE(provider_native_tools_enabled, true) IS DISTINCT FROM true
+  OR COALESCE(external_tools_enabled, true) IS DISTINCT FROM true
+  OR jsonb_array_length(COALESCE(disabled_provider_ids, '[]'::jsonb)) > 0
+  OR jsonb_array_length(COALESCE(disabled_model_ids, '[]'::jsonb)) > 0
+  OR jsonb_array_length(COALESCE(disabled_tool_keys, '[]'::jsonb)) > 0
+ON CONFLICT (organization_id, product_key) DO NOTHING;
 
 -- org_provider_api_key
 CREATE TABLE IF NOT EXISTS org_provider_api_key (

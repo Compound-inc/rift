@@ -11,7 +11,7 @@ import { zql } from '../zql'
 export const orgPolicyQueryDefinitions = {
   orgPolicy: {
     /**
-     * Returns the AI policy row for the active organization.
+     * Returns the organization policy row for the active organization.
      *
      * Query visibility should not depend on `ctx.memberRole` because the Zero
      * client provider does not hydrate org roles into local context. The write
@@ -21,12 +21,12 @@ export const orgPolicyQueryDefinitions = {
     current: defineQuery(({ ctx }) => {
       const scoped = getOrgContext(ctx)
       if (!scoped) {
-        return zql.orgAiPolicy
+        return zql.orgPolicy
           .where('organizationId', '__missing_org__')
           .one()
       }
 
-      return zql.orgAiPolicy
+      return zql.orgPolicy
         .where('organizationId', scoped.organizationId)
         .one()
     }),

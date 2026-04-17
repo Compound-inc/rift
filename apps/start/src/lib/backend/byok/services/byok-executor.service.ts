@@ -1,14 +1,14 @@
 import { Effect, Layer, Match, Option, pipe, ServiceMap } from 'effect'
 import { canUseOrganizationProviderKeys } from '@/utils/app-feature-flags'
 import {
-  getOrgAiPolicy,
-  upsertOrgAiPolicy,
-} from '@/lib/backend/model-policy/repository'
+  getOrgPolicy,
+  upsertOrgPolicy,
+} from '@/lib/backend/org-policy/repository'
 import type { ByokSupportedProviderId } from '@/lib/shared/model-policy/provider-keys'
 import {
-  deleteOrgProviderApiKeyEffect,
-  readOrgProviderApiKeyStatusEffect,
-  upsertOrgProviderApiKeyEffect,
+  deleteOrgProviderApiKey,
+  readOrgProviderApiKeyStatus,
+  upsertOrgProviderApiKey,
 } from '@/lib/backend/byok/infra/provider-key-store'
 import {
   DEFAULT_ORG_TOOL_POLICY,
@@ -107,7 +107,7 @@ const toPersistenceError = (cause: unknown): ByokPersistenceError =>
 
 const tryGetPolicy = (organizationId: string) =>
   Effect.tryPromise({
-    try: () => getOrgAiPolicy(organizationId),
+    try: () => getOrgPolicy(organizationId),
     catch: toPersistenceError,
   })
 
@@ -115,20 +115,31 @@ const tryUpsertKey = (params: {
   organizationId: string
   providerId: ByokSupportedProviderId
   apiKey: string
-}) => upsertOrgProviderApiKeyEffect(params).pipe(Effect.mapError(toPersistenceError))
+}) =>
+  Effect.tryPromise({
+    try: () => upsertOrgProviderApiKey(params),
+    catch: toPersistenceError,
+  })
 
 const tryDeleteKey = (params: {
   organizationId: string
   providerId: ByokSupportedProviderId
-}) => deleteOrgProviderApiKeyEffect(params).pipe(Effect.mapError(toPersistenceError))
+}) =>
+  Effect.tryPromise({
+    try: () => deleteOrgProviderApiKey(params),
+    catch: toPersistenceError,
+  })
 
 const tryReadStatus = (organizationId: string) =>
-  readOrgProviderApiKeyStatusEffect(organizationId).pipe(Effect.mapError(toPersistenceError))
+  Effect.tryPromise({
+    try: () => readOrgProviderApiKeyStatus(organizationId),
+    catch: toPersistenceError,
+  })
 
 /** Runs set_provider_api_key branch. */
 const runSet = (
   organizationId: string,
-  existing: Awaited<ReturnType<typeof getOrgAiPolicy>>,
+  existing: Awaited<ReturnType<typeof getOrgPolicy>>,
   action: Extract<UpdateByokPayload, { action: 'set_provider_api_key' }>,
 ): Effect.Effect<
   ByokUpdateResult,
@@ -158,7 +169,7 @@ const runSet = (
       pipe(
         Effect.tryPromise({
           try: () =>
-            upsertOrgAiPolicy({
+            upsertOrgPolicy({
               organizationId,
               disabledProviderIds: existing?.disabledProviderIds ?? [],
               disabledModelIds: existing?.disabledModelIds ?? [],
@@ -187,7 +198,7 @@ const runSet = (
 /** Runs remove_provider_api_key branch. */
 const runRemove = (
   organizationId: string,
-  existing: Awaited<ReturnType<typeof getOrgAiPolicy>>,
+  existing: Awaited<ReturnType<typeof getOrgPolicy>>,
   action: Extract<UpdateByokPayload, { action: 'remove_provider_api_key' }>,
 ): Effect.Effect<
   ByokUpdateResult,
@@ -213,7 +224,7 @@ const runRemove = (
       pipe(
         Effect.tryPromise({
           try: () =>
-            upsertOrgAiPolicy({
+            upsertOrgPolicy({
               organizationId,
               disabledProviderIds: existing?.disabledProviderIds ?? [],
               disabledModelIds: existing?.disabledModelIds ?? [],
@@ -243,4 +254,4 @@ type ExecuteUpdateEffect = Effect.Effect<
   ByokUpdateResult,
   ByokFeatureDisabledError | ByokPersistenceError
 >
-type ExistingPolicy = Awaited<ReturnType<typeof getOrgAiPolicy>>
+type ExistingPolicy = Awaited<ReturnType<typeof getOrgPolicy>>

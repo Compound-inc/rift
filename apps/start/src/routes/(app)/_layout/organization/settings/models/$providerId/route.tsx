@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { ProviderModelsPage } from '@/components/organization/settings/model-policy/provider-models-page'
-import { useProviderPolicy } from '@/components/organization/settings/model-policy/use-provider-policy'
+import { ProviderModelsPage } from '@/components/organization/settings/chat-policy/provider-models-page'
+import { useChatPolicySettings } from '@/components/organization/settings/chat-policy/use-chat-policy-settings'
 import { ContentPage } from '@/components/layout'
 import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 import { m } from '@/paraglide/messages.js'
@@ -18,7 +18,7 @@ export const Route = createFileRoute(
 function ProviderModelsRoutePage() {
   const { activeOrganizationId } = useAppAuth()
   const { providerId } = Route.useParams()
-  const { payload, loading, error, updating, update } = useProviderPolicy()
+  const { payload, loading, error, updating, update } = useChatPolicySettings()
 
   if (!activeOrganizationId) {
     return (

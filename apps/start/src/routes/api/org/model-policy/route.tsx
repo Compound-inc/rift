@@ -3,13 +3,13 @@ import { Effect } from 'effect'
 import { z } from 'zod'
 import { WorkspaceBillingService } from '@/lib/backend/billing/services/workspace-billing.service'
 import {
-  ModelPolicyRuntime,
-  OrgModelPolicyInvalidRequestError,
-  OrgModelPolicyMissingOrgContextError,
-  OrgModelPolicyService,
-  OrgModelPolicyUnauthorizedError,
-  toOrgModelPolicyErrorResponse,
-} from '@/lib/backend/model-policy'
+  ChatPolicyRuntime,
+  ChatPolicyInvalidRequestError,
+  ChatPolicyMissingOrgContextError,
+  ChatPolicySettingsService,
+  ChatPolicyUnauthorizedError,
+  toChatPolicyErrorResponse,
+} from '@/lib/backend/chat-policy'
 import { requireOrgAuth } from '@/lib/backend/server-effect/http/server-auth'
 
 /** Request shape for provider-level policy updates. */
@@ -55,7 +55,11 @@ const ToggleToolBody = z.object({
   disabled: z.boolean(),
 })
 
-/** Union for supported update actions handled by POST /api/org/model-policy. */
+/**
+ * Supported chat policy updates for the legacy `/api/org/model-policy` endpoint.
+ * The URL stays stable for compatibility even though the domain is now named
+ * chat policy throughout the codebase.
+ */
 const UpdatePolicyBody = z.discriminatedUnion('action', [
   ToggleProviderBody,
   ToggleModelBody,
@@ -66,7 +70,7 @@ const UpdatePolicyBody = z.discriminatedUnion('action', [
   ToggleToolBody,
 ])
 
-/** Org-scoped API for model policy read/write operations. */
+/** Org-scoped API for chat policy settings read/write operations. */
 export const Route = createFileRoute('/api/org/model-policy')({
   server: {
     handlers: {
@@ -77,18 +81,18 @@ export const Route = createFileRoute('/api/org/model-policy')({
           const authContext = yield* requireOrgAuth({
             headers: request.headers,
             onUnauthorized: () =>
-              new OrgModelPolicyUnauthorizedError({
+              new ChatPolicyUnauthorizedError({
                 message: 'Unauthorized',
                 requestId,
               }),
             onMissingOrg: () =>
-              new OrgModelPolicyMissingOrgContextError({
+              new ChatPolicyMissingOrgContextError({
                 message: 'Organization context is required for org settings.',
                 requestId,
               }),
           })
 
-          const policyService = yield* OrgModelPolicyService
+          const policyService = yield* ChatPolicySettingsService
           const payload = yield* policyService.getPayload({
             organizationId: authContext.organizationId,
             requestId,
@@ -101,9 +105,9 @@ export const Route = createFileRoute('/api/org/model-policy')({
         })
 
         try {
-          return await ModelPolicyRuntime.run(program)
+          return await ChatPolicyRuntime.run(program)
         } catch (error) {
-          return toOrgModelPolicyErrorResponse(error, requestId)
+          return toChatPolicyErrorResponse(error, requestId)
         }
       },
       POST: async ({ request }) => {
@@ -113,12 +117,12 @@ export const Route = createFileRoute('/api/org/model-policy')({
           const authContext = yield* requireOrgAuth({
             headers: request.headers,
             onUnauthorized: () =>
-              new OrgModelPolicyUnauthorizedError({
+              new ChatPolicyUnauthorizedError({
                 message: 'Unauthorized',
                 requestId,
               }),
             onMissingOrg: () =>
-              new OrgModelPolicyMissingOrgContextError({
+              new ChatPolicyMissingOrgContextError({
                 message: 'Organization context is required for org settings.',
                 requestId,
               }),
@@ -127,7 +131,7 @@ export const Route = createFileRoute('/api/org/model-policy')({
           const rawBody = yield* Effect.tryPromise({
             try: () => request.json(),
             catch: () =>
-              new OrgModelPolicyInvalidRequestError({
+              new ChatPolicyInvalidRequestError({
                 message: 'Invalid JSON body',
                 requestId,
               }),
@@ -135,7 +139,7 @@ export const Route = createFileRoute('/api/org/model-policy')({
           const parsedBody = UpdatePolicyBody.safeParse(rawBody)
           if (!parsedBody.success) {
             return yield* Effect.fail(
-              new OrgModelPolicyInvalidRequestError({
+              new ChatPolicyInvalidRequestError({
                 message: 'Invalid payload',
                 requestId,
                 details: parsedBody.error.issues,
@@ -158,7 +162,7 @@ export const Route = createFileRoute('/api/org/model-policy')({
             feature,
           })
 
-          const policyService = yield* OrgModelPolicyService
+          const policyService = yield* ChatPolicySettingsService
           const payload = yield* policyService.updatePolicy({
             organizationId: authContext.organizationId,
             requestId,
@@ -172,9 +176,9 @@ export const Route = createFileRoute('/api/org/model-policy')({
         })
 
         try {
-          return await ModelPolicyRuntime.run(program)
+          return await ChatPolicyRuntime.run(program)
         } catch (error) {
-          return toOrgModelPolicyErrorResponse(error, requestId)
+          return toChatPolicyErrorResponse(error, requestId)
         }
       },
     },

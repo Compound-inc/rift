@@ -1,5 +1,6 @@
 import type { AiReasoningEffort } from '@/lib/shared/ai-catalog/types'
 import type { OrgComplianceFlags } from '@/lib/shared/ai-catalog/compliance-map'
+import { isChatModeId } from '@/lib/shared/chat-modes'
 import type { ChatModeId } from '@/lib/shared/chat-modes'
 
 export type OrgToolPolicy = {
@@ -50,7 +51,7 @@ export function toOrgProviderKeyStatusSnapshot(input: {
  * Persisted organization policy snapshot used to evaluate model availability.
  * Arrays represent deny rules; missing IDs are considered allowed.
  */
-export type OrgAiPolicy = {
+export type OrgPolicy = {
   readonly organizationId: string
   readonly disabledProviderIds: readonly string[]
   readonly disabledModelIds: readonly string[]
@@ -64,6 +65,72 @@ export type OrgAiPolicy = {
    */
   readonly providerKeyStatus?: OrgProviderKeyStatusSnapshot
   readonly updatedAt: number
+}
+
+/**
+ * Normalizes partially populated policy-like objects into the canonical
+ * in-memory org policy snapshot used across chat and settings surfaces.
+ */
+export function normalizeOrgPolicy(input?: {
+  readonly organizationId?: string
+  readonly disabledProviderIds?: readonly string[]
+  readonly disabledModelIds?: readonly string[]
+  readonly complianceFlags?: OrgComplianceFlags
+  readonly toolPolicy?: Partial<OrgToolPolicy>
+  readonly orgKnowledgeEnabled?: boolean | null
+  readonly enforcedModeId?: ChatModeId | string | null
+  readonly providerKeyStatus?: {
+    readonly syncedAt?: number
+    readonly hasAnyProviderKey?: boolean
+    readonly providers?: {
+      readonly openai?: boolean
+      readonly anthropic?: boolean
+    }
+  }
+  readonly updatedAt?: number
+} | null): OrgPolicy | undefined {
+  if (!input?.organizationId) {
+    return undefined
+  }
+
+  const enforcedModeId =
+    typeof input.enforcedModeId === 'string' && isChatModeId(input.enforcedModeId)
+      ? (input.enforcedModeId as ChatModeId)
+      : undefined
+
+  return {
+    organizationId: input.organizationId,
+    disabledProviderIds: input.disabledProviderIds ?? [],
+    disabledModelIds: input.disabledModelIds ?? [],
+    complianceFlags: input.complianceFlags ?? {},
+    toolPolicy: {
+      providerNativeToolsEnabled:
+        input.toolPolicy?.providerNativeToolsEnabled ??
+        DEFAULT_ORG_TOOL_POLICY.providerNativeToolsEnabled,
+      externalToolsEnabled:
+        input.toolPolicy?.externalToolsEnabled ??
+        DEFAULT_ORG_TOOL_POLICY.externalToolsEnabled,
+      disabledToolKeys:
+        input.toolPolicy?.disabledToolKeys ??
+        DEFAULT_ORG_TOOL_POLICY.disabledToolKeys,
+    },
+    orgKnowledgeEnabled: input.orgKnowledgeEnabled ?? false,
+    enforcedModeId,
+    providerKeyStatus: input.providerKeyStatus
+        ? {
+          syncedAt: input.providerKeyStatus.syncedAt ?? 0,
+          hasAnyProviderKey:
+            (input.providerKeyStatus.hasAnyProviderKey ??
+              (Boolean(input.providerKeyStatus.providers?.openai) ||
+                Boolean(input.providerKeyStatus.providers?.anthropic))),
+          providers: {
+            openai: Boolean(input.providerKeyStatus.providers?.openai),
+            anthropic: Boolean(input.providerKeyStatus.providers?.anthropic),
+          },
+        }
+      : undefined,
+    updatedAt: input.updatedAt ?? Date.now(),
+  }
 }
 
 /** Result of policy evaluation for one model candidate. */

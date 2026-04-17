@@ -7,7 +7,7 @@ import type { PersistedGenerationAnalytics } from '@/lib/backend/chat/domain/gen
 import type { ChatAttachmentInput } from '@/lib/shared/chat-contracts/attachments'
 import type { ChatErrorCode } from '@/lib/shared/chat-contracts/error-codes'
 import type { ChatErrorI18nKey } from '@/lib/shared/chat-contracts/error-i18n'
-import type { OrgAiPolicy } from '@/lib/shared/model-policy/types'
+import type { OrgPolicy } from '@/lib/shared/model-policy/types'
 import type {
   BranchVersionConflictError,
   InvalidEditTargetError,
@@ -36,7 +36,7 @@ export type MessageStoreServiceShape = {
     readonly threadId: string
     readonly model: string
     readonly organizationId?: string
-    readonly orgPolicy?: OrgAiPolicy
+    readonly orgPolicy?: OrgPolicy
     readonly untilMessageId?: string
     readonly requestId: string
   }) => Effect.Effect<UIMessage[], MessagePersistenceError>

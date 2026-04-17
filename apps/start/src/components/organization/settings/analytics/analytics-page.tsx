@@ -3,7 +3,7 @@
 import { Form } from '@rift/ui/form'
 import { ContentPage } from '@/components/layout'
 import { m } from '@/paraglide/messages.js'
-import { useProviderPolicy } from '../model-policy/use-provider-policy'
+import { useChatPolicySettings } from '../chat-policy/use-chat-policy-settings'
 
 /** Flag keys stored in org policy complianceFlags for analytics extraction features. */
 const TOPIC_EXTRACTION_FLAG = 'topic_extraction_enabled' as const
@@ -16,7 +16,7 @@ const INTENTION_EXTRACTION_FLAG = 'intention_extraction_enabled' as const
  * Contact Rift support to enable. Analytics are org-internal only, not shared externally.
  */
 export function AnalyticsPage() {
-  const { payload, error, update } = useProviderPolicy()
+  const { payload, error, update } = useChatPolicySettings()
   const flags = payload.policy.complianceFlags ?? {}
 
   return (

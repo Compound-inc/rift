@@ -62,8 +62,8 @@ const invitation = table('invitation')
   })
   .primaryKey('id')
 
-const orgAiPolicy = table('orgAiPolicy')
-  .from('org_ai_policy')
+const orgPolicy = table('orgPolicy')
+  .from('org_policy')
   .columns({
     id: string(),
     organizationId: string().from('organization_id'),
@@ -87,6 +87,35 @@ const orgAiPolicy = table('orgAiPolicy')
       }
     }>().from('provider_key_status'),
     enforcedModeId: string().from('enforced_mode_id').optional(),
+    updatedAt: number().from('updated_at'),
+  })
+  .primaryKey('id')
+
+const orgProductConfig = table('orgProductConfig')
+  .from('org_product_config')
+  .columns({
+    id: string(),
+    organizationId: string().from('organization_id'),
+    featureStates: json<Record<string, boolean>>().from('feature_states'),
+    version: number(),
+    updatedAt: number().from('updated_at'),
+  })
+  .primaryKey('id')
+
+const orgProductPolicy = table('orgProductPolicy')
+  .from('org_product_policy')
+  .columns({
+    id: string(),
+    organizationId: string().from('organization_id'),
+    productKey: string().from('product_key'),
+    capabilities: json<Record<string, boolean>>(),
+    settings: json<Record<string, boolean | string | number | null>>(),
+    disabledProviderIds: json<readonly string[]>()
+      .from('disabled_provider_ids'),
+    disabledModelIds: json<readonly string[]>().from('disabled_model_ids'),
+    disabledToolKeys: json<readonly string[]>().from('disabled_tool_keys'),
+    complianceFlags: json<Record<string, boolean>>().from('compliance_flags'),
+    version: number(),
     updatedAt: number().from('updated_at'),
   })
   .primaryKey('id')
@@ -370,9 +399,19 @@ const organizationRelationships = relationships(organization, ({ many }) => ({
     destSchema: orgEntitlementSnapshot,
     destField: ['organizationId'],
   }),
-  orgAiPolicies: many({
+  orgPolicies: many({
     sourceField: ['id'],
-    destSchema: orgAiPolicy,
+    destSchema: orgPolicy,
+    destField: ['organizationId'],
+  }),
+  productConfigs: many({
+    sourceField: ['id'],
+    destSchema: orgProductConfig,
+    destField: ['organizationId'],
+  }),
+  productPolicies: many({
+    sourceField: ['id'],
+    destSchema: orgProductPolicy,
     destField: ['organizationId'],
   }),
   memberAccess: many({
@@ -405,7 +444,23 @@ const memberRelationships = relationships(member, ({ one }) => ({
   }),
 }))
 
-const orgAiPolicyRelationships = relationships(orgAiPolicy, ({ one }) => ({
+const orgPolicyRelationships = relationships(orgPolicy, ({ one }) => ({
+  organization: one({
+    sourceField: ['organizationId'],
+    destField: ['id'],
+    destSchema: organization,
+  }),
+}))
+
+const orgProductConfigRelationships = relationships(orgProductConfig, ({ one }) => ({
+  organization: one({
+    sourceField: ['organizationId'],
+    destField: ['id'],
+    destSchema: organization,
+  }),
+}))
+
+const orgProductPolicyRelationships = relationships(orgProductPolicy, ({ one }) => ({
   organization: one({
     sourceField: ['organizationId'],
     destField: ['id'],
@@ -460,7 +515,9 @@ export const schema = createSchema({
     organization,
     member,
     invitation,
-    orgAiPolicy,
+    orgPolicy,
+    orgProductConfig,
+    orgProductPolicy,
     orgBillingAccount,
     orgSubscription,
     orgEntitlementSnapshot,
@@ -473,7 +530,9 @@ export const schema = createSchema({
   relationships: [
     organizationRelationships,
     memberRelationships,
-    orgAiPolicyRelationships,
+    orgPolicyRelationships,
+    orgProductConfigRelationships,
+    orgProductPolicyRelationships,
     attachmentRelationships,
     orgSubscriptionRelationships,
     orgUserUsageSummaryRelationships,
