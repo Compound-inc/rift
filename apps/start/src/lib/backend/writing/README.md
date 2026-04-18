@@ -10,6 +10,7 @@ than a real filesystem or shell sandbox.
 ## Layout
 
 - `domain/`: tagged errors for project, chat, persistence, conflict, and agent failures.
+- `tool/`: the writing-agent tool runtime and related backend-facing tool orchestration.
 - `services/`: project, workspace, snapshot, change-set, chat, and PI-agent orchestration.
 - `runtime/`: the single runtime used by routes and server functions.
 

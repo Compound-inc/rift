@@ -6,8 +6,8 @@ import {
   createAgentSession,
   createExtensionRuntime,
   defineTool,
-  type ToolDefinition,
 } from '@mariozechner/pi-coding-agent'
+import type { ToolDefinition } from '@mariozechner/pi-coding-agent'
 import { getEnvApiKey, getModel } from '@mariozechner/pi-ai'
 import { Type } from '@sinclair/typebox'
 import {
@@ -34,12 +34,12 @@ import {
   WritingProjectNotFoundError,
   WritingToolExecutionError,
 } from '../domain'
-import { UserSkillRegistryService } from './user-skill-registry.service'
-import { WritingChangeSetService } from './writing-change-set.service'
-import { WritingChatService } from './writing-chat.service'
-import { WritingProjectService } from './writing-project.service'
-import { WritingWorkspaceService } from './writing-workspace.service'
-import { getProjectChat } from './writing-persistence'
+import { UserSkillRegistryService } from '../services/user-skill-registry.service'
+import { WritingChangeSetService } from '../services/writing-change-set.service'
+import { WritingChatService } from '../services/writing-chat.service'
+import { WritingProjectService } from '../services/writing-project.service'
+import { WritingWorkspaceService } from '../services/writing-workspace.service'
+import { getProjectChat } from '../services/writing-persistence'
 
 type WritingAgentResponse = {
   readonly chatId: string

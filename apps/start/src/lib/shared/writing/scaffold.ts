@@ -1,4 +1,7 @@
-import { WRITING_PROJECT_INSTRUCTION_PATH, WRITING_ROOT_PATH } from './constants'
+import {
+  WRITING_PROJECT_INSTRUCTION_PATH,
+  WRITING_ROOT_PATH,
+} from './constants'
 
 export type WritingScaffoldEntry =
   | {

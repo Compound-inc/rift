@@ -3,7 +3,7 @@ import {
   WRITING_ALLOWED_FILE_EXTENSION,
   WRITING_PROJECT_INSTRUCTION_PATH,
   WRITING_ROOT_PATH,
-} from './constants'
+} from '../constants'
 
 export class WritingPathError extends Error {
   constructor(message: string) {
