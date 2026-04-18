@@ -27,6 +27,7 @@ import { Route as AuthAcceptInvitationIdRouteRouteImport } from './routes/auth/a
 import { Route as ApiZeroTokenRouteRouteImport } from './routes/api/zero/token/route'
 import { Route as ApiZeroQueryRouteRouteImport } from './routes/api/zero/query/route'
 import { Route as ApiZeroMutateRouteRouteImport } from './routes/api/zero/mutate/route'
+import { Route as ApiWritingChatRouteRouteImport } from './routes/api/writing/chat/route'
 import { Route as ApiOrgModelPolicyRouteRouteImport } from './routes/api/org/model-policy/route'
 import { Route as ApiFilesUploadRouteRouteImport } from './routes/api/files/upload/route'
 import { Route as ApiFilesObjectRouteRouteImport } from './routes/api/files/object/route'
@@ -45,6 +46,7 @@ import { Route as appLayoutOrganizationSettingsRouteRouteImport } from './routes
 import { Route as appLayoutChatThreadIdRouteRouteImport } from './routes/(app)/_layout/chat/$threadId/route'
 import { Route as appLayoutOrganizationSettingsIndexRouteImport } from './routes/(app)/_layout/organization/settings/index'
 import { Route as eeSingularityLayoutOrgsOrganizationIdRouteImport } from './routes/(ee)/singularity/_layout/orgs/$organizationId'
+import { Route as appLayoutWritingProjectsProjectIdRouteRouteImport } from './routes/(app)/_layout/writing/projects/$projectId/route'
 import { Route as appLayoutOrganizationSettingsToolsRouteRouteImport } from './routes/(app)/_layout/organization/settings/tools/route'
 import { Route as appLayoutOrganizationSettingsSecurityRouteRouteImport } from './routes/(app)/_layout/organization/settings/security/route'
 import { Route as appLayoutOrganizationSettingsProviderPolicyRouteRouteImport } from './routes/(app)/_layout/organization/settings/provider-policy/route'
@@ -148,6 +150,11 @@ const ApiZeroMutateRouteRoute = ApiZeroMutateRouteRouteImport.update({
   path: '/api/zero/mutate',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWritingChatRouteRoute = ApiWritingChatRouteRouteImport.update({
+  id: '/api/writing/chat',
+  path: '/api/writing/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiOrgModelPolicyRouteRoute = ApiOrgModelPolicyRouteRouteImport.update({
   id: '/api/org/model-policy',
   path: '/api/org/model-policy',
@@ -246,6 +253,12 @@ const eeSingularityLayoutOrgsOrganizationIdRoute =
     path: '/orgs/$organizationId',
     getParentRoute: () => eeSingularityLayoutRouteRoute,
   } as any)
+const appLayoutWritingProjectsProjectIdRouteRoute =
+  appLayoutWritingProjectsProjectIdRouteRouteImport.update({
+    id: '/projects/$projectId',
+    path: '/projects/$projectId',
+    getParentRoute: () => appLayoutWritingRouteRoute,
+  } as any)
 const appLayoutOrganizationSettingsToolsRouteRoute =
   appLayoutOrganizationSettingsToolsRouteRouteImport.update({
     id: '/tools',
@@ -339,6 +352,7 @@ export interface FileRoutesByFullPath {
   '/api/files/object': typeof ApiFilesObjectRouteRoute
   '/api/files/upload': typeof ApiFilesUploadRouteRoute
   '/api/org/model-policy': typeof ApiOrgModelPolicyRouteRoute
+  '/api/writing/chat': typeof ApiWritingChatRouteRoute
   '/api/zero/mutate': typeof ApiZeroMutateRouteRoute
   '/api/zero/query': typeof ApiZeroQueryRouteRoute
   '/api/zero/token': typeof ApiZeroTokenRouteRoute
@@ -363,6 +377,7 @@ export interface FileRoutesByFullPath {
   '/organization/settings/provider-policy': typeof appLayoutOrganizationSettingsProviderPolicyRouteRoute
   '/organization/settings/security': typeof appLayoutOrganizationSettingsSecurityRouteRoute
   '/organization/settings/tools': typeof appLayoutOrganizationSettingsToolsRouteRoute
+  '/writing/projects/$projectId': typeof appLayoutWritingProjectsProjectIdRouteRoute
   '/singularity/orgs/$organizationId': typeof eeSingularityLayoutOrgsOrganizationIdRoute
   '/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
   '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
@@ -384,6 +399,7 @@ export interface FileRoutesByTo {
   '/api/files/object': typeof ApiFilesObjectRouteRoute
   '/api/files/upload': typeof ApiFilesUploadRouteRoute
   '/api/org/model-policy': typeof ApiOrgModelPolicyRouteRoute
+  '/api/writing/chat': typeof ApiWritingChatRouteRoute
   '/api/zero/mutate': typeof ApiZeroMutateRouteRoute
   '/api/zero/query': typeof ApiZeroQueryRouteRoute
   '/api/zero/token': typeof ApiZeroTokenRouteRoute
@@ -406,6 +422,7 @@ export interface FileRoutesByTo {
   '/organization/settings/provider-policy': typeof appLayoutOrganizationSettingsProviderPolicyRouteRoute
   '/organization/settings/security': typeof appLayoutOrganizationSettingsSecurityRouteRoute
   '/organization/settings/tools': typeof appLayoutOrganizationSettingsToolsRouteRoute
+  '/writing/projects/$projectId': typeof appLayoutWritingProjectsProjectIdRouteRoute
   '/singularity/orgs/$organizationId': typeof eeSingularityLayoutOrgsOrganizationIdRoute
   '/organization/settings': typeof appLayoutOrganizationSettingsIndexRoute
   '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
@@ -433,6 +450,7 @@ export interface FileRoutesById {
   '/api/files/object': typeof ApiFilesObjectRouteRoute
   '/api/files/upload': typeof ApiFilesUploadRouteRoute
   '/api/org/model-policy': typeof ApiOrgModelPolicyRouteRoute
+  '/api/writing/chat': typeof ApiWritingChatRouteRoute
   '/api/zero/mutate': typeof ApiZeroMutateRouteRoute
   '/api/zero/query': typeof ApiZeroQueryRouteRoute
   '/api/zero/token': typeof ApiZeroTokenRouteRoute
@@ -457,6 +475,7 @@ export interface FileRoutesById {
   '/(app)/_layout/organization/settings/provider-policy': typeof appLayoutOrganizationSettingsProviderPolicyRouteRoute
   '/(app)/_layout/organization/settings/security': typeof appLayoutOrganizationSettingsSecurityRouteRoute
   '/(app)/_layout/organization/settings/tools': typeof appLayoutOrganizationSettingsToolsRouteRoute
+  '/(app)/_layout/writing/projects/$projectId': typeof appLayoutWritingProjectsProjectIdRouteRoute
   '/(ee)/singularity/_layout/orgs/$organizationId': typeof eeSingularityLayoutOrgsOrganizationIdRoute
   '/(app)/_layout/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
   '/(app)/_layout/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
@@ -484,6 +503,7 @@ export interface FileRouteTypes {
     | '/api/files/object'
     | '/api/files/upload'
     | '/api/org/model-policy'
+    | '/api/writing/chat'
     | '/api/zero/mutate'
     | '/api/zero/query'
     | '/api/zero/token'
@@ -508,6 +528,7 @@ export interface FileRouteTypes {
     | '/organization/settings/provider-policy'
     | '/organization/settings/security'
     | '/organization/settings/tools'
+    | '/writing/projects/$projectId'
     | '/singularity/orgs/$organizationId'
     | '/organization/settings/'
     | '/organization/settings/models/$providerId'
@@ -529,6 +550,7 @@ export interface FileRouteTypes {
     | '/api/files/object'
     | '/api/files/upload'
     | '/api/org/model-policy'
+    | '/api/writing/chat'
     | '/api/zero/mutate'
     | '/api/zero/query'
     | '/api/zero/token'
@@ -551,6 +573,7 @@ export interface FileRouteTypes {
     | '/organization/settings/provider-policy'
     | '/organization/settings/security'
     | '/organization/settings/tools'
+    | '/writing/projects/$projectId'
     | '/singularity/orgs/$organizationId'
     | '/organization/settings'
     | '/organization/settings/models/$providerId'
@@ -577,6 +600,7 @@ export interface FileRouteTypes {
     | '/api/files/object'
     | '/api/files/upload'
     | '/api/org/model-policy'
+    | '/api/writing/chat'
     | '/api/zero/mutate'
     | '/api/zero/query'
     | '/api/zero/token'
@@ -601,6 +625,7 @@ export interface FileRouteTypes {
     | '/(app)/_layout/organization/settings/provider-policy'
     | '/(app)/_layout/organization/settings/security'
     | '/(app)/_layout/organization/settings/tools'
+    | '/(app)/_layout/writing/projects/$projectId'
     | '/(ee)/singularity/_layout/orgs/$organizationId'
     | '/(app)/_layout/organization/settings/'
     | '/(app)/_layout/organization/settings/models/$providerId'
@@ -622,6 +647,7 @@ export interface RootRouteChildren {
   ApiFilesObjectRouteRoute: typeof ApiFilesObjectRouteRoute
   ApiFilesUploadRouteRoute: typeof ApiFilesUploadRouteRoute
   ApiOrgModelPolicyRouteRoute: typeof ApiOrgModelPolicyRouteRoute
+  ApiWritingChatRouteRoute: typeof ApiWritingChatRouteRoute
   ApiZeroMutateRouteRoute: typeof ApiZeroMutateRouteRoute
   ApiZeroQueryRouteRoute: typeof ApiZeroQueryRouteRoute
   ApiZeroTokenRouteRoute: typeof ApiZeroTokenRouteRoute
@@ -756,6 +782,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiZeroMutateRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/writing/chat': {
+      id: '/api/writing/chat'
+      path: '/api/writing/chat'
+      fullPath: '/api/writing/chat'
+      preLoaderRoute: typeof ApiWritingChatRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/org/model-policy': {
       id: '/api/org/model-policy'
       path: '/api/org/model-policy'
@@ -881,6 +914,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/singularity/orgs/$organizationId'
       preLoaderRoute: typeof eeSingularityLayoutOrgsOrganizationIdRouteImport
       parentRoute: typeof eeSingularityLayoutRouteRoute
+    }
+    '/(app)/_layout/writing/projects/$projectId': {
+      id: '/(app)/_layout/writing/projects/$projectId'
+      path: '/projects/$projectId'
+      fullPath: '/writing/projects/$projectId'
+      preLoaderRoute: typeof appLayoutWritingProjectsProjectIdRouteRouteImport
+      parentRoute: typeof appLayoutWritingRouteRoute
     }
     '/(app)/_layout/organization/settings/tools': {
       id: '/(app)/_layout/organization/settings/tools'
@@ -1094,10 +1134,13 @@ const appLayoutSettingsRouteRouteWithChildren =
 
 interface appLayoutWritingRouteRouteChildren {
   appLayoutWritingIndexRoute: typeof appLayoutWritingIndexRoute
+  appLayoutWritingProjectsProjectIdRouteRoute: typeof appLayoutWritingProjectsProjectIdRouteRoute
 }
 
 const appLayoutWritingRouteRouteChildren: appLayoutWritingRouteRouteChildren = {
   appLayoutWritingIndexRoute: appLayoutWritingIndexRoute,
+  appLayoutWritingProjectsProjectIdRouteRoute:
+    appLayoutWritingProjectsProjectIdRouteRoute,
 }
 
 const appLayoutWritingRouteRouteWithChildren =
@@ -1159,6 +1202,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFilesObjectRouteRoute: ApiFilesObjectRouteRoute,
   ApiFilesUploadRouteRoute: ApiFilesUploadRouteRoute,
   ApiOrgModelPolicyRouteRoute: ApiOrgModelPolicyRouteRoute,
+  ApiWritingChatRouteRoute: ApiWritingChatRouteRoute,
   ApiZeroMutateRouteRoute: ApiZeroMutateRouteRoute,
   ApiZeroQueryRouteRoute: ApiZeroQueryRouteRoute,
   ApiZeroTokenRouteRoute: ApiZeroTokenRouteRoute,

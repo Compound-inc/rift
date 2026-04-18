@@ -369,6 +369,190 @@ const attachment = table('attachment')
   })
   .primaryKey('id')
 
+const writingProject = table('writingProject')
+  .from('writing_projects')
+  .columns({
+    id: string(),
+    ownerUserId: string().from('owner_user_id'),
+    ownerOrgId: string().from('owner_org_id'),
+    title: string(),
+    slug: string(),
+    description: string().optional(),
+    headSnapshotId: string().from('head_snapshot_id').optional(),
+    defaultChatId: string().from('default_chat_id').optional(),
+    autoAcceptMode: boolean().from('auto_accept_mode'),
+    archivedAt: number().from('archived_at').optional(),
+    createdAt: number().from('created_at'),
+    updatedAt: number().from('updated_at'),
+  })
+  .primaryKey('id')
+
+const writingBlob = table('writingBlob')
+  .from('writing_blobs')
+  .columns({
+    id: string(),
+    sha256: string(),
+    content: string(),
+    byteSize: number().from('byte_size'),
+    createdAt: number().from('created_at'),
+  })
+  .primaryKey('id')
+
+const writingEntry = table('writingEntry')
+  .from('writing_entries')
+  .columns({
+    id: string(),
+    projectId: string().from('project_id'),
+    path: string(),
+    parentPath: string().from('parent_path').optional(),
+    name: string(),
+    kind: enumeration<'file' | 'folder'>(),
+    blobId: string().from('blob_id').optional(),
+    sha256: string().optional(),
+    lineCount: number().from('line_count').optional(),
+    sizeBytes: number().from('size_bytes').optional(),
+    createdAt: number().from('created_at'),
+    updatedAt: number().from('updated_at'),
+  })
+  .primaryKey('id')
+
+const writingSnapshot = table('writingSnapshot')
+  .from('writing_snapshots')
+  .columns({
+    id: string(),
+    projectId: string().from('project_id'),
+    parentSnapshotId: string().from('parent_snapshot_id').optional(),
+    source: enumeration<'user' | 'ai' | 'restore' | 'system'>(),
+    summary: string(),
+    chatId: string().from('chat_id').optional(),
+    messageId: string().from('message_id').optional(),
+    createdByUserId: string().from('created_by_user_id'),
+    restoredFromSnapshotId: string().from('restored_from_snapshot_id').optional(),
+    createdAt: number().from('created_at'),
+  })
+  .primaryKey('id')
+
+const writingSnapshotEntry = table('writingSnapshotEntry')
+  .from('writing_snapshot_entries')
+  .columns({
+    id: string(),
+    snapshotId: string().from('snapshot_id'),
+    path: string(),
+    kind: enumeration<'file' | 'folder'>(),
+    blobId: string().from('blob_id').optional(),
+    sha256: string().optional(),
+    lineCount: number().from('line_count').optional(),
+  })
+  .primaryKey('id')
+
+const writingProjectChat = table('writingProjectChat')
+  .from('writing_project_chats')
+  .columns({
+    id: string(),
+    projectId: string().from('project_id'),
+    ownerUserId: string().from('owner_user_id'),
+    title: string(),
+    modelId: string().from('model_id'),
+    status: enumeration<'active' | 'archived'>(),
+    createdAt: number().from('created_at'),
+    updatedAt: number().from('updated_at'),
+    lastMessageAt: number().from('last_message_at'),
+  })
+  .primaryKey('id')
+
+const writingChatMessage = table('writingChatMessage')
+  .from('writing_chat_messages')
+  .columns({
+    id: string(),
+    chatId: string().from('chat_id'),
+    projectId: string().from('project_id'),
+    role: enumeration<'user' | 'assistant' | 'system'>(),
+    content: string(),
+    status: enumeration<'pending' | 'done' | 'error'>(),
+    metadataJson: json().from('metadata_json'),
+    changeSetId: string().from('change_set_id').optional(),
+    createdAt: number().from('created_at'),
+    updatedAt: number().from('updated_at'),
+  })
+  .primaryKey('id')
+
+const writingChangeSet = table('writingChangeSet')
+  .from('writing_change_sets')
+  .columns({
+    id: string(),
+    projectId: string().from('project_id'),
+    chatId: string().from('chat_id'),
+    assistantMessageId: string().from('assistant_message_id').optional(),
+    baseSnapshotId: string().from('base_snapshot_id'),
+    status: enumeration<
+      'pending' | 'partially_applied' | 'applied' | 'rejected' | 'conflicted'
+    >(),
+    autoAccept: boolean().from('auto_accept'),
+    summary: string(),
+    createdAt: number().from('created_at'),
+    resolvedAt: number().from('resolved_at').optional(),
+  })
+  .primaryKey('id')
+
+const writingChange = table('writingChange')
+  .from('writing_changes')
+  .columns({
+    id: string(),
+    changeSetId: string().from('change_set_id'),
+    path: string(),
+    fromPath: string().from('from_path').optional(),
+    operation: enumeration<'create' | 'update' | 'delete' | 'move'>(),
+    baseBlobId: string().from('base_blob_id').optional(),
+    proposedBlobId: string().from('proposed_blob_id').optional(),
+    status: enumeration<
+      'pending' | 'rejected' | 'applied' | 'conflicted'
+    >(),
+    createdAt: number().from('created_at'),
+  })
+  .primaryKey('id')
+
+const writingChangeHunk = table('writingChangeHunk')
+  .from('writing_change_hunks')
+  .columns({
+    id: string(),
+    changeId: string().from('change_id'),
+    hunkIndex: number().from('hunk_index'),
+    status: enumeration<
+      'pending' | 'rejected' | 'applied' | 'conflicted'
+    >(),
+    oldStart: number().from('old_start'),
+    oldLines: number().from('old_lines'),
+    newStart: number().from('new_start'),
+    newLines: number().from('new_lines'),
+    patchText: string().from('patch_text'),
+    createdAt: number().from('created_at'),
+  })
+  .primaryKey('id')
+
+const userSkill = table('userSkill')
+  .from('user_skills')
+  .columns({
+    id: string(),
+    ownerUserId: string().from('owner_user_id'),
+    slug: string(),
+    title: string(),
+    instructions: string(),
+    archivedAt: number().from('archived_at').optional(),
+    createdAt: number().from('created_at'),
+    updatedAt: number().from('updated_at'),
+  })
+  .primaryKey('id')
+
+const writingProjectSkillLink = table('writingProjectSkillLink')
+  .from('writing_project_skill_links')
+  .columns({
+    id: string(),
+    projectId: string().from('project_id'),
+    userSkillId: string().from('user_skill_id'),
+    createdAt: number().from('created_at'),
+  })
+  .primaryKey('id')
+
 // ---------------------------------------------------------------------------
 // Relationships (optional; use for .related() in ZQL)
 // ---------------------------------------------------------------------------
@@ -505,6 +689,184 @@ const messageRelationships = relationships(message, ({ one }) => ({
   }),
 }))
 
+const writingProjectRelationships = relationships(writingProject, ({ many }) => ({
+  entries: many({
+    sourceField: ['id'],
+    destSchema: writingEntry,
+    destField: ['projectId'],
+  }),
+  snapshots: many({
+    sourceField: ['id'],
+    destSchema: writingSnapshot,
+    destField: ['projectId'],
+  }),
+  chats: many({
+    sourceField: ['id'],
+    destSchema: writingProjectChat,
+    destField: ['projectId'],
+  }),
+  changeSets: many({
+    sourceField: ['id'],
+    destSchema: writingChangeSet,
+    destField: ['projectId'],
+  }),
+  skillLinks: many({
+    sourceField: ['id'],
+    destSchema: writingProjectSkillLink,
+    destField: ['projectId'],
+  }),
+}))
+
+const writingEntryRelationships = relationships(writingEntry, ({ one }) => ({
+  project: one({
+    sourceField: ['projectId'],
+    destField: ['id'],
+    destSchema: writingProject,
+  }),
+  blob: one({
+    sourceField: ['blobId'],
+    destField: ['id'],
+    destSchema: writingBlob,
+  }),
+}))
+
+const writingSnapshotRelationships = relationships(writingSnapshot, ({ many, one }) => ({
+  project: one({
+    sourceField: ['projectId'],
+    destField: ['id'],
+    destSchema: writingProject,
+  }),
+  entries: many({
+    sourceField: ['id'],
+    destSchema: writingSnapshotEntry,
+    destField: ['snapshotId'],
+  }),
+}))
+
+const writingSnapshotEntryRelationships = relationships(
+  writingSnapshotEntry,
+  ({ one }) => ({
+    snapshot: one({
+      sourceField: ['snapshotId'],
+      destField: ['id'],
+      destSchema: writingSnapshot,
+    }),
+    blob: one({
+      sourceField: ['blobId'],
+      destField: ['id'],
+      destSchema: writingBlob,
+    }),
+  }),
+)
+
+const writingProjectChatRelationships = relationships(
+  writingProjectChat,
+  ({ many, one }) => ({
+    project: one({
+      sourceField: ['projectId'],
+      destField: ['id'],
+      destSchema: writingProject,
+    }),
+    messages: many({
+      sourceField: ['id'],
+      destSchema: writingChatMessage,
+      destField: ['chatId'],
+    }),
+    changeSets: many({
+      sourceField: ['id'],
+      destSchema: writingChangeSet,
+      destField: ['chatId'],
+    }),
+  }),
+)
+
+const writingChatMessageRelationships = relationships(
+  writingChatMessage,
+  ({ one }) => ({
+    chat: one({
+      sourceField: ['chatId'],
+      destField: ['id'],
+      destSchema: writingProjectChat,
+    }),
+    project: one({
+      sourceField: ['projectId'],
+      destField: ['id'],
+      destSchema: writingProject,
+    }),
+    changeSet: one({
+      sourceField: ['changeSetId'],
+      destField: ['id'],
+      destSchema: writingChangeSet,
+    }),
+  }),
+)
+
+const writingChangeSetRelationships = relationships(
+  writingChangeSet,
+  ({ many, one }) => ({
+    project: one({
+      sourceField: ['projectId'],
+      destField: ['id'],
+      destSchema: writingProject,
+    }),
+    chat: one({
+      sourceField: ['chatId'],
+      destField: ['id'],
+      destSchema: writingProjectChat,
+    }),
+    changes: many({
+      sourceField: ['id'],
+      destSchema: writingChange,
+      destField: ['changeSetId'],
+    }),
+  }),
+)
+
+const writingChangeRelationships = relationships(writingChange, ({ many, one }) => ({
+  changeSet: one({
+    sourceField: ['changeSetId'],
+    destField: ['id'],
+    destSchema: writingChangeSet,
+  }),
+  hunks: many({
+    sourceField: ['id'],
+    destSchema: writingChangeHunk,
+    destField: ['changeId'],
+  }),
+}))
+
+const writingChangeHunkRelationships = relationships(writingChangeHunk, ({ one }) => ({
+  change: one({
+    sourceField: ['changeId'],
+    destField: ['id'],
+    destSchema: writingChange,
+  }),
+}))
+
+const userSkillRelationships = relationships(userSkill, ({ many }) => ({
+  projectLinks: many({
+    sourceField: ['id'],
+    destSchema: writingProjectSkillLink,
+    destField: ['userSkillId'],
+  }),
+}))
+
+const writingProjectSkillLinkRelationships = relationships(
+  writingProjectSkillLink,
+  ({ one }) => ({
+    project: one({
+      sourceField: ['projectId'],
+      destField: ['id'],
+      destSchema: writingProject,
+    }),
+    userSkill: one({
+      sourceField: ['userSkillId'],
+      destField: ['id'],
+      destSchema: userSkill,
+    }),
+  }),
+)
+
 // ---------------------------------------------------------------------------
 // Schema export and default types
 // ---------------------------------------------------------------------------
@@ -526,6 +888,18 @@ export const schema = createSchema({
     thread,
     message,
     attachment,
+    writingProject,
+    writingBlob,
+    writingEntry,
+    writingSnapshot,
+    writingSnapshotEntry,
+    writingProjectChat,
+    writingChatMessage,
+    writingChangeSet,
+    writingChange,
+    writingChangeHunk,
+    userSkill,
+    writingProjectSkillLink,
   ],
   relationships: [
     organizationRelationships,
@@ -537,6 +911,17 @@ export const schema = createSchema({
     orgSubscriptionRelationships,
     orgUserUsageSummaryRelationships,
     messageRelationships,
+    writingProjectRelationships,
+    writingEntryRelationships,
+    writingSnapshotRelationships,
+    writingSnapshotEntryRelationships,
+    writingProjectChatRelationships,
+    writingChatMessageRelationships,
+    writingChangeSetRelationships,
+    writingChangeRelationships,
+    writingChangeHunkRelationships,
+    userSkillRelationships,
+    writingProjectSkillLinkRelationships,
   ],
 })
 

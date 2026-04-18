@@ -7,6 +7,7 @@ import { orgProductFeaturesQueryDefinitions } from './queries/org-product-featur
 import { orgProductPolicyQueryDefinitions } from './queries/org-product-policy.queries'
 import { orgSettingsQueryDefinitions } from './queries/org-settings.queries'
 import { orgPolicyQueryDefinitions } from './queries/org-policy.queries'
+import { writingQueryDefinitions } from './queries/writing.queries'
 
 /**
  * Workspace-wide Zero queries composed from feature-scoped modules.
@@ -20,4 +21,5 @@ export const queries = defineQueriesWithType<Schema>()({
   ...orgProductPolicyQueryDefinitions,
   ...orgSettingsQueryDefinitions,
   ...orgPolicyQueryDefinitions,
+  ...writingQueryDefinitions,
 })
