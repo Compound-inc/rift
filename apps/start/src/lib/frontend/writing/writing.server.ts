@@ -1,4 +1,3 @@
-import { getRequestHeaders } from '@tanstack/react-start/server'
 import { Effect } from 'effect'
 import {
   handleWritingServerActionFailure,
@@ -11,56 +10,36 @@ import {
   WritingUnauthorizedError,
   WritingWorkspaceService,
 } from '@/lib/backend/writing'
-import { requireAppUserAuth } from '@/lib/backend/server-effect/http/server-auth'
+import {
+  runAuthenticatedServerAction,
+  type AuthenticatedServerActionContext,
+} from '@/lib/backend/server-effect'
 
-type WritingActionAuth = {
-  readonly userId: string
-  readonly organizationId?: string
-  readonly requestId: string
-}
+type WritingActionAuth = AuthenticatedServerActionContext
 
 async function runWritingAction<T>(input: {
   readonly operation: string
   readonly defaultMessage: string
   readonly program: (auth: WritingActionAuth) => Effect.Effect<T, unknown, any>
 }) {
-  const requestId = crypto.randomUUID()
-  let authContext: Omit<WritingActionAuth, 'requestId'> | undefined
-
-  try {
-    return await WritingRuntime.run(
-      Effect.gen(function* () {
-        const headers = getRequestHeaders()
-        const auth = yield* requireAppUserAuth({
-          headers,
-          onUnauthorized: () =>
-            new WritingUnauthorizedError({
-              message: 'Unauthorized',
-              requestId,
-            }),
-        })
-
-        authContext = {
-          userId: auth.userId,
-          organizationId: auth.organizationId,
-        }
-
-        return yield* input.program({
-          ...authContext,
-          requestId,
-        })
+  return runAuthenticatedServerAction({
+    runtime: WritingRuntime,
+    onUnauthorized: (requestId) =>
+      new WritingUnauthorizedError({
+        message: 'Unauthorized',
+        requestId,
       }),
-    )
-  } catch (error) {
-    return handleWritingServerActionFailure({
-      error,
-      operation: input.operation,
-      defaultMessage: input.defaultMessage,
-      requestId,
-      userId: authContext?.userId,
-      organizationId: authContext?.organizationId,
-    })
-  }
+    onFailure: ({ error, requestId, userId, organizationId }) =>
+      handleWritingServerActionFailure({
+        error,
+        operation: input.operation,
+        defaultMessage: input.defaultMessage,
+        requestId,
+        userId,
+        organizationId,
+      }),
+    program: input.program,
+  })
 }
 
 export async function createWritingProjectAction(input: {

@@ -1,5 +1,6 @@
 export * from './domain'
 export * from './http'
+export * from './observability/wide-event'
 export * from './runtime/writing-runtime'
 export * from './services/user-skill-registry.service'
 export * from './services/writing-agent.service'

@@ -49,19 +49,6 @@ export function toReadableWritingErrorCause(
   return fallback
 }
 
-export function getWritingErrorTag(error: unknown): string {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    '_tag' in error &&
-    typeof (error as { _tag?: unknown })._tag === 'string'
-  ) {
-    return (error as { _tag: string })._tag
-  }
-
-  return 'UnknownError'
-}
-
 export function extractWritingErrorContext(error: unknown): WritingErrorContext {
   const record = asRecord(error)
   if (!record) {

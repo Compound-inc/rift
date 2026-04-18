@@ -1,3 +1,8 @@
+import {
+  buildStandardApiErrorEnvelope,
+  jsonResponse,
+  resolveBackendErrorMetadata,
+} from '@/lib/backend/server-effect'
 import type { ChatDomainError } from '../domain/errors'
 import {
   classifyChatError,
@@ -5,6 +10,7 @@ import {
 } from '../domain/error-classification'
 import { ChatErrorCode } from '../domain/error-codes'
 import type { ChatApiErrorEnvelope } from '@/lib/shared/chat-contracts/error-envelope'
+export { jsonResponse } from '@/lib/backend/server-effect'
 
 export function buildChatApiErrorEnvelope(input: {
   readonly requestId: string
@@ -16,25 +22,18 @@ export function buildChatApiErrorEnvelope(input: {
   readonly detailsMessage?: string
   readonly threadId?: string
 }): ChatApiErrorEnvelope {
-  return {
-    ok: false,
-    error: {
-      code: input.code,
-      i18nKey: input.i18nKey,
-      i18nParams: input.i18nParams,
-      requestId: input.requestId,
-      retryable: input.retryable,
-    },
+  return buildStandardApiErrorEnvelope({
     requestId: input.requestId,
-    telemetry: {
-      owner: 'server',
-    },
+    code: input.code,
+    i18nKey: input.i18nKey,
+    i18nParams: input.i18nParams,
+    retryable: input.retryable,
     details: {
       tag: input.tag,
       message: input.detailsMessage,
       threadId: input.threadId,
     },
-  }
+  })
 }
 
 /**
@@ -45,29 +44,28 @@ export function toErrorResponse(
   error: unknown,
   fallbackRequestId: string,
 ): Response {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    '_tag' in error &&
-    typeof error._tag === 'string'
-  ) {
-    const tagged = error as ChatDomainError
-    const classification = classifyChatError(tagged)
-    const requestId =
-      'requestId' in tagged && typeof tagged.requestId === 'string'
-        ? tagged.requestId
-        : fallbackRequestId
+  const resolved = resolveBackendErrorMetadata({
+    error,
+    fallbackRequestId,
+    defaultMessage: 'Unexpected server error',
+    classifyTagged: classifyChatError,
+    classifyUnknown: classifyUnknownChatError,
+    toReadableMessage: () => 'Unexpected server error',
+  })
+
+  if (resolved.taggedError) {
+    const tagged = resolved.taggedError as ChatDomainError
     const threadId =
       'threadId' in tagged && typeof tagged.threadId === 'string'
         ? tagged.threadId
         : undefined
 
     const payload = buildChatApiErrorEnvelope({
-      requestId,
-      code: classification.code,
-      i18nKey: classification.i18nKey,
-      i18nParams: classification.i18nParams,
-      retryable: classification.retryable,
+      requestId: resolved.requestId,
+      code: resolved.classification.code,
+      i18nKey: resolved.classification.i18nKey,
+      i18nParams: resolved.classification.i18nParams,
+      retryable: resolved.classification.retryable,
       tag: tagged._tag,
       detailsMessage:
         'message' in tagged && typeof tagged.message === 'string'
@@ -76,27 +74,18 @@ export function toErrorResponse(
       threadId,
     })
 
-    return jsonResponse(payload, classification.status)
+    return jsonResponse(payload, resolved.classification.status)
   }
 
-  const classification = classifyUnknownChatError()
   return jsonResponse(
     buildChatApiErrorEnvelope({
-      requestId: fallbackRequestId,
+      requestId: resolved.requestId,
       code: ChatErrorCode.Unknown,
-      i18nKey: classification.i18nKey,
+      i18nKey: resolved.classification.i18nKey,
       retryable: false,
-      tag: 'UnknownError',
+      tag: resolved.errorTag,
       detailsMessage: 'Unexpected server error',
     }),
     500,
   )
-}
-
-/** JSON helper used by chat API routes for consistent response headers. */
-export function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  })
 }

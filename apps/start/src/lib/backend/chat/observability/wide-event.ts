@@ -1,13 +1,22 @@
-import { inspect } from 'node:util'
 import { Effect } from 'effect'
 import type { ChatErrorCode } from '../domain/error-codes'
 import type {
   ChatErrorI18nKey,
   ChatErrorI18nParams,
 } from '@/lib/shared/chat-contracts/error-i18n'
+import {
+  addBackendWideEventBreadcrumb,
+  createBackendWideEventBase,
+  createDrainBackendWideEventEffect,
+  finalizeBackendWideEventFailure,
+  finalizeBackendWideEventSuccess,
+  getBackendErrorTag,
+  type BackendWideEventBase,
+  type BackendWideEventBreadcrumb,
+  type BackendWideEventLevel,
+  type BackendWideEventOutcome,
+} from '@/lib/backend/server-effect'
 import { captureChatWideEventInPostHog } from './posthog.server'
-
-type WideEventLevel = 'info' | 'warn' | 'error'
 
 export type WideErrorEvent = {
   readonly eventName: string
@@ -24,37 +33,21 @@ export type WideErrorEvent = {
   readonly cause?: string
 }
 
-type WideEventBreadcrumb = {
-  readonly at: number
-  readonly name: string
-  readonly detail?: Readonly<Record<string, unknown>>
-}
-
-type ChatRequestOutcome = {
-  ok: boolean
-  status: number
-  level: WideEventLevel
-  captureMode: 'none' | 'signal' | 'exception'
-  suppressLog: boolean
-  retryable: boolean
-  latencyMs: number
-  finalizedAt: number
-  error?: {
-    readonly code?: ChatErrorCode
-    readonly tag: string
-    readonly message: string
-    readonly cause?: string
-    readonly i18nKey?: ChatErrorI18nKey
-    readonly i18nParams?: ChatErrorI18nParams
-  }
-}
+type ChatRequestOutcome = BackendWideEventOutcome<
+  ChatErrorCode,
+  ChatErrorI18nKey,
+  ChatErrorI18nParams
+>
 
 /**
  * One mutable event per request. Context is accumulated across route parsing,
  * orchestration, streaming, persistence, and final transport mapping.
  */
-export type ChatRequestWideEvent = {
-  readonly eventName: string
+export type ChatRequestWideEvent = BackendWideEventBase<
+  ChatErrorCode,
+  ChatErrorI18nKey,
+  ChatErrorI18nParams
+> & {
   readonly request: {
     readonly requestId: string
     readonly route: string
@@ -105,9 +98,8 @@ export type ChatRequestWideEvent = {
     actualCostUsd?: number
     usedByok?: boolean
   }
-  breadcrumbs: WideEventBreadcrumb[]
+  breadcrumbs: BackendWideEventBreadcrumb[]
   outcome?: ChatRequestOutcome
-  _drained: boolean
 }
 
 export function createChatWideEvent(input: {
@@ -117,21 +109,18 @@ export function createChatWideEvent(input: {
   readonly method: string
 }): ChatRequestWideEvent {
   return {
-    eventName: input.eventName,
-    request: {
+    ...createBackendWideEventBase({
+      eventName: input.eventName,
       requestId: input.requestId,
       route: input.route,
       method: input.method,
-      startedAt: Date.now(),
-    },
+    }),
     actor: {},
     thread: {},
     model: {},
     policy: {},
     stream: {},
     usage: {},
-    breadcrumbs: [],
-    _drained: false,
   }
 }
 
@@ -178,12 +167,7 @@ export function addWideEventBreadcrumb(
     readonly detail?: Readonly<Record<string, unknown>>
   },
 ): ChatRequestWideEvent {
-  event.breadcrumbs.push({
-    at: Date.now(),
-    name: input.name,
-    detail: input.detail,
-  })
-  return event
+  return addBackendWideEventBreadcrumb(event, input)
 }
 
 export function finalizeWideEventSuccess(
@@ -193,25 +177,14 @@ export function finalizeWideEventSuccess(
     readonly suppressLog?: boolean
   },
 ): ChatRequestWideEvent {
-  if (event.outcome) return event
-  event.outcome = {
-    ok: true,
-    status: input.status,
-    level: input.status >= 400 ? 'warn' : 'info',
-    captureMode: 'none',
-    suppressLog: Boolean(input.suppressLog),
-    retryable: false,
-    latencyMs: Date.now() - event.request.startedAt,
-    finalizedAt: Date.now(),
-  }
-  return event
+  return finalizeBackendWideEventSuccess(event, input)
 }
 
 export function finalizeWideEventFailure(
   event: ChatRequestWideEvent,
   input: {
     readonly status: number
-    readonly level: WideEventLevel
+    readonly level: BackendWideEventLevel
     readonly captureMode: 'none' | 'signal' | 'exception'
     readonly suppressLog?: boolean
     readonly retryable: boolean
@@ -223,26 +196,7 @@ export function finalizeWideEventFailure(
     readonly i18nParams?: ChatErrorI18nParams
   },
 ): ChatRequestWideEvent {
-  if (event.outcome) return event
-  event.outcome = {
-    ok: false,
-    status: input.status,
-    level: input.level,
-    captureMode: input.captureMode,
-    suppressLog: Boolean(input.suppressLog),
-    retryable: input.retryable,
-    latencyMs: Date.now() - event.request.startedAt,
-    finalizedAt: Date.now(),
-    error: {
-      code: input.errorCode,
-      tag: input.errorTag,
-      message: input.message,
-      cause: input.cause,
-      i18nKey: input.i18nKey,
-      i18nParams: input.i18nParams,
-    },
-  }
-  return event
+  return finalizeBackendWideEventFailure(event, input)
 }
 
 /**
@@ -251,71 +205,23 @@ export function finalizeWideEventFailure(
 export const drainWideEvent = Effect.fn('ChatObservability.drainWideEvent')((
   event: ChatRequestWideEvent,
 ) => {
-  if (event._drained) {
-    return Effect.void
-  }
-  event._drained = true
-  if (event.outcome?.suppressLog) {
-    return Effect.void
-  }
-
-  const effect =
-    event.outcome?.level === 'error'
-      ? Effect.logError('chat.request')
-      : event.outcome?.level === 'warn'
-        ? Effect.logWarning('chat.request')
-        : Effect.logInfo('chat.request')
-  const isProduction = process.env.NODE_ENV === 'production'
-  const wideEventLogValue = isProduction
-    ? event
-    : inspect(event, {
-        depth: null,
-        colors: false,
-        compact: false,
-        breakLength: 120,
-      })
-
-  return Effect.annotateLogs(effect, {
-    event_name: event.eventName,
-    request_id: event.request.requestId,
-    route: event.request.route,
-    method: event.request.method,
-    status: event.outcome?.status,
-    latency_ms: event.outcome?.latencyMs,
-    error_code: event.outcome?.error?.code,
-    error_tag: event.outcome?.error?.tag,
-    error_message: event.outcome?.error?.message,
-    error_cause: event.outcome?.error?.cause,
-    error_i18n_key: event.outcome?.error?.i18nKey,
-    error_i18n_params: event.outcome?.error?.i18nParams,
-    retryable: event.outcome?.retryable,
-    capture_mode: event.outcome?.captureMode,
-    prompt_tokens: event.usage.promptTokens,
-    total_tokens: event.usage.totalTokens,
-    output_tokens: event.usage.outputTokens,
-    estimated_cost_usd: event.usage.estimatedCostUsd,
-    actual_cost_usd: event.usage.actualCostUsd,
-    breadcrumbs_count: event.breadcrumbs.length,
-    wide_event: wideEventLogValue,
-  }).pipe(
-    Effect.tap(() =>
-      Effect.promise(() => captureChatWideEventInPostHog(event)),
-    ),
-  )
+  return createDrainBackendWideEventEffect({
+    event,
+    logName: 'chat.request',
+    annotations: {
+      prompt_tokens: event.usage.promptTokens,
+      total_tokens: event.usage.totalTokens,
+      output_tokens: event.usage.outputTokens,
+      estimated_cost_usd: event.usage.estimatedCostUsd,
+      actual_cost_usd: event.usage.actualCostUsd,
+    },
+    afterDrain: (wideEvent) => captureChatWideEventInPostHog(wideEvent),
+  })
 })
 
 /** Returns stable tag for domain errors; falls back to `UnknownError`. */
 export function getErrorTag(error: unknown): string {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    '_tag' in error &&
-    typeof error._tag === 'string'
-  ) {
-    return error._tag
-  }
-
-  return 'UnknownError'
+  return getBackendErrorTag(error)
 }
 
 /**

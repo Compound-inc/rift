@@ -1,9 +1,16 @@
 import {
+  formatServerActionErrorMessage,
+  resolveBackendErrorMetadata,
+} from '@/lib/backend/server-effect'
+import {
   extractWritingErrorContext,
-  getWritingErrorTag,
   toReadableWritingErrorCause,
   toReadableWritingErrorMessage,
 } from '../domain/error-formatting'
+import {
+  classifyUnknownWritingError,
+  classifyWritingError,
+} from '../domain/error-classification'
 import { logWritingFailure, type WritingFailureLogInput } from './failure-logging'
 
 export type WritingServerActionFailureInput = Omit<
@@ -30,27 +37,31 @@ export async function handleWritingServerActionFailure(
 export function formatWritingServerActionError(
   input: Pick<WritingServerActionFailureInput, 'error' | 'requestId' | 'defaultMessage' | 'operation'>,
 ): string {
-  const errorTag = getWritingErrorTag(input.error)
-  const readableMessage = toReadableWritingErrorMessage(input.error, input.defaultMessage)
-  const readableCause = toReadableWritingErrorCause(
-    input.error,
-    'No additional error details',
-  )
-  const context = extractWritingErrorContext(input.error)
+  const resolved = resolveBackendErrorMetadata({
+    error: input.error,
+    fallbackRequestId: input.requestId,
+    defaultMessage: input.defaultMessage,
+    classifyTagged: classifyWritingError,
+    classifyUnknown: classifyUnknownWritingError,
+    toReadableMessage: toReadableWritingErrorMessage,
+    toReadableCause: toReadableWritingErrorCause,
+    extractContext: extractWritingErrorContext,
+  })
 
-  const annotations = [
-    `requestId: ${input.requestId}`,
-    `tag: ${errorTag}`,
-    `operation: ${input.operation}`,
-    context.projectId ? `projectId: ${context.projectId}` : undefined,
-    context.chatId ? `chatId: ${context.chatId}` : undefined,
-    context.path ? `path: ${context.path}` : undefined,
-    context.toolName ? `tool: ${context.toolName}` : undefined,
-  ].filter(Boolean)
-
-  const suffix = annotations.length > 0 ? ` (${annotations.join(', ')})` : ''
-  const cause =
-    readableCause && readableCause !== readableMessage ? `. Cause: ${readableCause}` : ''
-
-  return `${readableMessage}${suffix}${cause}`
+  return formatServerActionErrorMessage({
+    requestId: input.requestId,
+    operation: input.operation,
+    readableMessage: resolved.readableMessage,
+    readableCause: resolved.readableCause,
+    errorTag: resolved.errorTag,
+    context: {
+      projectId: resolved.context.projectId,
+      chatId: resolved.context.chatId,
+      path: resolved.context.path,
+      toolName: resolved.context.toolName,
+    },
+    contextLabels: {
+      toolName: 'tool',
+    },
+  })
 }
