@@ -1,3 +1,3 @@
 export * from './constants'
 export * from './scaffold'
-export * from './tool'
+export * from './diff'

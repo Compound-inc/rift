@@ -4,10 +4,12 @@ import { ZeroDatabaseNotConfiguredError, ZeroDatabaseService } from '@/lib/backe
 import {
   WRITING_DEFAULT_MODEL_ID,
   WRITING_PROJECT_INSTRUCTION_PATH,
-  createDefaultWritingScaffold,
+} from '@/lib/shared/writing/constants'
+import { createDefaultWritingScaffold } from '@/lib/shared/writing/scaffold'
+import {
   createProjectSlug,
   getWritingParentPath,
-} from '@/lib/shared/writing'
+} from '@/lib/shared/writing/path-utils'
 import {
   WritingConflictError,
   WritingInvalidRequestError,
@@ -23,7 +25,7 @@ import {
   normalizeScopedOrgId,
   upsertWritingBlob,
   upsertWritingEntry,
-} from './writing-persistence'
+} from './persistence'
 
 export type WritingProjectServiceShape = {
   readonly createProject: (input: {

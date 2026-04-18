@@ -1,13 +1,16 @@
 import { createHash } from 'node:crypto'
 import { zql } from '@/lib/backend/chat/infra/zero/db'
-import type { WritingEntryKind, WritingSnapshotSource } from '@/lib/shared/writing'
+import type {
+  WritingEntryKind,
+  WritingSnapshotSource,
+} from '@/lib/shared/writing/constants'
+import { WRITING_ROOT_PATH } from '@/lib/shared/writing/constants'
 import {
-  WRITING_ROOT_PATH,
   assertValidWritingFolderPath,
   getWritingBaseName,
   getWritingParentPath,
   normalizeWritingPath,
-} from '@/lib/shared/writing'
+} from '@/lib/shared/writing/path-utils'
 
 export type WritingProjectRow = {
   readonly id: string

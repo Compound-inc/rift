@@ -1,4 +1,4 @@
-import { WRITING_DEFAULT_MODEL_ID } from '@/lib/shared/writing'
+import { WRITING_DEFAULT_MODEL_ID } from '@/lib/shared/writing/constants'
 
 export const WRITING_GATEWAY_PROVIDER = 'vercel-ai-gateway' as const
 

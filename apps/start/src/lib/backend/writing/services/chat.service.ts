@@ -1,13 +1,13 @@
 import { Effect, Layer, ServiceMap } from 'effect'
 import { zql } from '@/lib/backend/chat/infra/zero/db'
 import { ZeroDatabaseNotConfiguredError, ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
-import { WRITING_DEFAULT_MODEL_ID } from '@/lib/shared/writing'
+import { WRITING_DEFAULT_MODEL_ID } from '@/lib/shared/writing/constants'
 import {
   WritingChatNotFoundError,
   WritingPersistenceError,
   WritingProjectNotFoundError,
 } from '../domain/errors'
-import { getProjectChat, getScopedProject, now } from './writing-persistence'
+import { getProjectChat, getScopedProject, now } from './persistence'
 
 function toPersistenceError(requestId: string, message: string, cause?: unknown) {
   return new WritingPersistenceError({

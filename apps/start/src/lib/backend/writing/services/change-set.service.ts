@@ -4,7 +4,7 @@ import { ZeroDatabaseNotConfiguredError, ZeroDatabaseService } from '@/lib/backe
 import {
   applyAcceptedHunks,
   createWritingHunks,
-} from '@/lib/shared/writing'
+} from '@/lib/shared/writing/diff'
 import {
   WritingChatNotFoundError,
   WritingConflictError,
@@ -21,120 +21,19 @@ import {
   now,
   replaceProjectEntries,
   upsertWritingBlob,
-} from './writing-persistence'
+} from './persistence'
 import type {
-  WritingChangeHunkRow,
   WritingChangeRow,
-  WritingChangeSetRow,
-} from './writing-persistence'
-
-function toPersistenceError(requestId: string, message: string, cause?: unknown) {
-  return new WritingPersistenceError({
-    message,
-    requestId,
-    cause: cause instanceof Error ? cause.message : String(cause ?? ''),
-  })
-}
-
-async function getScopedChangeSet(input: {
-  readonly db: any
-  readonly changeSetId: string
-  readonly userId: string
-  readonly organizationId?: string
-}): Promise<{ project: Awaited<ReturnType<typeof getScopedProject>>; changeSet: WritingChangeSetRow | null }> {
-  const changeSet = (await input.db.run(
-    zql.writingChangeSet.where('id', input.changeSetId).one(),
-  )) as WritingChangeSetRow | null
-
-  if (!changeSet) {
-    return { project: null, changeSet: null }
-  }
-
-  const project = await getScopedProject({
-    db: input.db,
-    projectId: changeSet.projectId,
-    userId: input.userId,
-    organizationId: input.organizationId,
-  })
-
-  return { project, changeSet }
-}
-
-async function loadChangeRows(db: any, changeSetId: string): Promise<WritingChangeRow[]> {
-  return (await db.run(
-    zql.writingChange.where('changeSetId', changeSetId).orderBy('path', 'asc'),
-  )) as WritingChangeRow[]
-}
-
-async function loadChangeHunks(db: any, changeId: string): Promise<WritingChangeHunkRow[]> {
-  return (await db.run(
-    zql.writingChangeHunk.where('changeId', changeId).orderBy('hunkIndex', 'asc'),
-  )) as WritingChangeHunkRow[]
-}
-
-async function replaceChangeHunks(input: {
-  readonly tx: any
-  readonly changeId: string
-  readonly hunks: readonly ReturnType<typeof createWritingHunks>[number][]
-  readonly createdAt: number
-}) {
-  const existing = await input.tx.run(
-    zql.writingChangeHunk.where('changeId', input.changeId).orderBy('hunkIndex', 'asc'),
-  )
-  for (const row of existing as WritingChangeHunkRow[]) {
-    await input.tx.mutate.writingChangeHunk.delete({ id: row.id })
-  }
-
-  for (const hunk of input.hunks) {
-    await input.tx.mutate.writingChangeHunk.insert({
-      id: crypto.randomUUID(),
-      changeId: input.changeId,
-      hunkIndex: hunk.index,
-      status: 'pending',
-      oldStart: hunk.oldStart,
-      oldLines: hunk.oldLines,
-      newStart: hunk.newStart,
-      newLines: hunk.newLines,
-      patchText: hunk.patchText,
-      createdAt: input.createdAt,
-    })
-  }
-}
-
-async function updateChangeSetResolution(input: {
-  readonly tx: any
-  readonly changeSetId: string
-}) {
-  const changes = (await input.tx.run(
-    zql.writingChange.where('changeSetId', input.changeSetId).orderBy('path', 'asc'),
-  )) as WritingChangeRow[]
-
-  const statuses = new Set(changes.map((change) => change.status))
-  let nextStatus: WritingChangeSetRow['status'] = 'pending'
-  let resolvedAt: number | undefined
-
-  if (statuses.size === 0 || statuses.has('rejected')) {
-    nextStatus = changes.length === 0 ? 'rejected' : 'rejected'
-    resolvedAt = now()
-  }
-  if (statuses.has('conflicted')) {
-    nextStatus = 'conflicted'
-    resolvedAt = now()
-  } else if (changes.length > 0 && [...statuses].every((status) => status === 'applied')) {
-    nextStatus = 'applied'
-    resolvedAt = now()
-  } else if (statuses.has('applied')) {
-    nextStatus = 'partially_applied'
-  } else if (statuses.has('pending')) {
-    nextStatus = 'pending'
-  }
-
-  await input.tx.mutate.writingChangeSet.update({
-    id: input.changeSetId,
-    status: nextStatus,
-    resolvedAt,
-  })
-}
+} from './persistence'
+import {
+  assertScopedChangeSetProject,
+  getScopedChangeSet,
+  loadChangeHunks,
+  loadChangeRows,
+  replaceChangeHunks,
+  toPersistenceError,
+  updateChangeSetResolution,
+} from './change-set/store'
 
 /**
  * Centralizes the hunk-application workflow so manual approvals and auto-accept
@@ -154,17 +53,15 @@ async function acceptChangeSetHunks(input: {
     userId: input.userId,
     organizationId: input.organizationId,
   })
-  if (!project || !changeSet) {
-    throw new WritingProjectNotFoundError({
-      message: 'Writing project not found',
-      requestId: input.requestId,
-      projectId: changeSet?.projectId ?? 'unknown-project',
-    })
-  }
+  const scoped = assertScopedChangeSetProject({
+    project,
+    changeSet,
+    requestId: input.requestId,
+  })
 
   const changes = await loadChangeRows(input.db, input.changeSetId)
   const manifest = new Map(
-    (await captureCurrentSnapshotManifest(input.db, project.id)).map((entry) => [entry.path, entry]),
+    (await captureCurrentSnapshotManifest(input.db, scoped.project.id)).map((entry) => [entry.path, entry]),
   )
   const createdAt = now()
   const selectedIds = new Set(input.hunkIds)
@@ -254,26 +151,26 @@ async function acceptChangeSetHunks(input: {
     if (changeResults.size > conflictingChanges.size) {
       await replaceProjectEntries({
         tx,
-        projectId: project.id,
+        projectId: scoped.project.id,
         entries: [...manifest.values()],
         createdAt,
       })
 
       nextHeadSnapshotId = await insertSnapshot({
         tx,
-        projectId: project.id,
-        parentSnapshotId: project.headSnapshotId ?? undefined,
+        projectId: scoped.project.id,
+        parentSnapshotId: scoped.project.headSnapshotId ?? undefined,
         source: 'ai',
         summary: 'Accepted AI writing changes',
-        chatId: changeSet.chatId,
-        messageId: changeSet.assistantMessageId ?? undefined,
+        chatId: scoped.changeSet.chatId,
+        messageId: scoped.changeSet.assistantMessageId ?? undefined,
         createdByUserId: input.userId,
         entries: [...manifest.values()],
         createdAt,
       })
 
       await tx.mutate.writingProject.update({
-        id: project.id,
+        id: scoped.project.id,
         headSnapshotId: nextHeadSnapshotId,
         updatedAt: createdAt,
       })
@@ -336,9 +233,9 @@ async function acceptChangeSetHunks(input: {
     throw new WritingConflictError({
       message: 'Some pending writing hunks could not be applied cleanly',
       requestId: input.requestId,
-      projectId: project.id,
-      expectedHeadSnapshotId: changeSet.baseSnapshotId,
-      actualHeadSnapshotId: project.headSnapshotId ?? undefined,
+      projectId: scoped.project.id,
+      expectedHeadSnapshotId: scoped.changeSet.baseSnapshotId,
+      actualHeadSnapshotId: scoped.project.headSnapshotId ?? undefined,
     })
   }
 

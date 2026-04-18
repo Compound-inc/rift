@@ -1,9 +1,8 @@
-import { posix as pathPosix } from 'node:path'
 import {
   WRITING_ALLOWED_FILE_EXTENSION,
   WRITING_PROJECT_INSTRUCTION_PATH,
   WRITING_ROOT_PATH,
-} from '../constants'
+} from './constants'
 
 export class WritingPathError extends Error {
   constructor(message: string) {
@@ -16,6 +15,36 @@ function ensureLeadingSlash(path: string): string {
   return path.startsWith('/') ? path : `/${path}`
 }
 
+function normalizeWritingPosixPath(path: string): string {
+  const segments = ensureLeadingSlash(path).split('/')
+  const normalizedSegments: string[] = []
+
+  for (const segment of segments) {
+    if (segment.length === 0 || segment === '.') {
+      continue
+    }
+
+    if (segment === '..') {
+      if (normalizedSegments.length === 0) {
+        throw new WritingPathError('Path must stay inside the project root')
+      }
+
+      normalizedSegments.pop()
+      continue
+    }
+
+    normalizedSegments.push(segment)
+  }
+
+  return normalizedSegments.length === 0
+    ? WRITING_ROOT_PATH
+    : `/${normalizedSegments.join('/')}`
+}
+
+function getWritingPathSegments(path: string): string[] {
+  return normalizeWritingPath(path).split('/').filter(Boolean)
+}
+
 /**
  * Writing projects are intentionally markdown-first. This validator keeps the
  * workspace inside a predictable virtual path space and blocks traversal.
@@ -26,19 +55,7 @@ export function normalizeWritingPath(input: string): string {
     throw new WritingPathError('Path cannot be empty')
   }
 
-  const normalized = pathPosix.normalize(ensureLeadingSlash(trimmed))
-  if (!normalized.startsWith('/')) {
-    throw new WritingPathError('Path must stay inside the project root')
-  }
-  if (normalized.includes('..')) {
-    throw new WritingPathError('Parent directory traversal is not allowed')
-  }
-
-  if (normalized === '.' || normalized === '') {
-    return WRITING_ROOT_PATH
-  }
-
-  return normalized === '/' ? WRITING_ROOT_PATH : normalized.replace(/\/+$/, '')
+  return normalizeWritingPosixPath(trimmed)
 }
 
 export function getWritingParentPath(path: string): string | null {
@@ -47,8 +64,10 @@ export function getWritingParentPath(path: string): string | null {
     return null
   }
 
-  const parent = pathPosix.dirname(normalized)
-  return parent === '.' ? WRITING_ROOT_PATH : parent
+  const segments = getWritingPathSegments(normalized)
+  segments.pop()
+
+  return segments.length === 0 ? WRITING_ROOT_PATH : `/${segments.join('/')}`
 }
 
 export function getWritingBaseName(path: string): string {
@@ -56,7 +75,9 @@ export function getWritingBaseName(path: string): string {
   if (normalized === WRITING_ROOT_PATH) {
     return ''
   }
-  return pathPosix.basename(normalized)
+
+  const segments = getWritingPathSegments(normalized)
+  return segments.at(-1) ?? ''
 }
 
 /**

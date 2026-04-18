@@ -1,16 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { WRITING_PROJECT_INSTRUCTION_PATH } from '../constants'
+import { WRITING_PROJECT_INSTRUCTION_PATH } from './constants'
 import {
-  applyAcceptedHunks,
-  applyWritingPatchToContent,
   assertValidWritingFolderPath,
   assertValidWritingFilePath,
+  getWritingBaseName,
+  getWritingParentPath,
+  normalizeWritingPath,
+} from './path-utils'
+import {
+  applyAcceptedHunks,
   createWritingHunks,
   getWritingHunkPreviewText,
   getWritingHunkReplacementText,
-  normalizeWritingPath,
+} from './diff'
+import {
+  applyWritingPatchToContent,
   parseWritingApplyPatch,
-} from './index'
+} from './patch'
 
 describe('writing tool paths', () => {
   it('normalizes workspace-relative paths into rooted project paths', () => {
@@ -21,6 +27,18 @@ describe('writing tool paths', () => {
       WRITING_PROJECT_INSTRUCTION_PATH,
     )
     expect(assertValidWritingFolderPath('/research')).toBe('/research')
+  })
+
+  it('derives parent and basename information without node:path', () => {
+    expect(getWritingParentPath('/research/notes/chapter-1.md')).toBe('/research/notes')
+    expect(getWritingParentPath('/chapter-1.md')).toBe('/')
+    expect(getWritingBaseName('/research/notes/chapter-1.md')).toBe('chapter-1.md')
+  })
+
+  it('rejects traversal that would escape the virtual project root', () => {
+    expect(() => normalizeWritingPath('../../draft.md')).toThrow(
+      'Path must stay inside the project root',
+    )
   })
 })
 

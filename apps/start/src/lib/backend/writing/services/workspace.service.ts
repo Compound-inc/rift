@@ -10,12 +10,12 @@ import {
   getBlobById,
   getScopedProject,
   listProjectEntries,
-} from './writing-persistence'
+} from './persistence'
 import type {
   WritingChangeRow,
   WritingChangeSetRow,
   WritingEntryRow,
-} from './writing-persistence'
+} from './persistence'
 
 function toPersistenceError(requestId: string, message: string, cause?: unknown) {
   return new WritingPersistenceError({

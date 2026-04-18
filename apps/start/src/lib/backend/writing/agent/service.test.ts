@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeWritingAgentToolPath } from './writing-agent.service'
+import { normalizeWritingAgentToolPath } from './service'
 
 describe('normalizeWritingAgentToolPath', () => {
   it('strips the virtual writing workspace prefix from tool paths', () => {

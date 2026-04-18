@@ -1,13 +1,13 @@
 import { Layer } from 'effect'
 import { makeRuntimeRunner } from '@/lib/backend/server-effect'
 import { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
-import { WritingAgentService } from '../tool/writing-agent.service'
-import { UserSkillRegistryService } from '../services/user-skill-registry.service'
-import { WritingChangeSetService } from '../services/writing-change-set.service'
-import { WritingChatService } from '../services/writing-chat.service'
-import { WritingProjectService } from '../services/writing-project.service'
-import { WritingSnapshotService } from '../services/writing-snapshot.service'
-import { WritingWorkspaceService } from '../services/writing-workspace.service'
+import { WritingAgentService } from '../agent/service'
+import { UserSkillRegistryService } from '../services/skill-registry.service'
+import { WritingChangeSetService } from '../services/change-set.service'
+import { WritingChatService } from '../services/chat.service'
+import { WritingProjectService } from '../services/project.service'
+import { WritingSnapshotService } from '../services/snapshot.service'
+import { WritingWorkspaceService } from '../services/workspace.service'
 
 /**
  * Central runtime for the writing workspace domain.
