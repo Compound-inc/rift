@@ -23,6 +23,7 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import { isSingularityOrganizationId } from '@/ee/singularity/shared/singularity'
 import { waitForPageSettled } from '@/lib/frontend/performance/page-settled'
 import { SidebarChatThreadPreloader } from './sidebar/sidebar-chat-thread-preloader'
+import { SidebarWritingChatPreloader } from './sidebar/sidebar-writing-chat-preloader'
 import { usePageSidebarVisibility } from './page-sidebar-visibility-context'
 
 const SidebarOrganizationMenu = lazy(async () => ({
@@ -156,6 +157,7 @@ export const AppSidebar: ComponentType = () => {
       style={sidebarStyle}
     >
       <SidebarChatThreadPreloader />
+      <SidebarWritingChatPreloader />
       {/* Single chrome wrapper so the right-side border and top-right cutout stay
           attached to whichever sidebar surface is currently visible. */}
       <div

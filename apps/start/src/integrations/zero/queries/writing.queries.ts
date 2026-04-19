@@ -14,6 +14,10 @@ const chatIdArgs = z.object({
   chatId: z.string().trim().min(1),
 })
 
+const writingSidebarProjectsArgs = z.object({
+  limit: z.number().int().positive(),
+})
+
 const changeSetIdArgs = z.object({
   changeSetId: z.string().trim().min(1),
 })
@@ -62,6 +66,16 @@ export const writingQueryDefinitions = {
         )
         .where('projectId', args.projectId)
         .orderBy('updatedAt', 'desc'),
+    ),
+    sidebarProjects: defineQuery(writingSidebarProjectsArgs, ({ args, ctx }) =>
+      applyProjectScope(zql.writingProject, ctx)
+        .orderBy('updatedAt', 'desc')
+        .limit(args.limit)
+        .related('chats', (chats) =>
+          chats
+            .where('status', 'active')
+            .orderBy('updatedAt', 'desc'),
+        )
     ),
     messagesByChat: defineQuery(chatIdArgs, ({ args, ctx }) =>
       zql.writingChatMessage

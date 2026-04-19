@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useQuery } from '@rocicorp/zero/react'
 import {
@@ -41,6 +41,7 @@ import { getWritingHunkPreviewText } from '@/lib/shared/writing'
 
 type WritingWorkspacePageProps = {
   readonly projectId: string
+  readonly initialChatId?: string
 }
 
 function pathDepth(path: string) {
@@ -84,7 +85,11 @@ function getWritingRouteErrorMessage(payload: unknown, fallback: string) {
  * writes, Zero queries for live state, and a single-screen layout that exposes
  * the full persistence and approval model for developer testing.
  */
-export function WritingWorkspacePage({ projectId }: WritingWorkspacePageProps) {
+export function WritingWorkspacePage({
+  projectId,
+  initialChatId,
+}: WritingWorkspacePageProps) {
+  const navigate = useNavigate()
   const renameProjectFn = useServerFn(renameWritingProject)
   const setAutoAcceptModeFn = useServerFn(setWritingAutoAcceptMode)
   const createChatFn = useServerFn(createWritingChat)
@@ -150,10 +155,25 @@ export function WritingWorkspacePage({ projectId }: WritingWorkspacePageProps) {
   }, [project?.title])
 
   useEffect(() => {
-    if (!selectedChatId && chats[0]?.id) {
-      setSelectedChatId(chats[0].id)
+    if (initialChatId && chats.some((chat: any) => chat.id === initialChatId)) {
+      setSelectedChatId((current) => (current === initialChatId ? current : initialChatId))
+      return
     }
-  }, [chats, selectedChatId])
+
+    const fallbackChatId = chats[0]?.id ?? null
+    if (!fallbackChatId) {
+      setSelectedChatId(null)
+      return
+    }
+
+    setSelectedChatId((current) => current ?? fallbackChatId)
+    void navigate({
+      to: '/writing/projects/$projectId',
+      params: { projectId },
+      search: { chatId: fallbackChatId },
+      replace: true,
+    })
+  }, [chats, initialChatId, navigate, projectId])
 
   useEffect(() => {
     if (!selectedPath) {
@@ -240,6 +260,12 @@ export function WritingWorkspacePage({ projectId }: WritingWorkspacePageProps) {
       })) as { chatId: string }
       setChatTitle('')
       setSelectedChatId(result.chatId)
+      void navigate({
+        to: '/writing/projects/$projectId',
+        params: { projectId },
+        search: { chatId: result.chatId },
+        replace: true,
+      })
       toast.success('Project chat created')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to create chat')
@@ -509,7 +535,15 @@ export function WritingWorkspacePage({ projectId }: WritingWorkspacePageProps) {
                 <button
                   key={chat.id}
                   type="button"
-                  onClick={() => setSelectedChatId(chat.id)}
+                  onClick={() => {
+                    setSelectedChatId(chat.id)
+                    void navigate({
+                      to: '/writing/projects/$projectId',
+                      params: { projectId },
+                      search: { chatId: chat.id },
+                      replace: true,
+                    })
+                  }}
                   className={`rounded-full px-3 py-1 text-sm transition ${
                     selectedChatId === chat.id
                       ? 'bg-primary text-primary-foreground'
