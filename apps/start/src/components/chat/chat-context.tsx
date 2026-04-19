@@ -2,9 +2,7 @@
 'use client'
 
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -14,7 +12,7 @@ import {
 import type { ReactNode } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useChat as useAIChat } from '@ai-sdk/react'
-import type { LanguageModelUsage, UIMessage  } from 'ai'
+import type { UIMessage  } from 'ai'
 import { useQuery, useZero  } from '@rocicorp/zero/react'
 import { DefaultChatTransport } from 'ai'
 import { flushSync } from 'react-dom'
@@ -34,7 +32,7 @@ import {
   
   
 } from '@/lib/shared/access-control'
-import type {AccessContext, PaidWorkspacePlanId} from '@/lib/shared/access-control';
+import type {AccessContext} from '@/lib/shared/access-control';
 import { getLocalizedFeatureAccessGateMessage } from '@/lib/frontend/access-control'
 import {
   getLocalizedToolCopy,
@@ -81,6 +79,9 @@ import {
 } from '@/lib/frontend/observability/posthog'
 import { parseChatApiError } from './chat-error-messages'
 import {
+  SharedChatContextProvider,
+} from './chat-shared-context'
+import {
   getThreadGenerationStatus,
   getThreadStatusesVersion,
   setThreadGenerationStatus,
@@ -93,26 +94,24 @@ import {
   resolveCanonicalBranch,
 } from '@/lib/shared/chat-branching/branch-resolver'
 import { buildLatestAssistantUsage } from './token-usage'
+import type {
+  BranchSelectorState,
+  ChatComposerContextValue,
+  ChatMessageActionsContextValue,
+  ChatMessagesContextValue,
+  ChatModelOption,
+  ChatVisibleTool,
+} from './chat-shared-context'
+export type { ChatVisibleTool } from './chat-shared-context'
+export {
+  useChat,
+  useChatActions,
+  useChatComposer,
+  useChatMessageActions,
+  useChatMessages,
+} from './chat-shared-context'
 
 type ChatUIMessage = UIMessage<ChatMessageMetadata>
-
-type ChatModelOption = {
-  readonly id: string
-  readonly name: string
-  readonly reasoningEfforts: readonly AiReasoningEffort[]
-  readonly defaultReasoningEffort?: AiReasoningEffort
-  readonly locked: boolean
-  readonly minimumPlanId?: PaidWorkspacePlanId
-}
-
-export type ChatVisibleTool = {
-  readonly key: string
-  readonly label: string
-  readonly description: string
-  readonly enabled: boolean
-  readonly disabled: boolean
-  readonly advanced: boolean
-}
 
 type ChatActionsContextValue = Pick<
   ReturnType<typeof useAIChat<ChatUIMessage>>,
@@ -157,51 +156,6 @@ type ChatActionsContextValue = Pick<
   clear: () => void
 }
 
-type ChatComposerContextValue = Pick<
-  ChatActionsContextValue,
-  | 'status'
-  | 'error'
-  | 'sendMessage'
-  | 'activeThreadId'
-  | 'selectedModelId'
-  | 'selectedReasoningEffort'
-  | 'selectedContextWindowMode'
-  | 'selectableModels'
-  | 'visibleModels'
-  | 'setSelectedModelId'
-  | 'setSelectedReasoningEffort'
-  | 'setSelectedContextWindowMode'
-  | 'selectedModeId'
-  | 'isModeEnforced'
-  | 'setSelectedModeId'
-  | 'visibleTools'
-  | 'disabledToolKeys'
-  | 'setThreadDisabledToolKeys'
-  | 'activeContextWindow'
-  | 'contextWindowSupportsMaxMode'
-  | 'canUploadFiles'
-  | 'uploadUpgradeCallout'
->
-
-type ChatMessageActionsContextValue = Pick<
-  ChatActionsContextValue,
-  | 'status'
-  | 'regenerate'
-  | 'regenerateMessage'
-  | 'editMessage'
-  | 'selectBranchVersion'
-  | 'revealMessageBranch'
-  | 'setMessages'
-  | 'resumeStream'
-  | 'clear'
->
-
-type BranchSelectorState = {
-  readonly parentMessageId: string
-  readonly optionMessageIds: readonly string[]
-  readonly selectedMessageId: string
-}
-
 type PendingBranchSelectorState = {
   readonly anchorMessageId: string
   readonly parentMessageId: string
@@ -214,22 +168,6 @@ type OptimisticThreadBranchState = {
   readonly activeChildByParent: Record<string, string>
   readonly branchVersion: number
 }
-
-type ChatMessagesContextValue = {
-  messages: ChatUIMessage[]
-  status: ReturnType<typeof useAIChat<ChatUIMessage>>['status']
-  activeThreadId?: string
-  hasHydratedActiveThread: boolean
-  branchSelectorsByAnchorMessageId: Record<string, BranchSelectorState>
-  latestAssistantUsage?: LanguageModelUsage
-  branchCost?: number
-  showBranchCost: boolean
-}
-
-const ChatMessagesContext = createContext<ChatMessagesContextValue | null>(null)
-const ChatComposerContext = createContext<ChatComposerContextValue | null>(null)
-const ChatMessageActionsContext =
-  createContext<ChatMessageActionsContextValue | null>(null)
 
 type PendingOptimisticAttachmentManifest = {
   readonly text: string
@@ -2353,50 +2291,12 @@ export function ChatProvider({
   )
 
   return (
-    <ChatMessagesContext.Provider value={messagesValue}>
-      <ChatComposerContext.Provider value={composerValue}>
-        <ChatMessageActionsContext.Provider value={messageActionsValue}>
-          {children}
-        </ChatMessageActionsContext.Provider>
-      </ChatComposerContext.Provider>
-    </ChatMessagesContext.Provider>
+    <SharedChatContextProvider
+      messagesValue={messagesValue}
+      composerValue={composerValue}
+      messageActionsValue={messageActionsValue}
+    >
+      {children}
+    </SharedChatContextProvider>
   )
-}
-
-export function useChatMessages() {
-  const ctx = useContext(ChatMessagesContext)
-  if (!ctx) {
-    throw new Error('useChatMessages must be used within ChatProvider')
-  }
-  return ctx
-}
-
-export function useChatComposer() {
-  const ctx = useContext(ChatComposerContext)
-  if (!ctx) {
-    throw new Error('useChatComposer must be used within ChatProvider')
-  }
-  return ctx
-}
-
-export function useChatMessageActions() {
-  const ctx = useContext(ChatMessageActionsContext)
-  if (!ctx) {
-    throw new Error('useChatMessageActions must be used within ChatProvider')
-  }
-  return ctx
-}
-
-export function useChatActions() {
-  return {
-    ...useChatComposer(),
-    ...useChatMessageActions(),
-  }
-}
-
-export function useChat() {
-  return {
-    ...useChatMessages(),
-    ...useChatActions(),
-  }
 }

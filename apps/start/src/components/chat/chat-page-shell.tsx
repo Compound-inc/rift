@@ -1,6 +1,7 @@
 'use client'
 
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import type { ComponentType } from 'react'
 import { Button } from '@rift/ui/button'
 import { useHotkey } from '@tanstack/react-hotkeys'
 import { useMediaQuery } from '@rift/ui/hooks/useMediaQuery'
@@ -14,7 +15,21 @@ import { ChatThread } from './chat-thread'
  * Shared shell used by both `/chat` and `/chat/$threadId`.
  * Keeping a single component prevents subtle layout drift between routes.
  */
-export function ChatPageShell() {
+export function ChatPageShell({
+  ThreadComponent = ChatThread,
+  InputComponent = ChatInput,
+}: {
+  /**
+   * Allow sibling products like writing to reuse the exact same shell while
+   * swapping in their own provider-backed thread renderer.
+   */
+  ThreadComponent?: ComponentType
+  /**
+   * The shared composer chrome stays identical across products even when the
+   * send logic comes from a different context implementation.
+   */
+  InputComponent?: ComponentType
+}) {
   const { isMobile } = useMediaQuery()
   const { isOpen: isMobileNavOpen, setIsOpen: setIsMobileNavOpen } =
     useSideNav()
@@ -77,13 +92,13 @@ export function ChatPageShell() {
         style={{ scrollbarGutter: 'stable' }}
       >
         <div className="h-full">
-          <ChatThread />
+          <ThreadComponent />
         </div>
       </div>
 
       <div className="sticky bottom-0 z-40 overflow-visible px-0 md:px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-2 md:pt-4">
         <div className="w-full md:mx-auto md:max-w-2xl -mb-[max(env(safe-area-inset-bottom),0.75rem)] bg-surface-base md:rounded-t-[30px] pb-[max(env(safe-area-inset-bottom),0.75rem)]">
-          <ChatInput />
+          <InputComponent />
         </div>
       </div>
     </div>

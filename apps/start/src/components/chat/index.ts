@@ -1,9 +1,13 @@
 export {
   ChatProvider,
+} from './chat-context'
+export {
   useChat,
   useChatActions,
   useChatMessages,
-} from './chat-context'
+  useChatComposer,
+  useChatMessageActions,
+} from './chat-shared-context'
 export { ChatMessage } from './chat-message'
 export { ChatThread } from './chat-thread'
 export { ChatInput } from './chat-input'
