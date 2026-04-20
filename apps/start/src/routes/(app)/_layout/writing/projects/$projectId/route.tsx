@@ -1,8 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { ChatInput, ChatPageShell } from '@/components/chat'
 import { WritingChatProvider } from '@/components/writing/writing-chat-context'
-import { WritingChatThread } from '@/components/writing/writing-chat-thread'
+import { WritingProjectShell } from '@/components/writing/writing-project-shell'
 
 export const Route = createFileRoute('/(app)/_layout/writing/projects/$projectId' as any)({
   validateSearch: z.object({
@@ -16,11 +15,10 @@ function WritingProjectRoute() {
   const { chatId } = Route.useSearch()
 
   return (
-    <WritingChatProvider projectId={projectId} initialChatId={chatId}>
-      <ChatPageShell
-        ThreadComponent={WritingChatThread}
-        InputComponent={ChatInput}
-      />
-    </WritingChatProvider>
+    <div className="h-full overflow-hidden">
+      <WritingChatProvider projectId={projectId} initialChatId={chatId}>
+        <WritingProjectShell projectId={projectId} />
+      </WritingChatProvider>
+    </div>
   )
 }

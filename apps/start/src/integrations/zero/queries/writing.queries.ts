@@ -57,6 +57,7 @@ export const writingQueryDefinitions = {
         )
         .where('projectId', args.projectId)
         .where('path', args.path)
+        .related('blob')
         .one(),
     ),
     chatsByProject: defineQuery(projectIdArgs, ({ args, ctx }) =>

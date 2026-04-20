@@ -57,7 +57,8 @@ append-only.
 The writing agent uses `@mariozechner/pi-coding-agent` in SDK mode with:
 
 - `createAgentSession`
-- in-memory sessions/settings
+- persisted per-chat PI sessions reopened via `SessionManager.open(...)`
+- in-memory settings tuned for writing-agent runtime behavior
 - a custom resource loader
 - Rift-defined fake tools only
 

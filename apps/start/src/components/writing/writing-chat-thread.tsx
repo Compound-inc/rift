@@ -67,7 +67,7 @@ export function WritingChatThread() {
     return { userMessageCount: count, lastUserMessageId: lastUserId }
   }, [messages])
 
-  const { lastUserMessageRef, contentEndRef, bottomRef } =
+  const { lastUserMessageRef, contentEndRef, spacerRef, bottomRef } =
     usePinToLastUserMessage({
       resetKey: activeThreadId,
       userMessageCount,
@@ -82,17 +82,18 @@ export function WritingChatThread() {
 
   if (messages.length === 0) {
     return (
-      <div className="mx-auto flex h-full w-full max-w-4xl flex-col">
-        <div className="flex flex-1 flex-col pb-6" />
+      <div className="flex h-full min-h-full w-full flex-col px-3 py-4 md:px-4 md:py-5">
+        <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col pb-6" />
         <div ref={contentEndRef} className="h-0 w-full shrink-0" />
+        <div ref={spacerRef} className="h-0 w-full shrink-0" />
         <div ref={bottomRef} className="h-px w-full shrink-0" />
       </div>
     )
   }
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-4xl flex-col">
-      <div className="flex flex-1 flex-col pb-6">
+    <div className="flex h-full min-h-full w-full flex-col px-3 py-4 md:px-4 md:py-5">
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col pb-6">
         {messages.map((message) => (
           <WritingChatThreadMessageRow
             key={message.id}
@@ -105,6 +106,7 @@ export function WritingChatThread() {
         ))}
         <div ref={contentEndRef} className="h-0 w-full shrink-0" />
       </div>
+      <div ref={spacerRef} className="h-0 w-full shrink-0" />
       <div ref={bottomRef} className="h-px w-full shrink-0" />
     </div>
   )

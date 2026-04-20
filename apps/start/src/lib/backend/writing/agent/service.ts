@@ -1,7 +1,6 @@
 import { Effect, Layer, ServiceMap } from 'effect'
 import {
   AuthStorage,
-  SessionManager,
   SettingsManager,
   createAgentSession,
 } from '@mariozechner/pi-coding-agent'
@@ -22,12 +21,17 @@ import {
   WritingProjectNotFoundError,
   WritingToolExecutionError,
 } from '../domain'
+import { WritingAgentSessionService } from '../services/agent-session.service'
 import { UserSkillRegistryService } from '../services/skill-registry.service'
 import { WritingChangeSetService } from '../services/change-set.service'
 import { WritingChatService } from '../services/chat.service'
 import { WritingProjectService } from '../services/project.service'
 import { WritingWorkspaceService } from '../services/workspace.service'
 import { getProjectChat } from '../services/persistence'
+import {
+  serializePiSession,
+  withPiSessionManager,
+} from './pi-session'
 import {
   createResourceLoader,
   extractAssistantText,
@@ -105,6 +109,7 @@ export class WritingAgentService extends ServiceMap.Service<
       const workspace = yield* WritingWorkspaceService
       const changeSets = yield* WritingChangeSetService
       const chats = yield* WritingChatService
+      const agentSessions = yield* WritingAgentSessionService
       const skillRegistry = yield* UserSkillRegistryService
 
       const submitPrompt: WritingAgentServiceShape['submitPrompt'] = Effect.fn(
@@ -143,6 +148,16 @@ export class WritingAgentService extends ServiceMap.Service<
                       chatId,
                     })
                   }
+
+                  const persistedSession = await Effect.runPromise(
+                    agentSessions.loadChatSession({
+                      projectId,
+                      chatId,
+                      userId,
+                      organizationId,
+                      requestId,
+                    }),
+                  )
 
                   const { changeSetId } = await Effect.runPromise(
                     changeSets.createChangeSet({
@@ -241,105 +256,130 @@ export class WritingAgentService extends ServiceMap.Service<
                     authStorage.setRuntimeApiKey(provider, runtimeKey)
                   }
 
-                  const { session } = await createAgentSession({
-                    cwd: `/writing/${projectId}`,
-                    agentDir: `/writing-agent/${projectId}`,
-                    authStorage,
-                    model,
-                    thinkingLevel: 'low',
-                    sessionManager: SessionManager.inMemory(),
-                    settingsManager: SettingsManager.inMemory({
-                      compaction: { enabled: false },
-                      retry: { enabled: true, maxRetries: 1 },
-                    }),
-                    tools: [],
-                    customTools: tools,
-                    resourceLoader: createResourceLoader({
-                      systemPrompt,
-                      appendedPrompts,
-                    }),
-                  })
-                  session.setActiveToolsByName(tools.map((tool) => tool.name))
-
-                  await session.prompt(prompt)
-
-                  const assistantMessage = extractAssistantText(
-                    session.messages,
-                  )
-                  const changeCount = await countChangeSetChanges(
-                    db,
-                    changeSetId,
-                  )
-                  const hasPendingChanges = changeCount > 0
-
-                  const { messageId: assistantMessageId } =
-                    await Effect.runPromise(
-                      chats.appendMessage({
-                        projectId,
-                        chatId,
-                        userId,
-                        organizationId,
-                        role: 'assistant',
-                        content:
-                          assistantMessage ||
-                          (hasPendingChanges
-                            ? 'I prepared changes for review in the writing workspace.'
-                            : 'I reviewed the workspace and did not stage any file edits.'),
-                        changeSetId: hasPendingChanges
-                          ? changeSetId
-                          : undefined,
-                        requestId,
+                  return await withPiSessionManager({
+                    chatId,
+                    sessionJsonl: persistedSession?.sessionJsonl,
+                    run: async (sessionManager) => {
+                    const { session } = await createAgentSession({
+                      cwd: `/writing/${projectId}`,
+                      agentDir: `/writing-agent/${projectId}`,
+                      authStorage,
+                      model,
+                      thinkingLevel: 'low',
+                      sessionManager,
+                      settingsManager: SettingsManager.inMemory({
+                        compaction: { enabled: false },
+                        retry: { enabled: true, maxRetries: 1 },
                       }),
+                      tools: [],
+                      customTools: tools,
+                      resourceLoader: createResourceLoader({
+                        systemPrompt,
+                        appendedPrompts,
+                      }),
+                    })
+                    session.setActiveToolsByName(
+                      tools.map((tool) => tool.name),
                     )
 
-                  if (!hasPendingChanges) {
-                    await Effect.runPromise(
-                      changeSets.discardChangeSet({
-                        changeSetId,
-                        userId,
-                        organizationId,
-                        requestId,
-                      }),
-                    )
-                    return {
-                      chatId,
-                      assistantMessageId,
-                      assistantMessage:
-                        assistantMessage ||
-                        'I reviewed the workspace and did not stage any file edits.',
+                    try {
+                      await session.prompt(prompt)
+                    } finally {
+                      await Effect.runPromise(
+                        agentSessions.saveChatSession({
+                          projectId,
+                          chatId,
+                          userId,
+                          organizationId,
+                          sessionJsonl: serializePiSession(session.sessionManager),
+                          requestId,
+                        }),
+                      )
                     }
-                  }
 
-                  await Effect.runPromise(
-                    changeSets.attachAssistantMessage({
+                    const assistantMessage = extractAssistantText(
+                      session.messages,
+                    )
+                    const changeCount = await countChangeSetChanges(
+                      db,
                       changeSetId,
-                      assistantMessageId,
-                      userId,
-                      organizationId,
-                      requestId,
-                    }),
-                  )
+                    )
+                    const hasPendingChanges = changeCount > 0
 
-                  const autoApplied = project.autoAcceptMode
-                    ? await Effect.runPromise(
-                        changeSets.applyChangeSet({
+                    const { messageId: assistantMessageId } =
+                      await Effect.runPromise(
+                        chats.appendMessage({
+                          projectId,
+                          chatId,
+                          userId,
+                          organizationId,
+                          role: 'assistant',
+                          content:
+                            assistantMessage ||
+                            (hasPendingChanges
+                              ? 'I prepared changes for review in the writing workspace.'
+                              : 'I reviewed the workspace and did not stage any file edits.'),
+                          metadataJson: {
+                            model: raw,
+                            provider,
+                          },
+                          changeSetId: hasPendingChanges
+                            ? changeSetId
+                            : undefined,
+                          requestId,
+                        }),
+                      )
+
+                    if (!hasPendingChanges) {
+                      await Effect.runPromise(
+                        changeSets.discardChangeSet({
                           changeSetId,
                           userId,
                           organizationId,
                           requestId,
                         }),
                       )
-                    : undefined
+                      return {
+                        chatId,
+                        assistantMessageId,
+                        assistantMessage:
+                          assistantMessage ||
+                          'I reviewed the workspace and did not stage any file edits.',
+                      }
+                    }
 
-                  return {
-                    chatId,
-                    assistantMessageId,
-                    assistantMessage:
-                      assistantMessage ||
-                      'I prepared changes for review in the writing workspace.',
-                    changeSetId,
-                    headSnapshotId: autoApplied?.headSnapshotId,
-                  }
+                    await Effect.runPromise(
+                      changeSets.attachAssistantMessage({
+                        changeSetId,
+                        assistantMessageId,
+                        userId,
+                        organizationId,
+                        requestId,
+                      }),
+                    )
+
+                    const autoApplied = project.autoAcceptMode
+                      ? await Effect.runPromise(
+                          changeSets.applyChangeSet({
+                            changeSetId,
+                            userId,
+                            organizationId,
+                            requestId,
+                          }),
+                        )
+                      : undefined
+
+                    return {
+                      chatId,
+                      assistantMessageId,
+                      assistantMessage:
+                        assistantMessage ||
+                        'I prepared changes for review in the writing workspace.',
+                      changeSetId,
+                      headSnapshotId: autoApplied?.headSnapshotId,
+                    }
+                    },
+                  })
                 },
                 catch: (error) => {
                   if (

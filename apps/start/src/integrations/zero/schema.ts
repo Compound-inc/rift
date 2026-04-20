@@ -476,6 +476,17 @@ const writingChatMessage = table('writingChatMessage')
   })
   .primaryKey('id')
 
+const writingChatSession = table('writingChatSession')
+  .from('writing_chat_sessions')
+  .columns({
+    chatId: string().from('chat_id'),
+    projectId: string().from('project_id'),
+    sessionJsonl: string().from('session_jsonl'),
+    createdAt: number().from('created_at'),
+    updatedAt: number().from('updated_at'),
+  })
+  .primaryKey('chatId')
+
 const writingChangeSet = table('writingChangeSet')
   .from('writing_change_sets')
   .columns({
@@ -777,6 +788,11 @@ const writingProjectChatRelationships = relationships(
       destSchema: writingChangeSet,
       destField: ['chatId'],
     }),
+    session: one({
+      sourceField: ['id'],
+      destField: ['chatId'],
+      destSchema: writingChatSession,
+    }),
   }),
 )
 
@@ -797,6 +813,22 @@ const writingChatMessageRelationships = relationships(
       sourceField: ['changeSetId'],
       destField: ['id'],
       destSchema: writingChangeSet,
+    }),
+  }),
+)
+
+const writingChatSessionRelationships = relationships(
+  writingChatSession,
+  ({ one }) => ({
+    chat: one({
+      sourceField: ['chatId'],
+      destField: ['id'],
+      destSchema: writingProjectChat,
+    }),
+    project: one({
+      sourceField: ['projectId'],
+      destField: ['id'],
+      destSchema: writingProject,
     }),
   }),
 )
@@ -895,6 +927,7 @@ export const schema = createSchema({
     writingSnapshotEntry,
     writingProjectChat,
     writingChatMessage,
+    writingChatSession,
     writingChangeSet,
     writingChange,
     writingChangeHunk,
@@ -917,6 +950,7 @@ export const schema = createSchema({
     writingSnapshotEntryRelationships,
     writingProjectChatRelationships,
     writingChatMessageRelationships,
+    writingChatSessionRelationships,
     writingChangeSetRelationships,
     writingChangeRelationships,
     writingChangeHunkRelationships,

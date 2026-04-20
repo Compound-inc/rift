@@ -2,6 +2,7 @@ import { Layer } from 'effect'
 import { makeRuntimeRunner } from '@/lib/backend/server-effect'
 import { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
 import { WritingAgentService } from '../agent/service'
+import { WritingAgentSessionService } from '../services/agent-session.service'
 import { UserSkillRegistryService } from '../services/skill-registry.service'
 import { WritingChangeSetService } from '../services/change-set.service'
 import { WritingChatService } from '../services/chat.service'
@@ -25,6 +26,7 @@ const dependencyLayer = Layer.mergeAll(
   WritingWorkspaceService.layer.pipe(Layer.provide(storageLayer)),
   WritingSnapshotService.layer.pipe(Layer.provide(storageLayer)),
   WritingChatService.layer.pipe(Layer.provide(storageLayer)),
+  WritingAgentSessionService.layer.pipe(Layer.provide(storageLayer)),
   WritingChangeSetService.layer.pipe(Layer.provide(storageLayer)),
 )
 
