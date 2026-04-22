@@ -5,18 +5,21 @@ import { WritingProjectShell } from '@/components/writing/writing-project-shell'
 
 export const Route = createFileRoute('/(app)/_layout/writing/projects/$projectId' as any)({
   validateSearch: z.object({
-    chatId: z.string().trim().min(1).optional(),
+    conversationId: z.string().trim().min(1).optional(),
   }),
   component: WritingProjectRoute,
 })
 
 function WritingProjectRoute() {
   const { projectId } = Route.useParams()
-  const { chatId } = Route.useSearch()
+  const { conversationId } = Route.useSearch()
 
   return (
     <div className="h-full overflow-hidden">
-      <WritingChatProvider projectId={projectId} initialChatId={chatId}>
+      <WritingChatProvider
+        projectId={projectId}
+        initialConversationId={conversationId}
+      >
         <WritingProjectShell projectId={projectId} />
       </WritingChatProvider>
     </div>

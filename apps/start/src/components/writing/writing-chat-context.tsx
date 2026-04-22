@@ -1,62 +1,105 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  createContext,
+  use,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import type { ReactNode } from 'react'
+import type { ChatStatus } from 'ai'
 import { useNavigate } from '@tanstack/react-router'
-import type { UIMessage } from 'ai'
 import { useServerFn } from '@tanstack/react-start'
 import { useQuery } from '@rocicorp/zero/react'
 import { SharedChatContextProvider } from '@/components/chat/chat-shared-context'
-import { queries } from '@/integrations/zero'
-import { createWritingChat } from '@/lib/frontend/writing'
-import { WRITING_DEFAULT_MODEL_ID } from '@/lib/shared/writing/constants'
-import type {
-  AiContextWindowMode,
-  AiReasoningEffort,
-} from '@/lib/shared/ai-catalog/types'
 import { parseChatApiError } from '@/components/chat/chat-error-messages'
-import type { ChatModeId } from '@/lib/shared/chat-modes'
 import type {
   ChatComposerContextValue,
   ChatMessageActionsContextValue,
   ChatMessagesContextValue,
   ChatModelOption,
 } from '@/components/chat/chat-shared-context'
-
-type WritingMessageMetadata = {
-  readonly model?: string
-}
-
-type WritingUIMessage = UIMessage<WritingMessageMetadata>
+import { queries } from '@/integrations/zero'
+import { createWritingChat } from '@/lib/frontend/writing'
+import {
+  EMPTY_AGENT_LIVE_TURN_STATE,
+  readAgentLiveEvents,
+  reduceAgentLiveTurnEvent,
+} from '@/lib/shared/agent'
+import type {
+  AgentLiveTurnState,
+  AgentMessagePart,
+  AgentRenderableMessage,
+} from '@/lib/shared/agent'
+import { WRITING_DEFAULT_MODEL_ID } from '@/lib/shared/writing/constants'
+import type {
+  AiContextWindowMode,
+  AiReasoningEffort,
+} from '@/lib/shared/ai-catalog/types'
+import type { ChatModeId } from '@/lib/shared/chat-modes'
 
 type WritingChatProviderProps = {
   readonly projectId: string
-  readonly initialChatId?: string
+  readonly initialConversationId?: string
   readonly children: ReactNode
 }
 
-function toWritingUiMessage(row: {
-  id: string
-  role: 'user' | 'assistant' | 'system'
-  content: string
-  metadataJson?: unknown
-}): WritingUIMessage {
-  const metadata =
-    row.metadataJson && typeof row.metadataJson === 'object'
-      ? (row.metadataJson as WritingMessageMetadata)
-      : undefined
+type WritingChatContextValue = {
+  readonly activeConversationId?: string
+  readonly messages: readonly AgentRenderableMessage[]
+  readonly liveTurn: AgentLiveTurnState
+  readonly status: ChatStatus
+  readonly error: Error | null
+}
 
+const WritingChatContext = createContext<WritingChatContextValue | null>(null)
+
+function asMessageParts(value: unknown): readonly AgentMessagePart[] {
+  return Array.isArray(value) ? (value as AgentMessagePart[]) : []
+}
+
+function toRenderableMessage(row: {
+  readonly id: string
+  readonly role: 'user' | 'assistant' | 'tool_result' | 'system'
+  readonly status: ChatStatus
+  readonly partsJson?: unknown
+  readonly toolCallId?: string | null
+  readonly toolName?: string | null
+  readonly isError?: boolean | null
+  readonly createdAt: number
+}): AgentRenderableMessage {
   return {
     id: row.id,
     role: row.role,
-    parts: [
-      {
-        type: 'text',
-        text: row.content,
-      },
-    ],
-    metadata,
+    parts: asMessageParts(row.partsJson),
+    status:
+      row.status === 'submitted'
+        ? 'streaming'
+        : (row.status as AgentRenderableMessage['status']),
+    createdAt: row.createdAt,
+    toolCallId: row.toolCallId ?? undefined,
+    toolName: row.toolName ?? undefined,
+    isError: row.isError ?? undefined,
   }
+}
+
+function mergeRenderableMessages(input: {
+  readonly persistedMessages: readonly AgentRenderableMessage[]
+  readonly liveMessages: readonly AgentRenderableMessage[]
+}): readonly AgentRenderableMessage[] {
+  const merged = new Map<string, AgentRenderableMessage>()
+
+  for (const message of input.persistedMessages) {
+    merged.set(message.id, message)
+  }
+  for (const message of input.liveMessages) {
+    merged.set(message.id, message)
+  }
+
+  return [...merged.values()].sort((left, right) => left.createdAt - right.createdAt)
 }
 
 function formatWritingModelLabel(modelId: string): string {
@@ -70,17 +113,25 @@ function formatWritingModelLabel(modelId: string): string {
 
 export function WritingChatProvider({
   projectId,
-  initialChatId,
+  initialConversationId,
   children,
 }: WritingChatProviderProps) {
   const navigate = useNavigate()
   const createChatFn = useServerFn(createWritingChat)
+  const liveTurnRef = useRef<AgentLiveTurnState>(EMPTY_AGENT_LIVE_TURN_STATE)
   const [projectRows] = useQuery(queries.writing.projectById({ projectId }))
-  const [chats] = useQuery(queries.writing.chatsByProject({ projectId }))
+  const [conversations] = useQuery(
+    queries.writing.conversationsByProject({ projectId }),
+  )
   const project = Array.isArray(projectRows) ? projectRows[0] : projectRows
-  const [activeChatId, setActiveChatId] = useState<string | undefined>(initialChatId)
-  const [status, setStatus] = useState<'ready' | 'submitted'>('ready')
+  const [activeConversationId, setActiveConversationId] = useState<string | undefined>(
+    initialConversationId,
+  )
+  const [status, setStatus] = useState<ChatStatus>('ready')
   const [error, setError] = useState<Error | null>(null)
+  const [liveTurn, setLiveTurn] = useState<AgentLiveTurnState>(
+    EMPTY_AGENT_LIVE_TURN_STATE,
+  )
   const [selectedModelId, setSelectedModelIdState] = useState<string>(
     WRITING_DEFAULT_MODEL_ID,
   )
@@ -88,61 +139,99 @@ export function WritingChatProvider({
     useState<AiReasoningEffort>()
 
   useEffect(() => {
-    const activeChat = chats.find((chat: any) => chat.id === activeChatId)
-    if (activeChat?.modelId) {
-      setSelectedModelIdState(activeChat.modelId)
+    const activeConversation = conversations.find(
+      (conversation: any) => conversation.id === activeConversationId,
+    )
+    if (activeConversation?.defaultModelId) {
+      setSelectedModelIdState(activeConversation.defaultModelId)
       return
     }
 
-    if (project && typeof project === 'object' && 'modelId' in project) {
-      const projectModelId = (project as { modelId?: unknown }).modelId
-      if (typeof projectModelId === 'string' && projectModelId.trim().length > 0) {
-        setSelectedModelIdState(projectModelId)
-      }
+    if (
+      project &&
+      typeof project === 'object' &&
+      'defaultConversationId' in project &&
+      typeof project.defaultConversationId === 'string' &&
+      project.defaultConversationId.length > 0
+    ) {
+      setSelectedModelIdState(WRITING_DEFAULT_MODEL_ID)
     }
-  }, [activeChatId, chats, project])
+  }, [activeConversationId, conversations, project])
 
   useEffect(() => {
-    if (initialChatId && chats.some((chat: any) => chat.id === initialChatId)) {
-      setActiveChatId(initialChatId)
+    if (
+      initialConversationId &&
+      conversations.some((conversation: any) => conversation.id === initialConversationId)
+    ) {
+      setActiveConversationId(initialConversationId)
       return
     }
 
-    const fallbackChatId = chats[0]?.id
-    if (fallbackChatId) {
-      setActiveChatId((current) => current ?? fallbackChatId)
-    } else if (!initialChatId) {
-      setActiveChatId(undefined)
+    const fallbackConversationId = conversations[0]?.id
+    if (fallbackConversationId) {
+      setActiveConversationId((current) => current ?? fallbackConversationId)
+    } else if (!initialConversationId) {
+      setActiveConversationId(undefined)
     }
-  }, [chats, initialChatId])
+  }, [conversations, initialConversationId])
 
   useEffect(() => {
-    if (!activeChatId) return
+    if (!activeConversationId) {
+      return
+    }
 
-    const search = { chatId: activeChatId }
     void navigate({
       to: '/writing/projects/$projectId',
       params: { projectId },
-      search,
+      search: { conversationId: activeConversationId },
       replace: true,
     })
-  }, [activeChatId, navigate, projectId])
+  }, [activeConversationId, navigate, projectId])
+
+  useEffect(() => {
+    liveTurnRef.current = liveTurn
+  }, [liveTurn])
+
+  useEffect(() => {
+    if (liveTurn.conversationId === activeConversationId) {
+      return
+    }
+
+    setLiveTurn(EMPTY_AGENT_LIVE_TURN_STATE)
+    liveTurnRef.current = EMPTY_AGENT_LIVE_TURN_STATE
+  }, [activeConversationId, liveTurn.conversationId])
 
   const [messageRows] = useQuery(
-    queries.writing.messagesByChat({ chatId: activeChatId ?? '__none__' }),
+    queries.writing.messagesByConversation({
+      conversationId: activeConversationId ?? '__none__',
+    }),
+  )
+
+  const persistedMessages = useMemo(
+    () =>
+      messageRows.map((row: any) =>
+        toRenderableMessage({
+          id: row.id,
+          role: row.role,
+          status: row.status,
+          partsJson: row.partsJson,
+          toolCallId: row.toolCallId,
+          toolName: row.toolName,
+          isError: row.isError,
+          createdAt: row.createdAt,
+        }),
+      ),
+    [messageRows],
   )
 
   const messages = useMemo(
     () =>
-      messageRows.map((row: any) =>
-        toWritingUiMessage({
-          id: row.id,
-          role: row.role,
-          content: row.content,
-          metadataJson: row.metadataJson,
-        }),
-      ),
-    [messageRows],
+      mergeRenderableMessages({
+        persistedMessages,
+        liveMessages:
+          liveTurn.conversationId === activeConversationId ? liveTurn.messages : [],
+      }),
+    [activeConversationId, liveTurn.conversationId, liveTurn.messages, persistedMessages],
   )
 
   const modelOptions = useMemo<readonly ChatModelOption[]>(
@@ -161,19 +250,21 @@ export function WritingChatProvider({
     setSelectedModelIdState(modelId)
   }, [])
 
-  const ensureActiveChat = useCallback(async () => {
-    if (activeChatId) return activeChatId
+  const ensureActiveConversation = useCallback(async () => {
+    if (activeConversationId) {
+      return activeConversationId
+    }
 
     const result = (await createChatFn({
       data: {
         projectId,
         modelId: selectedModelId,
       },
-    })) as { chatId: string }
+    })) as { conversationId: string }
 
-    setActiveChatId(result.chatId)
-    return result.chatId
-  }, [activeChatId, createChatFn, projectId, selectedModelId])
+    setActiveConversationId(result.conversationId)
+    return result.conversationId
+  }, [activeConversationId, createChatFn, projectId, selectedModelId])
 
   const sendMessage = useCallback(
     async ({ text }: { text: string }) => {
@@ -181,7 +272,10 @@ export function WritingChatProvider({
       setStatus('submitted')
 
       try {
-        const chatId = await ensureActiveChat()
+        const conversationId = await ensureActiveConversation()
+        setLiveTurn(EMPTY_AGENT_LIVE_TURN_STATE)
+        liveTurnRef.current = EMPTY_AGENT_LIVE_TURN_STATE
+
         const response = await fetch('/api/writing/chat', {
           method: 'POST',
           headers: {
@@ -189,16 +283,42 @@ export function WritingChatProvider({
           },
           body: JSON.stringify({
             projectId,
-            chatId,
+            conversationId,
             prompt: text,
             modelId: selectedModelId,
           }),
         })
 
-        const payload = await response.json().catch(() => undefined)
         if (!response.ok) {
+          const payload = await response.json().catch(() => undefined)
           const parsed = parseChatApiError(payload)
           throw new Error(parsed?.message ?? 'Writing chat request failed')
+        }
+
+        const stream = response.body
+        if (!stream) {
+          throw new Error('Writing stream did not return a response body')
+        }
+
+        setStatus('streaming')
+        let streamError: Error | null = null
+
+        await readAgentLiveEvents({
+          stream,
+          onEvent: (event) => {
+            setLiveTurn((current) => {
+              const nextState = reduceAgentLiveTurnEvent(current, event)
+              liveTurnRef.current = nextState
+              if (nextState.status === 'failed' && nextState.errorMessage) {
+                streamError = new Error(nextState.errorMessage)
+              }
+              return nextState
+            })
+          },
+        })
+
+        if (streamError) {
+          throw streamError
         }
       } catch (caughtError) {
         const normalized =
@@ -211,45 +331,39 @@ export function WritingChatProvider({
         setStatus('ready')
       }
     },
-    [ensureActiveChat, projectId, selectedModelId],
+    [ensureActiveConversation, projectId, selectedModelId],
   )
 
   const setSelectedContextWindowMode = useCallback(
-    async (_contextWindowMode: AiContextWindowMode) => {
-      return
-    },
+    async (_contextWindowMode: AiContextWindowMode) => undefined,
     [],
   )
 
-  const setSelectedModeId = useCallback(async (_modeId?: ChatModeId) => {
-    return
-  }, [])
+  const setSelectedModeId = useCallback(async (_modeId?: ChatModeId) => undefined, [])
 
   const setThreadDisabledToolKeys = useCallback(
-    async (_disabledToolKeys: readonly string[]) => {
-      return
-    },
+    async (_disabledToolKeys: readonly string[]) => undefined,
     [],
   )
 
   const unsupportedMessageAction = useCallback(async () => {
-    throw new Error('Writing chat message actions are not available yet')
+    throw new Error('Writing message actions are not available')
   }, [])
 
   const revealMessageBranch = useCallback(async () => false, [])
 
   const messagesValue = useMemo<ChatMessagesContextValue>(
     () => ({
-      messages,
+      messages: [],
       status,
-      activeThreadId: activeChatId,
+      activeThreadId: activeConversationId,
       hasHydratedActiveThread: true,
       branchSelectorsByAnchorMessageId: {},
       latestAssistantUsage: undefined,
       branchCost: undefined,
       showBranchCost: false,
     }),
-    [activeChatId, messages, status],
+    [activeConversationId, status],
   )
 
   const composerValue = useMemo<ChatComposerContextValue>(
@@ -257,7 +371,7 @@ export function WritingChatProvider({
       sendMessage,
       status,
       error,
-      activeThreadId: activeChatId,
+      activeThreadId: activeConversationId,
       selectedModelId,
       selectedReasoningEffort,
       selectedContextWindowMode: 'standard',
@@ -267,18 +381,18 @@ export function WritingChatProvider({
       setSelectedReasoningEffort,
       setSelectedContextWindowMode,
       selectedModeId: undefined,
-      isModeEnforced: true,
+      isModeEnforced: false,
       setSelectedModeId,
       visibleTools: [],
       disabledToolKeys: [],
       setThreadDisabledToolKeys,
-      activeContextWindow: 128_000,
+      activeContextWindow: 1_000_000,
       contextWindowSupportsMaxMode: false,
       canUploadFiles: false,
-      uploadUpgradeCallout: 'Writing chat attachments are not available yet',
+      uploadUpgradeCallout: undefined,
     }),
     [
-      activeChatId,
+      activeConversationId,
       error,
       modelOptions,
       selectedModelId,
@@ -286,6 +400,7 @@ export function WritingChatProvider({
       sendMessage,
       setSelectedContextWindowMode,
       setSelectedModeId,
+      setSelectedModelId,
       setThreadDisabledToolKeys,
       status,
     ],
@@ -298,21 +413,39 @@ export function WritingChatProvider({
       editMessage: unsupportedMessageAction,
       selectBranchVersion: unsupportedMessageAction,
       revealMessageBranch,
-      regenerate: undefined,
-      setMessages: undefined,
-      resumeStream: undefined,
-      clear: undefined,
     }),
     [revealMessageBranch, status, unsupportedMessageAction],
   )
 
-  return (
-    <SharedChatContextProvider
-      messagesValue={messagesValue}
-      composerValue={composerValue}
-      messageActionsValue={messageActionsValue}
-    >
-      {children}
-    </SharedChatContextProvider>
+  const writingValue = useMemo<WritingChatContextValue>(
+    () => ({
+      activeConversationId,
+      messages,
+      liveTurn,
+      status,
+      error,
+    }),
+    [activeConversationId, error, liveTurn, messages, status],
   )
+
+  return (
+    <WritingChatContext.Provider value={writingValue}>
+      <SharedChatContextProvider
+        messagesValue={messagesValue}
+        composerValue={composerValue}
+        messageActionsValue={messageActionsValue}
+      >
+        {children}
+      </SharedChatContextProvider>
+    </WritingChatContext.Provider>
+  )
+}
+
+export function useWritingChat() {
+  const value = use(WritingChatContext)
+  if (!value) {
+    throw new Error('useWritingChat must be used within WritingChatProvider')
+  }
+
+  return value
 }

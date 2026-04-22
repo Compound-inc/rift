@@ -369,6 +369,46 @@ const attachment = table('attachment')
   })
   .primaryKey('id')
 
+const agentConversation = table('agentConversation')
+  .from('agent_conversations')
+  .columns({
+    id: string(),
+    product: string(),
+    scopeType: string().from('scope_type'),
+    scopeId: string().from('scope_id'),
+    ownerUserId: string().from('owner_user_id'),
+    ownerOrgId: string().from('owner_org_id'),
+    title: string(),
+    defaultModelId: string().from('default_model_id'),
+    status: enumeration<'active' | 'archived'>(),
+    metadataJson: json().from('metadata_json'),
+    createdAt: number().from('created_at'),
+    updatedAt: number().from('updated_at'),
+    lastMessageAt: number().from('last_message_at'),
+  })
+  .primaryKey('id')
+
+const agentMessage = table('agentMessage')
+  .from('agent_messages')
+  .columns({
+    id: string(),
+    conversationId: string().from('conversation_id'),
+    turnId: string().from('turn_id'),
+    product: string(),
+    role: enumeration<'user' | 'assistant' | 'tool_result' | 'system'>(),
+    messageIndex: number().from('message_index'),
+    status: enumeration<
+      'pending' | 'streaming' | 'completed' | 'failed' | 'aborted'
+    >(),
+    partsJson: json().from('parts_json'),
+    toolCallId: string().from('tool_call_id').optional(),
+    toolName: string().from('tool_name').optional(),
+    isError: boolean().from('is_error').optional(),
+    createdAt: number().from('created_at'),
+    updatedAt: number().from('updated_at'),
+  })
+  .primaryKey('id')
+
 const writingProject = table('writingProject')
   .from('writing_projects')
   .columns({
@@ -379,7 +419,7 @@ const writingProject = table('writingProject')
     slug: string(),
     description: string().optional(),
     headSnapshotId: string().from('head_snapshot_id').optional(),
-    defaultChatId: string().from('default_chat_id').optional(),
+    defaultConversationId: string().from('default_conversation_id').optional(),
     autoAcceptMode: boolean().from('auto_accept_mode'),
     archivedAt: number().from('archived_at').optional(),
     createdAt: number().from('created_at'),
@@ -424,7 +464,7 @@ const writingSnapshot = table('writingSnapshot')
     parentSnapshotId: string().from('parent_snapshot_id').optional(),
     source: enumeration<'user' | 'ai' | 'restore' | 'system'>(),
     summary: string(),
-    chatId: string().from('chat_id').optional(),
+    conversationId: string().from('conversation_id').optional(),
     messageId: string().from('message_id').optional(),
     createdByUserId: string().from('created_by_user_id'),
     restoredFromSnapshotId: string().from('restored_from_snapshot_id').optional(),
@@ -445,54 +485,12 @@ const writingSnapshotEntry = table('writingSnapshotEntry')
   })
   .primaryKey('id')
 
-const writingProjectChat = table('writingProjectChat')
-  .from('writing_project_chats')
-  .columns({
-    id: string(),
-    projectId: string().from('project_id'),
-    ownerUserId: string().from('owner_user_id'),
-    title: string(),
-    modelId: string().from('model_id'),
-    status: enumeration<'active' | 'archived'>(),
-    createdAt: number().from('created_at'),
-    updatedAt: number().from('updated_at'),
-    lastMessageAt: number().from('last_message_at'),
-  })
-  .primaryKey('id')
-
-const writingChatMessage = table('writingChatMessage')
-  .from('writing_chat_messages')
-  .columns({
-    id: string(),
-    chatId: string().from('chat_id'),
-    projectId: string().from('project_id'),
-    role: enumeration<'user' | 'assistant' | 'system'>(),
-    content: string(),
-    status: enumeration<'pending' | 'done' | 'error'>(),
-    metadataJson: json().from('metadata_json'),
-    changeSetId: string().from('change_set_id').optional(),
-    createdAt: number().from('created_at'),
-    updatedAt: number().from('updated_at'),
-  })
-  .primaryKey('id')
-
-const writingChatSession = table('writingChatSession')
-  .from('writing_chat_sessions')
-  .columns({
-    chatId: string().from('chat_id'),
-    projectId: string().from('project_id'),
-    sessionJsonl: string().from('session_jsonl'),
-    createdAt: number().from('created_at'),
-    updatedAt: number().from('updated_at'),
-  })
-  .primaryKey('chatId')
-
 const writingChangeSet = table('writingChangeSet')
   .from('writing_change_sets')
   .columns({
     id: string(),
     projectId: string().from('project_id'),
-    chatId: string().from('chat_id'),
+    conversationId: string().from('conversation_id'),
     assistantMessageId: string().from('assistant_message_id').optional(),
     baseSnapshotId: string().from('base_snapshot_id'),
     status: enumeration<
@@ -700,6 +698,30 @@ const messageRelationships = relationships(message, ({ one }) => ({
   }),
 }))
 
+const agentConversationRelationships = relationships(
+  agentConversation,
+  ({ many, one }) => ({
+    messages: many({
+      sourceField: ['id'],
+      destSchema: agentMessage,
+      destField: ['conversationId'],
+    }),
+    project: one({
+      sourceField: ['scopeId'],
+      destField: ['id'],
+      destSchema: writingProject,
+    }),
+  }),
+)
+
+const agentMessageRelationships = relationships(agentMessage, ({ one }) => ({
+  conversation: one({
+    sourceField: ['conversationId'],
+    destField: ['id'],
+    destSchema: agentConversation,
+  }),
+}))
+
 const writingProjectRelationships = relationships(writingProject, ({ many }) => ({
   entries: many({
     sourceField: ['id'],
@@ -711,10 +733,10 @@ const writingProjectRelationships = relationships(writingProject, ({ many }) => 
     destSchema: writingSnapshot,
     destField: ['projectId'],
   }),
-  chats: many({
+  conversations: many({
     sourceField: ['id'],
-    destSchema: writingProjectChat,
-    destField: ['projectId'],
+    destSchema: agentConversation,
+    destField: ['scopeId'],
   }),
   changeSets: many({
     sourceField: ['id'],
@@ -770,69 +792,6 @@ const writingSnapshotEntryRelationships = relationships(
   }),
 )
 
-const writingProjectChatRelationships = relationships(
-  writingProjectChat,
-  ({ many, one }) => ({
-    project: one({
-      sourceField: ['projectId'],
-      destField: ['id'],
-      destSchema: writingProject,
-    }),
-    messages: many({
-      sourceField: ['id'],
-      destSchema: writingChatMessage,
-      destField: ['chatId'],
-    }),
-    changeSets: many({
-      sourceField: ['id'],
-      destSchema: writingChangeSet,
-      destField: ['chatId'],
-    }),
-    session: one({
-      sourceField: ['id'],
-      destField: ['chatId'],
-      destSchema: writingChatSession,
-    }),
-  }),
-)
-
-const writingChatMessageRelationships = relationships(
-  writingChatMessage,
-  ({ one }) => ({
-    chat: one({
-      sourceField: ['chatId'],
-      destField: ['id'],
-      destSchema: writingProjectChat,
-    }),
-    project: one({
-      sourceField: ['projectId'],
-      destField: ['id'],
-      destSchema: writingProject,
-    }),
-    changeSet: one({
-      sourceField: ['changeSetId'],
-      destField: ['id'],
-      destSchema: writingChangeSet,
-    }),
-  }),
-)
-
-const writingChatSessionRelationships = relationships(
-  writingChatSession,
-  ({ one }) => ({
-    chat: one({
-      sourceField: ['chatId'],
-      destField: ['id'],
-      destSchema: writingProjectChat,
-    }),
-    project: one({
-      sourceField: ['projectId'],
-      destField: ['id'],
-      destSchema: writingProject,
-    }),
-  }),
-)
-
 const writingChangeSetRelationships = relationships(
   writingChangeSet,
   ({ many, one }) => ({
@@ -841,10 +800,10 @@ const writingChangeSetRelationships = relationships(
       destField: ['id'],
       destSchema: writingProject,
     }),
-    chat: one({
-      sourceField: ['chatId'],
+    conversation: one({
+      sourceField: ['conversationId'],
       destField: ['id'],
-      destSchema: writingProjectChat,
+      destSchema: agentConversation,
     }),
     changes: many({
       sourceField: ['id'],
@@ -920,14 +879,13 @@ export const schema = createSchema({
     thread,
     message,
     attachment,
+    agentConversation,
+    agentMessage,
     writingProject,
     writingBlob,
     writingEntry,
     writingSnapshot,
     writingSnapshotEntry,
-    writingProjectChat,
-    writingChatMessage,
-    writingChatSession,
     writingChangeSet,
     writingChange,
     writingChangeHunk,
@@ -944,13 +902,12 @@ export const schema = createSchema({
     orgSubscriptionRelationships,
     orgUserUsageSummaryRelationships,
     messageRelationships,
+    agentConversationRelationships,
+    agentMessageRelationships,
     writingProjectRelationships,
     writingEntryRelationships,
     writingSnapshotRelationships,
     writingSnapshotEntryRelationships,
-    writingProjectChatRelationships,
-    writingChatMessageRelationships,
-    writingChatSessionRelationships,
     writingChangeSetRelationships,
     writingChangeRelationships,
     writingChangeHunkRelationships,

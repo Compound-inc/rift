@@ -1,5 +1,8 @@
 import { Effect } from 'effect'
-import { WritingChatService, WritingProjectService } from '@/lib/backend/writing'
+import {
+  WritingConversationService,
+  WritingProjectService,
+} from '@/lib/backend/writing'
 import { runWritingAction } from './server-action.server'
 
 export * from './tool/writing-tool.server'
@@ -77,8 +80,8 @@ export async function createWritingChatAction(input: {
     defaultMessage: 'Failed to create writing chat',
     program: (auth) =>
       Effect.gen(function* () {
-        const service = yield* WritingChatService
-        return yield* service.createProjectChat({
+        const service = yield* WritingConversationService
+        return yield* service.createProjectConversation({
           projectId: input.projectId,
           userId: auth.userId,
           organizationId: auth.organizationId,

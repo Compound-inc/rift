@@ -10,8 +10,8 @@ const fileByPathArgs = projectIdArgs.extend({
   path: z.string().trim().min(1),
 })
 
-const chatIdArgs = z.object({
-  chatId: z.string().trim().min(1),
+const conversationIdArgs = z.object({
+  conversationId: z.string().trim().min(1),
 })
 
 const writingSidebarProjectsArgs = z.object({
@@ -60,33 +60,41 @@ export const writingQueryDefinitions = {
         .related('blob')
         .one(),
     ),
-    chatsByProject: defineQuery(projectIdArgs, ({ args, ctx }) =>
-      zql.writingProjectChat
+    conversationsByProject: defineQuery(projectIdArgs, ({ args, ctx }) =>
+      zql.agentConversation
         .whereExists('project', (project) =>
           applyProjectScope(project.where('id', args.projectId), ctx),
         )
-        .where('projectId', args.projectId)
+        .where('product', 'writing')
+        .where('scopeType', 'writing_project')
+        .where('scopeId', args.projectId)
         .orderBy('updatedAt', 'desc'),
     ),
     sidebarProjects: defineQuery(writingSidebarProjectsArgs, ({ args, ctx }) =>
       applyProjectScope(zql.writingProject, ctx)
         .orderBy('updatedAt', 'desc')
         .limit(args.limit)
-        .related('chats', (chats) =>
-          chats
+        .related('conversations', (conversations) =>
+          conversations
+            .where('product', 'writing')
+            .where('scopeType', 'writing_project')
             .where('status', 'active')
             .orderBy('updatedAt', 'desc'),
         )
     ),
-    messagesByChat: defineQuery(chatIdArgs, ({ args, ctx }) =>
-      zql.writingChatMessage
-        .whereExists('chat', (chat) =>
-          chat.where('id', args.chatId).whereExists('project', (project) =>
+    messagesByConversation: defineQuery(conversationIdArgs, ({ args, ctx }) =>
+      zql.agentMessage
+        .whereExists('conversation', (conversation) =>
+          conversation
+            .where('id', args.conversationId)
+            .where('product', 'writing')
+            .where('scopeType', 'writing_project')
+            .whereExists('project', (project) =>
             applyProjectScope(project, ctx),
-          ),
+            ),
         )
-        .where('chatId', args.chatId)
-        .orderBy('createdAt', 'asc'),
+        .where('conversationId', args.conversationId)
+        .orderBy('messageIndex', 'asc'),
     ),
     snapshotsByProject: defineQuery(projectIdArgs, ({ args, ctx }) =>
       zql.writingSnapshot

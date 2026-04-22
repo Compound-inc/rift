@@ -76,6 +76,7 @@ export function buildWritingAgentTools(input: {
         )) as readonly WorkspaceEntry[]
         return createToolResult(formatEntryList(entries, targetPath), {
           path: targetPath,
+          toolName: 'ls',
         })
       },
     }),
@@ -112,6 +113,8 @@ export function buildWritingAgentTools(input: {
           : matches
         return createToolResult(filtered.join('\n') || '(no matches)', {
           count: filtered.length,
+          query: params.query,
+          path: prefix,
         })
       },
     }),
@@ -153,7 +156,11 @@ export function buildWritingAgentTools(input: {
           filtered
             .map((match) => `${match.path}:${match.lineNumber} ${match.line}`)
             .join('\n') || '(no matches)',
-          { count: filtered.length },
+          {
+            count: filtered.length,
+            pattern: params.pattern,
+            path: prefix,
+          },
         )
       },
     }),
@@ -200,6 +207,8 @@ export function buildWritingAgentTools(input: {
         return createToolResult(text, {
           path: file.path,
           lineCount: lines.length,
+          startLine: params.startLine ?? 1,
+          endLine: requestedEndLine,
         })
       },
     }),
@@ -253,7 +262,11 @@ export function buildWritingAgentTools(input: {
 
         return createToolResult(
           `Staged ${operation} for ${normalizedPath} (${result.hunkCount} hunks).`,
-          result,
+          {
+            ...result,
+            path: normalizedPath,
+            operation,
+          },
         )
       },
     }),
@@ -316,7 +329,11 @@ export function buildWritingAgentTools(input: {
 
         return createToolResult(
           `Staged update for ${normalizedPath} (${result.hunkCount} hunks).`,
-          result,
+          {
+            ...result,
+            path: normalizedPath,
+            operation: 'update',
+          },
         )
       },
     }),
@@ -412,6 +429,7 @@ export function buildWritingAgentTools(input: {
 
         return createToolResult(`Staged ${appliedCount} patch operation(s).`, {
           count: appliedCount,
+          paths: [...new Set(operations.map((operation) => operation.path))],
         })
       },
     }),

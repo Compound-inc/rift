@@ -331,7 +331,7 @@ CREATE TABLE IF NOT EXISTS writing_projects (
   slug TEXT NOT NULL,
   description TEXT,
   head_snapshot_id TEXT,
-  default_chat_id TEXT,
+  default_conversation_id TEXT,
   auto_accept_mode BOOLEAN NOT NULL DEFAULT FALSE,
   archived_at BIGINT,
   created_at BIGINT NOT NULL,
@@ -380,7 +380,7 @@ CREATE TABLE IF NOT EXISTS writing_snapshots (
   parent_snapshot_id TEXT,
   source TEXT NOT NULL,
   summary TEXT NOT NULL,
-  chat_id TEXT,
+  conversation_id TEXT,
   message_id TEXT,
   created_by_user_id TEXT NOT NULL,
   restored_from_snapshot_id TEXT,
@@ -402,42 +402,79 @@ CREATE TABLE IF NOT EXISTS writing_snapshot_entries (
 CREATE UNIQUE INDEX IF NOT EXISTS writing_snapshot_entries_snapshot_path_idx
   ON writing_snapshot_entries (snapshot_id, path);
 
--- writing_project_chats
-CREATE TABLE IF NOT EXISTS writing_project_chats (
+-- agent_conversations
+CREATE TABLE IF NOT EXISTS agent_conversations (
   id TEXT PRIMARY KEY,
-  project_id TEXT NOT NULL,
+  product TEXT NOT NULL,
+  scope_type TEXT NOT NULL,
+  scope_id TEXT NOT NULL,
   owner_user_id TEXT NOT NULL,
+  owner_org_id TEXT NOT NULL DEFAULT '',
   title TEXT NOT NULL,
-  model_id TEXT NOT NULL,
+  default_model_id TEXT NOT NULL,
   status TEXT NOT NULL,
+  metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at BIGINT NOT NULL,
   updated_at BIGINT NOT NULL,
   last_message_at BIGINT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS writing_project_chats_project_updated_idx
-  ON writing_project_chats (project_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS agent_conversations_scope_updated_idx
+  ON agent_conversations (product, scope_type, scope_id, updated_at DESC);
 
--- writing_chat_messages
-CREATE TABLE IF NOT EXISTS writing_chat_messages (
+-- agent_turns
+CREATE TABLE IF NOT EXISTS agent_turns (
   id TEXT PRIMARY KEY,
-  chat_id TEXT NOT NULL,
-  project_id TEXT NOT NULL,
-  role TEXT NOT NULL,
-  content TEXT NOT NULL,
+  conversation_id TEXT NOT NULL,
+  product TEXT NOT NULL,
+  runtime TEXT NOT NULL,
   status TEXT NOT NULL,
-  metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  request_id TEXT NOT NULL,
+  model_id TEXT,
+  provider_id TEXT,
+  turn_index INTEGER NOT NULL,
+  user_message_id TEXT,
+  assistant_message_id TEXT,
   change_set_id TEXT,
+  turn_json JSONB NOT NULL,
+  error_json JSONB,
+  started_at BIGINT NOT NULL,
+  completed_at BIGINT,
+  updated_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS agent_turns_conversation_turn_idx
+  ON agent_turns (conversation_id, turn_index ASC);
+CREATE INDEX IF NOT EXISTS agent_turns_conversation_started_idx
+  ON agent_turns (conversation_id, started_at ASC);
+
+-- agent_messages
+CREATE TABLE IF NOT EXISTS agent_messages (
+  id TEXT PRIMARY KEY,
+  conversation_id TEXT NOT NULL,
+  turn_id TEXT NOT NULL,
+  product TEXT NOT NULL,
+  role TEXT NOT NULL,
+  message_index INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  parts_json JSONB NOT NULL,
+  tool_call_id TEXT,
+  tool_name TEXT,
+  is_error BOOLEAN,
   created_at BIGINT NOT NULL,
   updated_at BIGINT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS writing_chat_messages_chat_created_idx
-  ON writing_chat_messages (chat_id, created_at ASC);
+CREATE INDEX IF NOT EXISTS agent_messages_conversation_message_idx
+  ON agent_messages (conversation_id, message_index ASC);
+CREATE INDEX IF NOT EXISTS agent_messages_turn_message_idx
+  ON agent_messages (turn_id, message_index ASC);
+CREATE INDEX IF NOT EXISTS agent_messages_tool_call_idx
+  ON agent_messages (tool_call_id)
+  WHERE tool_call_id IS NOT NULL;
 
--- writing_chat_sessions
-CREATE TABLE IF NOT EXISTS writing_chat_sessions (
-  chat_id TEXT PRIMARY KEY,
-  project_id TEXT NOT NULL,
-  session_jsonl TEXT NOT NULL,
+-- agent_sessions
+CREATE TABLE IF NOT EXISTS agent_sessions (
+  conversation_id TEXT PRIMARY KEY,
+  runtime TEXT NOT NULL,
+  session_json TEXT NOT NULL,
   created_at BIGINT NOT NULL,
   updated_at BIGINT NOT NULL
 );
@@ -446,7 +483,7 @@ CREATE TABLE IF NOT EXISTS writing_chat_sessions (
 CREATE TABLE IF NOT EXISTS writing_change_sets (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL,
-  chat_id TEXT NOT NULL,
+  conversation_id TEXT NOT NULL,
   assistant_message_id TEXT,
   base_snapshot_id TEXT NOT NULL,
   status TEXT NOT NULL,

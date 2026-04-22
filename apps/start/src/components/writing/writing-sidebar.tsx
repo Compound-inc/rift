@@ -24,7 +24,7 @@ const PROJECT_ROW_CLASS =
   'flex h-7 items-center pl-3 pr-3 text-sm text-foreground-secondary'
 
 type WritingSidebarChatRow = {
-  readonly chatId: string
+  readonly conversationId: string
   readonly projectId: string
   readonly title: string
 }
@@ -59,17 +59,17 @@ function getStaticSections(): NavSection[] {
 
 function buildWritingChatNavItem({
   chat,
-  activeChatId,
+  activeConversationId,
 }: {
   chat: WritingSidebarChatRow
-  activeChatId: string | null
+  activeConversationId: string | null
 }): NavItemType {
   const title = chat.title.trim() || 'Untitled chat'
 
   return {
     name: title,
-    href: `${WRITING_HREF}/projects/${chat.projectId}?chatId=${encodeURIComponent(chat.chatId)}`,
-    isActive: () => activeChatId === chat.chatId,
+    href: `${WRITING_HREF}/projects/${chat.projectId}?conversationId=${encodeURIComponent(chat.conversationId)}`,
+    isActive: () => activeConversationId === chat.conversationId,
   }
 }
 
@@ -79,11 +79,13 @@ function buildWritingChatNavItem({
  */
 function WritingSidebarProjects({ pathname }: { pathname: string }) {
   const z = useZero()
-  const activeChatId = useRouterState({
+  const activeConversationId = useRouterState({
     select: (state) => {
       const search = (state.resolvedLocation?.search ??
-        state.location.search) as { chatId?: unknown } | undefined
-      return typeof search?.chatId === 'string' ? search.chatId : null
+        state.location.search) as { conversationId?: unknown } | undefined
+      return typeof search?.conversationId === 'string'
+        ? search.conversationId
+        : null
     },
   })
   const [rows] = useQuery(
@@ -110,10 +112,15 @@ function WritingSidebarProjects({ pathname }: { pathname: string }) {
     (chat: WritingSidebarChatRow) => {
       z.preload(queries.writing.projectById({ projectId: chat.projectId }), CACHE_WRITING_NAV)
       z.preload(
-        queries.writing.chatsByProject({ projectId: chat.projectId }),
+        queries.writing.conversationsByProject({ projectId: chat.projectId }),
         CACHE_WRITING_NAV,
       )
-      z.preload(queries.writing.messagesByChat({ chatId: chat.chatId }), CACHE_WRITING_NAV)
+      z.preload(
+        queries.writing.messagesByConversation({
+          conversationId: chat.conversationId,
+        }),
+        CACHE_WRITING_NAV,
+      )
     },
     [z],
   )
@@ -146,12 +153,12 @@ function WritingSidebarProjects({ pathname }: { pathname: string }) {
                 {project.chats.map((chat) => {
                   const item = buildWritingChatNavItem({
                     chat,
-                    activeChatId,
+                    activeConversationId,
                   })
 
                   return (
                     <div
-                      key={chat.chatId}
+                      key={chat.conversationId}
                       className="pl-4"
                       onPointerEnter={() => preloadWritingChat(chat)}
                       onFocus={() => preloadWritingChat(chat)}
@@ -175,8 +182,8 @@ function WritingSidebarProjects({ pathname }: { pathname: string }) {
  * handle sparse titles consistently.
  */
 function mapProjectChats(project: WritingSidebarProjectRow): readonly WritingSidebarChatRow[] {
-  return (project.chats ?? []).map((chat) => ({
-    chatId: chat.id,
+  return (project.conversations ?? []).map((chat) => ({
+    conversationId: chat.id,
     projectId: project.id,
     title: chat.title,
   }))

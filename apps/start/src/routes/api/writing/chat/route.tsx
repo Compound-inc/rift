@@ -22,7 +22,7 @@ export const Route = createFileRoute('/api/writing/chat' as any)({
     handlers: {
       POST: async ({ request }) => {
         let projectId: string | undefined
-        let chatId: string | undefined
+        let conversationId: string | undefined
 
         return runAuthenticatedBackendRoute({
           request,
@@ -60,7 +60,10 @@ export const Route = createFileRoute('/api/writing/chat' as any)({
 
               projectId =
                 typeof body.projectId === 'string' ? body.projectId.trim() : ''
-              chatId = typeof body.chatId === 'string' ? body.chatId.trim() : ''
+              conversationId =
+                typeof body.conversationId === 'string'
+                  ? body.conversationId.trim()
+                  : ''
               const prompt =
                 typeof body.prompt === 'string' ? body.prompt.trim() : ''
               const modelId =
@@ -69,17 +72,17 @@ export const Route = createFileRoute('/api/writing/chat' as any)({
               setWritingWideEventContext(wideEvent!, {
                 workspace: {
                   projectId,
-                  chatId,
+                  chatId: conversationId,
                 },
                 agent: {
                   requestedModelId: modelId,
                 },
               })
 
-              if (!projectId || !chatId || !prompt) {
+              if (!projectId || !conversationId || !prompt) {
                 return yield* Effect.fail(
                   new WritingInvalidRequestError({
-                    message: 'projectId, chatId, and prompt are required',
+                    message: 'projectId, conversationId, and prompt are required',
                     requestId,
                   }),
                 )
@@ -93,9 +96,9 @@ export const Route = createFileRoute('/api/writing/chat' as any)({
               })
 
               const service = yield* WritingAgentService
-              const response = yield* service.submitPrompt({
+              const response = yield* service.streamPrompt({
                 projectId,
-                chatId,
+                conversationId,
                 prompt,
                 modelId,
                 userId: auth.userId,
@@ -106,15 +109,13 @@ export const Route = createFileRoute('/api/writing/chat' as any)({
               setWritingWideEventContext(wideEvent!, {
                 workspace: {
                   projectId,
-                  chatId,
-                  changeSetId: response.changeSetId,
+                  chatId: conversationId,
                 },
               })
               addWritingWideEventBreadcrumb(wideEvent!, {
-                name: 'writing.prompt.completed',
+                name: 'writing.prompt.streaming',
                 detail: {
-                  staged_change_set: Boolean(response.changeSetId),
-                  auto_applied_snapshot: response.headSnapshotId,
+                  turn_id: response.turnId,
                 },
               })
 
@@ -123,7 +124,14 @@ export const Route = createFileRoute('/api/writing/chat' as any)({
           onSuccess: async ({ result, wideEvent }) => {
             finalizeWritingWideEventSuccess(wideEvent!, { status: 200 })
             await Effect.runPromise(drainWritingWideEvent(wideEvent!)).catch(() => undefined)
-            return Response.json(result)
+            return new Response(result.stream, {
+              status: 200,
+              headers: {
+                'content-type': 'text/event-stream; charset=utf-8',
+                'cache-control': 'no-cache, no-transform',
+                connection: 'keep-alive',
+              },
+            })
           },
           onFailure: ({ error, requestId, auth, wideEvent }) =>
             handleWritingRouteFailure({
@@ -136,7 +144,7 @@ export const Route = createFileRoute('/api/writing/chat' as any)({
               userId: auth?.userId,
               organizationId: auth?.organizationId,
               projectId,
-              chatId,
+              chatId: conversationId,
               wideEvent,
             }),
         })

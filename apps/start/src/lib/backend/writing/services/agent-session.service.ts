@@ -1,15 +1,13 @@
+import { PgClient } from '@effect/sql-pg'
 import { Effect, Layer, ServiceMap } from 'effect'
-import { zql } from '@/lib/backend/chat/infra/zero/db'
+import { AgentSessionStore } from '@/lib/backend/agent'
 import {
-  ZeroDatabaseNotConfiguredError,
-  ZeroDatabaseService,
-} from '@/lib/backend/server-effect/services/zero-database.service'
-import {
-  WritingChatNotFoundError,
   WritingPersistenceError,
   WritingProjectNotFoundError,
+  WritingChatNotFoundError,
 } from '../domain/errors'
-import { getProjectChat, getScopedProject, now } from './persistence'
+import { getProjectConversationSql } from './persistence'
+import { WritingProjectService } from './project.service'
 
 function toPersistenceError(requestId: string, message: string, cause?: unknown) {
   return new WritingPersistenceError({
@@ -20,17 +18,17 @@ function toPersistenceError(requestId: string, message: string, cause?: unknown)
 }
 
 export type WritingAgentSessionRecord = {
-  readonly chatId: string
-  readonly projectId: string
-  readonly sessionJsonl: string
+  readonly conversationId: string
+  readonly runtime: string
+  readonly sessionJson: string
   readonly createdAt: number
   readonly updatedAt: number
 }
 
 export type WritingAgentSessionServiceShape = {
-  readonly loadChatSession: (input: {
+  readonly loadConversationSession: (input: {
     readonly projectId: string
-    readonly chatId: string
+    readonly conversationId: string
     readonly userId: string
     readonly organizationId?: string
     readonly requestId: string
@@ -40,12 +38,12 @@ export type WritingAgentSessionServiceShape = {
     | WritingChatNotFoundError
     | WritingPersistenceError
   >
-  readonly saveChatSession: (input: {
+  readonly saveConversationSession: (input: {
     readonly projectId: string
-    readonly chatId: string
+    readonly conversationId: string
     readonly userId: string
     readonly organizationId?: string
-    readonly sessionJsonl: string
+    readonly sessionJson: string
     readonly requestId: string
   }) => Effect.Effect<
     void,
@@ -55,11 +53,6 @@ export type WritingAgentSessionServiceShape = {
   >
 }
 
-/**
- * Keeps PI native session JSONL beside writing chats so each request can reopen
- * exact session state through SessionManager.open(), including tool history and
- * any PI-managed metadata.
- */
 export class WritingAgentSessionService extends ServiceMap.Service<
   WritingAgentSessionService,
   WritingAgentSessionServiceShape
@@ -67,179 +60,116 @@ export class WritingAgentSessionService extends ServiceMap.Service<
   static readonly layer = Layer.effect(
     this,
     Effect.gen(function* () {
-      const zeroDatabase = yield* ZeroDatabaseService
+      const sql = yield* PgClient.PgClient
+      const projects = yield* WritingProjectService
+      const sessions = yield* AgentSessionStore
 
-      const assertScopedChat = async (input: {
-        readonly db: any
-        readonly projectId: string
-        readonly chatId: string
-        readonly userId: string
-        readonly organizationId?: string
-        readonly requestId: string
-      }) => {
-        const project = await getScopedProject({
-          db: input.db,
-          projectId: input.projectId,
-          userId: input.userId,
-          organizationId: input.organizationId,
-        })
-        if (!project) {
-          throw new WritingProjectNotFoundError({
-            message: 'Writing project not found',
-            requestId: input.requestId,
-            projectId: input.projectId,
-          })
-        }
+      const assertScopedConversation = Effect.fn(
+        'WritingAgentSessionService.assertScopedConversation',
+      )(
+        ({
+          projectId,
+          conversationId,
+          userId,
+          organizationId,
+          requestId,
+        }: {
+          readonly projectId: string
+          readonly conversationId: string
+          readonly userId: string
+          readonly organizationId?: string
+          readonly requestId: string
+        }) =>
+          Effect.gen(function* () {
+            yield* projects.getProject({
+              projectId,
+              userId,
+              organizationId,
+              requestId,
+            })
 
-        const chat = await getProjectChat({
-          db: input.db,
-          chatId: input.chatId,
-          projectId: input.projectId,
-        })
-        if (!chat) {
-          throw new WritingChatNotFoundError({
-            message: 'Writing chat not found',
-            requestId: input.requestId,
-            chatId: input.chatId,
-          })
-        }
-      }
-
-      const loadChatSession: WritingAgentSessionServiceShape['loadChatSession'] =
-        Effect.fn('WritingAgentSessionService.loadChatSession')(
-          ({ projectId, chatId, userId, organizationId, requestId }) =>
-            zeroDatabase
-              .withDatabase((db) =>
-                Effect.tryPromise({
-                  try: async () => {
-                    await assertScopedChat({
-                      db,
-                      projectId,
-                      chatId,
-                      userId,
-                      organizationId,
-                      requestId,
-                    })
-
-                    const row = await db.run(
-                      zql.writingChatSession
-                        .where('chatId', chatId)
-                        .where('projectId', projectId)
-                        .one(),
-                    )
-
-                    return (row as WritingAgentSessionRecord | null) ?? null
-                  },
-                  catch: (error) => {
-                    if (
-                      error instanceof WritingProjectNotFoundError ||
-                      error instanceof WritingChatNotFoundError
-                    ) {
-                      return error
-                    }
-                    return toPersistenceError(
-                      requestId,
-                      'Failed to load writing agent session',
-                      error,
-                    )
-                  },
-                }),
-              )
-              .pipe(
-                Effect.mapError((error) =>
-                  error instanceof ZeroDatabaseNotConfiguredError
-                    ? toPersistenceError(
-                        requestId,
-                        'Writing storage is unavailable',
-                        error,
-                      )
-                    : error,
+            const conversation = yield* getProjectConversationSql({
+              conversationId,
+              projectId,
+            }).pipe(
+              Effect.provideService(PgClient.PgClient, sql),
+              Effect.mapError((error) =>
+                toPersistenceError(
+                  requestId,
+                  'Failed to validate writing conversation scope',
+                  error,
                 ),
               ),
-        )
+            )
 
-      const saveChatSession: WritingAgentSessionServiceShape['saveChatSession'] =
-        Effect.fn('WritingAgentSessionService.saveChatSession')(
-          ({
-            projectId,
-            chatId,
-            userId,
-            organizationId,
-            sessionJsonl,
-            requestId,
-          }) =>
-            zeroDatabase
-              .withDatabase((db) =>
-                Effect.tryPromise({
-                  try: async () => {
-                    await assertScopedChat({
-                      db,
-                      projectId,
-                      chatId,
-                      userId,
-                      organizationId,
-                      requestId,
-                    })
-
-                    const existing = await db.run(
-                      zql.writingChatSession
-                        .where('chatId', chatId)
-                        .where('projectId', projectId)
-                        .one(),
-                    )
-
-                    const persistedAt = now()
-                    await db.transaction(async (tx) => {
-                      if (existing) {
-                        await tx.mutate.writingChatSession.update({
-                          chatId,
-                          projectId,
-                          sessionJsonl,
-                          updatedAt: persistedAt,
-                        })
-                        return
-                      }
-
-                      await tx.mutate.writingChatSession.insert({
-                        chatId,
-                        projectId,
-                        sessionJsonl,
-                        createdAt: persistedAt,
-                        updatedAt: persistedAt,
-                      })
-                    })
-                  },
-                  catch: (error) => {
-                    if (
-                      error instanceof WritingProjectNotFoundError ||
-                      error instanceof WritingChatNotFoundError
-                    ) {
-                      return error
-                    }
-                    return toPersistenceError(
-                      requestId,
-                      'Failed to save writing agent session',
-                      error,
-                    )
-                  },
+            if (!conversation) {
+              return yield* Effect.fail(
+                new WritingChatNotFoundError({
+                  message: 'Writing conversation not found',
+                  requestId,
+                  chatId: conversationId,
                 }),
               )
-              .pipe(
-                Effect.mapError((error) =>
-                  error instanceof ZeroDatabaseNotConfiguredError
-                    ? toPersistenceError(
-                        requestId,
-                        'Writing storage is unavailable',
-                        error,
-                      )
-                    : error,
-                ),
-              ),
-        )
+            }
+          }),
+      )
 
       return {
-        loadChatSession,
-        saveChatSession,
+        loadConversationSession: Effect.fn(
+        'WritingAgentSessionService.loadConversationSession',
+        )(({ projectId, conversationId, userId, organizationId, requestId }) =>
+          Effect.gen(function* () {
+            yield* assertScopedConversation({
+              projectId,
+              conversationId,
+              userId,
+              organizationId,
+              requestId,
+            })
+
+            const row = yield* sessions.loadSession({
+              conversationId,
+              runtime: 'pi',
+            }).pipe(
+              Effect.mapError((error) =>
+                toPersistenceError(
+                  requestId,
+                  'Failed to load writing agent session',
+                  error,
+                ),
+              ),
+            )
+
+            return row as WritingAgentSessionRecord | null
+          }),
+        ),
+        saveConversationSession: Effect.fn(
+          'WritingAgentSessionService.saveConversationSession',
+        )(({ projectId, conversationId, userId, organizationId, sessionJson, requestId }) =>
+          Effect.gen(function* () {
+            yield* assertScopedConversation({
+              projectId,
+              conversationId,
+              userId,
+              organizationId,
+              requestId,
+            })
+
+            yield* sessions.saveSession({
+              conversationId,
+              runtime: 'pi',
+              sessionJson,
+            }).pipe(
+              Effect.mapError((error) =>
+                toPersistenceError(
+                  requestId,
+                  'Failed to save writing agent session',
+                  error,
+                ),
+              ),
+            )
+          }),
+        ),
       }
     }),
   )

@@ -191,7 +191,7 @@ export async function discardWritingChangeSetAction(input: {
 
 export async function submitWritingPromptAction(input: {
   readonly projectId: string
-  readonly chatId: string
+  readonly conversationId: string
   readonly prompt: string
   readonly modelId?: string
 }) {
@@ -201,9 +201,9 @@ export async function submitWritingPromptAction(input: {
     program: (auth) =>
       Effect.gen(function* () {
         const service = yield* WritingAgentService
-        return yield* service.submitPrompt({
+        return yield* service.streamPrompt({
           projectId: input.projectId,
-          chatId: input.chatId,
+          conversationId: input.conversationId,
           prompt: input.prompt,
           modelId: input.modelId,
           userId: auth.userId,

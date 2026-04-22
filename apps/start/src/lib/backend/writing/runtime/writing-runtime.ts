@@ -1,11 +1,17 @@
 import { Layer } from 'effect'
+import {
+  AgentConversationService,
+  AgentSessionStore,
+  AgentSseBridge,
+  AgentTurnStore,
+} from '@/lib/backend/agent'
 import { makeRuntimeRunner } from '@/lib/backend/server-effect'
-import { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
+import { UpstreamPostgresLayer } from '@/lib/backend/server-effect/services/upstream-postgres.service'
 import { WritingAgentService } from '../agent/service'
 import { WritingAgentSessionService } from '../services/agent-session.service'
 import { UserSkillRegistryService } from '../services/skill-registry.service'
 import { WritingChangeSetService } from '../services/change-set.service'
-import { WritingChatService } from '../services/chat.service'
+import { WritingConversationService } from '../services/chat.service'
 import { WritingProjectService } from '../services/project.service'
 import { WritingSnapshotService } from '../services/snapshot.service'
 import { WritingWorkspaceService } from '../services/workspace.service'
@@ -17,22 +23,57 @@ import { WritingWorkspaceService } from '../services/workspace.service'
  * through this runtime so auth parsing stays at the boundary while all writing
  * orchestration remains in typed services.
  */
-const storageLayer = ZeroDatabaseService.layer
+const writingProjectStorageLayer = UpstreamPostgresLayer
 
-const dependencyLayer = Layer.mergeAll(
-  storageLayer,
+const sharedAgentLayer = Layer.mergeAll(
+  AgentConversationService.layer,
+  AgentSessionStore.layer,
+  AgentTurnStore.layer,
+  AgentSseBridge.layer,
+).pipe(Layer.provideMerge(UpstreamPostgresLayer))
+
+const writingCoreLayer = Layer.mergeAll(
+  sharedAgentLayer,
   UserSkillRegistryService.layer,
-  WritingProjectService.layer.pipe(Layer.provide(storageLayer)),
-  WritingWorkspaceService.layer.pipe(Layer.provide(storageLayer)),
-  WritingSnapshotService.layer.pipe(Layer.provide(storageLayer)),
-  WritingChatService.layer.pipe(Layer.provide(storageLayer)),
-  WritingAgentSessionService.layer.pipe(Layer.provide(storageLayer)),
-  WritingChangeSetService.layer.pipe(Layer.provide(storageLayer)),
+  WritingProjectService.layer.pipe(Layer.provide(writingProjectStorageLayer)),
+  WritingWorkspaceService.layer.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        UpstreamPostgresLayer,
+        WritingProjectService.layer.pipe(Layer.provide(writingProjectStorageLayer)),
+      ),
+    ),
+  ),
+  WritingSnapshotService.layer.pipe(Layer.provide(UpstreamPostgresLayer)),
+  WritingChangeSetService.layer.pipe(Layer.provide(UpstreamPostgresLayer)),
+)
+
+const writingAdapterLayer = Layer.mergeAll(
+  writingCoreLayer,
+  WritingConversationService.layer.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        sharedAgentLayer,
+        WritingProjectService.layer.pipe(Layer.provide(writingProjectStorageLayer)),
+      ),
+    ),
+  ),
+  WritingAgentSessionService.layer.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        sharedAgentLayer,
+        UpstreamPostgresLayer,
+        WritingProjectService.layer.pipe(Layer.provide(writingProjectStorageLayer)),
+      ),
+    ),
+  ),
 )
 
 const layer = Layer.mergeAll(
-  dependencyLayer,
-  WritingAgentService.layer.pipe(Layer.provide(dependencyLayer)),
+  writingAdapterLayer,
+  WritingAgentService.layer.pipe(
+    Layer.provide(Layer.mergeAll(writingAdapterLayer, UpstreamPostgresLayer)),
+  ),
 )
 
 const runtime = makeRuntimeRunner(layer)
