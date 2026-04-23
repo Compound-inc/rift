@@ -21,6 +21,7 @@ export type WritingManuscriptFile = {
   readonly sectionPath: string | null
   readonly sectionTitle: string
   readonly nestedPathLabel: string | null
+  readonly review: WritingManuscriptReview | null
 }
 
 export type WritingManuscriptSection = {
@@ -39,6 +40,32 @@ export type WritingManuscript = {
   readonly totalFileCount: number
   readonly workspaceInstructionsPath: string | null
   readonly hasUngroupedFiles: boolean
+}
+
+export type WritingManuscriptReview = {
+  readonly changeSetId: string
+  readonly changeId: string
+  readonly changeSetSummary: string
+  readonly operation: 'create' | 'update' | 'delete' | 'move'
+  readonly status: 'pending' | 'partially_applied'
+  readonly hunkIds: readonly string[]
+  readonly pendingHunkCount: number
+  readonly baseContent: string
+  readonly proposedContent: string
+  readonly createdAt: number
+}
+
+export type WritingPendingReviewInput = {
+  readonly changeSetId: string
+  readonly changeId: string
+  readonly changeSetSummary: string
+  readonly changeSetStatus: 'pending' | 'partially_applied'
+  readonly path: string
+  readonly operation: 'create' | 'update' | 'delete' | 'move'
+  readonly createdAt: number
+  readonly baseContent: string
+  readonly proposedContent: string
+  readonly hunkIds: readonly string[]
 }
 
 function getPathSegments(path: string) {
@@ -155,6 +182,7 @@ function compareManuscriptPath(leftPath: string, rightPath: string) {
  */
 export function buildWritingManuscript(
   entries: readonly WritingManuscriptEntry[],
+  pendingReviews: readonly WritingPendingReviewInput[] = [],
 ): WritingManuscript {
   const fileEntries = entries
     .filter(
@@ -191,11 +219,67 @@ export function buildWritingManuscript(
           nestedSegments.length > 0
             ? nestedSegments.map((segment) => humanizeLabel(segment)).join(' / ')
             : null,
+        review: null,
       }
     })
 
+  const latestReviewByPath = new Map<string, WritingPendingReviewInput>()
+  for (const review of [...pendingReviews].sort((left, right) => right.createdAt - left.createdAt)) {
+    if (review.hunkIds.length === 0) {
+      continue
+    }
+    if (!latestReviewByPath.has(review.path)) {
+      latestReviewByPath.set(review.path, review)
+    }
+  }
+
+  const fileMap = new Map<string, WritingManuscriptFile>(files.map((file) => [file.path, file]))
+
+  for (const review of latestReviewByPath.values()) {
+    const existing = fileMap.get(review.path)
+    const contentForPreview =
+      review.operation === 'delete' ? review.baseContent : review.proposedContent
+    const segments = getPathSegments(review.path)
+    const topLevelSection = segments.length > 1 ? segments[0] ?? null : null
+    const fileName = getBaseName(review.path)
+    const nestedSegments = segments.slice(topLevelSection ? 1 : 0, -1)
+    const reviewPayload: WritingManuscriptReview = {
+      changeSetId: review.changeSetId,
+      changeId: review.changeId,
+      changeSetSummary: review.changeSetSummary,
+      operation: review.operation,
+      status: review.changeSetStatus,
+      hunkIds: review.hunkIds,
+      pendingHunkCount: review.hunkIds.length,
+      baseContent: review.baseContent,
+      proposedContent: review.proposedContent,
+      createdAt: review.createdAt,
+    }
+
+    fileMap.set(review.path, {
+      id: existing?.id ?? `pending:${review.changeId}`,
+      path: review.path,
+      name: fileName,
+      title: humanizeLabel(fileName),
+      orderLabel: extractOrderLabel(fileName),
+      content: contentForPreview,
+      wordCount: countWords(contentForPreview),
+      sectionPath: topLevelSection ? `/${topLevelSection}` : null,
+      sectionTitle: topLevelSection ? humanizeLabel(topLevelSection) : 'Ungrouped Drafts',
+      nestedPathLabel:
+        nestedSegments.length > 0
+          ? nestedSegments.map((segment) => humanizeLabel(segment)).join(' / ')
+          : null,
+      review: reviewPayload,
+    })
+  }
+
+  const mergedFiles = [...fileMap.values()].sort((left, right) =>
+    compareManuscriptPath(left.path, right.path),
+  )
+
   const sectionMap = new Map<string, WritingManuscriptFile[]>()
-  for (const file of files) {
+  for (const file of mergedFiles) {
     const key = file.sectionPath ?? '__ungrouped__'
     const current = sectionMap.get(key)
     if (current) {
@@ -230,13 +314,13 @@ export function buildWritingManuscript(
       return compareManuscriptPath(left.path, right.path)
     })
 
-  const totalWordCount = files.reduce((total, file) => total + file.wordCount, 0)
+  const totalWordCount = mergedFiles.reduce((total, file) => total + file.wordCount, 0)
 
   return {
     sections,
-    files,
+    files: mergedFiles,
     totalWordCount,
-    totalFileCount: files.length,
+    totalFileCount: mergedFiles.length,
     workspaceInstructionsPath: workspaceInstructions?.path ?? null,
     hasUngroupedFiles: sections.some((section) => section.path == null),
   }

@@ -121,6 +121,25 @@ export const writingQueryDefinitions = {
         .where('projectId', args.projectId)
         .orderBy('createdAt', 'desc'),
     ),
+    pendingChangeSetsByProject: defineQuery(projectIdArgs, ({ args, ctx }) =>
+      zql.writingChangeSet
+        .whereExists('project', (project) =>
+          applyProjectScope(project.where('id', args.projectId), ctx),
+        )
+        .where('projectId', args.projectId)
+        .where('status', 'IN', ['pending', 'partially_applied'])
+        .orderBy('createdAt', 'desc')
+        .related('changes', (changes) =>
+          changes
+            .where('status', 'pending')
+            .orderBy('createdAt', 'desc')
+            .related('baseBlob')
+            .related('proposedBlob')
+            .related('hunks', (hunks) =>
+              hunks.where('status', 'pending').orderBy('hunkIndex', 'asc'),
+            ),
+        ),
+    ),
     changesByChangeSet: defineQuery(changeSetIdArgs, ({ args, ctx }) =>
       zql.writingChange
         .whereExists('changeSet', (changeSet) =>

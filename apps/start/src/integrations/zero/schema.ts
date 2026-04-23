@@ -819,6 +819,16 @@ const writingChangeRelationships = relationships(writingChange, ({ many, one }) 
     destField: ['id'],
     destSchema: writingChangeSet,
   }),
+  baseBlob: one({
+    sourceField: ['baseBlobId'],
+    destField: ['id'],
+    destSchema: writingBlob,
+  }),
+  proposedBlob: one({
+    sourceField: ['proposedBlobId'],
+    destField: ['id'],
+    destSchema: writingBlob,
+  }),
   hunks: many({
     sourceField: ['id'],
     destSchema: writingChangeHunk,

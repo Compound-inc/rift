@@ -126,4 +126,43 @@ describe('buildWritingManuscript', () => {
       '/01.-mechanics/02.-deep-dive/10-edge-cases.md',
     ])
   })
+
+  it('overlays pending AI-created files into the manuscript before acceptance', () => {
+    const manuscript = buildWritingManuscript(
+      [
+        {
+          id: 'intro',
+          path: '/01.-mechanics/01-intro.md',
+          name: '01-intro.md',
+          kind: 'file',
+          blob: { content: 'Intro' },
+        },
+      ],
+      [
+        {
+          changeSetId: 'change-set-1',
+          changeId: 'change-1',
+          changeSetSummary: 'Drafted a new advanced section',
+          changeSetStatus: 'pending',
+          path: '/01.-mechanics/02.-advanced/01-notes.md',
+          operation: 'create',
+          createdAt: 10,
+          baseContent: '',
+          proposedContent: 'Pending notes',
+          hunkIds: ['hunk-1'],
+        },
+      ],
+    )
+
+    expect(manuscript.files.map((file) => file.path)).toEqual([
+      '/01.-mechanics/01-intro.md',
+      '/01.-mechanics/02.-advanced/01-notes.md',
+    ])
+    expect(manuscript.files[1]?.review).toMatchObject({
+      changeSetId: 'change-set-1',
+      operation: 'create',
+      pendingHunkCount: 1,
+    })
+    expect(manuscript.sections[0]?.files[1]?.title).toBe('Notes')
+  })
 })

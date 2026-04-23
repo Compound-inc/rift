@@ -14,7 +14,11 @@ import {
   streamdownStaticComponents,
 } from '@/components/chat/message-parts/renderers/streamdown-components'
 import { useStreamdownPlugins } from '@/components/chat/message-parts/renderers/use-streamdown-plugins'
-import { buildWritingManuscript } from '@/lib/frontend/writing/manuscript'
+import {
+  buildWritingManuscript,
+} from '@/lib/frontend/writing/manuscript'
+import type { WritingPendingReviewInput } from '@/lib/frontend/writing/manuscript'
+import { WritingChangeReviewCard } from './writing-change-review-card'
 
 type WritingDocumentViewerProps = {
   readonly projectId: string
@@ -22,6 +26,9 @@ type WritingDocumentViewerProps = {
 
 type WritingDocumentEntry = QueryResultType<
   ReturnType<(typeof queries.writing)['manuscriptEntriesByProject']>
+>[number]
+type WritingPendingChangeSet = QueryResultType<
+  ReturnType<(typeof queries.writing)['pendingChangeSetsByProject']>
 >[number]
 
 type WritingDocumentViewMode = 'manuscript' | 'focused'
@@ -47,11 +54,48 @@ export function WritingDocumentViewer({
 }: WritingDocumentViewerProps) {
   const reducedMotion = useReducedMotion()
   const [entries] = useQuery(queries.writing.manuscriptEntriesByProject({ projectId }))
+  const [pendingChangeSets] = useQuery(queries.writing.pendingChangeSetsByProject({ projectId }))
   const deferredEntries = useDeferredValue(entries)
   const streamdownPlugins = useStreamdownPlugins()
+  const pendingReviews = useMemo<readonly WritingPendingReviewInput[]>(
+    () =>
+      (pendingChangeSets as readonly WritingPendingChangeSet[]).flatMap((changeSet) => {
+        const changes = Array.isArray(changeSet.changes) ? changeSet.changes : []
+        return changes.flatMap((change) => {
+          const hunks = Array.isArray(change.hunks) ? change.hunks : []
+          const hunkIds = hunks.map((hunk: { readonly id: string }) => hunk.id)
+          if (hunkIds.length === 0) {
+            return []
+          }
+
+          const reviewStatus: WritingPendingReviewInput['changeSetStatus'] =
+            changeSet.status === 'partially_applied' ? 'partially_applied' : 'pending'
+
+          return [
+            {
+              changeSetId: changeSet.id,
+              changeId: change.id,
+              changeSetSummary: changeSet.summary,
+              changeSetStatus: reviewStatus,
+              path: change.path,
+              operation: change.operation,
+              createdAt: change.createdAt,
+              baseContent: change.baseBlob?.content ?? '',
+              proposedContent: change.proposedBlob?.content ?? '',
+              hunkIds,
+            },
+          ]
+        })
+      }),
+    [pendingChangeSets],
+  )
   const manuscript = useMemo(
-    () => buildWritingManuscript(deferredEntries as readonly WritingDocumentEntry[]),
-    [deferredEntries],
+    () =>
+      buildWritingManuscript(
+        deferredEntries as readonly WritingDocumentEntry[],
+        pendingReviews,
+      ),
+    [deferredEntries, pendingReviews],
   )
   const [viewMode, setViewMode] = useState<WritingDocumentViewMode>('manuscript')
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
@@ -229,6 +273,11 @@ export function WritingDocumentViewer({
                                   : file.path}
                               </span>
                             </span>
+                            {file.review ? (
+                              <span className="rounded-full border border-amber-300/70 bg-amber-100/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-950 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-50">
+                                Review
+                              </span>
+                            ) : null}
                           </button>
                         )
                       })}
@@ -322,6 +371,11 @@ export function WritingDocumentViewer({
                                   {file.nestedPathLabel ? (
                                     <span>{file.nestedPathLabel}</span>
                                   ) : null}
+                                  {file.review ? (
+                                    <span className="rounded-full border border-amber-300/70 bg-amber-100/70 px-2 py-0.5 font-semibold uppercase tracking-[0.16em] text-amber-950 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-50">
+                                      Pending review
+                                    </span>
+                                  ) : null}
                                 </div>
                                 <h3 className="text-xl font-semibold tracking-tight text-foreground-strong [text-wrap:balance]">
                                   {file.title}
@@ -340,17 +394,25 @@ export function WritingDocumentViewer({
                               </button>
                             </div>
 
-                            <Streamdown
-                              plugins={streamdownPlugins}
-                              controls={false}
-                              isAnimating={false}
-                              mode="static"
-                              remarkPlugins={[inlineCitationRemarkPlugin]}
-                              components={streamdownStaticComponents}
-                              className="chat-streamdown min-w-0 max-w-none break-words antialiased [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
-                            >
-                              {file.content || '\u00a0'}
-                            </Streamdown>
+                            {file.review ? (
+                              <WritingChangeReviewCard
+                                filePath={file.path}
+                                fileTitle={file.title}
+                                review={file.review}
+                              />
+                            ) : (
+                              <Streamdown
+                                plugins={streamdownPlugins}
+                                controls={false}
+                                isAnimating={false}
+                                mode="static"
+                                remarkPlugins={[inlineCitationRemarkPlugin]}
+                                components={streamdownStaticComponents}
+                                className="chat-streamdown min-w-0 max-w-none break-words antialiased [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+                              >
+                                {file.content || '\u00a0'}
+                              </Streamdown>
+                            )}
                           </article>
                         )
                       })}
@@ -394,17 +456,25 @@ export function WritingDocumentViewer({
                   </div>
                 </div>
 
-                <Streamdown
-                  plugins={streamdownPlugins}
-                  controls={false}
-                  isAnimating={false}
-                  mode="static"
-                  remarkPlugins={[inlineCitationRemarkPlugin]}
-                  components={streamdownStaticComponents}
-                  className="chat-streamdown min-w-0 max-w-none break-words antialiased [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
-                >
-                  {selectedFile.content || '\u00a0'}
-                </Streamdown>
+                {selectedFile.review ? (
+                  <WritingChangeReviewCard
+                    filePath={selectedFile.path}
+                    fileTitle={selectedFile.title}
+                    review={selectedFile.review}
+                  />
+                ) : (
+                  <Streamdown
+                    plugins={streamdownPlugins}
+                    controls={false}
+                    isAnimating={false}
+                    mode="static"
+                    remarkPlugins={[inlineCitationRemarkPlugin]}
+                    components={streamdownStaticComponents}
+                    className="chat-streamdown min-w-0 max-w-none break-words antialiased [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+                  >
+                    {selectedFile.content || '\u00a0'}
+                  </Streamdown>
+                )}
               </article>
             </div>
           ) : (
