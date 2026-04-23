@@ -318,6 +318,10 @@ export class WritingAgentService extends ServiceMap.Service<
                     'Prefer small, intentional edits that preserve structure and voice.',
                     'When you change files, use the writing tools so the user can review diffs.',
                     'The workspace only supports folders and markdown files.',
+                    'Treat /agents.md as workspace instructions, not manuscript content.',
+                    'Prefer storing manuscript drafts inside top-level section folders instead of the project root.',
+                    'Use numeric prefixes in folder, subfolder, and file names as the source of truth for manuscript order.',
+                    'Prefer names such as /01.-mechanics/01-intro.md and /01.-mechanics/02.-advanced/01-details.md.',
                     instructionFile.content
                       ? `Project instructions:\n${instructionFile.content}`
                       : '',

@@ -213,7 +213,7 @@ export function writingNavArea() {
   return {
     title: 'Writing',
     href: WRITING_HREF,
-    description: 'Long-form documents with AI collaboration',
+    description: 'Sectioned manuscripts with AI collaboration',
     icon: Feather,
     content: getStaticSections(),
     ContentComponent: WritingSidebarContent,

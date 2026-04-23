@@ -23,8 +23,10 @@ This project starts intentionally blank. Create folders and markdown files only 
 
 Guidelines:
 - Keep the workspace markdown-first
-- Prefer clear, specific file names
-- Create folders only when they improve organization
+- Reserve the root for /agents.md and top-level section folders
+- Put manuscript files inside ordered section folders such as /01.-mechanics/01-intro.md
+- Prefer clear, specific folder and file names
+- Use numeric prefixes as the source of truth for folder, subfolder, and file order
 - Keep long-form writing structured with headings and sections
 `
 }

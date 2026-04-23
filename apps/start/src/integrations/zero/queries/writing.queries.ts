@@ -50,6 +50,15 @@ export const writingQueryDefinitions = {
         .where('projectId', args.projectId)
         .orderBy('path', 'asc'),
     ),
+    manuscriptEntriesByProject: defineQuery(projectIdArgs, ({ args, ctx }) =>
+      zql.writingEntry
+        .whereExists('project', (project) =>
+          applyProjectScope(project.where('id', args.projectId), ctx),
+        )
+        .where('projectId', args.projectId)
+        .orderBy('path', 'asc')
+        .related('blob'),
+    ),
     fileByPath: defineQuery(fileByPathArgs, ({ args, ctx }) =>
       zql.writingEntry
         .whereExists('project', (project) =>

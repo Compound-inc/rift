@@ -63,8 +63,9 @@ export function WritingHomePage() {
                 Vibe-code a business plan.
               </h1>
               <p className="text-sm leading-6 text-foreground-secondary">
-                Create a markdown project, open files and folders, and collaborate with an AI agent that
-                stages diffs for review instead of touching the real filesystem.
+                Create a markdown project, organize drafts into section folders, and collaborate
+                with an AI agent that stages diffs for review instead of touching the real
+                filesystem.
               </p>
             </div>
             <div className="rounded-2xl border border-border-base bg-surface-muted/60 p-3 text-foreground-secondary">
@@ -96,7 +97,8 @@ export function WritingHomePage() {
             <div>
               <h2 className="text-lg font-semibold text-foreground-strong">Projects</h2>
               <p className="text-sm text-foreground-secondary">
-                Each project keeps its own markdown tree, chats, pending diffs, and checkpoints.
+                Each project keeps its own sectioned manuscript tree, chats, pending diffs, and
+                checkpoints.
               </p>
             </div>
             <Feather className="size-4 text-foreground-secondary" />
