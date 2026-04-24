@@ -7,6 +7,7 @@ import {
 import {
   WritingChatNotFoundError,
   WritingConflictError,
+  WritingInvalidRequestError,
   WritingPersistenceError,
   WritingProjectNotFoundError,
 } from '../domain/errors'
@@ -31,6 +32,7 @@ import {
   toPersistenceError,
   updateChangeSetResolution,
 } from './change-set/store'
+import { resolveCanonicalWritingChangeOperation } from './change-set/operation-normalization'
 
 /**
  * Centralizes hunk application so explicit approvals and auto-apply share the
@@ -50,6 +52,7 @@ const acceptChangeSetHunksOperation = Effect.fn(
       const sql = yield* PgClient.PgClient
       const selectedIds = new Set(input.hunkIds)
       const conflictingChanges = new Set<string>()
+      let matchedSelectedHunkCount = 0
       const changeResults = new Map<
         string,
         {
@@ -102,6 +105,7 @@ const acceptChangeSetHunksOperation = Effect.fn(
             if (selectedHunks.length === 0) {
               continue
             }
+            matchedSelectedHunkCount += selectedHunks.length
 
             const currentEntry = manifest.get(change.path)
             const currentBlobId = currentEntry?.blobId
@@ -125,6 +129,17 @@ const acceptChangeSetHunksOperation = Effect.fn(
               nextBaseContent,
               currentProposedContent: proposedBlob?.content ?? '',
             })
+          }
+
+          if (matchedSelectedHunkCount === 0) {
+            return yield* Effect.fail(
+              new WritingInvalidRequestError({
+                message: 'No pending writing hunks matched the review request',
+                requestId: input.requestId,
+                issue:
+                  'The selected review hunks no longer exist or are no longer pending',
+              }),
+            )
           }
 
           for (const change of changes) {
@@ -444,6 +459,13 @@ const upsertFileChangeOperation = Effect.fn(
           const baseContent = baseBlob?.content ?? ''
           const nextContent =
             input.operation === 'delete' ? '' : (input.proposedContent ?? '')
+          const canonicalOperation = resolveCanonicalWritingChangeOperation({
+            requestedOperation: input.operation,
+            currentEntry:
+              currentEntry?.kind === 'file'
+                ? { kind: currentEntry.kind }
+                : null,
+          })
           const hunks = createWritingHunks({
             path: input.path,
             oldContent: baseContent,
@@ -476,7 +498,7 @@ const upsertFileChangeOperation = Effect.fn(
                 ${input.changeSetId},
                 ${input.path},
                 null,
-                ${input.operation},
+                ${canonicalOperation},
                 ${baseBlob?.id ?? null},
                 ${proposedBlob?.id ?? null},
                 ${hunks.length === 0 ? 'rejected' : 'pending'},
@@ -487,7 +509,7 @@ const upsertFileChangeOperation = Effect.fn(
             yield* sql`
               update writing_changes
               set
-                operation = ${input.operation},
+                operation = ${canonicalOperation},
                 proposed_blob_id = ${proposedBlob?.id ?? null},
                 status = ${hunks.length === 0 ? 'rejected' : 'pending'}
               where id = ${existingChange.id}
@@ -744,7 +766,10 @@ export type WritingChangeSetServiceShape = {
     readonly requestId: string
   }) => Effect.Effect<
     { readonly headSnapshotId?: string },
-    WritingProjectNotFoundError | WritingConflictError | WritingPersistenceError
+    | WritingInvalidRequestError
+    | WritingProjectNotFoundError
+    | WritingConflictError
+    | WritingPersistenceError
   >
   readonly rejectHunks: (input: {
     readonly changeSetId: string
@@ -886,6 +911,7 @@ export class WritingChangeSetService extends ServiceMap.Service<
         ).pipe(
           Effect.mapError((error) => {
             if (
+              error instanceof WritingInvalidRequestError ||
               error instanceof WritingProjectNotFoundError ||
               error instanceof WritingConflictError
             ) {

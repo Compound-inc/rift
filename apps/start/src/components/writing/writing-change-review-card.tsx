@@ -20,9 +20,11 @@ type WritingChangeReviewCardProps = {
 }
 
 function getReviewLabel(review: WritingManuscriptReview) {
+  const hasBaseContent = review.baseContent.length > 0
+
   switch (review.operation) {
     case 'create':
-      return 'New AI file'
+      return hasBaseContent ? 'AI revision' : 'New AI file'
     case 'delete':
       return 'Pending deletion'
     case 'update':
