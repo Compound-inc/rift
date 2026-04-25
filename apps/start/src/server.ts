@@ -1,5 +1,6 @@
 import { paraglideMiddleware } from './paraglide/server.js'
 import handler from '@tanstack/react-start/server-entry'
+import { isWorkflowInfrastructureRequest } from './workflow/config.server'
 
 /**
  * Middleware to redirect www.rift.mx to rift.mx (naked domain).
@@ -26,6 +27,10 @@ function wwwRedirectMiddleware(
 
 export default {
   fetch(request: Request): Promise<Response> {
+    if (isWorkflowInfrastructureRequest(request)) {
+      return handler.fetch(request)
+    }
+
     return wwwRedirectMiddleware(request, () =>
       paraglideMiddleware(request, () => handler.fetch(request)),
     )

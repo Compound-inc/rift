@@ -3,6 +3,7 @@ import { nitro } from 'nitro/vite'
 import { devtools } from '@tanstack/devtools-vite'
 import { paraglideVitePlugin } from '@inlang/paraglide-js'
 import tsconfigPaths from 'vite-tsconfig-paths'
+import { workflow } from 'workflow/vite'
 
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 
@@ -34,6 +35,13 @@ const config = defineConfig(({ command }) => {
         '@streamdown/code',
         '@streamdown/math',
         '@streamdown/mermaid',
+        '@tanstack/react-start',
+        '@tanstack/react-start-server',
+        '@tanstack/react-router',
+        '@tanstack/react-router-devtools',
+        '@tanstack/start-client-core',
+        '@tanstack/start-server-core',
+        '@tanstack/start-static-server-functions',
         '@rocicorp/zero',
         '@rocicorp/zero/react',
         '@rocicorp/zero-virtual',
@@ -66,11 +74,13 @@ const config = defineConfig(({ command }) => {
       tanstackStart(),
       nitro({
         preset: 'bun',
+        plugins: ['src/workflow/plugins/start-pg-world.ts'],
         compressPublicAssets: {
           gzip: true,
           brotli: true,
         },
       }),
+      workflow(),
       viteReact({
         babel: {
           plugins: ['babel-plugin-react-compiler'],

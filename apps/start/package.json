@@ -14,6 +14,9 @@
     "start": "bun run .output/server/index.mjs",
     "start:bun": "bun run .output/server/index.mjs",
     "preview": "vite preview",
+    "workflow:setup": "workflow-postgres-setup",
+    "workflow:inspect": "workflow inspect runs --backend @workflow/world-postgres",
+    "workflow:web": "workflow web --backend @workflow/world-postgres",
     "zero-cache": "zero-cache-dev",
     "zero:migrate": "bun run scripts/zero-migrate.ts",
     "db:reset": "bun run scripts/db-reset.ts",
@@ -56,6 +59,7 @@
     "@tanstack/react-router-ssr-query": "^1.131.7",
     "@tanstack/react-start": "^1.132.0",
     "@tanstack/router-plugin": "^1.132.0",
+    "@workflow/world-postgres": "^4.1.1",
     "ai": "^6.0.97",
     "better-auth": "^1.5.2",
     "cmdk": "^1.1.1",
@@ -80,6 +84,7 @@
     "stripe": "^20.4.1",
     "tailwindcss": "^4.1.18",
     "tokenlens": "^1.3.1",
+    "workflow": "^4.2.4",
     "zod": "4.3.6"
   },
   "devDependencies": {
