@@ -23,6 +23,8 @@ beforeEach(() => {
 describe('resolveUsagePolicySnapshot', () => {
   it('computes per-plan budgets from the seeded plan defaults', () => {
     const snapshot = resolveUsagePolicySnapshot('plus', resolveDefaultUsagePolicyTemplate('plus'))
+    const proSnapshot = resolveUsagePolicySnapshot('pro', resolveDefaultUsagePolicyTemplate('pro'))
+    const scaleSnapshot = resolveUsagePolicySnapshot('scale', resolveDefaultUsagePolicyTemplate('scale'))
 
     expect(snapshot.planId).toBe('plus')
     expect(snapshot.enabled).toBe(true)
@@ -30,6 +32,8 @@ describe('resolveUsagePolicySnapshot', () => {
     expect(snapshot.hasOrganizationMonthlyBudgetOverride).toBe(false)
     expect(snapshot.seatMonthlyBudgetNanoUsd).toBe(usdToNanoUsd(6))
     expect(snapshot.seatCycleBudgetNanoUsd).toBe(usdToNanoUsd(6))
+    expect(proSnapshot.seatCycleBudgetNanoUsd).toBe(usdToNanoUsd(35))
+    expect(scaleSnapshot.seatCycleBudgetNanoUsd).toBe(usdToNanoUsd(68))
   })
 
   it('supports an explicit organization monthly budget override', () => {

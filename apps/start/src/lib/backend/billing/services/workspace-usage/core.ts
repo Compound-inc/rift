@@ -1,10 +1,6 @@
 import type { WorkspacePlanId } from '@/lib/shared/access-control'
-import {
-  CHAT_USAGE_FEATURE_KEY
-  
-  
-} from './shared'
-import type {UsageBucketType, UsagePolicyTemplate} from './shared';
+import { CHAT_USAGE_FEATURE_KEY } from './shared'
+import type { UsageBucketType, UsagePolicyTemplate } from './shared'
 
 export type CurrentUsageSubscription = {
   id: string
@@ -105,15 +101,10 @@ export function cycleBounds(input: {
   }
 }
 
-export function prorateCycleBudget(input: {
+export function resolveSeatCycleBudget(input: {
   readonly totalNanoUsd: number
-  readonly now: number
-  readonly cycleStartAt: number
-  readonly cycleEndAt: number
 }): number {
-  const totalCycleMs = Math.max(1, input.cycleEndAt - input.cycleStartAt)
-  const remainingMs = Math.max(0, input.cycleEndAt - input.now)
-  return Math.round(input.totalNanoUsd * remainingMs / totalCycleMs)
+  return Math.max(0, Math.round(input.totalNanoUsd))
 }
 
 export function parseJson<T>(value: unknown, fallback: T): T {

@@ -37,11 +37,10 @@ import {
 import type { BillingSqlClient } from '../sql'
 
 /**
- * Seat budgets are continuously prorated across the cycle. When we release an
- * expired reservation and immediately re-reserve within the same transaction,
- * the recomputed bucket can shrink by a few nanodollars. Treating that tiny
- * drift as hard quota exhaustion causes the cleanup release to roll back even
- * though the member still has the same practical reserve available.
+ * Balances are reconciled from settled usage plus active reservations. The
+ * tolerance is still useful around transaction boundaries where an expired
+ * reservation is released and a replacement reservation is attempted before
+ * every summary surface has observed the refreshed balance.
  */
 const QUOTA_DRIFT_TOLERANCE_NANO_USD = 100_000
 

@@ -36,26 +36,21 @@ function buildUsagePolicySnapshot(
 }
 
 describe('projectSeatCycleBucket', () => {
-  it('re-prorates the cycle reserve without overstating remaining balance', () => {
+  it('keeps the paid cycle grant stable as time passes', () => {
     const usagePolicy = resolveUsagePolicySnapshot(
       'plus',
       resolveDefaultUsagePolicyTemplate('plus'),
     )
-    const cycleStartAt = Date.UTC(2026, 2, 1, 0, 0, 0)
-    const cycleEndAt = Date.UTC(2026, 3, 1, 0, 0, 0)
 
     expect(
       projectSeatCycleBucket({
         totalNanoUsd: usdToNanoUsd(6),
         remainingNanoUsd: usdToNanoUsd(4),
-        cycleStartAt,
-        cycleEndAt,
         usagePolicy,
-        now: Date.UTC(2026, 2, 16, 0, 0, 0),
       }),
     ).toEqual({
-      totalNanoUsd: 3_096_774_194,
-      remainingNanoUsd: 1_096_774_194,
+      totalNanoUsd: usdToNanoUsd(6),
+      remainingNanoUsd: usdToNanoUsd(4),
     })
   })
 
@@ -69,13 +64,10 @@ describe('projectSeatCycleBucket', () => {
       projectSeatCycleBucket({
         totalNanoUsd: usdToNanoUsd(6),
         remainingNanoUsd: -usdToNanoUsd(3),
-        cycleStartAt: Date.UTC(2026, 2, 1, 0, 0, 0),
-        cycleEndAt: Date.UTC(2026, 3, 1, 0, 0, 0),
         usagePolicy,
-        now: Date.UTC(2026, 2, 16, 0, 0, 0),
       }),
     ).toEqual({
-      totalNanoUsd: 3_096_774_194,
+      totalNanoUsd: usdToNanoUsd(6),
       remainingNanoUsd: 0,
     })
   })
@@ -87,24 +79,16 @@ describe('projectSeatCycleBucket', () => {
     const previousUsagePolicy = buildUsagePolicySnapshot({
       seatCycleBudgetNanoUsd: usdToNanoUsd(6),
     })
-    const now = Date.UTC(2026, 2, 18, 10, 15, 0)
 
     expect(
       projectSeatCycleBucket({
         totalNanoUsd: previousUsagePolicy.seatCycleBudgetNanoUsd,
         remainingNanoUsd: usdToNanoUsd(2),
-        cycleStartAt: Date.UTC(2026, 2, 1, 0, 0, 0),
-        cycleEndAt: Date.UTC(2026, 3, 1, 0, 0, 0),
         usagePolicy,
-        now,
       }),
     ).toEqual({
-      totalNanoUsd: Math.round(
-        usagePolicy.seatCycleBudgetNanoUsd
-          * (Date.UTC(2026, 3, 1, 0, 0, 0) - now)
-          / (Date.UTC(2026, 3, 1, 0, 0, 0) - Date.UTC(2026, 2, 1, 0, 0, 0)),
-      ),
-      remainingNanoUsd: 0,
+      totalNanoUsd: usagePolicy.seatCycleBudgetNanoUsd,
+      remainingNanoUsd: usdToNanoUsd(4),
     })
   })
 })

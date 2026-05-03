@@ -5,7 +5,7 @@ import {
   asNumber,
   asOptionalNumber,
   cycleBounds,
-  prorateCycleBudget,
+  resolveSeatCycleBudget,
 } from './core'
 import type {
   BucketBalanceRow,
@@ -35,6 +35,47 @@ function normalizeBucketBalanceRow(row: BucketBalanceRow): BucketBalanceRow {
     remainingNanoUsd: asNumber(row.remainingNanoUsd),
   }
 }
+
+const readSeatCycleDeductions = Effect.fn(
+  'WorkspaceUsageSeatStore.readSeatCycleDeductions',
+)(
+  (
+    client: BillingSqlClient,
+    input: {
+      readonly seatSlotId: string
+      readonly now: number
+    },
+  ): Effect.Effect<{
+    readonly settledNanoUsd: number
+    readonly reservedNanoUsd: number
+  }, unknown> =>
+    Effect.gen(function* () {
+      const [row] = yield* client<{
+        settledNanoUsd: number
+        reservedNanoUsd: number
+      }>`
+        select
+          coalesce((
+            select sum(actual_nano_usd)
+            from org_monetization_event
+            where seat_slot_id = ${input.seatSlotId}
+              and status = 'settled'
+          ), 0) as "settledNanoUsd",
+          coalesce((
+            select sum(reserved_nano_usd)
+            from org_usage_reservation
+            where seat_slot_id = ${input.seatSlotId}
+              and status = 'reserved'
+              and expires_at > ${input.now}
+          ), 0) as "reservedNanoUsd"
+      `
+
+      return {
+        settledNanoUsd: asNumber(row?.settledNanoUsd),
+        reservedNanoUsd: asNumber(row?.reservedNanoUsd),
+      }
+    }),
+)
 
 export const readSeatSlotsForCycle = Effect.fn(
   'WorkspaceUsageSeatStore.readSeatSlotsForCycle',
@@ -198,6 +239,9 @@ export const ensureSeatSlotBalanceRows = Effect.fn(
     readonly now: number
   }): Effect.Effect<void, unknown> => {
     const seatCycleBucketId = `seat_bucket_${input.seatSlotId}_seat_cycle`
+    const seatCycleBudgetNanoUsd = resolveSeatCycleBudget({
+      totalNanoUsd: input.usagePolicy.seatCycleBudgetNanoUsd,
+    })
 
     return client`
       insert into org_seat_bucket_balance (
@@ -215,18 +259,8 @@ export const ensureSeatSlotBalanceRows = Effect.fn(
         ${input.organizationId},
         ${input.seatSlotId},
         'seat_cycle',
-        ${prorateCycleBudget({
-          totalNanoUsd: input.usagePolicy.seatCycleBudgetNanoUsd,
-          now: input.now,
-          cycleStartAt: input.cycleStartAt,
-          cycleEndAt: input.cycleEndAt,
-        })},
-        ${prorateCycleBudget({
-          totalNanoUsd: input.usagePolicy.seatCycleBudgetNanoUsd,
-          now: input.now,
-          cycleStartAt: input.cycleStartAt,
-          cycleEndAt: input.cycleEndAt,
-        })},
+        ${seatCycleBudgetNanoUsd},
+        ${seatCycleBudgetNanoUsd},
         ${input.now},
         ${input.now}
       )
@@ -235,13 +269,43 @@ export const ensureSeatSlotBalanceRows = Effect.fn(
   },
 )
 
-const ensureCurrentCycleBucket = Effect.fn(
-  'WorkspaceUsageSeatStore.ensureCurrentCycleBucket',
+export function reconcileSeatCycleBucketSnapshot(input: {
+  readonly bucket: BucketBalanceRow
+  readonly usagePolicy: UsagePolicySnapshot
+  readonly settledNanoUsd: number
+  readonly reservedNanoUsd: number
+}): BucketBalanceRow {
+  if (input.bucket.bucketType !== 'seat_cycle') {
+    return input.bucket
+  }
+
+  const totalNanoUsd = resolveSeatCycleBudget({
+    totalNanoUsd: input.usagePolicy.seatCycleBudgetNanoUsd,
+  })
+
+  return {
+    ...input.bucket,
+    totalNanoUsd,
+    remainingNanoUsd:
+      totalNanoUsd
+      - Math.max(0, Math.round(input.settledNanoUsd))
+      - Math.max(0, Math.round(input.reservedNanoUsd)),
+  }
+}
+
+/**
+ * Rebuilds the mutable balance from durable facts: the margin-safe grant,
+ * already-settled monetized usage, and unexpired active reservations. This
+ * keeps summary and enforcement reads aligned with real spend even if an older
+ * balance row was previously shrunk by time-based projection or missed a
+ * refund/capture.
+ */
+export const reconcileSeatCycleBucketWithClient = Effect.fn(
+  'WorkspaceUsageSeatStore.reconcileSeatCycleBucketWithClient',
 )(
   (client: BillingSqlClient, input: {
     readonly bucket: BucketBalanceRow
-    readonly seatCycleStartAt: number
-    readonly seatCycleEndAt: number
+    readonly seatSlotId: string
     readonly usagePolicy: UsagePolicySnapshot
     readonly now: number
   }): Effect.Effect<BucketBalanceRow, unknown> =>
@@ -250,28 +314,22 @@ const ensureCurrentCycleBucket = Effect.fn(
         return input.bucket
       }
 
-      const nextTotal = prorateCycleBudget({
-        totalNanoUsd: input.usagePolicy.seatCycleBudgetNanoUsd,
+      const deductions = yield* readSeatCycleDeductions(client, {
+        seatSlotId: input.seatSlotId,
         now: input.now,
-        cycleStartAt: input.seatCycleStartAt,
-        cycleEndAt: input.seatCycleEndAt,
       })
-      const nextRemaining = Math.min(
-        nextTotal,
-        input.bucket.remainingNanoUsd + (nextTotal - input.bucket.totalNanoUsd),
-      )
+      const refreshed = reconcileSeatCycleBucketSnapshot({
+        bucket: input.bucket,
+        usagePolicy: input.usagePolicy,
+        settledNanoUsd: deductions.settledNanoUsd,
+        reservedNanoUsd: deductions.reservedNanoUsd,
+      })
 
       if (
-        input.bucket.totalNanoUsd === nextTotal
-        && input.bucket.remainingNanoUsd === nextRemaining
+        input.bucket.totalNanoUsd === refreshed.totalNanoUsd
+        && input.bucket.remainingNanoUsd === refreshed.remainingNanoUsd
       ) {
         return input.bucket
-      }
-
-      const refreshed: BucketBalanceRow = {
-        ...input.bucket,
-        totalNanoUsd: nextTotal,
-        remainingNanoUsd: nextRemaining,
       }
 
       yield* client`
@@ -345,10 +403,9 @@ export const hydrateSeatQuotaState = Effect.fn(
         return yield* Effect.fail(new Error('seat slot balances not found'))
       }
 
-      const refreshedCycleBucket = yield* ensureCurrentCycleBucket(client, {
+      const refreshedCycleBucket = yield* reconcileSeatCycleBucketWithClient(client, {
         bucket: resolvedCycleBucket,
-        seatCycleStartAt: slot.cycleStartAt,
-        seatCycleEndAt: slot.cycleEndAt,
+        seatSlotId: slot.id,
         usagePolicy: input.usagePolicy,
         now: input.now,
       })

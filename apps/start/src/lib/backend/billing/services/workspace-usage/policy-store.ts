@@ -13,7 +13,6 @@ import {
   asNumber,
   asOptionalNumber,
   cycleBounds,
-  prorateCycleBudget,
 } from './core'
 import type {
   BucketBalanceRow,
@@ -25,6 +24,7 @@ import {
   createSeatSlot,
   ensureSeatSlotBalanceRows,
   readSeatSlotsForCycle,
+  reconcileSeatCycleBucketWithClient,
 } from './seat-store'
 import {
   resolveBillingSqlClient,
@@ -379,17 +379,13 @@ const syncSeatSlotBudgetsEffect = Effect.fn(
           and cycle_start_at = ${cycleStartAt}
       `
 
-      const bucketRows = yield* client<
-        BucketBalanceRow & { seatSlotId: string; cycleStartAt: number; cycleEndAt: number }
-      >`
+      const bucketRows = yield* client<BucketBalanceRow & { seatSlotId: string }>`
         select
           balance.id,
           balance.seat_slot_id as "seatSlotId",
           balance.bucket_type as "bucketType",
           balance.total_nano_usd as "totalNanoUsd",
-          balance.remaining_nano_usd as "remainingNanoUsd",
-          slot.cycle_start_at as "cycleStartAt",
-          slot.cycle_end_at as "cycleEndAt"
+          balance.remaining_nano_usd as "remainingNanoUsd"
         from org_seat_bucket_balance balance
         join org_seat_slot slot on slot.id = balance.seat_slot_id
         where slot.organization_id = ${input.organizationId}
@@ -399,29 +395,15 @@ const syncSeatSlotBudgetsEffect = Effect.fn(
         ...row,
         totalNanoUsd: asNumber(row.totalNanoUsd),
         remainingNanoUsd: asNumber(row.remainingNanoUsd),
-        cycleStartAt: asNumber(row.cycleStartAt),
-        cycleEndAt: asNumber(row.cycleEndAt),
       }))
 
       for (const row of normalizedBucketRows) {
-        const nextTotal = prorateCycleBudget({
-          totalNanoUsd: input.usagePolicy.seatCycleBudgetNanoUsd,
+        yield* reconcileSeatCycleBucketWithClient(client, {
+          bucket: row,
+          seatSlotId: row.seatSlotId,
+          usagePolicy: input.usagePolicy,
           now: input.now,
-          cycleStartAt: row.cycleStartAt,
-          cycleEndAt: row.cycleEndAt,
         })
-        const nextRemaining = Math.min(
-          nextTotal,
-          row.remainingNanoUsd + (nextTotal - row.totalNanoUsd),
-        )
-
-        yield* client`
-          update org_seat_bucket_balance
-          set total_nano_usd = ${nextTotal},
-              remaining_nano_usd = ${nextRemaining},
-              updated_at = ${input.now}
-          where id = ${row.id}
-        `
       }
     }),
 )

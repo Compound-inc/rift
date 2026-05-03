@@ -4,7 +4,7 @@ import {
   resolveAccessContextEffect,
   resolveChatAccessPolicy,
 } from '@/lib/backend/access-control'
-import { asOptionalNumber, cycleBounds, prorateCycleBudget } from './core'
+import { asOptionalNumber, cycleBounds, resolveSeatCycleBudget } from './core'
 import type { CurrentUsageSubscription, SeatSlotRow } from './core'
 import { recomputeEntitlementSnapshotEffect } from '../workspace-billing/entitlement'
 import { readEntitlementSnapshotEffect } from '../workspace-billing/persistence'
@@ -12,7 +12,7 @@ import {
   readCurrentUsageSubscriptionEffect,
   resolveEffectiveUsagePolicyRecordEffect,
 } from './policy-store'
-import { readBucketBalances } from './seat-store'
+import { hydrateSeatQuotaState } from './seat-store'
 import type { UsagePolicySnapshot } from './shared'
 import { coerceWorkspacePlanId } from '@/lib/shared/access-control'
 import type { BillingSqlClient } from '../sql'
@@ -92,19 +92,13 @@ function buildFreeUsageSummary(input: {
 export function projectSeatCycleBucket(input: {
   totalNanoUsd: number
   remainingNanoUsd: number
-  cycleStartAt: number
-  cycleEndAt: number
   usagePolicy: UsagePolicySnapshot
-  now: number
 }): {
   totalNanoUsd: number
   remainingNanoUsd: number
 } {
-  const totalNanoUsd = prorateCycleBudget({
+  const totalNanoUsd = resolveSeatCycleBudget({
     totalNanoUsd: input.usagePolicy.seatCycleBudgetNanoUsd,
-    now: input.now,
-    cycleStartAt: input.cycleStartAt,
-    cycleEndAt: input.cycleEndAt,
   })
   const remainingNanoUsd = Math.max(
     0,
@@ -290,32 +284,14 @@ const readPaidUsageSummaryWithClientEffect = Effect.fn(
         })
       }
 
-      const bucketRows = yield* readBucketBalances(
-        input.client,
-        assignedSeat.id,
-      )
-      const seatCycle = bucketRows.find(
-        (bucket) => bucket.bucketType === 'seat_cycle',
-      )
-
-      if (!seatCycle) {
-        return buildUnassignedPaidUsageSummary({
-          ...input,
-          currentSubscription,
-        })
-      }
-
-      const projectedSeatCycle = projectSeatCycleBucket({
-        totalNanoUsd: seatCycle.totalNanoUsd,
-        remainingNanoUsd: seatCycle.remainingNanoUsd,
-        cycleStartAt: assignedSeat.cycleStartAt,
-        cycleEndAt: assignedSeat.cycleEndAt,
+      const seatState = yield* hydrateSeatQuotaState(input.client, {
+        seatSlotId: assignedSeat.id,
         usagePolicy,
         now: input.now,
       })
       const monthly = toPercentSnapshot(
-        projectedSeatCycle.totalNanoUsd,
-        projectedSeatCycle.remainingNanoUsd,
+        seatState.seatCycle.totalNanoUsd,
+        Math.max(0, seatState.seatCycle.remainingNanoUsd),
       )
 
       return {
