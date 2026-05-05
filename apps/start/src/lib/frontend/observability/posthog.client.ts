@@ -2,8 +2,8 @@
 
 import posthog from 'posthog-js/dist/module.slim'
 import {
-  AnalyticsExtensions,
   ErrorTrackingExtensions,
+  AnalyticsExtensions,
 } from 'posthog-js/dist/extension-bundles'
 import type { PublicPostHogConfig } from '@/lib/shared/observability/posthog-config'
 
@@ -70,7 +70,7 @@ export function initClientPostHog(config?: PublicPostHogConfig): boolean {
       }
     },
     __extensionClasses: {
-      ...AnalyticsExtensions,
+      webVitalsAutocapture: AnalyticsExtensions.webVitalsAutocapture,
       ...ErrorTrackingExtensions,
     },
   })
