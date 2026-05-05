@@ -8,6 +8,11 @@ import {
 import {
   CHAT_USAGE_FEATURE_KEY,
 } from '@/lib/backend/billing/services/workspace-usage/shared'
+import {
+  asNumber,
+  asOptionalNumber,
+  cycleBounds,
+} from '@/lib/backend/billing/services/workspace-usage/core'
 import type {
   SingularityUsageResetMode,
 } from '@/ee/singularity/shared/singularity-admin'
@@ -21,24 +26,29 @@ const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
 type CurrentSubscriptionRow = {
   id: string
   planId: string
+  seatCount: unknown
+  currentPeriodStart: unknown
+  currentPeriodEnd: unknown
+}
+
+type CurrentSubscriptionForReset = {
+  id: string
+  planId: string
   seatCount: number
   currentPeriodStart: number | null
   currentPeriodEnd: number | null
 }
 
-function resolveCycleBounds(input: {
-  now: number
-  currentPeriodStart: number | null
-  currentPeriodEnd: number | null
-}) {
-  const cycleStartAt = input.currentPeriodStart ?? input.now
-  const fallbackCycleEndAt = cycleStartAt + THIRTY_DAYS_MS
-  const cycleEndAt = Math.max(
-    input.currentPeriodEnd ?? fallbackCycleEndAt,
-    cycleStartAt + 1,
-  )
-
-  return { cycleStartAt, cycleEndAt }
+export function normalizeCurrentSubscriptionForReset(
+  row: CurrentSubscriptionRow,
+): CurrentSubscriptionForReset {
+  return {
+    id: row.id,
+    planId: row.planId,
+    seatCount: asNumber(row.seatCount, 1),
+    currentPeriodStart: asOptionalNumber(row.currentPeriodStart),
+    currentPeriodEnd: asOptionalNumber(row.currentPeriodEnd),
+  }
 }
 
 const readCurrentSubscriptionForReset = Effect.fn(
@@ -47,7 +57,7 @@ const readCurrentSubscriptionForReset = Effect.fn(
   (
     client: BillingSqlClient,
     organizationId: string,
-  ): Effect.Effect<CurrentSubscriptionRow | null, unknown> =>
+  ): Effect.Effect<CurrentSubscriptionForReset | null, unknown> =>
     Effect.gen(function* () {
       const [row] = yield* client<CurrentSubscriptionRow>`
         select
@@ -64,7 +74,7 @@ const readCurrentSubscriptionForReset = Effect.fn(
         for update
       `
 
-      return row ?? null
+      return row ? normalizeCurrentSubscriptionForReset(row) : null
     }),
 )
 
@@ -298,7 +308,7 @@ export const resetOrganizationUsageEffect = Effect.fn(
         return
       }
 
-      const currentCycle = resolveCycleBounds({
+      const currentCycle = cycleBounds({
         now,
         currentPeriodStart: currentSubscription.currentPeriodStart,
         currentPeriodEnd: currentSubscription.currentPeriodEnd,

@@ -140,6 +140,8 @@ vi.mock('./singularity-admin/usage-reset', () => ({
 }))
 
 vi.mock('@/lib/backend/billing/services/sql', () => ({
+  formatBillingSqlCause: (cause: unknown) =>
+    cause instanceof Error ? cause.message : String(cause),
   withBillingTransactionEffect: (
     operation: (client: unknown) => Effect.Effect<unknown>,
   ) => {

@@ -24,7 +24,10 @@ import {
   asRecord,
 } from '@/lib/backend/billing/services/workspace-billing/shared'
 import type { ManualBillingInterval } from '@/lib/backend/billing/services/workspace-billing/shared'
-import { withBillingTransactionEffect } from '@/lib/backend/billing/services/sql'
+import {
+  formatBillingSqlCause,
+  withBillingTransactionEffect,
+} from '@/lib/backend/billing/services/sql'
 import type { BillingSqlClient } from '@/lib/backend/billing/services/sql'
 import type {
   SingularityOrganizationDetail,
@@ -36,7 +39,6 @@ import {
   SingularityPersistenceError,
   SingularityValidationError,
 } from '../domain/errors'
-import { toReadableErrorCause } from '@/lib/backend/chat/domain/error-formatting'
 import { upsertOrganizationUsagePolicyOverrideRecordEffect } from '@/lib/backend/billing/services/workspace-usage/persistence'
 import {
   getOrganizationProfileEffect,
@@ -130,7 +132,7 @@ function toPersistenceError(
   return new SingularityPersistenceError({
     message,
     organizationId,
-    cause: toReadableErrorCause(cause, message),
+    cause: formatBillingSqlCause(cause),
   })
 }
 
