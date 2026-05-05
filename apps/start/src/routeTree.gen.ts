@@ -21,6 +21,7 @@ import { Route as AuthSignInRouteRouteImport } from './routes/auth/sign-in/route
 import { Route as ApiChatRouteRouteImport } from './routes/api/chat/route'
 import { Route as appLayoutRouteRouteImport } from './routes/(app)/_layout/route'
 import { Route as appLayoutIndexRouteImport } from './routes/(app)/_layout/index'
+import { Route as RCSplatRouteImport } from './routes/r/c/$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as appLayoutSplatRouteImport } from './routes/(app)/_layout/$'
 import { Route as AuthAcceptInvitationIdRouteRouteImport } from './routes/auth/accept-invitation/$id/route'
@@ -114,6 +115,11 @@ const appLayoutIndexRoute = appLayoutIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => appLayoutRouteRoute,
+} as any)
+const RCSplatRoute = RCSplatRouteImport.update({
+  id: '/r/c/$',
+  path: '/r/c/$',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
@@ -332,6 +338,7 @@ export interface FileRoutesByFullPath {
   '/auth/accept-invitation/$id': typeof AuthAcceptInvitationIdRouteRoute
   '/$': typeof appLayoutSplatRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/r/c/$': typeof RCSplatRoute
   '/': typeof appLayoutIndexRoute
   '/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
   '/organization/settings': typeof appLayoutOrganizationSettingsRouteRouteWithChildren
@@ -376,6 +383,7 @@ export interface FileRoutesByTo {
   '/auth/accept-invitation/$id': typeof AuthAcceptInvitationIdRouteRoute
   '/$': typeof appLayoutSplatRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/r/c/$': typeof RCSplatRoute
   '/': typeof appLayoutIndexRoute
   '/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
   '/settings/security': typeof appLayoutSettingsSecurityRouteRoute
@@ -423,6 +431,7 @@ export interface FileRoutesById {
   '/auth/accept-invitation/$id': typeof AuthAcceptInvitationIdRouteRoute
   '/(app)/_layout/$': typeof appLayoutSplatRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/r/c/$': typeof RCSplatRoute
   '/(app)/_layout/': typeof appLayoutIndexRoute
   '/(app)/_layout/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
   '/(app)/_layout/organization/settings': typeof appLayoutOrganizationSettingsRouteRouteWithChildren
@@ -472,6 +481,7 @@ export interface FileRouteTypes {
     | '/auth/accept-invitation/$id'
     | '/$'
     | '/api/auth/$'
+    | '/r/c/$'
     | '/'
     | '/chat/$threadId'
     | '/organization/settings'
@@ -516,6 +526,7 @@ export interface FileRouteTypes {
     | '/auth/accept-invitation/$id'
     | '/$'
     | '/api/auth/$'
+    | '/r/c/$'
     | '/'
     | '/chat/$threadId'
     | '/settings/security'
@@ -562,6 +573,7 @@ export interface FileRouteTypes {
     | '/auth/accept-invitation/$id'
     | '/(app)/_layout/$'
     | '/api/auth/$'
+    | '/r/c/$'
     | '/(app)/_layout/'
     | '/(app)/_layout/chat/$threadId'
     | '/(app)/_layout/organization/settings'
@@ -604,6 +616,7 @@ export interface RootRouteChildren {
   ApiZeroQueryRouteRoute: typeof ApiZeroQueryRouteRoute
   ApiZeroTokenRouteRoute: typeof ApiZeroTokenRouteRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  RCSplatRoute: typeof RCSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -691,6 +704,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof appLayoutIndexRouteImport
       parentRoute: typeof appLayoutRouteRoute
+    }
+    '/r/c/$': {
+      id: '/r/c/$'
+      path: '/r/c/$'
+      fullPath: '/r/c/$'
+      preLoaderRoute: typeof RCSplatRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/auth/$': {
       id: '/api/auth/$'
@@ -1112,6 +1132,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiZeroQueryRouteRoute: ApiZeroQueryRouteRoute,
   ApiZeroTokenRouteRoute: ApiZeroTokenRouteRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  RCSplatRoute: RCSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

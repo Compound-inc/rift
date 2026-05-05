@@ -1,5 +1,8 @@
 import { PostHog } from 'posthog-node'
-import { getPublicPostHogConfig } from './posthog-config.server'
+import {
+  getPostHogServerHost,
+  getPublicPostHogConfig,
+} from './posthog-config.server'
 import type { ChatRequestWideEvent } from './wide-event'
 
 let client: PostHog | undefined
@@ -32,7 +35,7 @@ function getClient(): PostHog | undefined {
   }
 
   client = new PostHog(config.apiKey, {
-    host: config.apiHost,
+    host: getPostHogServerHost(),
     enableExceptionAutocapture: false,
   })
   registerShutdownHooks(client)
@@ -90,6 +93,40 @@ export async function captureChatWideEventInPostHog(
     outcome,
     breadcrumbs: event.breadcrumbs,
     cause: outcome.error?.cause,
+    release: config.release,
+    environment: config.environment,
+  })
+}
+
+export async function captureUnhandledServerErrorInPostHog(input: {
+  readonly error: unknown
+  readonly request: Request
+}): Promise<void> {
+  const config = getPublicPostHogConfig()
+  const posthog = getClient()
+  if (!posthog) return
+
+  const url = new URL(input.request.url)
+  const error =
+    input.error instanceof Error
+      ? input.error
+      : new Error(
+          typeof input.error === 'string'
+            ? input.error
+            : 'Unhandled server error',
+        )
+
+  await posthog.captureExceptionImmediate(error, 'server', {
+    $exception_fingerprint: [
+      'server',
+      input.request.method,
+      url.pathname,
+      error.name,
+    ].join(':'),
+    capture_origin: 'server_unhandled',
+    telemetry_disposition: 'exception',
+    route: url.pathname,
+    method: input.request.method,
     release: config.release,
     environment: config.environment,
   })

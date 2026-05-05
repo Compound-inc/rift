@@ -41,6 +41,15 @@ const captureClientChatErrorClient = createClientOnlyFn(
   },
 )
 
+const captureClientPageViewClient = createClientOnlyFn(
+  async (
+    input: Parameters<typeof import('./posthog.client')['captureClientPageView']>[0],
+  ) => {
+    const mod = await import('./posthog.client')
+    mod.captureClientPageView(input)
+  },
+)
+
 const shouldCaptureClientChatErrorClient = createClientOnlyFn(
   async (
     input: Parameters<typeof import('./posthog.client')['shouldCaptureClientChatError']>[0],
@@ -90,6 +99,16 @@ export const captureClientChatError = createIsomorphicFn()
       input: Parameters<typeof import('./posthog.client')['captureClientChatError']>[0],
     ) => {
       void captureClientChatErrorClient(input)
+    },
+  )
+  .server(() => undefined)
+
+export const captureClientPageView = createIsomorphicFn()
+  .client(
+    (
+      input: Parameters<typeof import('./posthog.client')['captureClientPageView']>[0],
+    ) => {
+      void captureClientPageViewClient(input)
     },
   )
   .server(() => undefined)

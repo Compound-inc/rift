@@ -1,7 +1,10 @@
 'use client'
 
 import posthog from 'posthog-js/dist/module.slim'
-import { ErrorTrackingExtensions } from 'posthog-js/dist/extension-bundles'
+import {
+  AnalyticsExtensions,
+  ErrorTrackingExtensions,
+} from 'posthog-js/dist/extension-bundles'
 import type { PublicPostHogConfig } from '@/lib/shared/observability/posthog-config'
 
 let initialized = false
@@ -30,7 +33,9 @@ function clearMissingScopeProperties(
 }
 
 /**
- * Initializes browser-side PostHog once.
+ * Initializes browser-side PostHog once, before the first pageview is captured.
+ * TanStack Router owns navigation, so pageview events are emitted manually from
+ * the bootstrap component instead of relying on PostHog history patching.
  */
 export function initClientPostHog(config?: PublicPostHogConfig): boolean {
   if (initialized) return enabled
@@ -44,14 +49,28 @@ export function initClientPostHog(config?: PublicPostHogConfig): boolean {
 
   posthog.init(resolvedConfig.apiKey, {
     api_host: resolvedConfig.apiHost,
+    ui_host: resolvedConfig.uiHost,
     defaults: '2026-01-30',
+    capture_performance: {
+      web_vitals: true,
+      web_vitals_allowed_metrics: ['CLS', 'FCP', 'INP', 'LCP'],
+    },
     autocapture: false,
     capture_pageview: false,
-    capture_pageleave: false,
+    capture_pageleave: true,
     disable_session_recording: true,
     disable_surveys: true,
     disable_persistence: false,
+    loaded: (client) => {
+      if (resolvedConfig.environment) {
+        client.register({ environment: resolvedConfig.environment })
+      }
+      if (resolvedConfig.release) {
+        client.register({ release: resolvedConfig.release })
+      }
+    },
     __extensionClasses: {
+      ...AnalyticsExtensions,
       ...ErrorTrackingExtensions,
     },
   })
@@ -63,6 +82,25 @@ export function initClientPostHog(config?: PublicPostHogConfig): boolean {
 
 export function isClientPostHogEnabled(): boolean {
   return enabled
+}
+
+export function captureClientPageView(input: {
+  readonly pathname: string
+  readonly search?: string
+  readonly hash?: string
+}): void {
+  if (!isClientPostHogEnabled()) return
+
+  const path = `${input.pathname}${input.search ?? ''}${input.hash ?? ''}`
+  const href =
+    typeof window === 'undefined'
+      ? path
+      : new URL(path || '/', window.location.origin).href
+
+  posthog.capture('$pageview', {
+    $current_url: href,
+    path,
+  })
 }
 
 /**

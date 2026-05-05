@@ -1,4 +1,8 @@
-import { DEFAULT_POSTHOG_HOST } from '@/lib/shared/observability/posthog-config'
+import {
+  DEFAULT_POSTHOG_HOST,
+  DEFAULT_POSTHOG_UI_HOST,
+  POSTHOG_BROWSER_PROXY_PATH,
+} from '@/lib/shared/observability/posthog-config'
 import type { PublicPostHogConfig } from '@/lib/shared/observability/posthog-config'
 import { isSelfHosted } from '@/utils/app-feature-flags'
 
@@ -13,9 +17,16 @@ function readTrimmedEnv(name: string): string | undefined {
  * same ingest host and release metadata.
  */
 export function getPublicPostHogConfig(): PublicPostHogConfig {
+  const apiKey = !isSelfHosted
+    ? readTrimmedEnv('POSTHOG_PROJECT_API_KEY')
+    : undefined
+
   return {
-    apiKey: !isSelfHosted ? readTrimmedEnv('POSTHOG_PROJECT_API_KEY') : undefined,
-    apiHost: readTrimmedEnv('POSTHOG_HOST') ?? DEFAULT_POSTHOG_HOST,
+    apiKey,
+    apiHost: apiKey
+      ? POSTHOG_BROWSER_PROXY_PATH
+      : readTrimmedEnv('POSTHOG_HOST') ?? DEFAULT_POSTHOG_HOST,
+    uiHost: DEFAULT_POSTHOG_UI_HOST,
     environment:
       readTrimmedEnv('RAILWAY_ENVIRONMENT_NAME')
       ?? readTrimmedEnv('NODE_ENV'),
@@ -23,6 +34,10 @@ export function getPublicPostHogConfig(): PublicPostHogConfig {
       readTrimmedEnv('RAILWAY_GIT_COMMIT_SHA')
       ?? readTrimmedEnv('GITHUB_SHA'),
   }
+}
+
+export function getPostHogServerHost(): string {
+  return readTrimmedEnv('POSTHOG_HOST') ?? DEFAULT_POSTHOG_HOST
 }
 
 export function getPostHogSourceMapConfig(): {
