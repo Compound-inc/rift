@@ -312,25 +312,27 @@ export const getOrganizationProfileEffect = Effect.fn(
           es.usage_sync_status as "usageSyncStatus",
           es.usage_sync_error as "usageSyncError",
           (
-            select coalesce(sum(msg.public_cost), 0)::float8
-            from threads t
-            join messages msg
-              on msg.thread_id = t.thread_id
-            where t.owner_org_id = o.id
-              and msg.role = 'assistant'
-              and msg.public_cost is not null
-              and msg.created_at >= (
-                extract(epoch from date_trunc('month', now())) * 1000
-              )::bigint
+            select coalesce(sum(event.actual_nano_usd), 0)::float8 / 1000000000
+            from org_monetization_event event
+            where event.organization_id = o.id
+              and event.status = 'settled'
+              and event.updated_at >= coalesce(
+                current_subscription.current_period_start,
+                (extract(epoch from date_trunc('month', now())) * 1000)::bigint
+              )
+              and event.updated_at < coalesce(
+                current_subscription.current_period_end,
+                coalesce(
+                  current_subscription.current_period_start,
+                  (extract(epoch from date_trunc('month', now())) * 1000)::bigint
+                ) + (30::bigint * 24 * 60 * 60 * 1000)
+              )
           ) as "aiSpendThisMonth",
           (
-            select coalesce(sum(msg.public_cost), 0)::float8
-            from threads t
-            join messages msg
-              on msg.thread_id = t.thread_id
-            where t.owner_org_id = o.id
-              and msg.role = 'assistant'
-              and msg.public_cost is not null
+            select coalesce(sum(event.actual_nano_usd), 0)::float8 / 1000000000
+            from org_monetization_event event
+            where event.organization_id = o.id
+              and event.status in ('settled', 'reset_forgiven')
           ) as "aiSpendAllTime",
           current_subscription."providerSubscriptionId" as "providerSubscriptionId",
           current_subscription."billingInterval" as "billingInterval",

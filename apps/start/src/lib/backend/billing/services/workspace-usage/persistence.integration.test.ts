@@ -428,6 +428,73 @@ describeIfDb('workspace usage persistence integration', () => {
     ).rejects.toThrow(/already finalized with status released/)
   })
 
+  it('bypasses completed usage when an admin reset released the active reservation', async () => {
+    const owner = await createVerifiedUser('usage-admin-reset-owner')
+    const organization = await createOrganizationForUser({
+      userId: owner.id,
+      name: 'Admin Reset Workspace',
+    })
+    const { usagePersistence } = await loadHarness()
+    const requestId = `admin-reset-${uniqueSuffix()}`
+
+    await seedSeatCount({
+      organizationId: organization.id,
+      seatCount: 1,
+    })
+
+    const reservation = await usagePersistence.reserveChatQuotaRecord({
+      organizationId: organization.id,
+      userId: owner.id,
+      requestId,
+      modelId: 'openai/gpt-5-mini',
+      messages: [{ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'reserve before reset' }] }],
+      bypassQuota: false,
+    })
+    if (reservation.bypassed) {
+      throw new Error('expected the reservation to consume quota before reset')
+    }
+
+    await usagePersistence.releaseReservationRecord({
+      requestId,
+      reasonCode: 'admin_usage_reset',
+    })
+
+    await usagePersistence.recordChatUsageRecord({
+      organizationId: organization.id,
+      userId: owner.id,
+      requestId,
+      assistantMessageId: `assistant-${uniqueSuffix()}`,
+      modelId: 'openai/gpt-5-mini',
+      actualCostUsd: 0.05,
+      usedByok: false,
+    })
+
+    await usagePersistence.settleMonetizationEventRecord({ requestId })
+
+    const monetization = await readMonetization(requestId)
+    const buckets = await readBucketsForOrganization(organization.id)
+    const captureAmounts = await readLedgerAmounts({
+      requestId,
+      entryType: 'capture',
+    })
+    const captureDebtAmounts = await readLedgerAmounts({
+      requestId,
+      entryType: 'capture_debt',
+    })
+    const cycleBucket = buckets.find((bucket) => bucket.bucketType === 'seat_cycle')
+
+    expect(monetization).toMatchObject({
+      status: 'bypassed',
+      capturedNanoUsd: 0,
+      refundedNanoUsd: 0,
+      forgivenNanoUsd: 0,
+    })
+    expect(captureAmounts).toEqual([])
+    expect(captureDebtAmounts).toEqual([])
+    expect(cycleBucket?.totalNanoUsd).toBeGreaterThan(0)
+    expect(cycleBucket?.remainingNanoUsd).toBe(cycleBucket?.totalNanoUsd)
+  })
+
   it('turns underestimated real usage into overage debt instead of forgiving it', async () => {
     seedUsageEnv({
       targetMarginPercent: '99',

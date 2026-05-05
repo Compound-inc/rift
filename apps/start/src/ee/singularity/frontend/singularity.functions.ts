@@ -10,6 +10,7 @@ import type {
   WorkspaceFeatureId,
   WorkspacePlanId,
 } from '@/lib/shared/access-control'
+import type { SingularityUsageResetMode } from '../shared/singularity-admin'
 
 const BillingIntervalSchema = z.enum(MANUAL_BILLING_INTERVALS).nullable()
 
@@ -56,6 +57,11 @@ const SetPlanSchema = z.object({
       message: 'Billing interval is required for paid manual contracts.',
     })
   }
+})
+
+const ResetUsageSchema = z.object({
+  organizationId: z.string().trim().min(1),
+  mode: z.enum(['current_cycle_usage', 'fresh_cycle']),
 })
 
 function parseSetPlanInput(input: unknown): {
@@ -145,4 +151,14 @@ export const setSingularityOrganizationPlan = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const { setSingularityOrganizationPlanAction } = await import('./singularity.server')
     return setSingularityOrganizationPlanAction(data)
+  })
+
+export const resetSingularityOrganizationUsage = createServerFn({ method: 'POST' })
+  .inputValidator((input: unknown): {
+    organizationId: string
+    mode: SingularityUsageResetMode
+  } => ResetUsageSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { resetSingularityOrganizationUsageAction } = await import('./singularity.server')
+    return resetSingularityOrganizationUsageAction(data)
   })

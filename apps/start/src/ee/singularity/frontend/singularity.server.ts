@@ -3,6 +3,7 @@ import { Effect } from 'effect'
 import { getServerAuthContextFromHeaders } from '@/lib/backend/server-effect/http/server-auth'
 import type { ManualBillingInterval } from '@/lib/backend/billing/services/workspace-billing/shared'
 import type { WorkspacePlanId } from '@/lib/shared/access-control'
+import type { SingularityUsageResetMode } from '../shared/singularity-admin'
 import { requireSingularityAdminAuth } from '../backend/auth/singularity-auth.server'
 import type { SingularityAdminAuthContext } from '../backend/auth/singularity-auth.server'
 import { handleSingularityActionFailure } from '../backend/http/action-failure'
@@ -218,6 +219,29 @@ export async function setSingularityOrganizationPlanAction(input: {
             internalNote: input.internalNote,
             billingReference: input.billingReference,
             featureOverrides: input.featureOverrides,
+          })
+        }),
+      ),
+  })
+}
+
+export async function resetSingularityOrganizationUsageAction(input: {
+  organizationId: string
+  mode: SingularityUsageResetMode
+}) {
+  return runSingularityAction({
+    route: '/singularity/orgs/$organizationId/usage-reset',
+    eventName: 'singularity.organization.usage-reset.failed',
+    defaultMessage: 'Failed to reset the organization usage.',
+    organizationId: input.organizationId,
+    execute: async (authContext) =>
+      SingularityRuntime.run(
+        Effect.gen(function* () {
+          const service = yield* SingularityAdminService
+          yield* service.resetOrganizationUsage({
+            organizationId: input.organizationId,
+            actorUserId: authContext.userId,
+            mode: input.mode,
           })
         }),
       ),

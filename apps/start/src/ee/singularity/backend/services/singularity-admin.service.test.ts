@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   markOrgBillingAccountStatusMock: vi.fn(),
   markOrgSubscriptionCanceledMock: vi.fn(),
   upsertOrganizationUsagePolicyOverrideRecordMock: vi.fn(),
+  resetOrganizationUsageMock: vi.fn(),
   createInvitationMock: vi.fn(),
   removeMemberMock: vi.fn(),
   updateMemberRoleMock: vi.fn(),
@@ -130,6 +131,14 @@ vi.mock('@/lib/backend/billing/services/workspace-usage/persistence', () => ({
     }),
 }))
 
+vi.mock('./singularity-admin/usage-reset', () => ({
+  resetOrganizationUsageEffect: (_client: unknown, input: unknown) =>
+    Effect.tryPromise({
+      try: () => Promise.resolve(mocks.resetOrganizationUsageMock(input)),
+      catch: (cause) => cause,
+    }),
+}))
+
 vi.mock('@/lib/backend/billing/services/sql', () => ({
   withBillingTransactionEffect: (
     operation: (client: unknown) => Effect.Effect<unknown>,
@@ -172,6 +181,7 @@ describe('SingularityAdminService', () => {
     mocks.markOrgBillingAccountStatusMock.mockReset()
     mocks.markOrgSubscriptionCanceledMock.mockReset()
     mocks.upsertOrganizationUsagePolicyOverrideRecordMock.mockReset()
+    mocks.resetOrganizationUsageMock.mockReset()
     mocks.createInvitationMock.mockReset()
     mocks.removeMemberMock.mockReset()
     mocks.updateMemberRoleMock.mockReset()
@@ -386,6 +396,30 @@ describe('SingularityAdminService', () => {
       ),
     ).rejects.toThrow('Failed to apply the organization plan override.')
 
+    expect(mocks.withBillingTransactionMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('resets organization usage through the transactional quota repair path', async () => {
+    mocks.readOrganizationExistsMock.mockResolvedValue(true)
+
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const service = yield* SingularityAdminService
+        yield* service.resetOrganizationUsage({
+          organizationId: 'org-1',
+          actorUserId: 'admin-1',
+          mode: 'current_cycle_usage',
+        })
+      }).pipe(Effect.provide(SingularityTestLayer)),
+    )
+
+    expect(mocks.resetOrganizationUsageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: 'org-1',
+        actorUserId: 'admin-1',
+        mode: 'current_cycle_usage',
+      }),
+    )
     expect(mocks.withBillingTransactionMock).toHaveBeenCalledTimes(1)
   })
 })

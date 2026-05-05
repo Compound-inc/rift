@@ -29,6 +29,7 @@ import type { BillingSqlClient } from '@/lib/backend/billing/services/sql'
 import type {
   SingularityOrganizationDetail,
   SingularityOrganizationListItem,
+  SingularityUsageResetMode,
 } from '@/ee/singularity/shared/singularity-admin'
 import {
   SingularityNotFoundError,
@@ -43,6 +44,7 @@ import {
   readOrganizationExistsEffect,
   readOrganizationMemberRoleEffect,
 } from './singularity-admin/queries'
+import { resetOrganizationUsageEffect } from './singularity-admin/usage-reset'
 
 export type SingularityAdminServiceShape = {
   readonly listOrganizations: () => Effect.Effect<
@@ -94,6 +96,15 @@ export type SingularityAdminServiceShape = {
     void,
     | SingularityNotFoundError
     | SingularityValidationError
+    | SingularityPersistenceError
+  >
+  readonly resetOrganizationUsage: (input: {
+    organizationId: string
+    actorUserId: string
+    mode: SingularityUsageResetMode
+  }) => Effect.Effect<
+    void,
+    | SingularityNotFoundError
     | SingularityPersistenceError
   >
 }
@@ -554,6 +565,51 @@ export class SingularityAdminService extends ServiceMap.Service<
                 ),
               )
             }),
+        ),
+
+        resetOrganizationUsage: Effect.fn(
+          'SingularityAdminService.resetOrganizationUsage',
+        )(({ organizationId, actorUserId, mode }) =>
+          Effect.gen(function* () {
+            const organizationExists = yield* provideSql(
+              readOrganizationExistsEffect(organizationId),
+            ).pipe(
+              Effect.mapError((cause) =>
+                toPersistenceError(
+                  'Failed to reset the organization usage.',
+                  cause,
+                  organizationId,
+                ),
+              ),
+            )
+
+            if (!organizationExists) {
+              return yield* Effect.fail(
+                new SingularityNotFoundError({
+                  message: 'Organization not found.',
+                  organizationId,
+                }),
+              )
+            }
+
+            yield* provideSql(withBillingTransactionEffect((client) =>
+              resetOrganizationUsageEffect(client, {
+                organizationId,
+                actorUserId,
+                mode,
+              }),
+            )).pipe(
+              Effect.mapError((cause) =>
+                cause instanceof SingularityNotFoundError
+                  ? cause
+                  : toPersistenceError(
+                      'Failed to reset the organization usage.',
+                      cause,
+                      organizationId,
+                    ),
+              ),
+            )
+          }),
         ),
       }
     }),

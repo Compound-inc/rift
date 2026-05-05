@@ -37,7 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@rift/ui/select'
-import { MoreVertical, UserPlus } from 'lucide-react'
+import { MoreVertical, RefreshCcw, RotateCcw, UserPlus } from 'lucide-react'
 import {
   WORKSPACE_FEATURE_IDS,
   WORKSPACE_PLANS,
@@ -595,6 +595,7 @@ export function SingularityOrgDetailPage({
     handleRemoveMember,
     handleCancelInvitation,
     handleSetPlan,
+    handleResetUsage,
   } = useSingularityOrgDetailPageLogic(organization)
 
   const directoryRows = useMemo(
@@ -850,7 +851,7 @@ export function SingularityOrgDetailPage({
                 value={formatUsageCapLabel(organization)}
               />
               <SummaryMetric
-                label="AI spend this month"
+                label="AI spend current cycle"
                 value={formatCurrencyAmount(organization.aiSpendThisMonth)}
               />
               <SummaryMetric
@@ -928,6 +929,86 @@ export function SingularityOrgDetailPage({
           </div>
 
           <aside className="space-y-5">
+            <LayeredSideCard
+              title="Usage Controls"
+              description="Secure quota repair actions for the active workspace billing period."
+            >
+              <div className="space-y-4">
+                <div className="grid gap-3 rounded-xl border border-border-light/70 bg-surface-overlay/60 p-4">
+                  <SummaryMetric
+                    label="Current cycle spend"
+                    value={formatCurrencyAmount(organization.aiSpendThisMonth)}
+                  />
+                  <SummaryMetric
+                    label="Current cap"
+                    value={formatUsageCapLabel(organization)}
+                  />
+                  <SummaryMetric
+                    label="Next reset"
+                    value={formatDateLabel(organization.billingPeriodEnd)}
+                  />
+                </div>
+
+                <FormDialog
+                  trigger={
+                    <Button
+                      type="button"
+                      variant="dangerLight"
+                      className="w-full"
+                      disabled={isPending}
+                    >
+                      <RefreshCcw aria-hidden />
+                      Reset current usage
+                    </Button>
+                  }
+                  title="Reset current usage"
+                  description="Set every member in this organization to 0% used for the current cycle without changing the next reset date."
+                  buttonText="Reset usage"
+                  buttonVariant="danger"
+                  submitButtonDisabled={isPending}
+                  handleSubmit={() => handleResetUsage('current_cycle_usage')}
+                  helpText="Settled current-cycle quota events are marked as forgiven so reconciliation cannot reapply them."
+                >
+                  <div className="space-y-3 text-sm text-foreground-secondary">
+                    <p>
+                      This affects {organization.name}. Historical billing rows
+                      remain auditable, but they no longer count against the
+                      active quota cycle.
+                    </p>
+                  </div>
+                </FormDialog>
+
+                <FormDialog
+                  trigger={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="w-full"
+                      disabled={isPending}
+                    >
+                      <RotateCcw aria-hidden />
+                      Start fresh cycle
+                    </Button>
+                  }
+                  title="Start fresh cycle"
+                  description="Move this organization to a new usage cycle that starts now and resets again in 30 days."
+                  buttonText="Start new cycle"
+                  buttonVariant="danger"
+                  submitButtonDisabled={isPending}
+                  handleSubmit={() => handleResetUsage('fresh_cycle')}
+                  helpText="This changes the active billing period timestamps used by quota enforcement."
+                >
+                  <div className="space-y-3 text-sm text-foreground-secondary">
+                    <p>
+                      This affects {organization.name}. Existing cycle slots are
+                      closed and new empty seat slots are created for the next
+                      30 days.
+                    </p>
+                  </div>
+                </FormDialog>
+              </div>
+            </LayeredSideCard>
+
             <LayeredSideCard
               title="Plan Override"
               description="Configure manual subscriptions, usage caps, and feature access for workspaces billed outside Stripe."

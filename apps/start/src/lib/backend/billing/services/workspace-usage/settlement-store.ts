@@ -51,6 +51,10 @@ export const recordChatUsageRecordEffect = Effect.fn(
       yield* sql.withTransaction(
         Effect.gen(function* () {
           const reservation = yield* selectExistingReservation(sql, input.requestId)
+          const billableReservation =
+            reservation?.status === 'reserved' || reservation?.status === 'settled'
+              ? reservation
+              : null
           const usageEventId = `usage_event_${input.requestId}`
           const monetizationEventId = `monetization_event_${input.requestId}`
 
@@ -74,11 +78,11 @@ export const recordChatUsageRecordEffect = Effect.fn(
               ${input.requestId},
               ${organizationId},
               ${input.userId},
-              ${reservation?.seatSlotId ?? null},
+              ${billableReservation?.seatSlotId ?? null},
               ${input.assistantMessageId},
               ${input.modelId},
               ${input.usedByok},
-              ${input.estimatedCostNanoUsd ?? reservation?.estimatedNanoUsd ?? null},
+              ${input.estimatedCostNanoUsd ?? billableReservation?.estimatedNanoUsd ?? null},
               ${actualNanoUsd},
               ${sqlJson(sql, {})},
               ${now}
@@ -113,12 +117,12 @@ export const recordChatUsageRecordEffect = Effect.fn(
               ${input.requestId},
               ${organizationId},
               ${input.userId},
-              ${reservation?.seatSlotId ?? null},
+              ${billableReservation?.seatSlotId ?? null},
               ${usageEventId},
-              ${reservation?.id ?? null},
-              ${input.estimatedCostNanoUsd ?? reservation?.estimatedNanoUsd ?? 0},
+              ${billableReservation?.id ?? null},
+              ${input.estimatedCostNanoUsd ?? billableReservation?.estimatedNanoUsd ?? 0},
               ${actualNanoUsd},
-              ${input.usedByok || !reservation ? 'bypassed' : 'pending'},
+              ${input.usedByok || !billableReservation ? 'bypassed' : 'pending'},
               ${sqlJson(sql, {})},
               ${now},
               ${now}

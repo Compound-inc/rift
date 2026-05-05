@@ -14,11 +14,15 @@ import type {
   WorkspaceFeatureId,
   WorkspacePlanId,
 } from '@/lib/shared/access-control'
-import type { SingularityOrganizationDetail } from '@/ee/singularity/shared/singularity-admin'
+import type {
+  SingularityOrganizationDetail,
+  SingularityUsageResetMode,
+} from '@/ee/singularity/shared/singularity-admin'
 import {
   cancelSingularityInvitation,
   inviteSingularityOrganizationMember,
   removeSingularityOrganizationMember,
+  resetSingularityOrganizationUsage,
   setSingularityOrganizationPlan,
   updateSingularityOrganizationMemberRole,
 } from '@/ee/singularity/frontend/singularity.functions'
@@ -59,6 +63,7 @@ export type SingularityOrgDetailPageLogicResult = {
   handleRemoveMember: (memberId: string) => Promise<void>
   handleCancelInvitation: (invitationId: string) => Promise<void>
   handleSetPlan: () => Promise<void>
+  handleResetUsage: (mode: SingularityUsageResetMode) => Promise<void>
 }
 
 function toErrorMessage(error: unknown, fallback: string): string {
@@ -127,6 +132,7 @@ export function useSingularityOrgDetailPageLogic(
   )
   const cancelInvitationFn = useServerFn(cancelSingularityInvitation)
   const setPlanFn = useServerFn(setSingularityOrganizationPlan)
+  const resetUsageFn = useServerFn(resetSingularityOrganizationUsage)
 
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<SingularityRole>('member')
@@ -311,6 +317,26 @@ export function useSingularityOrgDetailPageLogic(
       }
     })
 
+  const handleResetUsage = (mode: SingularityUsageResetMode) =>
+    runTransitionAction(async () => {
+      try {
+        await resetUsageFn({
+          data: {
+            organizationId: organization.organizationId,
+            mode,
+          },
+        })
+        toast.success(
+          mode === 'fresh_cycle'
+            ? 'Usage cycle restarted.'
+            : 'Current cycle usage reset.',
+        )
+        await refreshRoute()
+      } catch (error) {
+        toast.error(toErrorMessage(error, 'Failed to reset usage.'))
+      }
+    })
+
   return {
     inviteEmail,
     inviteRole,
@@ -350,5 +376,6 @@ export function useSingularityOrgDetailPageLogic(
     handleRemoveMember,
     handleCancelInvitation,
     handleSetPlan,
+    handleResetUsage,
   }
 }

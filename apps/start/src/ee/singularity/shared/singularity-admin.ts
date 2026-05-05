@@ -23,6 +23,10 @@ export type SingularityManualPlanOverride = {
   featureOverrides: Partial<Record<WorkspaceFeatureId, boolean>>
 }
 
+export type SingularityUsageResetMode =
+  | 'current_cycle_usage'
+  | 'fresh_cycle'
+
 export type SingularityOrganizationListItem = {
   organizationId: string
   name: string
