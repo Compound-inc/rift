@@ -1,7 +1,6 @@
 import {
   DEFAULT_POSTHOG_HOST,
   DEFAULT_POSTHOG_UI_HOST,
-  POSTHOG_BROWSER_PROXY_PATH,
 } from '@/lib/shared/observability/posthog-config'
 import type { PublicPostHogConfig } from '@/lib/shared/observability/posthog-config'
 import { isSelfHosted } from '@/utils/app-feature-flags'
@@ -23,9 +22,7 @@ export function getPublicPostHogConfig(): PublicPostHogConfig {
 
   return {
     apiKey,
-    apiHost: apiKey
-      ? POSTHOG_BROWSER_PROXY_PATH
-      : readTrimmedEnv('POSTHOG_HOST') ?? DEFAULT_POSTHOG_HOST,
+    apiHost: DEFAULT_POSTHOG_HOST,
     uiHost: DEFAULT_POSTHOG_UI_HOST,
     environment:
       readTrimmedEnv('RAILWAY_ENVIRONMENT_NAME')

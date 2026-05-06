@@ -1,6 +1,5 @@
-export const DEFAULT_POSTHOG_HOST = 'https://us.i.posthog.com'
+export const DEFAULT_POSTHOG_HOST = 'https://z.rift.mx'
 export const DEFAULT_POSTHOG_UI_HOST = 'https://us.posthog.com'
-export const POSTHOG_BROWSER_PROXY_PATH = '/r/c'
 
 /**
  * Public PostHog settings that are safe to serialize into the app shell.
