@@ -95,6 +95,7 @@ export const makeAppendUserMessageOperation = (dependencies: {
                     zql.attachment.where('id', attachmentId).where('userId', userId).one(),
                   )
                   if (!existingAttachment) continue
+                  if (existingAttachment.status === 'deleted') continue
 
                   linkedAttachments.push({
                     id: existingAttachment.id,

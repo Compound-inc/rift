@@ -8,6 +8,7 @@ import type {
 import {
   getOrgKnowledgeAttachmentRecordEffect,
   insertAttachmentRecordEffect,
+  listAttachmentContentRowsByIdsForUserEffect,
   listAttachmentContentRowsByThreadEffect,
 } from '@/lib/backend/chat/infra/attachment-records'
 
@@ -18,6 +19,10 @@ export type AttachmentRecordServiceShape = {
   readonly listAttachmentContentRowsByThread: (
     threadId: string,
   ) => Effect.Effect<readonly AttachmentContentRow[], unknown>
+  readonly listAttachmentContentRowsByIdsForUser: (input: {
+    readonly userId: string
+    readonly attachmentIds: readonly string[]
+  }) => Effect.Effect<readonly AttachmentContentRow[], unknown>
   readonly getOrgKnowledgeAttachmentRecord: (input: {
     readonly organizationId: string
     readonly attachmentId: string
@@ -51,6 +56,14 @@ export class AttachmentRecordService extends ServiceMap.Service<
           'AttachmentRecordService.listAttachmentContentRowsByThread',
         )((threadId: string) =>
           provideUpstream(listAttachmentContentRowsByThreadEffect(threadId)),
+        ),
+        listAttachmentContentRowsByIdsForUser: Effect.fn(
+          'AttachmentRecordService.listAttachmentContentRowsByIdsForUser',
+        )((input: {
+          readonly userId: string
+          readonly attachmentIds: readonly string[]
+        }) =>
+          provideUpstream(listAttachmentContentRowsByIdsForUserEffect(input)),
         ),
         getOrgKnowledgeAttachmentRecord: Effect.fn(
           'AttachmentRecordService.getOrgKnowledgeAttachmentRecord',

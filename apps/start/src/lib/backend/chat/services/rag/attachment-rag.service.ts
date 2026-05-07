@@ -3,6 +3,7 @@ import {
   insertAttachmentVectors,
   linkAttachmentVectorsToThread,
   searchAttachmentVectors,
+  searchUserAttachmentVectors,
 } from '@/lib/backend/chat/infra/vector-db'
 import type {
   VectorSearchHit,
@@ -40,6 +41,9 @@ export type AttachmentRagServiceShape = {
     readonly updatedAt: number
   }) => Effect.Effect<void, unknown>
   readonly searchThreadAttachments: (input: {
+    readonly request: VectorSearchRequest
+  }) => Effect.Effect<readonly VectorSearchHit[], unknown>
+  readonly searchUserAttachments: (input: {
     readonly request: VectorSearchRequest
   }) => Effect.Effect<readonly VectorSearchHit[], unknown>
 }
@@ -88,6 +92,33 @@ export class AttachmentRagService extends ServiceMap.Service<
           if (sourceIds.length === 0) return []
           const rows = await searchAttachmentVectors({
             threadId: request.threadId,
+            userId: request.userId,
+            attachmentIds: sourceIds,
+            queryEmbedding: request.queryEmbedding,
+            limit: request.limit,
+          })
+          return rows.map((row) => ({
+            id: row.id,
+            sourceId: row.attachmentId,
+            chunkIndex: row.chunkIndex,
+            content: row.content,
+            score: row.score,
+          }))
+        },
+        catch: (error) => error,
+      }),
+    ),
+    searchUserAttachments: Effect.fn(
+      'AttachmentRagService.searchUserAttachments',
+    )(({ request }: { readonly request: VectorSearchRequest }) =>
+      Effect.tryPromise({
+        try: async () => {
+          if (request.scopeType !== 'attachment' || !request.userId) {
+            return []
+          }
+          const sourceIds = request.sourceIds ?? []
+          if (sourceIds.length === 0) return []
+          const rows = await searchUserAttachmentVectors({
             userId: request.userId,
             attachmentIds: sourceIds,
             queryEmbedding: request.queryEmbedding,

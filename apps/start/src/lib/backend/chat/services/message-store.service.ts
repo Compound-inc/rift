@@ -35,9 +35,12 @@ export type MessageStoreServiceShape = {
   readonly loadThreadMessages: (input: {
     readonly threadId: string
     readonly model: string
+    readonly userId?: string
     readonly organizationId?: string
     readonly orgPolicy?: OrgAiPolicy
     readonly untilMessageId?: string
+    readonly pendingUserMessage?: IncomingUserMessage
+    readonly pendingAttachments?: readonly ChatAttachmentInput[]
     readonly requestId: string
   }) => Effect.Effect<UIMessage[], MessagePersistenceError>
   readonly appendUserMessage: (input: {
@@ -153,15 +156,25 @@ export class MessageStoreService extends ServiceMap.Service<
 
   /** Test-only adapter retained for deterministic unit tests. */
   static readonly layerMemory = Layer.succeed(MessageStoreService, {
-  loadThreadMessages: ({ threadId, model: _model, untilMessageId, requestId }) =>
+  loadThreadMessages: ({
+    threadId,
+    model: _model,
+    untilMessageId,
+    pendingUserMessage,
+    requestId,
+  }) =>
     Effect.sync(() => {
       const existing = getMemoryState().messages.get(threadId)
       if (!existing) {
         throw new Error('missing thread message store')
       }
-      if (!untilMessageId) return existing.slice()
-      const endIndex = existing.findIndex((message) => message.id === untilMessageId)
-      return endIndex >= 0 ? existing.slice(0, endIndex + 1) : existing.slice()
+      const loaded = (() => {
+        if (!untilMessageId) return existing.slice()
+        const endIndex = existing.findIndex((message) => message.id === untilMessageId)
+        return endIndex >= 0 ? existing.slice(0, endIndex + 1) : existing.slice()
+      })()
+      if (!pendingUserMessage) return loaded
+      return [...loaded, toUserMessage(pendingUserMessage, [])]
     }).pipe(
       Effect.catch((error) =>
         Effect.fail(

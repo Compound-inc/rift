@@ -354,6 +354,65 @@ export async function searchAttachmentVectors(input: {
     .filter((row): row is VectorChunkSearchResult => !!row)
 }
 
+export async function searchUserAttachmentVectors(input: {
+  readonly userId: string
+  readonly attachmentIds: readonly string[]
+  readonly queryEmbedding: readonly number[]
+  readonly limit: number
+}): Promise<readonly VectorChunkSearchResult[]> {
+  if (
+    !isQdrantEnabled() ||
+    input.attachmentIds.length === 0 ||
+    input.limit <= 0 ||
+    input.queryEmbedding.length === 0
+  ) {
+    return []
+  }
+
+  await ensureCollection(input.queryEmbedding.length)
+  const collection = getQdrantCollectionName()
+  const hits = await qdrantRequest<readonly QdrantSearchHit[]>(
+    'POST',
+    `/collections/${collection}/points/search`,
+    {
+      vector: [...input.queryEmbedding],
+      limit: input.limit,
+      with_payload: true,
+      with_vector: false,
+      filter: {
+        must: [
+          { key: 'userId', match: { value: input.userId } },
+          { key: 'scopeType', match: { value: 'attachment' } },
+          { key: 'attachmentId', match: { any: [...input.attachmentIds] } },
+        ],
+      },
+    },
+  )
+
+  return hits
+    .map((hit) => {
+      const payload = hit.payload ?? {}
+      const attachmentId = payload.attachmentId
+      const content = payload.content
+      const chunkIndex = payload.chunkIndex
+      if (
+        typeof attachmentId !== 'string' ||
+        typeof content !== 'string' ||
+        typeof chunkIndex !== 'number'
+      ) {
+        return null
+      }
+      return {
+        id: String(hit.id),
+        attachmentId,
+        chunkIndex,
+        content,
+        score: Number.isFinite(hit.score) ? hit.score : 0,
+      }
+    })
+    .filter((row): row is VectorChunkSearchResult => !!row)
+}
+
 export async function searchOrgKnowledgeVectors(input: {
   readonly organizationId: string
   readonly attachmentIds: readonly string[]

@@ -152,8 +152,38 @@ export const listAttachmentContentRowsByThreadEffect = Effect.fn(
                file_name as "fileName",
                mime_type as "mimeType",
                file_content as "fileContent"
-          from attachments
+         from attachments
          where thread_id = ${threadId}
+           and coalesce(status, 'uploaded') = 'uploaded'
+         order by created_at asc
+      `
+    }),
+)
+
+export const listAttachmentContentRowsByIdsForUserEffect = Effect.fn(
+  'AttachmentRecords.listAttachmentContentRowsByIdsForUser',
+)(
+  (input: {
+    readonly userId: string
+    readonly attachmentIds: readonly string[]
+  }): Effect.Effect<
+    readonly AttachmentContentRow[],
+    unknown,
+    PgClient.PgClient
+  > =>
+    Effect.gen(function* () {
+      if (input.attachmentIds.length === 0) return []
+      const sql = yield* PgClient.PgClient
+
+      return yield* sql<AttachmentContentRow>`
+        select id,
+               file_name as "fileName",
+               mime_type as "mimeType",
+               file_content as "fileContent"
+         from attachments
+         where user_id = ${input.userId}
+           and id in ${sql.in(input.attachmentIds)}
+           and coalesce(status, 'uploaded') = 'uploaded'
          order by created_at asc
       `
     }),

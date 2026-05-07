@@ -69,7 +69,6 @@ import { buildPersistedGenerationAnalytics } from '../domain/generation-metrics'
 import { nanoUsdToUsd } from '@/lib/backend/billing/services/workspace-usage/shared'
 import { writeFreeOrgUserUsageSummaryRecord } from '@/lib/backend/billing/services/workspace-usage/usage-summary-store'
 import { estimatePromptTokens } from '@/lib/shared/chat-contracts'
-import { toUserMessage } from './message-store/helpers'
 import { ChatErrorCode } from '@/lib/shared/chat-contracts/error-codes'
 import { ChatErrorI18nKey } from '@/lib/shared/chat-contracts/error-i18n'
 
@@ -544,6 +543,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             messages = yield* messageStore.loadThreadMessages({
               threadId,
               model: modelResolution.modelId,
+              userId,
               organizationId,
               orgPolicy,
               untilMessageId: regeneration.anchorMessageId,
@@ -572,6 +572,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             messages = yield* messageStore.loadThreadMessages({
               threadId,
               model: modelResolution.modelId,
+              userId,
               organizationId,
               orgPolicy,
               untilMessageId: edited.editedMessageId,
@@ -584,15 +585,17 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               edited_message_id: edited.editedMessageId,
             })
           } else {
-            const existingMessages = yield* messageStore.loadThreadMessages({
+            const preparedMessages = yield* messageStore.loadThreadMessages({
               threadId,
               model: modelResolution.modelId,
+              userId,
               organizationId,
               orgPolicy,
+              pendingUserMessage: command.message!,
+              pendingAttachments: attachments,
               requestId,
             })
-            const nextMessages = [...existingMessages, toUserMessage(command.message!)]
-            const usedTokens = estimatePromptTokens(nextMessages)
+            const usedTokens = estimatePromptTokens(preparedMessages)
             if (wideEvent) {
               setWideEventContext(wideEvent, {
                 usage: { promptTokens: usedTokens },
@@ -631,7 +634,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               requestId,
             })
 
-            messages = nextMessages
+            messages = preparedMessages
             assistantParentMessageId = command.message!.id
           }
 

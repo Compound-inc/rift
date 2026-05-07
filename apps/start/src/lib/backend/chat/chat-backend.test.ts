@@ -33,6 +33,7 @@ import { ToolPolicyService } from '@/lib/backend/chat/services/tool-policy.servi
 import { ToolRegistryService } from '@/lib/backend/chat/services/tool-registry.service'
 
 let lastStreamRequest: {
+  readonly messages?: readonly UIMessage[]
   readonly providerOptions?: Record<string, unknown>
   readonly generateMessageId?: (() => string) | undefined
 } | null = null
@@ -41,6 +42,7 @@ const TestModelGatewayLive = Layer.succeed(ModelGatewayService, {
   streamResponse: ({ messages, providerOptions }) =>
     Effect.sync<ModelStreamResult>(() => {
       lastStreamRequest = {
+        messages,
         providerOptions,
       }
 
@@ -235,6 +237,9 @@ describe('chat-backend scaffold', () => {
       { type: 'reasoning', text: 'Mocked reasoning trace', state: 'done' },
       { type: 'text', text: 'Mocked assistant response' },
     ])
+    expect(lastStreamRequest?.messages?.map((message) => message.id)).toContain(
+      'user-message-1',
+    )
     expect(lastStreamRequest?.generateMessageId?.()).toBe(messages?.[1]?.id)
   })
 
