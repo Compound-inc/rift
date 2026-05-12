@@ -26,7 +26,7 @@ function wwwRedirectMiddleware(
 }
 
 export default {
-  fetch(request: Request): Promise<Response> {
+  async fetch(request: Request): Promise<Response> {
     if (isWorkflowInfrastructureRequest(request)) {
       return handler.fetch(request)
     }
