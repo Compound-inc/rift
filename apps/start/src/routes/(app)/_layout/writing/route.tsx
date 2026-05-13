@@ -1,18 +1,18 @@
 import { Navigate, Outlet, createFileRoute } from '@tanstack/react-router'
-import { useOrgProductFeatureAccess } from '@/lib/frontend/organizations/use-org-product-features'
+import { usePermissions } from '@/lib/frontend/permissions/use-permissions'
 
 export const Route = createFileRoute('/(app)/_layout/writing')({
   component: WritingLayout,
 })
 
 function WritingLayout() {
-  const { enabled: isWittingEnabled, loading } = useOrgProductFeatureAccess('writing')
+  const { can, loading } = usePermissions()
 
   if (loading) {
     return null
   }
 
-  if (!isWittingEnabled) {
+  if (!can('product.writing')) {
     return <Navigate to="/" />
   }
 

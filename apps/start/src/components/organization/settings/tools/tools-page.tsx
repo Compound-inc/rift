@@ -3,7 +3,7 @@
 import { ContentPage } from '@/components/layout'
 import { m } from '@/paraglide/messages.js'
 import { useChatPolicySettings } from '@/components/organization/settings/chat-policy/use-chat-policy-settings'
-import { useOrgFeatureAccess } from '@/lib/frontend/billing/use-org-billing'
+import { usePermissions } from '@/lib/frontend/permissions/use-permissions'
 import { ToolAccessSection } from './tool-access-section'
 import { ProviderToolsSection } from './provider-tools-section'
 
@@ -14,7 +14,8 @@ import { ProviderToolsSection } from './provider-tools-section'
  */
 export function ToolsPage() {
   const { payload, loading, error, updating, update } = useChatPolicySettings()
-  const featureAccess = useOrgFeatureAccess('toolPolicy')
+  const { workspaceFeatureState } = usePermissions()
+  const featureAccess = workspaceFeatureState('toolPolicy')
   const busy = loading || updating
 
   return (

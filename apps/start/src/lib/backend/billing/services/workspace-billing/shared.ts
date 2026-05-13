@@ -3,8 +3,10 @@ import {
   WORKSPACE_FEATURE_IDS,
   coerceWorkspacePlanId,
   getWorkspacePlanRank,
+  isProductAddonEntitlementId,
 } from '@/lib/shared/access-control'
 import type {
+  ProductAddonEntitlementId,
   SelfServeWorkspacePlanId,
   StripeManagedWorkspacePlanId,
   WorkspaceFeatureId,
@@ -43,6 +45,7 @@ export type ManualSubscriptionMetadata = {
   internalNote?: string
   billingReference?: string
   featureOverrides?: Partial<Record<WorkspaceFeatureId, boolean>>
+  addonGrants?: Partial<Record<ProductAddonEntitlementId, boolean>>
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -50,7 +53,9 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function asOptionalString(value: unknown): string | null {
-  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : null
 }
 
 export function asOptionalNumber(value: unknown): number | null {
@@ -88,6 +93,17 @@ export function coerceManualSubscriptionMetadata(
     }
   }
 
+  const addonGrantsValue = value.addonGrants
+  const addonGrants: Partial<Record<ProductAddonEntitlementId, boolean>> = {}
+
+  if (isRecord(addonGrantsValue)) {
+    for (const [key, grant] of Object.entries(addonGrantsValue)) {
+      if (typeof grant === 'boolean' && isProductAddonEntitlementId(key)) {
+        addonGrants[key] = grant
+      }
+    }
+  }
+
   return {
     overrideSource: asOptionalString(value.overrideSource) ?? undefined,
     overriddenByUserId: asOptionalString(value.overriddenByUserId) ?? undefined,
@@ -96,6 +112,7 @@ export function coerceManualSubscriptionMetadata(
     internalNote: asOptionalString(value.internalNote) ?? undefined,
     billingReference: asOptionalString(value.billingReference) ?? undefined,
     featureOverrides,
+    addonGrants,
   }
 }
 
@@ -115,7 +132,9 @@ export function toPersistenceError(
   })
 }
 
-export function normalizePlanId(planId: string | null | undefined): WorkspacePlanId {
+export function normalizePlanId(
+  planId: string | null | undefined,
+): WorkspacePlanId {
   return coerceWorkspacePlanId(planId)
 }
 
@@ -145,8 +164,10 @@ export function isScheduledDowngrade(input: {
   const nextPriority = getWorkspacePlanRank(input.nextPlanId)
   const currentSeats = input.currentSeats ?? 1
 
-  return nextPriority < currentPriority
-    || (nextPriority === currentPriority && input.nextSeats < currentSeats)
+  return (
+    nextPriority < currentPriority ||
+    (nextPriority === currentPriority && input.nextSeats < currentSeats)
+  )
 }
 
 /**

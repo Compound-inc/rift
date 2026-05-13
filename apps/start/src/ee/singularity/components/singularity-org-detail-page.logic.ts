@@ -8,9 +8,11 @@ import type { ManualBillingInterval } from '@/lib/backend/billing/services/works
 import {
   getPlanEffectiveFeatures,
   getWorkspacePlan,
+  PRODUCT_ADDON_ENTITLEMENT_IDS,
   WORKSPACE_FEATURE_IDS,
 } from '@/lib/shared/access-control'
 import type {
+  ProductAddonEntitlementId,
   WorkspaceFeatureId,
   WorkspacePlanId,
 } from '@/lib/shared/access-control'
@@ -19,6 +21,7 @@ import {
   cancelSingularityInvitation,
   inviteSingularityOrganizationMember,
   removeSingularityOrganizationMember,
+  setSingularityOrganizationAddonEntitlements,
   setSingularityOrganizationPlan,
   updateSingularityOrganizationMemberRole,
 } from '@/ee/singularity/frontend/singularity.functions'
@@ -36,6 +39,7 @@ export type SingularityOrgDetailPageLogicResult = {
   selectedInternalNote: string
   selectedBillingReference: string
   selectedFeatureAccess: Record<WorkspaceFeatureId, boolean>
+  selectedAddonEntitlements: Record<ProductAddonEntitlementId, boolean>
   isSeatCountValid: boolean
   isUsageLimitValid: boolean
   isPending: boolean
@@ -53,12 +57,17 @@ export type SingularityOrgDetailPageLogicResult = {
     feature: WorkspaceFeatureId,
     value: boolean,
   ) => void
+  setSelectedAddonEntitlement: (
+    entitlementId: ProductAddonEntitlementId,
+    value: boolean,
+  ) => void
   resetSelectedOverridesToPlanDefaults: () => void
   handleInvite: () => Promise<void>
   handleRoleChange: (memberId: string, role: SingularityRole) => Promise<void>
   handleRemoveMember: (memberId: string) => Promise<void>
   handleCancelInvitation: (invitationId: string) => Promise<void>
   handleSetPlan: () => Promise<void>
+  handleSetAddonEntitlements: () => Promise<void>
 }
 
 function toErrorMessage(error: unknown, fallback: string): string {
@@ -96,6 +105,21 @@ function buildFeatureAccessState(
   ) as Record<WorkspaceFeatureId, boolean>
 }
 
+function buildAddonEntitlementState(
+  organization: SingularityOrganizationDetail,
+): Record<ProductAddonEntitlementId, boolean> {
+  return Object.fromEntries(
+    PRODUCT_ADDON_ENTITLEMENT_IDS.map((id) => {
+      const explicitGrant = organization.addonGrants[id]
+      const resolved = organization.productAddonEntitlements[id]
+      return [
+        id,
+        typeof explicitGrant === 'boolean' ? explicitGrant : Boolean(resolved),
+      ]
+    }),
+  ) as Record<ProductAddonEntitlementId, boolean>
+}
+
 function buildPlanDefaultFeatureAccess(
   planId: WorkspacePlanId,
 ): Record<WorkspaceFeatureId, boolean> {
@@ -127,15 +151,19 @@ export function useSingularityOrgDetailPageLogic(
   )
   const cancelInvitationFn = useServerFn(cancelSingularityInvitation)
   const setPlanFn = useServerFn(setSingularityOrganizationPlan)
+  const setAddonEntitlementsFn = useServerFn(
+    setSingularityOrganizationAddonEntitlements,
+  )
 
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<SingularityRole>('member')
   const [selectedPlan, setSelectedPlan] = useState<WorkspacePlanId>(
     organization.planId,
   )
-  const [selectedBillingInterval, setSelectedBillingInterval] = useState<ManualBillingInterval | null>(
-    organization.billingInterval ?? 'month',
-  )
+  const [selectedBillingInterval, setSelectedBillingInterval] =
+    useState<ManualBillingInterval | null>(
+      organization.billingInterval ?? 'month',
+    )
   /**
    * Keep the seat count as raw text so operators can edit naturally while we
    * still validate before submitting the override mutation.
@@ -144,8 +172,8 @@ export function useSingularityOrgDetailPageLogic(
     String(organization.seatCount),
   )
   const [selectedUsageLimitUsd, setSelectedUsageLimitUsd] = useState<string>(
-    organization.usagePolicy.hasCustomMonthlyBudget
-      && organization.usagePolicy.organizationMonthlyBudgetUsd != null
+    organization.usagePolicy.hasCustomMonthlyBudget &&
+      organization.usagePolicy.organizationMonthlyBudgetUsd != null
       ? String(organization.usagePolicy.organizationMonthlyBudgetUsd)
       : '',
   )
@@ -155,12 +183,15 @@ export function useSingularityOrgDetailPageLogic(
   const [selectedInternalNote, setSelectedInternalNote] = useState<string>(
     organization.manualPlanOverride.internalNote ?? '',
   )
-  const [selectedBillingReference, setSelectedBillingReference] = useState<string>(
-    organization.manualPlanOverride.billingReference ?? '',
-  )
+  const [selectedBillingReference, setSelectedBillingReference] =
+    useState<string>(organization.manualPlanOverride.billingReference ?? '')
   const [selectedFeatureAccessState, setSelectedFeatureAccessState] = useState<
     Record<WorkspaceFeatureId, boolean>
   >(() => buildFeatureAccessState(organization))
+  const [selectedAddonEntitlementsState, setSelectedAddonEntitlementsState] =
+    useState<Record<ProductAddonEntitlementId, boolean>>(() =>
+      buildAddonEntitlementState(organization),
+    )
   const [isPending, startTransition] = useTransition()
 
   const activePlanName = useMemo(
@@ -172,12 +203,13 @@ export function useSingularityOrgDetailPageLogic(
     Number.isFinite(parsedSeatCount) &&
     Number.isInteger(parsedSeatCount) &&
     parsedSeatCount >= 1
-  const parsedUsageLimitUsd = selectedUsageLimitUsd.trim().length === 0
-    ? null
-    : Number(selectedUsageLimitUsd)
+  const parsedUsageLimitUsd =
+    selectedUsageLimitUsd.trim().length === 0
+      ? null
+      : Number(selectedUsageLimitUsd)
   const isUsageLimitValid =
-    parsedUsageLimitUsd == null
-    || (Number.isFinite(parsedUsageLimitUsd) && parsedUsageLimitUsd >= 0)
+    parsedUsageLimitUsd == null ||
+    (Number.isFinite(parsedUsageLimitUsd) && parsedUsageLimitUsd >= 0)
 
   /**
    * Wrap async mutations in a transition while still returning a promise that
@@ -268,11 +300,15 @@ export function useSingularityOrgDetailPageLogic(
   const handleSetPlan = () =>
     runTransitionAction(async () => {
       if (!isSeatCountValid) {
-        toast.error('Seat count must be a whole number greater than or equal to 1.')
+        toast.error(
+          'Seat count must be a whole number greater than or equal to 1.',
+        )
         return
       }
       if (!isUsageLimitValid) {
-        toast.error('Usage limit must be empty or a number greater than or equal to 0.')
+        toast.error(
+          'Usage limit must be empty or a number greater than or equal to 0.',
+        )
         return
       }
 
@@ -282,11 +318,17 @@ export function useSingularityOrgDetailPageLogic(
         const normalizedUsageLimitUsd =
           selectedPlan === 'free' ? null : parsedUsageLimitUsd
         const normalizedOverrideReason =
-          selectedPlan === 'free' ? null : normalizeOptionalText(selectedOverrideReason)
+          selectedPlan === 'free'
+            ? null
+            : normalizeOptionalText(selectedOverrideReason)
         const normalizedInternalNote =
-          selectedPlan === 'free' ? null : normalizeOptionalText(selectedInternalNote)
+          selectedPlan === 'free'
+            ? null
+            : normalizeOptionalText(selectedInternalNote)
         const normalizedBillingReference =
-          selectedPlan === 'free' ? null : normalizeOptionalText(selectedBillingReference)
+          selectedPlan === 'free'
+            ? null
+            : normalizeOptionalText(selectedBillingReference)
 
         await setPlanFn({
           data: {
@@ -308,6 +350,24 @@ export function useSingularityOrgDetailPageLogic(
         await refreshRoute()
       } catch (error) {
         toast.error(toErrorMessage(error, 'Failed to update plan.'))
+      }
+    })
+
+  const handleSetAddonEntitlements = () =>
+    runTransitionAction(async () => {
+      try {
+        await setAddonEntitlementsFn({
+          data: {
+            organizationId: organization.organizationId,
+            grants: selectedAddonEntitlementsState,
+          },
+        })
+        toast.success('Addon entitlements updated.')
+        await refreshRoute()
+      } catch (error) {
+        toast.error(
+          toErrorMessage(error, 'Failed to update addon entitlements.'),
+        )
       }
     })
 
@@ -341,6 +401,13 @@ export function useSingularityOrgDetailPageLogic(
         [feature]: value,
       }))
     },
+    selectedAddonEntitlements: selectedAddonEntitlementsState,
+    setSelectedAddonEntitlement: (entitlementId, value) => {
+      setSelectedAddonEntitlementsState((current) => ({
+        ...current,
+        [entitlementId]: value,
+      }))
+    },
     resetSelectedOverridesToPlanDefaults: () => {
       setSelectedUsageLimitUsd('')
       setSelectedFeatureAccessState(buildPlanDefaultFeatureAccess(selectedPlan))
@@ -350,5 +417,6 @@ export function useSingularityOrgDetailPageLogic(
     handleRemoveMember,
     handleCancelInvitation,
     handleSetPlan,
+    handleSetAddonEntitlements,
   }
 }

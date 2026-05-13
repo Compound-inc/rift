@@ -3,7 +3,7 @@
 import { Form } from '@rift/ui/form'
 import { ContentPage } from '@/components/layout'
 import { getFeatureAccessFormProps } from '@/components/organization/settings/feature-access-form-helpers'
-import { useOrgFeatureAccess } from '@/lib/frontend/billing/use-org-billing'
+import { usePermissions } from '@/lib/frontend/permissions/use-permissions'
 import { m } from '@/paraglide/messages.js'
 
 const DOMAINS_ACTION_HREF = '#'
@@ -11,9 +11,10 @@ const SSO_ACTION_HREF = '#'
 const DIRECTORY_ACTION_HREF = '#'
 
 export function OrgSecurityPage() {
-  const domainAccess = useOrgFeatureAccess('verifiedDomains')
-  const ssoAccess = useOrgFeatureAccess('singleSignOn')
-  const directoryAccess = useOrgFeatureAccess('directoryProvisioning')
+  const { workspaceFeatureState } = usePermissions()
+  const domainAccess = workspaceFeatureState('verifiedDomains')
+  const ssoAccess = workspaceFeatureState('singleSignOn')
+  const directoryAccess = workspaceFeatureState('directoryProvisioning')
 
   return (
     <ContentPage

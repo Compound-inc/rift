@@ -24,11 +24,13 @@ async function runSingularityAction<T>(input: {
     authContext = await requireSingularityAdminAuth(headers)
     return await input.execute(authContext)
   } catch (error) {
-    const userId = authContext?.userId ?? await Effect.runPromise(
-      getServerAuthContextFromHeaders(headers).pipe(
-        Effect.map((context) => context.userId),
-      ),
-    ).catch(() => undefined)
+    const userId =
+      authContext?.userId ??
+      (await Effect.runPromise(
+        getServerAuthContextFromHeaders(headers).pipe(
+          Effect.map((context) => context.userId),
+        ),
+      ).catch(() => undefined))
 
     return handleSingularityActionFailure({
       error,
@@ -218,6 +220,29 @@ export async function setSingularityOrganizationPlanAction(input: {
             internalNote: input.internalNote,
             billingReference: input.billingReference,
             featureOverrides: input.featureOverrides,
+          })
+        }),
+      ),
+  })
+}
+
+export async function setSingularityOrganizationAddonEntitlementsAction(input: {
+  organizationId: string
+  grants: Record<string, boolean>
+}) {
+  return runSingularityAction({
+    route: '/singularity/orgs/$organizationId/addon-entitlements',
+    eventName: 'singularity.organization.addon-entitlements.failed',
+    defaultMessage: 'Failed to update the product addon entitlements.',
+    organizationId: input.organizationId,
+    execute: async (authContext) =>
+      SingularityRuntime.run(
+        Effect.gen(function* () {
+          const service = yield* SingularityAdminService
+          yield* service.setProductAddonEntitlements({
+            organizationId: input.organizationId,
+            actorUserId: authContext.userId,
+            grants: input.grants,
           })
         }),
       ),

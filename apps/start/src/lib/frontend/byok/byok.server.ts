@@ -16,9 +16,7 @@ import { isAdminRole } from '@/lib/shared/auth/roles'
 /**
  * Server-side BYOK mutation entrypoint.
  */
-export async function updateByokAction(input: {
-  readonly data: unknown
-}) {
+export async function updateByokAction(input: { readonly data: unknown }) {
   const headers = getRequestHeaders()
   const authContext = await Effect.runPromise(
     requireOrgAuth({
@@ -48,6 +46,7 @@ export async function updateByokAction(input: {
 
   return runUpdateByok({
     organizationId: authContext.organizationId,
+    userId: authContext.userId,
     data: input.data,
   })
 }

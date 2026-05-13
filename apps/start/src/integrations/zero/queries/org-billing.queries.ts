@@ -33,6 +33,7 @@ export const orgBillingQueryDefinitions = {
         .related('entitlementSnapshots', (snapshots) =>
           snapshots.orderBy('computedAt', 'desc').limit(1),
         )
+        .related('productPolicies')
         .related('members', (members) =>
           members.where('userId', scoped.userID).limit(1).related('access'),
         )

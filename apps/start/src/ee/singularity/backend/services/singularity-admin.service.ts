@@ -16,13 +16,12 @@ import {
   resolveWorkspaceEffectiveFeatures,
 } from '@/lib/shared/access-control'
 import type {
+  ProductAddonEntitlementId,
   WorkspaceFeatureId,
   WorkspacePlanId,
 } from '@/lib/shared/access-control'
 import { usdToNanoUsd } from '@/lib/backend/billing/services/workspace-usage/shared'
-import {
-  asRecord,
-} from '@/lib/backend/billing/services/workspace-billing/shared'
+import { asRecord } from '@/lib/backend/billing/services/workspace-billing/shared'
 import type { ManualBillingInterval } from '@/lib/backend/billing/services/workspace-billing/shared'
 import { withBillingTransactionEffect } from '@/lib/backend/billing/services/sql'
 import type { BillingSqlClient } from '@/lib/backend/billing/services/sql'
@@ -43,6 +42,7 @@ import {
   readOrganizationExistsEffect,
   readOrganizationMemberRoleEffect,
 } from './singularity-admin/queries'
+import { setProductAddonEntitlementsOperation } from './singularity-admin/operations/set-product-addon-entitlements'
 
 export type SingularityAdminServiceShape = {
   readonly listOrganizations: () => Effect.Effect<
@@ -90,6 +90,17 @@ export type SingularityAdminServiceShape = {
     internalNote: string | null
     billingReference: string | null
     featureOverrides: Partial<Record<WorkspaceFeatureId, boolean>>
+  }) => Effect.Effect<
+    void,
+    | SingularityNotFoundError
+    | SingularityValidationError
+    | SingularityPersistenceError
+  >
+
+  readonly setProductAddonEntitlements: (input: {
+    organizationId: string
+    actorUserId: string
+    grants: Partial<Record<ProductAddonEntitlementId, boolean>>
   }) => Effect.Effect<
     void,
     | SingularityNotFoundError
@@ -308,10 +319,12 @@ export class SingularityAdminService extends ServiceMap.Service<
           'SingularityAdminService.updateOrganizationMemberRole',
         )(({ headers, organizationId, memberId, role }) =>
           Effect.gen(function* () {
-            const currentRole = yield* provideSql(readOrganizationMemberRoleEffect({
-              organizationId,
-              memberId,
-            })).pipe(
+            const currentRole = yield* provideSql(
+              readOrganizationMemberRoleEffect({
+                organizationId,
+                memberId,
+              }),
+            ).pipe(
               Effect.map((value) => value?.trim().toLowerCase() ?? null),
               Effect.mapError((cause) =>
                 toPersistenceError(
@@ -401,9 +414,9 @@ export class SingularityAdminService extends ServiceMap.Service<
               })
               validatePlanOverrideInput(normalizedInput)
 
-              const organizationExists = yield* provideSql(readOrganizationExistsEffect(
-                organizationId,
-              )).pipe(
+              const organizationExists = yield* provideSql(
+                readOrganizationExistsEffect(organizationId),
+              ).pipe(
                 Effect.mapError((cause) =>
                   toPersistenceError(
                     'Failed to apply the organization plan override.',
@@ -422,7 +435,9 @@ export class SingularityAdminService extends ServiceMap.Service<
                 )
               }
 
-              yield* provideSql(ensureOrganizationBillingBaselineEffect(organizationId)).pipe(
+              yield* provideSql(
+                ensureOrganizationBillingBaselineEffect(organizationId),
+              ).pipe(
                 Effect.mapError((cause) =>
                   toPersistenceError(
                     'Failed to apply the organization plan override.',
@@ -432,8 +447,9 @@ export class SingularityAdminService extends ServiceMap.Service<
                 ),
               )
 
-              yield* provideSql(withBillingTransactionEffect((client) =>
-                Effect.gen(function* () {
+              yield* provideSql(
+                withBillingTransactionEffect((client) =>
+                  Effect.gen(function* () {
                     const currentSubscription =
                       yield* readCurrentOrgSubscriptionEffect({
                         organizationId,
@@ -541,7 +557,8 @@ export class SingularityAdminService extends ServiceMap.Service<
                       client,
                     })
                   }),
-                )).pipe(
+                ),
+              ).pipe(
                 Effect.mapError((cause) =>
                   cause instanceof SingularityNotFoundError ||
                   cause instanceof SingularityValidationError
@@ -554,6 +571,18 @@ export class SingularityAdminService extends ServiceMap.Service<
                 ),
               )
             }),
+        ),
+
+        setProductAddonEntitlements: Effect.fn(
+          'SingularityAdminService.setProductAddonEntitlements',
+        )(({ organizationId, actorUserId, grants }) =>
+          provideSql(
+            setProductAddonEntitlementsOperation({
+              organizationId,
+              actorUserId,
+              grants,
+            }),
+          ),
         ),
       }
     }),

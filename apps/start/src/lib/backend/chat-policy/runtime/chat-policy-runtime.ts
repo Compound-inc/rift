@@ -1,11 +1,16 @@
 import { Layer } from 'effect'
 import { makeRuntimeRunner } from '@/lib/backend/server-effect'
-import { WorkspaceBillingService } from '@/lib/backend/billing/services/workspace-billing.service'
+import { PermissionService } from '@/lib/backend/permissions'
 import { UpstreamPostgresLayer } from '@/lib/backend/server-effect/services/upstream-postgres.service'
 import { ChatPolicySettingsService } from '../services/chat-policy-settings.service'
 
+/**
+ * Chat policy runtime. Provides `ChatPolicySettingsService` (the domain
+ * write surface) and `PermissionService` (the canonical server-side
+ * gate) so routes only execute the domain programs.
+ */
 const layer = Layer.mergeAll(
-  WorkspaceBillingService.layer,
+  PermissionService.layer,
   ChatPolicySettingsService.layer,
 ).pipe(Layer.provideMerge(UpstreamPostgresLayer))
 

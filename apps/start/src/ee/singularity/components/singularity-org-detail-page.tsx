@@ -39,6 +39,7 @@ import {
 } from '@rift/ui/select'
 import { MoreVertical, UserPlus } from 'lucide-react'
 import {
+  PRODUCT_ADDON_ENTITLEMENT_IDS,
   WORKSPACE_FEATURE_IDS,
   WORKSPACE_PLANS,
 } from '@/lib/shared/access-control'
@@ -108,10 +109,10 @@ function formatBillingPeriodLabel(
   endTimestamp: number | null,
 ): string {
   if (
-    startTimestamp != null
-    && Number.isFinite(startTimestamp)
-    && endTimestamp != null
-    && Number.isFinite(endTimestamp)
+    startTimestamp != null &&
+    Number.isFinite(startTimestamp) &&
+    endTimestamp != null &&
+    Number.isFinite(endTimestamp)
   ) {
     return `${formatDateLabel(startTimestamp)} - ${formatDateLabel(endTimestamp)}`
   }
@@ -152,11 +153,12 @@ function formatSingularitySubscriptionStatus(
   organization: SingularityOrganizationDetail,
 ): string {
   if (
-    organization.planId === 'free'
-    && Object.keys(organization.manualPlanOverride.featureOverrides).length === 0
-    && !organization.manualPlanOverride.overrideReason
-    && !organization.manualPlanOverride.internalNote
-    && !organization.manualPlanOverride.billingReference
+    organization.planId === 'free' &&
+    Object.keys(organization.manualPlanOverride.featureOverrides).length ===
+      0 &&
+    !organization.manualPlanOverride.overrideReason &&
+    !organization.manualPlanOverride.internalNote &&
+    !organization.manualPlanOverride.billingReference
   ) {
     return 'Free tier'
   }
@@ -181,11 +183,12 @@ function formatUsageCapLabel(
   organization: SingularityOrganizationDetail,
 ): string {
   if (
-    organization.planId === 'free'
-    && Object.keys(organization.manualPlanOverride.featureOverrides).length === 0
-    && !organization.manualPlanOverride.overrideReason
-    && !organization.manualPlanOverride.internalNote
-    && !organization.manualPlanOverride.billingReference
+    organization.planId === 'free' &&
+    Object.keys(organization.manualPlanOverride.featureOverrides).length ===
+      0 &&
+    !organization.manualPlanOverride.overrideReason &&
+    !organization.manualPlanOverride.internalNote &&
+    !organization.manualPlanOverride.billingReference
   ) {
     return 'Free tier'
   }
@@ -199,10 +202,10 @@ function hasManualContractState(
   organization: SingularityOrganizationDetail,
 ): boolean {
   return (
-    Object.keys(organization.manualPlanOverride.featureOverrides).length > 0
-    || Boolean(organization.manualPlanOverride.overrideReason)
-    || Boolean(organization.manualPlanOverride.internalNote)
-    || Boolean(organization.manualPlanOverride.billingReference)
+    Object.keys(organization.manualPlanOverride.featureOverrides).length > 0 ||
+    Boolean(organization.manualPlanOverride.overrideReason) ||
+    Boolean(organization.manualPlanOverride.internalNote) ||
+    Boolean(organization.manualPlanOverride.billingReference)
   )
 }
 
@@ -218,8 +221,8 @@ function formatSubscriptionAge(timestamp: number | null): string {
   const startedAt = new Date(timestamp)
   const now = new Date()
   let months =
-    (now.getFullYear() - startedAt.getFullYear()) * 12
-    + (now.getMonth() - startedAt.getMonth())
+    (now.getFullYear() - startedAt.getFullYear()) * 12 +
+    (now.getMonth() - startedAt.getMonth())
 
   if (now.getDate() < startedAt.getDate()) {
     months -= 1
@@ -555,9 +558,8 @@ export function SingularityOrgDetailPage({
 }: {
   organization: SingularityOrganizationDetail
 }) {
-  const subscriptionStatusLabel = formatSingularitySubscriptionStatus(
-    organization,
-  )
+  const subscriptionStatusLabel =
+    formatSingularitySubscriptionStatus(organization)
   const billingSourceLabel = formatSingularityBillingSource({
     planId: organization.planId,
     billingProvider: organization.billingProvider,
@@ -575,6 +577,7 @@ export function SingularityOrgDetailPage({
     selectedInternalNote,
     selectedBillingReference,
     selectedFeatureAccess,
+    selectedAddonEntitlements,
     isSeatCountValid,
     isUsageLimitValid,
     isPending,
@@ -589,12 +592,14 @@ export function SingularityOrgDetailPage({
     setSelectedInternalNote,
     setSelectedBillingReference,
     setSelectedFeatureAccess,
+    setSelectedAddonEntitlement,
     resetSelectedOverridesToPlanDefaults,
     handleInvite,
     handleRoleChange,
     handleRemoveMember,
     handleCancelInvitation,
     handleSetPlan,
+    handleSetAddonEntitlements,
   } = useSingularityOrgDetailPageLogic(organization)
 
   const directoryRows = useMemo(
@@ -608,32 +613,34 @@ export function SingularityOrgDetailPage({
   const hasBillingIntervalChanged =
     (selectedBillingInterval ?? null) !== (organization.billingInterval ?? null)
   const hasUsageLimitChanged =
-    selectedUsageLimitUsd.trim()
-    !== (
-      organization.usagePolicy.hasCustomMonthlyBudget
-      && organization.usagePolicy.organizationMonthlyBudgetUsd != null
-        ? String(organization.usagePolicy.organizationMonthlyBudgetUsd)
-        : ''
-    )
+    selectedUsageLimitUsd.trim() !==
+    (organization.usagePolicy.hasCustomMonthlyBudget &&
+    organization.usagePolicy.organizationMonthlyBudgetUsd != null
+      ? String(organization.usagePolicy.organizationMonthlyBudgetUsd)
+      : '')
   const hasOverrideReasonChanged =
-    selectedOverrideReason.trim() !== (organization.manualPlanOverride.overrideReason ?? '')
+    selectedOverrideReason.trim() !==
+    (organization.manualPlanOverride.overrideReason ?? '')
   const hasInternalNoteChanged =
-    selectedInternalNote.trim() !== (organization.manualPlanOverride.internalNote ?? '')
+    selectedInternalNote.trim() !==
+    (organization.manualPlanOverride.internalNote ?? '')
   const hasBillingReferenceChanged =
-    selectedBillingReference.trim() !== (organization.manualPlanOverride.billingReference ?? '')
+    selectedBillingReference.trim() !==
+    (organization.manualPlanOverride.billingReference ?? '')
   const hasFeatureOverridesChanged = WORKSPACE_FEATURE_IDS.some(
     (featureId) =>
-      selectedFeatureAccess[featureId] !== organization.effectiveFeatures[featureId],
+      selectedFeatureAccess[featureId] !==
+      organization.effectiveFeatures[featureId],
   )
   const hasOverrideChanges =
-    hasPlanChanged
-    || hasSeatCountChanged
-    || hasBillingIntervalChanged
-    || hasUsageLimitChanged
-    || hasOverrideReasonChanged
-    || hasInternalNoteChanged
-    || hasBillingReferenceChanged
-    || hasFeatureOverridesChanged
+    hasPlanChanged ||
+    hasSeatCountChanged ||
+    hasBillingIntervalChanged ||
+    hasUsageLimitChanged ||
+    hasOverrideReasonChanged ||
+    hasInternalNoteChanged ||
+    hasBillingReferenceChanged ||
+    hasFeatureOverridesChanged
 
   const directoryColumns = useMemo<Array<DataTableColumnDef<DirectoryRow>>>(
     () => [
@@ -805,9 +812,7 @@ export function SingularityOrgDetailPage({
                   </span>
                   <Badge
                     variant="outline"
-                    className={getStatusBadgeClassName(
-                      subscriptionStatusLabel,
-                    )}
+                    className={getStatusBadgeClassName(subscriptionStatusLabel)}
                   >
                     {subscriptionStatusLabel}
                   </Badge>
@@ -875,7 +880,11 @@ export function SingularityOrgDetailPage({
                     'Not subscribed'
                   ) : (
                     <div className="space-y-0.5">
-                      <div>{formatDateLabel(organization.paidSubscriptionStartedAt)}</div>
+                      <div>
+                        {formatDateLabel(
+                          organization.paidSubscriptionStartedAt,
+                        )}
+                      </div>
                       <div className="text-xs font-normal text-foreground-tertiary">
                         {formatSubscriptionAge(
                           organization.paidSubscriptionStartedAt,
@@ -952,7 +961,9 @@ export function SingularityOrgDetailPage({
                   />
                   <SummaryMetric
                     label="Override notes"
-                    value={organization.manualPlanOverride.overrideReason ?? 'None'}
+                    value={
+                      organization.manualPlanOverride.overrideReason ?? 'None'
+                    }
                   />
                 </div>
 
@@ -1037,20 +1048,22 @@ export function SingularityOrgDetailPage({
                     disabled={isPending}
                   />
                   <p className="text-xs text-foreground-tertiary">
-                    Leave empty to use the plan-derived default. Current effective
-                    cap:{' '}
-                    {formatUsageCapLabel(organization)}
+                    Leave empty to use the plan-derived default. Current
+                    effective cap: {formatUsageCapLabel(organization)}
                   </p>
-                  {organization.usagePolicy.syncStatus === 'degraded'
-                    && organization.usagePolicy.syncError ? (
-                      <p className="text-xs text-amber-700 dark:text-amber-400">
-                        Quota sync is degraded: {organization.usagePolicy.syncError}
-                      </p>
-                    ) : null}
+                  {organization.usagePolicy.syncStatus === 'degraded' &&
+                  organization.usagePolicy.syncError ? (
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      Quota sync is degraded:{' '}
+                      {organization.usagePolicy.syncError}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="org-billing-reference">Billing reference</Label>
+                  <Label htmlFor="org-billing-reference">
+                    Billing reference
+                  </Label>
                   <Input
                     id="org-billing-reference"
                     value={selectedBillingReference}
@@ -1128,7 +1141,9 @@ export function SingularityOrgDetailPage({
                 {organization.manualPlanOverride.overriddenAt != null ? (
                   <p className="text-xs text-foreground-tertiary">
                     Last manual update on{' '}
-                    {formatDateLabel(organization.manualPlanOverride.overriddenAt)}
+                    {formatDateLabel(
+                      organization.manualPlanOverride.overriddenAt,
+                    )}
                     {organization.manualPlanOverride.overriddenByUserId
                       ? ` by ${organization.manualPlanOverride.overriddenByUserId}`
                       : ''}
@@ -1151,13 +1166,78 @@ export function SingularityOrgDetailPage({
                   size="large"
                   onClick={() => void handleSetPlan()}
                   disabled={
-                    isPending
-                    || !isSeatCountValid
-                    || !isUsageLimitValid
-                    || !hasOverrideChanges
+                    isPending ||
+                    !isSeatCountValid ||
+                    !isUsageLimitValid ||
+                    !hasOverrideChanges
                   }
                 >
                   Apply override
+                </Button>
+              </div>
+            </LayeredSideCard>
+
+            <LayeredSideCard
+              title="Addon Entitlements"
+              description="Platform-granted product addons. These are set by Singularity only; organization admins cannot change them. See PRODUCTS_AND_ADDONS.md."
+            >
+              <div className="flex flex-col gap-4 p-5">
+                <div className="space-y-1">
+                  <p className="text-xs text-foreground-tertiary">
+                    Enable product and paid addon entitlements for this org.
+                    Flipping a switch writes to{' '}
+                    <code className="font-mono text-[0.72rem]">
+                      org_subscription.metadata.addonGrants
+                    </code>{' '}
+                    and triggers an entitlement snapshot recompute. Plan
+                    defaults in{' '}
+                    <code className="font-mono text-[0.72rem]">
+                      PLAN_DEFAULT_PRODUCT_ADDONS
+                    </code>{' '}
+                    serve as the base; explicit grants here override them.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  {PRODUCT_ADDON_ENTITLEMENT_IDS.map((entitlementId) => (
+                    <div
+                      key={entitlementId}
+                      className="flex items-center justify-between gap-4 rounded-xl border border-border-light/70 bg-surface-overlay/60 px-4 py-3"
+                      data-entitlement-id={entitlementId}
+                    >
+                      <div className="space-y-1">
+                        <div className="text-sm font-mono font-medium text-foreground-strong">
+                          {entitlementId}
+                        </div>
+                        <p className="text-xs text-foreground-tertiary">
+                          Currently{' '}
+                          {organization.productAddonEntitlements[entitlementId]
+                            ? 'granted'
+                            : 'not granted'}
+                          {organization.addonGrants[entitlementId] !== undefined
+                            ? ' (explicit grant)'
+                            : ' (plan default)'}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={selectedAddonEntitlements[entitlementId]}
+                        onCheckedChange={(checked) =>
+                          setSelectedAddonEntitlement(entitlementId, checked)
+                        }
+                        disabled={isPending}
+                        data-addon-toggle={entitlementId}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <Button
+                  className="w-full"
+                  size="large"
+                  onClick={() => void handleSetAddonEntitlements()}
+                  disabled={isPending}
+                >
+                  Apply addon entitlements
                 </Button>
               </div>
             </LayeredSideCard>

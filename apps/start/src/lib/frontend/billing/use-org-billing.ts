@@ -5,13 +5,9 @@ import { useEffect, useState } from 'react'
 import { authClient } from '@/lib/frontend/auth/auth-client'
 import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 import { queries } from '@/integrations/zero'
-import {
-  coerceWorkspacePlanId,
-  getWorkspaceFeatureAccessState
-} from '@/lib/shared/access-control'
 import type {
+  ProductAddonEntitlements,
   SelfServeWorkspacePlanId,
-  WorkspaceFeatureAccessState,
   WorkspaceFeatureId,
   WorkspacePlanId,
 } from '@/lib/shared/access-control'
@@ -51,6 +47,7 @@ type BillingEntitlementRow = {
   pendingInvitationCount: number
   isOverSeatLimit: boolean
   effectiveFeatures?: Record<WorkspaceFeatureId, boolean>
+  productAddonEntitlements?: ProductAddonEntitlements
 }
 
 type BillingMemberAccessRow = {
@@ -84,7 +81,8 @@ export function toOrgBillingSummary(row: BillingSummaryRow): OrgBillingSummary {
 
 export function useOrgBillingSummary() {
   const { activeOrganizationId } = useAppAuth()
-  const requestedOrganizationId = activeOrganizationId?.trim() ?? '__missing_org__'
+  const requestedOrganizationId =
+    activeOrganizationId?.trim() ?? '__missing_org__'
   const [summary, result] = useQuery(
     queries.orgBilling.currentSummary({
       organizationId: requestedOrganizationId,
@@ -102,33 +100,20 @@ export function useOrgBillingSummary() {
     entitlement: resolvedSummary?.entitlement ?? null,
     currentMemberAccess: resolvedSummary?.currentMemberAccess ?? null,
     loading:
-      activeOrganizationId != null
-      && (result.type !== 'complete' || resolvedSummary == null),
-  }
-}
-
-export function useOrgFeatureAccess(
-  feature: WorkspaceFeatureId,
-): WorkspaceFeatureAccessState & { loading: boolean } {
-  const { entitlement, loading } = useOrgBillingSummary()
-
-  return {
-    loading,
-    ...getWorkspaceFeatureAccessState({
-      planId: coerceWorkspacePlanId(entitlement?.planId),
-      feature,
-      effectiveFeatures: entitlement?.effectiveFeatures,
-    }),
+      activeOrganizationId != null &&
+      (result.type !== 'complete' || resolvedSummary == null),
   }
 }
 
 export function useWorkspaceSwitcher() {
-  const [organizations, setOrganizations] = useState<Array<{
-    id: string
-    name: string
-    slug: string
-    logo?: string | null
-  }>>([])
+  const [organizations, setOrganizations] = useState<
+    Array<{
+      id: string
+      name: string
+      slug: string
+      logo?: string | null
+    }>
+  >([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {

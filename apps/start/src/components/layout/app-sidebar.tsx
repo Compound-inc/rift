@@ -5,6 +5,7 @@ import { useMediaQuery } from '@rift/ui/hooks/useMediaQuery'
 import {
   CHAT_AREA_KEY,
   getCurrentArea,
+  HR_AREA_KEY,
   NAV_AREAS,
   SINGULARITY_AREA_KEY,
   SETTINGS_AREA_KEY,
@@ -18,7 +19,7 @@ import { directionClass, useDirection } from '@rift/ui/direction'
 import { SidebarGroupTooltip } from '@rift/ui/tooltip'
 import { cn } from '@rift/utils'
 import { useAppAuth } from '@/lib/frontend/auth/use-auth'
-import { useOrgProductFeatureAccess } from '@/lib/frontend/organizations/use-org-product-features'
+import { usePermissions } from '@/lib/frontend/permissions/use-permissions'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { isSingularityOrganizationId } from '@/ee/singularity/shared/singularity'
 import { waitForPageSettled } from '@/lib/frontend/performance/page-settled'
@@ -115,7 +116,10 @@ export const AppSidebar: ComponentType = () => {
     }
   }, [effectiveCurrentArea, isTransitionReady])
   const { user, loading, isAnonymous, activeOrganizationId } = useAppAuth()
-  const { enabled: isWittingEnabled } = useOrgProductFeatureAccess('writing')
+
+  const { can } = usePermissions()
+  const isWittingEnabled = can('product.writing')
+  const isHrEnabled = can('product.hr')
   const { isChatPageSidebarCollapsed } = usePageSidebarVisibility()
   const direction = useDirection()
   const canAccessSingularity = isSingularityOrganizationId(activeOrganizationId)
@@ -190,6 +194,7 @@ export const AppSidebar: ComponentType = () => {
               .filter(([key]) =>
                 key === WRITING_AREA_KEY ? isWittingEnabled : true,
               )
+              .filter(([key]) => (key === HR_AREA_KEY ? isHrEnabled : true))
               .filter(
                 ([key]) =>
                   key !== SETTINGS_AREA_KEY && key !== ORG_SETTINGS_AREA_KEY,

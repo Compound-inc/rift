@@ -2,7 +2,10 @@ import { PgClient } from '@effect/sql-pg'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { Effect, Layer } from 'effect'
 import { SingularityAdminService } from './singularity-admin.service'
-import { SingularityValidationError } from '../domain/errors'
+import {
+  SingularityNotFoundError,
+  SingularityValidationError,
+} from '../domain/errors'
 
 const mocks = vi.hoisted(() => ({
   readOrganizationMemberRoleMock: vi.fn(),
@@ -387,5 +390,104 @@ describe('SingularityAdminService', () => {
     ).rejects.toThrow('Failed to apply the organization plan override.')
 
     expect(mocks.withBillingTransactionMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('grants product addon entitlements by merging subscription metadata and recomputing the snapshot', async () => {
+    mocks.readOrganizationExistsMock.mockResolvedValue(true)
+    mocks.readCurrentOrgSubscriptionMock.mockResolvedValue({
+      id: 'workspace_subscription_org-1',
+      planId: 'enterprise',
+      status: 'active',
+      seatCount: 12,
+      billingProvider: 'manual',
+      providerSubscriptionId: null,
+      currentPeriodStart: null,
+      currentPeriodEnd: null,
+      billingInterval: 'year',
+      metadata: {
+        overrideReason: 'Existing enterprise contract',
+        addonGrants: {
+          hr: false,
+        },
+      },
+    })
+
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const service = yield* SingularityAdminService
+        yield* service.setProductAddonEntitlements({
+          organizationId: 'org-1',
+          actorUserId: 'user-1',
+          grants: {
+            hr: true,
+            'hr.recruitment': true,
+            // Unknown key is dropped silently by the service boundary.
+            'hr.ghost': true as never,
+          } as Record<string, boolean>,
+        })
+      }).pipe(Effect.provide(SingularityTestLayer)),
+    )
+
+    expect(mocks.ensureOrganizationBillingBaselineMock).toHaveBeenCalledWith(
+      'org-1',
+    )
+    expect(mocks.withBillingTransactionMock).toHaveBeenCalled()
+    expect(mocks.upsertOrgSubscriptionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subscriptionId: 'workspace_subscription_org-1',
+        organizationId: 'org-1',
+        metadata: expect.objectContaining({
+          overrideSource: 'singularity',
+          overriddenByUserId: 'user-1',
+          addonGrants: expect.objectContaining({
+            hr: true,
+            'hr.recruitment': true,
+          }),
+        }),
+      }),
+    )
+    const upsertCall = mocks.upsertOrgSubscriptionMock.mock.calls[0][0]
+    expect(upsertCall.metadata.addonGrants['hr.ghost']).toBeUndefined()
+    expect(mocks.upsertEntitlementSnapshotMock).toHaveBeenCalled()
+  })
+
+  it('fails when the organization does not exist', async () => {
+    mocks.readOrganizationExistsMock.mockResolvedValue(false)
+
+    await expect(
+      Effect.runPromise(
+        Effect.gen(function* () {
+          const service = yield* SingularityAdminService
+          yield* service.setProductAddonEntitlements({
+            organizationId: 'org-missing',
+            actorUserId: 'user-1',
+            grants: { hr: true },
+          })
+        }).pipe(Effect.provide(SingularityTestLayer)),
+      ),
+    ).rejects.toBeInstanceOf(SingularityNotFoundError)
+
+    expect(mocks.ensureOrganizationBillingBaselineMock).not.toHaveBeenCalled()
+  })
+
+  it('fails when the organization has no active subscription to merge into', async () => {
+    mocks.readOrganizationExistsMock.mockResolvedValue(true)
+    mocks.readCurrentOrgSubscriptionMock.mockResolvedValue(null)
+
+    await expect(
+      Effect.runPromise(
+        Effect.gen(function* () {
+          const service = yield* SingularityAdminService
+          yield* service.setProductAddonEntitlements({
+            organizationId: 'org-1',
+            actorUserId: 'user-1',
+            grants: { hr: true },
+          })
+        }).pipe(Effect.provide(SingularityTestLayer)),
+      ),
+    ).rejects.toBeInstanceOf(SingularityNotFoundError)
+
+    expect(mocks.upsertOrgSubscriptionMock).not.toHaveBeenCalled()
+    expect(mocks.upsertEntitlementSnapshotMock).not.toHaveBeenCalled()
   })
 })

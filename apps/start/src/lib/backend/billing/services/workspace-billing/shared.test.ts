@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   classifyWorkspaceSubscriptionChange,
+  coerceManualSubscriptionMetadata,
   isScheduledDowngrade,
   normalizePlanId,
 } from './shared'
@@ -144,5 +145,59 @@ describe('classifyWorkspaceSubscriptionChange', () => {
         seats: 3,
       }),
     ).toBe('noop')
+  })
+})
+
+describe('coerceManualSubscriptionMetadata', () => {
+  it('parses valid addonGrants entries and drops unknown entitlement ids', () => {
+    const metadata = coerceManualSubscriptionMetadata({
+      addonGrants: {
+        hr: true,
+        'hr.recruitment': true,
+        'hr.payroll': false,
+        // Unknown id — must be silently dropped so rogue metadata cannot
+        // widen the entitlement surface.
+        'hr.ghost': true,
+      },
+    })
+
+    expect(metadata.addonGrants).toEqual({
+      hr: true,
+      'hr.recruitment': true,
+      'hr.payroll': false,
+    })
+  })
+
+  it('returns an empty addonGrants map when the field is missing or malformed', () => {
+    expect(coerceManualSubscriptionMetadata({}).addonGrants).toEqual({})
+    expect(
+      coerceManualSubscriptionMetadata({ addonGrants: 'not an object' })
+        .addonGrants,
+    ).toEqual({})
+  })
+
+  it('ignores non-boolean grant values', () => {
+    const metadata = coerceManualSubscriptionMetadata({
+      addonGrants: {
+        hr: 'yes',
+        'hr.recruitment': 1,
+        'hr.payroll': true,
+      },
+    })
+
+    expect(metadata.addonGrants).toEqual({ 'hr.payroll': true })
+  })
+
+  it('ignores unknown subscription metadata keys so legacy rows cannot leak entitlements', () => {
+    // Older subscription rows may carry a legacy `addonOverrides` key or
+    // other stray metadata. The coercer must only trust the canonical
+    // `addonGrants` field — nothing else can widen the entitlement
+    // surface.
+    const metadata = coerceManualSubscriptionMetadata({
+      addonOverrides: { hr: true },
+      stray: 'value',
+    } as unknown)
+
+    expect(metadata.addonGrants).toEqual({})
   })
 })

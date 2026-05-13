@@ -1,19 +1,23 @@
 import { Effect, Schema } from 'effect'
-import { WorkspaceBillingService } from '@/lib/backend/billing/services/workspace-billing.service'
+import { PermissionService } from '@/lib/backend/permissions'
 import { ByokExecutorService } from './services/byok-executor.service'
 import { ByokValidationError } from './domain/errors'
 import { UpdateByokPayload } from './domain/schemas'
 import type { ByokUpdateResult } from './domain/types'
 import { ByokRuntime } from './runtime/byok-runtime'
-import {
-  validateProviderApiKeyFormat,
-} from '@/lib/shared/model-policy/provider-keys'
+import { validateProviderApiKeyFormat } from '@/lib/shared/model-policy/provider-keys'
 
 /**
  * Validates input and runs the BYOK update Effect.
+ *
+ * Gating goes through the canonical `PermissionService.authorize('workspace.byok')`
+ * so plan changes, Singularity-granted feature overrides, and the
+ * resolver's denial context (minimum plan id, gate message) are all
+ * shared with every other server-side check.
  */
 export async function runUpdateByok(input: {
   readonly organizationId: string
+  readonly userId: string
   readonly data: unknown
 }): Promise<ByokUpdateResult> {
   const program = Effect.gen(function* () {
@@ -44,10 +48,11 @@ export async function runUpdateByok(input: {
       }
     }
 
-    const billing = yield* WorkspaceBillingService
-    yield* billing.assertFeatureEnabled({
+    const permissions = yield* PermissionService
+    yield* permissions.authorize({
       organizationId: input.organizationId,
-      feature: 'byok',
+      userId: input.userId,
+      permissionKey: 'workspace.byok',
     })
     return yield* executor.executeUpdate(input.organizationId, validated)
   })

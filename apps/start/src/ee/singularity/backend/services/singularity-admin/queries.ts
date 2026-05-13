@@ -1,10 +1,14 @@
 import { PgClient } from '@effect/sql-pg'
 import { Effect } from 'effect'
 import {
+  PRODUCT_ADDON_ENTITLEMENT_IDS,
   WORKSPACE_FEATURE_IDS,
+  resolveProductAddonEntitlements,
   resolveWorkspaceEffectiveFeatures,
 } from '@/lib/shared/access-control'
 import type {
+  ProductAddonEntitlementId,
+  ProductAddonEntitlements,
   WorkspaceEffectiveFeatures,
   WorkspacePlanId,
 } from '@/lib/shared/access-control'
@@ -51,6 +55,7 @@ type OrganizationSummaryRow = {
   pendingInvitationCount: number
   isOverSeatLimit: boolean | null
   effectiveFeatures: Record<string, boolean> | null
+  productAddonEntitlements: Record<string, boolean> | null
   usagePolicy: Record<string, unknown> | null
   usageSyncStatus: string | null
   usageSyncError: string | null
@@ -159,6 +164,38 @@ function toEffectiveFeatures(input: {
     featureOverrides: toManualPlanOverride(input.metadataValue)
       .featureOverrides,
   })
+}
+
+function toProductAddonEntitlements(input: {
+  planId: WorkspacePlanId
+  snapshotValue: unknown
+  metadataValue: unknown
+}): ProductAddonEntitlements {
+  const metadataGrants = coerceManualSubscriptionMetadata(
+    input.metadataValue,
+  ).addonGrants
+  const resolved = resolveProductAddonEntitlements({
+    planId: input.planId,
+    addonGrants: metadataGrants,
+  })
+
+  if (typeof input.snapshotValue === 'object' && input.snapshotValue !== null) {
+    const snapshotMap = input.snapshotValue as Record<string, unknown>
+    for (const id of PRODUCT_ADDON_ENTITLEMENT_IDS) {
+      const value = snapshotMap[id]
+      if (typeof value === 'boolean') {
+        resolved[id] = value
+      }
+    }
+  }
+
+  return resolved
+}
+
+function toAddonGrants(
+  value: unknown,
+): Partial<Record<ProductAddonEntitlementId, boolean>> {
+  return coerceManualSubscriptionMetadata(value).addonGrants ?? {}
 }
 
 const readOrganizationMembersEffect = Effect.fn(
@@ -308,6 +345,7 @@ export const getOrganizationProfileEffect = Effect.fn(
           ) as "pendingInvitationCount",
           es.is_over_seat_limit as "isOverSeatLimit",
           es.effective_features as "effectiveFeatures",
+          es.product_addon_entitlements as "productAddonEntitlements",
           es.usage_policy as "usagePolicy",
           es.usage_sync_status as "usageSyncStatus",
           es.usage_sync_error as "usageSyncError",
@@ -399,6 +437,12 @@ export const getOrganizationProfileEffect = Effect.fn(
           snapshotValue: summary.effectiveFeatures,
           metadataValue: summary.subscriptionMetadata,
         }),
+        productAddonEntitlements: toProductAddonEntitlements({
+          planId: summary.planId ?? 'free',
+          snapshotValue: summary.productAddonEntitlements,
+          metadataValue: summary.subscriptionMetadata,
+        }),
+        addonGrants: toAddonGrants(summary.subscriptionMetadata),
         usagePolicy: toUsagePolicySummary(
           summary.usagePolicy,
           summary.usageSyncStatus,

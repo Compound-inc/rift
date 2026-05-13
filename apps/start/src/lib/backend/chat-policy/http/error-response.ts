@@ -1,4 +1,8 @@
 import type { ChatPolicyDomainError } from '../domain/errors'
+import {
+  PermissionDeniedError,
+  toPermissionDeniedResponse,
+} from '@/lib/backend/permissions'
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -64,8 +68,15 @@ export function toChatPolicyErrorResponse(
     return jsonResponse({ error: tagged.message, requestId }, 500)
   }
 
-  if (tagged._tag === 'WorkspaceBillingFeatureUnavailableError') {
-    return jsonResponse({ error: tagged.message, requestId }, 403)
+  if (
+    tagged._tag === 'PermissionDeniedError' &&
+    error instanceof PermissionDeniedError
+  ) {
+    return toPermissionDeniedResponse(error, requestId)
+  }
+
+  if (tagged._tag === 'PermissionResolveError') {
+    return jsonResponse({ error: tagged.message, requestId }, 500)
   }
 
   return jsonResponse(

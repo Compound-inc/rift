@@ -31,19 +31,21 @@ describe('updateByokAction', () => {
     mockRequireOrgAuth.mockReset()
     mockRunUpdateByok.mockReset()
     mockRunAuthSqlEffect.mockReset()
-    mockRunAuthSqlEffect.mockImplementation((effect: Promise<unknown>) => effect)
+    mockRunAuthSqlEffect.mockImplementation(
+      (effect: Promise<unknown>) => effect,
+    )
     mockReadOrganizationMemberRoleEffect.mockReset()
     mockReadOrganizationMemberRoleEffect.mockResolvedValue('admin')
   })
 
   it('fails when org auth is missing', async () => {
-    const { ByokMissingOrgContextError } = await import(
-      '@/lib/backend/byok/domain/errors'
-    )
+    const { ByokMissingOrgContextError } =
+      await import('@/lib/backend/byok/domain/errors')
     const { updateByokAction } = await import('./byok.server')
 
-    mockRequireOrgAuth.mockImplementation((input: { onMissingOrg: () => unknown }) =>
-      Effect.fail(input.onMissingOrg()),
+    mockRequireOrgAuth.mockImplementation(
+      (input: { onMissingOrg: () => unknown }) =>
+        Effect.fail(input.onMissingOrg()),
     )
 
     await expect(
@@ -57,13 +59,13 @@ describe('updateByokAction', () => {
   })
 
   it('fails when user is unauthorized', async () => {
-    const { ByokUnauthorizedError } = await import(
-      '@/lib/backend/byok/domain/errors'
-    )
+    const { ByokUnauthorizedError } =
+      await import('@/lib/backend/byok/domain/errors')
     const { updateByokAction } = await import('./byok.server')
 
-    mockRequireOrgAuth.mockImplementation((input: { onUnauthorized: () => unknown }) =>
-      Effect.fail(input.onUnauthorized()),
+    mockRequireOrgAuth.mockImplementation(
+      (input: { onUnauthorized: () => unknown }) =>
+        Effect.fail(input.onUnauthorized()),
     )
 
     await expect(
@@ -102,6 +104,7 @@ describe('updateByokAction', () => {
 
     expect(mockRunUpdateByok).toHaveBeenCalledWith({
       organizationId: 'org-123',
+      userId: 'user-1',
       data: {
         action: 'set_provider_api_key',
         providerId: 'openai',
@@ -121,7 +124,8 @@ describe('updateByokAction', () => {
   })
 
   it('fails when caller is not owner/admin', async () => {
-    const { ByokForbiddenError } = await import('@/lib/backend/byok/domain/errors')
+    const { ByokForbiddenError } =
+      await import('@/lib/backend/byok/domain/errors')
     const { updateByokAction } = await import('./byok.server')
 
     mockRequireOrgAuth.mockImplementation(() =>

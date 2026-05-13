@@ -1,6 +1,7 @@
 import { isAreaPath } from '@/utils/nav-utils'
 import { m } from '@/paraglide/messages.js'
 import {
+  Briefcase,
   Building2,
   Cpu,
   Database,
@@ -22,8 +23,13 @@ export const ORG_SETTINGS_AREA_KEY = 'organization-settings' as const
 export const isOrgSettingsPath = (pathname: string) =>
   isAreaPath(pathname, ORG_SETTINGS_HREF)
 
-/** Sidebar configuration for organization-level settings pages. */
-export const orgSettingsNavArea = () => ({
+export const ORG_SETTINGS_HR_NAV_HREF = `${ORG_SETTINGS_HREF}/hr`
+
+export type OrgSettingsNavFlags = {
+  readonly hrEnabled: boolean
+}
+
+export const orgSettingsNavArea = (flags?: OrgSettingsNavFlags) => ({
   title: m.layout_organization_tooltip_name(),
   href: ORG_SETTINGS_HREF,
   description: m.org_settings_nav_description(),
@@ -38,12 +44,6 @@ export const orgSettingsNavArea = () => ({
           href: `${ORG_SETTINGS_HREF}`,
           exact: true,
         },
-        // {
-        //   name: 'Integrations',
-        //   icon: Layout,
-        //   href: `${ORG_SETTINGS_HREF}/integrations`,
-        //   exact: true,
-        // },
         {
           name: m.org_analytics_page_title(),
           icon: TrendingUp,
@@ -67,12 +67,6 @@ export const orgSettingsNavArea = () => ({
           href: `${ORG_SETTINGS_HREF}/members`,
           exact: true,
         },
-        // {
-        //   name: 'Groups',
-        //   icon: Layout,
-        //   href: `${ORG_SETTINGS_HREF}/groups`,
-        //   exact: true,
-        // },
       ],
     },
     {
@@ -110,6 +104,21 @@ export const orgSettingsNavArea = () => ({
         },
       ],
     },
+    ...(flags?.hrEnabled
+      ? [
+          {
+            name: 'HR',
+            items: [
+              {
+                name: 'HR',
+                icon: Briefcase,
+                href: ORG_SETTINGS_HR_NAV_HREF,
+                exact: true,
+              },
+            ],
+          },
+        ]
+      : []),
     {
       name: m.org_settings_nav_section_security_access(),
       items: [
@@ -119,12 +128,6 @@ export const orgSettingsNavArea = () => ({
           href: `${ORG_SETTINGS_HREF}/security`,
           exact: true,
         },
-        // {
-        //   name: 'API Keys',
-        //   icon: Key,
-        //   href: `${ORG_SETTINGS_HREF}/api-keys`,
-        //   exact: true,
-        // },
       ],
     },
   ],

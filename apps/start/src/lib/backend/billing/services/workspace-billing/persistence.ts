@@ -1,17 +1,17 @@
 import { PgClient } from '@effect/sql-pg'
 import { Effect } from 'effect'
-import { resolveWorkspaceEffectiveFeatures } from '@/lib/shared/access-control'
+import {
+  resolveProductAddonEntitlements,
+  resolveWorkspaceEffectiveFeatures,
+} from '@/lib/shared/access-control'
 import type {
+  ProductAddonEntitlements,
   SelfServeWorkspacePlanId,
   WorkspacePlanId,
 } from '@/lib/shared/access-control'
 import { selectRestrictedMembersForSeatLimit } from '@/lib/shared/billing/member-seat-restrictions'
 import type { SeatReconciliationMember } from '@/lib/shared/billing/member-seat-restrictions'
-import {
-  resolveBillingSqlClient,
-  runBillingSqlEffect,
-  sqlJson,
-} from '../sql'
+import { resolveBillingSqlClient, runBillingSqlEffect, sqlJson } from '../sql'
 import type { BillingClientInput, BillingSqlClient } from '../sql'
 import {
   resolveEffectiveUsagePolicyRecordEffect,
@@ -44,6 +44,7 @@ type EntitlementSnapshotRow = {
   pendingInvitationCount: number
   isOverSeatLimit: boolean
   effectiveFeatures: Record<string, boolean>
+  productAddonEntitlements: Record<string, boolean>
   usagePolicy: UsagePolicySnapshot
   usageSyncStatus: 'ok' | 'degraded'
   usageSyncError: string | null
@@ -146,7 +147,11 @@ export const readCurrentOrgSubscriptionEffect = Effect.fn(
   (input: {
     readonly organizationId: string
     readonly client?: BillingPersistenceClient
-  }): Effect.Effect<CurrentOrgSubscription | null, unknown, PgClient.PgClient> =>
+  }): Effect.Effect<
+    CurrentOrgSubscription | null,
+    unknown,
+    PgClient.PgClient
+  > =>
     Effect.gen(function* () {
       const client = yield* resolveBillingSqlClient(input.client)
       return yield* readCurrentOrgSubscriptionWithClientEffect(
@@ -196,7 +201,11 @@ export const readOrganizationMembersForSeatReconciliationEffect = Effect.fn(
   (input: {
     readonly organizationId: string
     readonly client?: BillingPersistenceClient
-  }): Effect.Effect<Array<SeatReconciliationMember>, unknown, PgClient.PgClient> =>
+  }): Effect.Effect<
+    Array<SeatReconciliationMember>,
+    unknown,
+    PgClient.PgClient
+  > =>
     Effect.gen(function* () {
       const client = yield* resolveBillingSqlClient(input.client)
       return yield* readOrganizationMembersForSeatReconciliationWithClientEffect(
@@ -257,7 +266,11 @@ export const readCurrentWorkspaceSubscriptionEffect = Effect.fn(
   (input: {
     readonly organizationId: string
     readonly client?: BillingPersistenceClient
-  }): Effect.Effect<WorkspaceSubscriptionRow | null, unknown, PgClient.PgClient> =>
+  }): Effect.Effect<
+    WorkspaceSubscriptionRow | null,
+    unknown,
+    PgClient.PgClient
+  > =>
     Effect.gen(function* () {
       const client = yield* resolveBillingSqlClient(input.client)
       return yield* readCurrentWorkspaceSubscriptionWithClientEffect(
@@ -282,16 +295,20 @@ export async function readCurrentWorkspaceSubscription(
 const reconcileOrgMemberAccessForSeatLimitWithClientEffect = Effect.fn(
   'WorkspaceBillingPersistence.reconcileOrgMemberAccessForSeatLimitWithClient',
 )(
-  (client: BillingSqlClient, input: {
-    readonly organizationId: string
-    readonly seatCount: number
-    readonly sourceSubscriptionId: string | null
-  }): Effect.Effect<void, unknown> =>
+  (
+    client: BillingSqlClient,
+    input: {
+      readonly organizationId: string
+      readonly seatCount: number
+      readonly sourceSubscriptionId: string | null
+    },
+  ): Effect.Effect<void, unknown> =>
     Effect.gen(function* () {
-      const members = yield* readOrganizationMembersForSeatReconciliationWithClientEffect(
-        client,
-        input.organizationId,
-      )
+      const members =
+        yield* readOrganizationMembersForSeatReconciliationWithClientEffect(
+          client,
+          input.organizationId,
+        )
       const restrictedMembers = selectRestrictedMembersForSeatLimit({
         members,
         seatCount: input.seatCount,
@@ -407,11 +424,14 @@ export async function reconcileOrgMemberAccessForSeatLimit(input: {
 const upsertEntitlementSnapshotWithClientEffect = Effect.fn(
   'WorkspaceBillingPersistence.upsertEntitlementSnapshotWithClient',
 )(
-  (client: BillingSqlClient, input: {
-    readonly organizationId: string
-    readonly currentSubscription: CurrentOrgSubscription | null
-    readonly counts: OrgMemberCounts
-  }): Effect.Effect<OrgSeatAvailability, unknown, PgClient.PgClient> =>
+  (
+    client: BillingSqlClient,
+    input: {
+      readonly organizationId: string
+      readonly currentSubscription: CurrentOrgSubscription | null
+      readonly counts: OrgMemberCounts
+    },
+  ): Effect.Effect<OrgSeatAvailability, unknown, PgClient.PgClient> =>
     Effect.gen(function* () {
       const normalizedCurrentSubscription = input.currentSubscription
         ? {
@@ -446,7 +466,8 @@ const upsertEntitlementSnapshotWithClientEffect = Effect.fn(
       const seatCount = Math.max(1, input.currentSubscription?.seatCount ?? 1)
       const planId = normalizePlanId(input.currentSubscription?.planId)
       const subscriptionStatus = input.currentSubscription?.status ?? 'inactive'
-      const billingProvider = input.currentSubscription?.billingProvider ?? 'manual'
+      const billingProvider =
+        input.currentSubscription?.billingProvider ?? 'manual'
       const manualMetadata = coerceManualSubscriptionMetadata(
         input.currentSubscription?.metadata,
       )
@@ -454,9 +475,13 @@ const upsertEntitlementSnapshotWithClientEffect = Effect.fn(
         planId,
         featureOverrides: manualMetadata.featureOverrides,
       })
-      const isOverSeatLimit
-        = input.counts.activeMemberCount + input.counts.pendingInvitationCount
-          > seatCount
+      const productAddonEntitlements = resolveProductAddonEntitlements({
+        planId,
+        addonGrants: manualMetadata.addonGrants,
+      })
+      const isOverSeatLimit =
+        input.counts.activeMemberCount + input.counts.pendingInvitationCount >
+        seatCount
       const now = Date.now()
 
       yield* client`
@@ -470,6 +495,7 @@ const upsertEntitlementSnapshotWithClientEffect = Effect.fn(
           pending_invitation_count,
           is_over_seat_limit,
           effective_features,
+          product_addon_entitlements,
           usage_policy,
           usage_sync_status,
           usage_sync_error,
@@ -486,6 +512,7 @@ const upsertEntitlementSnapshotWithClientEffect = Effect.fn(
           ${input.counts.pendingInvitationCount},
           ${isOverSeatLimit},
           ${sqlJson(client, effectiveFeatures)},
+          ${sqlJson(client, productAddonEntitlements)},
           ${sqlJson(client, usagePolicy)},
           ${usageSyncStatus},
           ${usageSyncError},
@@ -501,6 +528,7 @@ const upsertEntitlementSnapshotWithClientEffect = Effect.fn(
             pending_invitation_count = excluded.pending_invitation_count,
             is_over_seat_limit = excluded.is_over_seat_limit,
             effective_features = excluded.effective_features,
+            product_addon_entitlements = excluded.product_addon_entitlements,
             usage_policy = excluded.usage_policy,
             usage_sync_status = excluded.usage_sync_status,
             usage_sync_error = excluded.usage_sync_error,
@@ -522,6 +550,7 @@ const upsertEntitlementSnapshotWithClientEffect = Effect.fn(
         pendingInvitationCount: input.counts.pendingInvitationCount,
         isOverSeatLimit,
         effectiveFeatures,
+        productAddonEntitlements,
         usagePolicy,
         usageSyncStatus,
         usageSyncError,
@@ -585,6 +614,7 @@ export const readEntitlementSnapshotEffect = Effect.fn(
           pending_invitation_count as "pendingInvitationCount",
           is_over_seat_limit as "isOverSeatLimit",
           effective_features as "effectiveFeatures",
+          product_addon_entitlements as "productAddonEntitlements",
           usage_policy as "usagePolicy",
           usage_sync_status as "usageSyncStatus",
           usage_sync_error as "usageSyncError"
@@ -604,8 +634,11 @@ export const readEntitlementSnapshotEffect = Effect.fn(
         activeMemberCount: row.activeMemberCount,
         pendingInvitationCount: row.pendingInvitationCount,
         isOverSeatLimit: row.isOverSeatLimit,
-        effectiveFeatures:
-          row.effectiveFeatures as ReturnType<typeof resolveWorkspaceEffectiveFeatures>,
+        effectiveFeatures: row.effectiveFeatures as ReturnType<
+          typeof resolveWorkspaceEffectiveFeatures
+        >,
+        productAddonEntitlements: (row.productAddonEntitlements ??
+          {}) as ProductAddonEntitlements,
         usagePolicy: row.usagePolicy,
         usageSyncStatus: row.usageSyncStatus,
         usageSyncError: row.usageSyncError,

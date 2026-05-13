@@ -1,5 +1,11 @@
 import { isSelfHosted } from '@/utils/app-feature-flags'
 import { AI_CATALOG } from '@/lib/shared/ai-catalog'
+import {
+  ORG_PRODUCT_ADDON_CATALOG,
+  getProductAddonEntitlementIdsForProduct,
+} from '@/lib/shared/org-product-addons'
+import type { OrgProductAddonKey } from '@/lib/shared/org-product-addons'
+import type { OrgProductKey } from '@/lib/shared/org-products'
 
 export type WorkspacePlanId =
   | 'free'
@@ -460,4 +466,119 @@ export function getModelAccess(input: {
     reason: 'free_tier_locked',
     minimumPlanId: RUNTIME_FEATURE_MINIMUM_PLANS['chat.paidModels'],
   }
+}
+
+// ---------------------------------------------------------------------------
+// Product addon entitlements
+// ---------------------------------------------------------------------------
+
+/**
+ * Template-literal union of every valid product-addon entitlement id.
+ * Derived from the product catalog + addon catalog, so adding a new addon
+ * automatically extends this union with no manual edits here.
+ */
+export type ProductAddonEntitlementId = {
+  [K in OrgProductKey]: OrgProductAddonKey<K> extends never
+    ? K
+    : K | `${K}.${OrgProductAddonKey<K>}`
+}[OrgProductKey]
+
+export const PRODUCT_ADDON_ENTITLEMENT_IDS: readonly ProductAddonEntitlementId[] =
+  (Object.keys(ORG_PRODUCT_ADDON_CATALOG) as OrgProductKey[]).flatMap(
+    (productKey) => getProductAddonEntitlementIdsForProduct(productKey),
+  ) as readonly ProductAddonEntitlementId[]
+
+export type ProductAddonEntitlements = Record<
+  ProductAddonEntitlementId,
+  boolean
+>
+
+/**
+ * Partial map of entitlement ids to booleans. Used for both plan defaults
+ * and per-org explicit grants. `true` means granted, `false` means
+ * explicitly revoked (so a plan-default `true` can be overridden off for a
+ * specific org), `undefined`/missing means "inherit the layer below".
+ */
+export type ProductAddonGrants = Partial<
+  Record<ProductAddonEntitlementId, boolean>
+>
+
+export const PLAN_DEFAULT_PRODUCT_ADDONS: Readonly<
+  Record<WorkspacePlanId, ProductAddonGrants>
+> = {
+  free: {},
+  plus: {},
+  pro: {},
+  scale: {},
+  enterprise: {},
+  self_hosted: {},
+}
+
+/**
+ * Resolves the final product-addon entitlement map for an organization by
+ * layering the plan defaults with the explicit grants persisted on the
+ * subscription.
+ *
+ * - `planId` controls the base layer (`PLAN_DEFAULT_PRODUCT_ADDONS`).
+ * - `addonGrants` is the explicit per-org layer; when a grant is a boolean
+ *   it replaces whatever the plan defaulted to, when it is missing the
+ *   plan default survives.
+ *
+ */
+export function resolveProductAddonEntitlements(input: {
+  readonly planId?: WorkspacePlanId | null
+  readonly addonGrants?: ProductAddonGrants | null
+}): ProductAddonEntitlements {
+  const resolved = Object.fromEntries(
+    PRODUCT_ADDON_ENTITLEMENT_IDS.map((id) => [id, false]),
+  ) as ProductAddonEntitlements
+
+  const planId: WorkspacePlanId = input.planId ?? 'free'
+  const planDefaults = PLAN_DEFAULT_PRODUCT_ADDONS[planId] ?? {}
+
+  for (const id of PRODUCT_ADDON_ENTITLEMENT_IDS) {
+    const planDefault = planDefaults[id]
+    if (typeof planDefault === 'boolean') {
+      resolved[id] = planDefault
+    }
+  }
+
+  if (input.addonGrants) {
+    for (const id of PRODUCT_ADDON_ENTITLEMENT_IDS) {
+      const grant = input.addonGrants[id]
+      if (typeof grant === 'boolean') {
+        resolved[id] = grant
+      }
+    }
+  }
+
+  return resolved
+}
+
+export function isProductAddonEntitlementId(
+  value: string,
+): value is ProductAddonEntitlementId {
+  return (PRODUCT_ADDON_ENTITLEMENT_IDS as readonly string[]).includes(value)
+}
+
+/**
+ * Helper for reading a single entitlement from a resolved
+ * entitlements map without repeating dot-key construction at call sites.
+ */
+export function readProductAddonEntitlement<
+  TProduct extends OrgProductKey,
+>(input: {
+  readonly entitlements: ProductAddonEntitlements | null | undefined
+  readonly productKey: TProduct
+  readonly addonKey?: OrgProductAddonKey<TProduct>
+}): boolean {
+  if (!input.entitlements) {
+    return false
+  }
+
+  const id = (
+    input.addonKey ? `${input.productKey}.${input.addonKey}` : input.productKey
+  ) as ProductAddonEntitlementId
+
+  return input.entitlements[id] === true
 }

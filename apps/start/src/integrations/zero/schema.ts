@@ -67,16 +67,16 @@ const orgPolicy = table('orgPolicy')
   .columns({
     id: string(),
     organizationId: string().from('organization_id'),
-    disabledProviderIds: json<readonly string[]>()
-      .from('disabled_provider_ids'),
+    disabledProviderIds: json<readonly string[]>().from(
+      'disabled_provider_ids',
+    ),
     disabledModelIds: json<readonly string[]>().from('disabled_model_ids'),
     complianceFlags: json<Record<string, boolean>>().from('compliance_flags'),
     providerNativeToolsEnabled: boolean()
       .from('provider_native_tools_enabled')
       .optional(),
     externalToolsEnabled: boolean().from('external_tools_enabled').optional(),
-    disabledToolKeys: json<readonly string[]>()
-      .from('disabled_tool_keys'),
+    disabledToolKeys: json<readonly string[]>().from('disabled_tool_keys'),
     orgKnowledgeEnabled: boolean().from('org_knowledge_enabled').optional(),
     providerKeyStatus: json<{
       syncedAt: number
@@ -91,17 +91,6 @@ const orgPolicy = table('orgPolicy')
   })
   .primaryKey('id')
 
-const orgProductConfig = table('orgProductConfig')
-  .from('org_product_config')
-  .columns({
-    id: string(),
-    organizationId: string().from('organization_id'),
-    featureStates: json<Record<string, boolean>>().from('feature_states'),
-    version: number(),
-    updatedAt: number().from('updated_at'),
-  })
-  .primaryKey('id')
-
 const orgProductPolicy = table('orgProductPolicy')
   .from('org_product_policy')
   .columns({
@@ -110,8 +99,9 @@ const orgProductPolicy = table('orgProductPolicy')
     productKey: string().from('product_key'),
     capabilities: json<Record<string, boolean>>(),
     settings: json<Record<string, boolean | string | number | null>>(),
-    disabledProviderIds: json<readonly string[]>()
-      .from('disabled_provider_ids'),
+    disabledProviderIds: json<readonly string[]>().from(
+      'disabled_provider_ids',
+    ),
     disabledModelIds: json<readonly string[]>().from('disabled_model_ids'),
     disabledToolKeys: json<readonly string[]>().from('disabled_tool_keys'),
     complianceFlags: json<Record<string, boolean>>().from('compliance_flags'),
@@ -139,7 +129,9 @@ const orgSubscription = table('orgSubscription')
     id: string(),
     organizationId: string().from('organization_id'),
     billingAccountId: string().from('billing_account_id'),
-    providerSubscriptionId: string().from('provider_subscription_id').optional(),
+    providerSubscriptionId: string()
+      .from('provider_subscription_id')
+      .optional(),
     planId: string().from('plan_id'),
     billingInterval: string().from('billing_interval').optional(),
     seatCount: number().from('seat_count').optional(),
@@ -170,10 +162,15 @@ const orgEntitlementSnapshot = table('orgEntitlementSnapshot')
     activeMemberCount: number().from('active_member_count'),
     pendingInvitationCount: number().from('pending_invitation_count'),
     isOverSeatLimit: boolean().from('is_over_seat_limit'),
-    effectiveFeatures: json<Record<string, boolean | string | number>>()
-      .from('effective_features'),
-    usagePolicy: json<Record<string, boolean | string | number>>()
-      .from('usage_policy'),
+    effectiveFeatures:
+      json<Record<string, boolean | string | number>>().from(
+        'effective_features',
+      ),
+    productAddonEntitlements: json<Record<string, boolean>>().from(
+      'product_addon_entitlements',
+    ),
+    usagePolicy:
+      json<Record<string, boolean | string | number>>().from('usage_policy'),
     usageSyncStatus: string().from('usage_sync_status'),
     usageSyncError: string().from('usage_sync_error').optional(),
     computedAt: number().from('computed_at'),
@@ -224,8 +221,7 @@ const thread = table('thread')
     lastMessageAt: number().from('last_message_at'),
     generationStatus: enumeration<
       'pending' | 'generation' | 'completed' | 'failed'
-    >()
-      .from('generation_status'),
+    >().from('generation_status'),
     visibility: enumeration<'visible' | 'archived'>(),
     userSetTitle: boolean().from('user_set_title').optional(),
     userId: string().from('user_id'),
@@ -241,8 +237,9 @@ const thread = table('thread')
       .from('response_style')
       .optional(),
     pinned: boolean(),
-    activeChildByParent: json<Record<string, string>>()
-      .from('active_child_by_parent'),
+    activeChildByParent: json<Record<string, string>>().from(
+      'active_child_by_parent',
+    ),
     branchVersion: number().from('branch_version'),
     shareId: string().from('share_id').optional(),
     shareStatus: enumeration<'active' | 'revoked'>()
@@ -286,12 +283,8 @@ const message = table('message')
     updated_at: number().optional(),
     parentMessageId: string().from('parent_message_id').optional(),
     branchIndex: number().from('branch_index'),
-    branchAnchorMessageId: string()
-      .from('branch_anchor_message_id')
-      .optional(),
-    regenSourceMessageId: string()
-      .from('regen_source_message_id')
-      .optional(),
+    branchAnchorMessageId: string().from('branch_anchor_message_id').optional(),
+    regenSourceMessageId: string().from('regen_source_message_id').optional(),
     role: enumeration<'user' | 'assistant' | 'system'>(),
     created_at: number(),
     serverError: json<{
@@ -304,9 +297,10 @@ const message = table('message')
       .optional(),
     model: string(),
     attachmentsIds: json<readonly string[]>().from('attachments_ids'),
-    sources: json<
-      readonly { sourceId: string; url: string; title?: string }[]
-    >().optional(),
+    sources:
+      json<
+        readonly { sourceId: string; url: string; title?: string }[]
+      >().optional(),
     modelParams: json<{
       temperature?: number
       topP?: number
@@ -360,7 +354,9 @@ const attachment = table('attachment')
       .optional(),
     orgKnowledgeKind: string().from('org_knowledge_kind').optional(),
     orgKnowledgeActive: boolean().from('org_knowledge_active').optional(),
-    accessGroupIds: json<readonly string[]>().from('access_group_ids').optional(),
+    accessGroupIds: json<readonly string[]>()
+      .from('access_group_ids')
+      .optional(),
     vectorIndexedAt: number().from('vector_indexed_at').optional(),
     vectorError: string().from('vector_error').optional(),
     status: enumeration<'deleted' | 'uploaded'>().optional(),
@@ -402,11 +398,6 @@ const organizationRelationships = relationships(organization, ({ many }) => ({
   orgPolicies: many({
     sourceField: ['id'],
     destSchema: orgPolicy,
-    destField: ['organizationId'],
-  }),
-  productConfigs: many({
-    sourceField: ['id'],
-    destSchema: orgProductConfig,
     destField: ['organizationId'],
   }),
   productPolicies: many({
@@ -452,21 +443,16 @@ const orgPolicyRelationships = relationships(orgPolicy, ({ one }) => ({
   }),
 }))
 
-const orgProductConfigRelationships = relationships(orgProductConfig, ({ one }) => ({
-  organization: one({
-    sourceField: ['organizationId'],
-    destField: ['id'],
-    destSchema: organization,
+const orgProductPolicyRelationships = relationships(
+  orgProductPolicy,
+  ({ one }) => ({
+    organization: one({
+      sourceField: ['organizationId'],
+      destField: ['id'],
+      destSchema: organization,
+    }),
   }),
-}))
-
-const orgProductPolicyRelationships = relationships(orgProductPolicy, ({ one }) => ({
-  organization: one({
-    sourceField: ['organizationId'],
-    destField: ['id'],
-    destSchema: organization,
-  }),
-}))
+)
 
 const attachmentRelationships = relationships(attachment, ({ one }) => ({
   organization: one({
@@ -476,26 +462,32 @@ const attachmentRelationships = relationships(attachment, ({ one }) => ({
   }),
 }))
 
-const orgSubscriptionRelationships = relationships(orgSubscription, ({ one }) => ({
-  organization: one({
-    sourceField: ['organizationId'],
-    destField: ['id'],
-    destSchema: organization,
+const orgSubscriptionRelationships = relationships(
+  orgSubscription,
+  ({ one }) => ({
+    organization: one({
+      sourceField: ['organizationId'],
+      destField: ['id'],
+      destSchema: organization,
+    }),
+    billingAccount: one({
+      sourceField: ['billingAccountId'],
+      destField: ['id'],
+      destSchema: orgBillingAccount,
+    }),
   }),
-  billingAccount: one({
-    sourceField: ['billingAccountId'],
-    destField: ['id'],
-    destSchema: orgBillingAccount,
-  }),
-}))
+)
 
-const orgUserUsageSummaryRelationships = relationships(orgUserUsageSummary, ({ one }) => ({
-  organization: one({
-    sourceField: ['organizationId'],
-    destField: ['id'],
-    destSchema: organization,
+const orgUserUsageSummaryRelationships = relationships(
+  orgUserUsageSummary,
+  ({ one }) => ({
+    organization: one({
+      sourceField: ['organizationId'],
+      destField: ['id'],
+      destSchema: organization,
+    }),
   }),
-}))
+)
 
 const messageRelationships = relationships(message, ({ one }) => ({
   thread: one({
@@ -516,7 +508,6 @@ export const schema = createSchema({
     member,
     invitation,
     orgPolicy,
-    orgProductConfig,
     orgProductPolicy,
     orgBillingAccount,
     orgSubscription,
@@ -531,7 +522,6 @@ export const schema = createSchema({
     organizationRelationships,
     memberRelationships,
     orgPolicyRelationships,
-    orgProductConfigRelationships,
     orgProductPolicyRelationships,
     attachmentRelationships,
     orgSubscriptionRelationships,

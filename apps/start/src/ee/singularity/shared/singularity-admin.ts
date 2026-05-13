@@ -1,4 +1,6 @@
 import type {
+  ProductAddonEntitlementId,
+  ProductAddonEntitlements,
   WorkspaceEffectiveFeatures,
   WorkspaceFeatureId,
   WorkspacePlanId,
@@ -72,6 +74,8 @@ export type SingularityOrganizationDetail = {
   pendingInvitationCount: number
   isOverSeatLimit: boolean
   effectiveFeatures: WorkspaceEffectiveFeatures
+  productAddonEntitlements: ProductAddonEntitlements
+  addonGrants: Partial<Record<ProductAddonEntitlementId, boolean>>
   usagePolicy: SingularityUsagePolicySummary
   manualPlanOverride: SingularityManualPlanOverride
   aiSpendThisMonth: number

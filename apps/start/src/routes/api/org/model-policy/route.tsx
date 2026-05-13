@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { Effect } from 'effect'
 import { z } from 'zod'
-import { WorkspaceBillingService } from '@/lib/backend/billing/services/workspace-billing.service'
+import { PermissionService } from '@/lib/backend/permissions'
+import type { PermissionKey } from '@/lib/shared/permissions'
 import {
   ChatPolicyRuntime,
   ChatPolicyInvalidRequestError,
@@ -147,19 +148,21 @@ export const Route = createFileRoute('/api/org/model-policy')({
             )
           }
 
-          const feature
-            = parsedBody.data.action === 'toggle_compliance_flag'
-              ? 'compliancePolicy'
-              : parsedBody.data.action === 'toggle_provider_native_tools'
-                  || parsedBody.data.action === 'toggle_external_tools'
-                  || parsedBody.data.action === 'toggle_tool'
-                ? 'toolPolicy'
-                : 'providerPolicy'
+          const permissionKey = (
+            parsedBody.data.action === 'toggle_compliance_flag'
+              ? 'workspace.compliancePolicy'
+              : parsedBody.data.action === 'toggle_provider_native_tools' ||
+                  parsedBody.data.action === 'toggle_external_tools' ||
+                  parsedBody.data.action === 'toggle_tool'
+                ? 'workspace.toolPolicy'
+                : 'workspace.providerPolicy'
+          ) as PermissionKey
 
-          const billing = yield* WorkspaceBillingService
-          yield* billing.assertFeatureEnabled({
+          const permissions = yield* PermissionService
+          yield* permissions.authorize({
             organizationId: authContext.organizationId,
-            feature,
+            userId: authContext.userId,
+            permissionKey,
           })
 
           const policyService = yield* ChatPolicySettingsService

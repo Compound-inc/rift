@@ -4,14 +4,30 @@ import { useState } from 'react'
 import { Form } from '@rift/ui/form'
 import { ContentPage } from '@/components/layout'
 import { AvatarUploadField } from '@/components/settings/avatar-upload'
-import { useOrgProductFeatures } from '@/lib/frontend/organizations/use-org-product-features'
+import { useOrgProductPolicy } from '@/lib/frontend/organizations/use-org-product-policy'
+import { usePermissions } from '@/lib/frontend/permissions/use-permissions'
+import {
+  productCapabilityKey,
+  readOrgProductCapability,
+} from '@/lib/shared/org-product-capabilities'
+import { EMPTY_ORG_PRODUCT_POLICY } from '@/lib/shared/org-product-policy'
 import { m } from '@/paraglide/messages.js'
 import { useOrgGeneralPageLogic } from './org-general-page.logic'
 
 export function OrgGeneralPage() {
   const [avatarError, setAvatarError] = useState<string | null>(null)
-  const { states, updatingKey, error: productFeatureError, setFeatureEnabled } =
-    useOrgProductFeatures()
+  const { canRaw } = usePermissions()
+  const {
+    policy: writingPolicy,
+    saving: writingSaving,
+    error: writingError,
+    setPolicy: setWritingPolicy,
+  } = useOrgProductPolicy('writing')
+  const isWritingEntitled = canRaw('product.writing')
+  const writingCapabilityEnabled = readOrgProductCapability({
+    policy: writingPolicy,
+    productKey: 'writing',
+  })
   const {
     name,
     savedName,
@@ -88,22 +104,33 @@ export function OrgGeneralPage() {
         handleSubmit={submitName}
       />
 
-      <Form
-        title={m.org_settings_general_witting_title()}
-        description={m.org_settings_general_witting_description()}
-        error={productFeatureError ?? undefined}
-        helpText={
-          <p className="text-sm text-foreground-tertiary">
-            {m.org_settings_general_witting_help()}
-          </p>
-        }
-        headerToggle={{
-          checked: states.writing,
-          onCheckedChange: (enabled) =>
-            void setFeatureEnabled('writing', enabled),
-          disabled: !canEdit || loading || updatingKey === 'writing',
-        }}
-      />
+      {isWritingEntitled ? (
+        <Form
+          title={m.org_settings_general_witting_title()}
+          description={m.org_settings_general_witting_description()}
+          error={writingError ?? undefined}
+          helpText={
+            <p className="text-sm text-foreground-tertiary">
+              {m.org_settings_general_witting_help()}
+            </p>
+          }
+          headerToggle={{
+            checked: writingCapabilityEnabled,
+            onCheckedChange: (enabled) => {
+              const base = writingPolicy ?? EMPTY_ORG_PRODUCT_POLICY
+              const key = productCapabilityKey({})
+              void setWritingPolicy({
+                ...base,
+                capabilities: {
+                  ...base.capabilities,
+                  [key]: enabled,
+                },
+              })
+            },
+            disabled: !canEdit || loading || writingSaving,
+          }}
+        />
+      ) : null}
     </ContentPage>
   )
 }

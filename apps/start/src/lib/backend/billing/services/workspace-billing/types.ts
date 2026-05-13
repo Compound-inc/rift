@@ -7,15 +7,14 @@ import type { BillingClientInput } from '../sql'
 import type { OrgSubscriptionBillingInterval } from './shared'
 import type {
   WorkspaceBillingConfigurationError,
-  WorkspaceBillingFeatureUnavailableError,
   WorkspaceBillingForbiddenError,
   WorkspaceBillingPersistenceError,
   WorkspaceBillingSeatLimitExceededError,
 } from '../../domain/errors'
 import type {
+  ProductAddonEntitlements,
   SelfServeWorkspacePlanId,
   StripeManagedWorkspacePlanId,
-  WorkspaceFeatureId,
   WorkspacePlanId,
 } from '@/lib/shared/access-control'
 
@@ -60,6 +59,7 @@ export type OrgSeatAvailability = OrgMemberCounts & {
   seatCount: number
   isOverSeatLimit: boolean
   effectiveFeatures: EffectiveFeatures
+  productAddonEntitlements: ProductAddonEntitlements
   usagePolicy: UsagePolicySnapshot
   usageSyncStatus: 'ok' | 'degraded'
   usageSyncError: string | null
@@ -80,14 +80,6 @@ export type WorkspaceBillingServiceShape = {
   }) => Effect.Effect<
     void,
     WorkspaceBillingPersistenceError | WorkspaceBillingSeatLimitExceededError
-  >
-  readonly assertFeatureEnabled: (input: {
-    organizationId: string
-    feature: WorkspaceFeatureId
-  }) => Effect.Effect<
-    OrgSeatAvailability,
-    | WorkspaceBillingPersistenceError
-    | WorkspaceBillingFeatureUnavailableError
   >
   readonly startCheckout: (input: {
     headers: Headers
@@ -119,8 +111,7 @@ export type WorkspaceBillingServiceShape = {
     userId: string
   }) => Effect.Effect<
     { url: string },
-    | WorkspaceBillingPersistenceError
-    | WorkspaceBillingForbiddenError
+    WorkspaceBillingPersistenceError | WorkspaceBillingForbiddenError
   >
   readonly syncWorkspaceSubscription: (input: {
     subscription: BetterAuthStripeSubscription

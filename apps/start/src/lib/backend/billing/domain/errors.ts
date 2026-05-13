@@ -29,15 +29,6 @@ export class WorkspaceBillingSeatLimitExceededError extends Schema.TaggedErrorCl
   },
 ) {}
 
-export class WorkspaceBillingFeatureUnavailableError extends Schema.TaggedErrorClass<WorkspaceBillingFeatureUnavailableError>()(
-  'WorkspaceBillingFeatureUnavailableError',
-  {
-    ...ContextFields,
-    feature: Schema.String,
-    planId: Schema.String,
-  },
-) {}
-
 export class WorkspaceBillingConfigurationError extends Schema.TaggedErrorClass<WorkspaceBillingConfigurationError>()(
   'WorkspaceBillingConfigurationError',
   ContextFields,
@@ -65,7 +56,6 @@ export type WorkspaceBillingDomainError =
   | WorkspaceBillingMissingOrgContextError
   | WorkspaceBillingForbiddenError
   | WorkspaceBillingSeatLimitExceededError
-  | WorkspaceBillingFeatureUnavailableError
   | WorkspaceBillingConfigurationError
   | WorkspaceBillingPersistenceError
   | WorkspaceUsageQuotaExceededError

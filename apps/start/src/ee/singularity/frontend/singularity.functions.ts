@@ -3,10 +3,12 @@ import { z } from 'zod'
 import { MANUAL_BILLING_INTERVALS } from '@/lib/backend/billing/services/workspace-billing/shared'
 import type { ManualBillingInterval } from '@/lib/backend/billing/services/workspace-billing/shared'
 import {
+  isProductAddonEntitlementId,
   isWorkspacePlanId,
   WORKSPACE_FEATURE_IDS,
 } from '@/lib/shared/access-control'
 import type {
+  ProductAddonEntitlementId,
   WorkspaceFeatureId,
   WorkspacePlanId,
 } from '@/lib/shared/access-control'
@@ -38,25 +40,27 @@ const CancelInvitationSchema = z.object({
   invitationId: z.string().trim().min(1),
 })
 
-const SetPlanSchema = z.object({
-  organizationId: z.string().trim().min(1),
-  planId: z.string().trim().refine(isWorkspacePlanId),
-  seatCount: z.number().int().min(1),
-  billingInterval: BillingIntervalSchema,
-  monthlyUsageLimitUsd: z.number().min(0).max(1_000_000).nullable(),
-  overrideReason: z.string().trim().max(500).nullable(),
-  internalNote: z.string().trim().max(2000).nullable(),
-  billingReference: z.string().trim().max(255).nullable(),
-  featureOverrides: z.record(z.string(), z.boolean()),
-}).superRefine((value, context) => {
-  if (value.planId !== 'free' && value.billingInterval == null) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['billingInterval'],
-      message: 'Billing interval is required for paid manual contracts.',
-    })
-  }
-})
+const SetPlanSchema = z
+  .object({
+    organizationId: z.string().trim().min(1),
+    planId: z.string().trim().refine(isWorkspacePlanId),
+    seatCount: z.number().int().min(1),
+    billingInterval: BillingIntervalSchema,
+    monthlyUsageLimitUsd: z.number().min(0).max(1_000_000).nullable(),
+    overrideReason: z.string().trim().max(500).nullable(),
+    internalNote: z.string().trim().max(2000).nullable(),
+    billingReference: z.string().trim().max(255).nullable(),
+    featureOverrides: z.record(z.string(), z.boolean()),
+  })
+  .superRefine((value, context) => {
+    if (value.planId !== 'free' && value.billingInterval == null) {
+      context.addIssue({
+        code: 'custom',
+        path: ['billingInterval'],
+        message: 'Billing interval is required for paid manual contracts.',
+      })
+    }
+  })
 
 function parseSetPlanInput(input: unknown): {
   organizationId: string
@@ -71,12 +75,10 @@ function parseSetPlanInput(input: unknown): {
 } {
   const parsed = SetPlanSchema.parse(input)
   const featureOverrides = Object.fromEntries(
-    WORKSPACE_FEATURE_IDS
-      .map((featureId) => {
-        const value = parsed.featureOverrides[featureId]
-        return typeof value === 'boolean' ? [featureId, value] : null
-      })
-      .filter((entry): entry is [WorkspaceFeatureId, boolean] => entry != null),
+    WORKSPACE_FEATURE_IDS.map((featureId) => {
+      const value = parsed.featureOverrides[featureId]
+      return typeof value === 'boolean' ? [featureId, value] : null
+    }).filter((entry): entry is [WorkspaceFeatureId, boolean] => entry != null),
   )
   return {
     organizationId: parsed.organizationId,
@@ -91,58 +93,106 @@ function parseSetPlanInput(input: unknown): {
   }
 }
 
-export const assertSingularityAccess = createServerFn({ method: 'GET' }).handler(
-  async () => {
-    const { assertSingularityAccessAction } = await import('./singularity.server')
-    return assertSingularityAccessAction()
-  },
-)
+export const assertSingularityAccess = createServerFn({
+  method: 'GET',
+}).handler(async () => {
+  const { assertSingularityAccessAction } = await import('./singularity.server')
+  return assertSingularityAccessAction()
+})
 
-export const listSingularityOrganizations = createServerFn({ method: 'GET' }).handler(
-  async () => {
-    const { listSingularityOrganizationsAction } = await import('./singularity.server')
-    return listSingularityOrganizationsAction()
-  },
-)
+export const listSingularityOrganizations = createServerFn({
+  method: 'GET',
+}).handler(async () => {
+  const { listSingularityOrganizationsAction } =
+    await import('./singularity.server')
+  return listSingularityOrganizationsAction()
+})
 
-export const getSingularityOrganizationProfile = createServerFn({ method: 'GET' })
+export const getSingularityOrganizationProfile = createServerFn({
+  method: 'GET',
+})
   .inputValidator((input: unknown) => OrganizationIdSchema.parse(input))
   .handler(async ({ data }) => {
-    const { getSingularityOrganizationProfileAction } = await import('./singularity.server')
+    const { getSingularityOrganizationProfileAction } =
+      await import('./singularity.server')
     return getSingularityOrganizationProfileAction(data)
   })
 
-export const inviteSingularityOrganizationMember = createServerFn({ method: 'POST' })
+export const inviteSingularityOrganizationMember = createServerFn({
+  method: 'POST',
+})
   .inputValidator((input: unknown) => InviteMemberSchema.parse(input))
   .handler(async ({ data }) => {
-    const { inviteSingularityOrganizationMemberAction } = await import('./singularity.server')
+    const { inviteSingularityOrganizationMemberAction } =
+      await import('./singularity.server')
     return inviteSingularityOrganizationMemberAction(data)
   })
 
-export const removeSingularityOrganizationMember = createServerFn({ method: 'POST' })
+export const removeSingularityOrganizationMember = createServerFn({
+  method: 'POST',
+})
   .inputValidator((input: unknown) => RemoveMemberSchema.parse(input))
   .handler(async ({ data }) => {
-    const { removeSingularityOrganizationMemberAction } = await import('./singularity.server')
+    const { removeSingularityOrganizationMemberAction } =
+      await import('./singularity.server')
     return removeSingularityOrganizationMemberAction(data)
   })
 
-export const updateSingularityOrganizationMemberRole = createServerFn({ method: 'POST' })
+export const updateSingularityOrganizationMemberRole = createServerFn({
+  method: 'POST',
+})
   .inputValidator((input: unknown) => UpdateMemberRoleSchema.parse(input))
   .handler(async ({ data }) => {
-    const { updateSingularityOrganizationMemberRoleAction } = await import('./singularity.server')
+    const { updateSingularityOrganizationMemberRoleAction } =
+      await import('./singularity.server')
     return updateSingularityOrganizationMemberRoleAction(data)
   })
 
 export const cancelSingularityInvitation = createServerFn({ method: 'POST' })
   .inputValidator((input: unknown) => CancelInvitationSchema.parse(input))
   .handler(async ({ data }) => {
-    const { cancelSingularityInvitationAction } = await import('./singularity.server')
+    const { cancelSingularityInvitationAction } =
+      await import('./singularity.server')
     return cancelSingularityInvitationAction(data)
   })
 
 export const setSingularityOrganizationPlan = createServerFn({ method: 'POST' })
   .inputValidator(parseSetPlanInput)
   .handler(async ({ data }) => {
-    const { setSingularityOrganizationPlanAction } = await import('./singularity.server')
+    const { setSingularityOrganizationPlanAction } =
+      await import('./singularity.server')
     return setSingularityOrganizationPlanAction(data)
+  })
+
+const SetAddonEntitlementsSchema = z.object({
+  organizationId: z.string().trim().min(1),
+  grants: z.record(z.string(), z.boolean()),
+})
+
+function parseSetAddonEntitlementsInput(input: unknown): {
+  organizationId: string
+  grants: Partial<Record<ProductAddonEntitlementId, boolean>>
+} {
+  const parsed = SetAddonEntitlementsSchema.parse(input)
+  const normalized: Partial<Record<ProductAddonEntitlementId, boolean>> = {}
+
+  for (const [rawKey, value] of Object.entries(parsed.grants)) {
+    if (!isProductAddonEntitlementId(rawKey)) continue
+    normalized[rawKey] = value
+  }
+
+  return {
+    organizationId: parsed.organizationId,
+    grants: normalized,
+  }
+}
+
+export const setSingularityOrganizationAddonEntitlements = createServerFn({
+  method: 'POST',
+})
+  .inputValidator(parseSetAddonEntitlementsInput)
+  .handler(async ({ data }) => {
+    const { setSingularityOrganizationAddonEntitlementsAction } =
+      await import('./singularity.server')
+    return setSingularityOrganizationAddonEntitlementsAction(data)
   })

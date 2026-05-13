@@ -14,8 +14,8 @@ import {
 import type { ReactNode } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useChat as useAIChat } from '@ai-sdk/react'
-import type { LanguageModelUsage, UIMessage  } from 'ai'
-import { useQuery, useZero  } from '@rocicorp/zero/react'
+import type { LanguageModelUsage, UIMessage } from 'ai'
+import { useQuery, useZero } from '@rocicorp/zero/react'
 import { DefaultChatTransport } from 'ai'
 import { flushSync } from 'react-dom'
 import { mutators, queries } from '@/integrations/zero'
@@ -30,23 +30,20 @@ import {
   coerceWorkspacePlanId,
   getFeatureAccessState,
   getModelAccess,
-  hasFeatureAccess
-  
-  
+  hasFeatureAccess,
 } from '@/lib/shared/access-control'
-import type {AccessContext, PaidWorkspacePlanId} from '@/lib/shared/access-control';
+import type {
+  AccessContext,
+  PaidWorkspacePlanId,
+} from '@/lib/shared/access-control'
 import { getLocalizedFeatureAccessGateMessage } from '@/lib/frontend/access-control'
 import {
   getLocalizedToolCopy,
   getToolDisplayLabel,
 } from '@/lib/shared/ai-catalog/tool-ui'
 import { canUseReasoningControls } from '@/utils/app-feature-flags'
-import {
-  isChatModeId,
-  resolveEffectiveChatMode
-  
-} from '@/lib/shared/chat-modes'
-import type {ChatModeId} from '@/lib/shared/chat-modes';
+import { isChatModeId, resolveEffectiveChatMode } from '@/lib/shared/chat-modes'
+import type { ChatModeId } from '@/lib/shared/chat-modes'
 import { resolveToolPolicy } from '@/lib/shared/chat/tool-policy'
 import {
   CHAT_PRODUCT_KEY,
@@ -59,7 +56,7 @@ import {
   EMPTY_ORG_PROVIDER_KEY_STATUS,
   normalizeOrgPolicy,
 } from '@/lib/shared/model-policy/types'
-import type {OrgPolicy} from '@/lib/shared/model-policy/types';
+import type { OrgPolicy } from '@/lib/shared/model-policy/types'
 import type {
   ChatAttachment,
   ChatAttachmentInput,
@@ -131,7 +128,9 @@ type ChatActionsContextValue = Pick<
   visibleModels: readonly ChatModelOption[]
   setSelectedModelId: (modelId: string) => void
   setSelectedReasoningEffort: (reasoningEffort?: AiReasoningEffort) => void
-  setSelectedContextWindowMode: (contextWindowMode: AiContextWindowMode) => Promise<void>
+  setSelectedContextWindowMode: (
+    contextWindowMode: AiContextWindowMode,
+  ) => Promise<void>
   selectedModeId?: ChatModeId
   isModeEnforced: boolean
   setSelectedModeId: (modeId?: ChatModeId) => Promise<void>
@@ -280,7 +279,8 @@ function toOrgPolicy(row: unknown): OrgPolicy | undefined {
           : DEFAULT_ORG_TOOL_POLICY.disabledToolKeys,
     },
     orgKnowledgeEnabled:
-      'orgKnowledgeEnabled' in row && typeof row.orgKnowledgeEnabled === 'boolean'
+      'orgKnowledgeEnabled' in row &&
+      typeof row.orgKnowledgeEnabled === 'boolean'
         ? row.orgKnowledgeEnabled
         : false,
     providerKeyStatus:
@@ -809,9 +809,7 @@ export function ChatProvider({
       return {
         id: model.id,
         name: model.name,
-        reasoningEfforts: canUseReasoningControls
-          ? model.reasoningEfforts
-          : [],
+        reasoningEfforts: canUseReasoningControls ? model.reasoningEfforts : [],
         defaultReasoningEffort: canUseReasoningControls
           ? model.defaultReasoningEffort
           : undefined,
@@ -859,18 +857,16 @@ export function ChatProvider({
   const [selectedReasoningEffort, setSelectedReasoningEffort] = useState<
     AiReasoningEffort | undefined
   >(undefined)
-  const [selectedContextWindowMode, setSelectedContextWindowMode] = useState<
-    AiContextWindowMode
-  >(DEFAULT_CONTEXT_WINDOW_MODE)
+  const [selectedContextWindowMode, setSelectedContextWindowMode] =
+    useState<AiContextWindowMode>(DEFAULT_CONTEXT_WINDOW_MODE)
   const [threadDisabledToolKeysById, setThreadDisabledToolKeysById] = useState<
     Record<string, readonly string[]>
   >({})
   const [draftDisabledToolKeys, setDraftDisabledToolKeys] = useState<
     readonly string[]
   >([])
-  const [threadContextWindowModeById, setThreadContextWindowModeById] = useState<
-    Record<string, AiContextWindowMode>
-  >({})
+  const [threadContextWindowModeById, setThreadContextWindowModeById] =
+    useState<Record<string, AiContextWindowMode>>({})
   const hydratedModelSelectionThreadIdRef = useRef<string | undefined>(
     undefined,
   )
@@ -1499,9 +1495,7 @@ export function ChatProvider({
       latestAssistantFailure.serverError !== null &&
       'i18nKey' in latestAssistantFailure.serverError &&
       typeof latestAssistantFailure.serverError.i18nKey === 'string'
-        ? resolveChatErrorMessage(
-            latestAssistantFailure.serverError.i18nKey,
-          )
+        ? resolveChatErrorMessage(latestAssistantFailure.serverError.i18nKey)
         : undefined
 
     const fallbackErrorMessage =
@@ -1602,7 +1596,10 @@ export function ChatProvider({
               void write.server
                 .then((serverRes) => {
                   if (serverRes.type === 'error') {
-                    console.error('Failed to reconcile bootstrap thread:', serverRes)
+                    console.error(
+                      'Failed to reconcile bootstrap thread:',
+                      serverRes,
+                    )
                   }
                 })
                 .catch((error) => {

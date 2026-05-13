@@ -241,16 +241,9 @@ ADD COLUMN IF NOT EXISTS active_org_knowledge_count BIGINT NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS org_policy_organization_id ON org_policy (organization_id);
 CREATE INDEX IF NOT EXISTS org_policy_updated_at ON org_policy (updated_at);
 
--- org_product_config
-CREATE TABLE IF NOT EXISTS org_product_config (
-  id TEXT PRIMARY KEY,
-  organization_id TEXT NOT NULL UNIQUE,
-  feature_states JSONB NOT NULL DEFAULT '{}'::jsonb,
-  version BIGINT NOT NULL DEFAULT 1,
-  updated_at BIGINT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS org_product_config_organization_id ON org_product_config (organization_id);
-CREATE INDEX IF NOT EXISTS org_product_config_updated_at ON org_product_config (updated_at);
+-- org_product_config was dropped in 20260514_drop_org_product_config.sql.
+-- Writing (its only feature) moved to the product-addon entitlement model.
+-- See apps/start/PRODUCTS_AND_ADDONS.md.
 
 -- org_product_policy
 CREATE TABLE IF NOT EXISTS org_product_policy (
@@ -388,12 +381,15 @@ CREATE TABLE IF NOT EXISTS org_entitlement_snapshot (
   pending_invitation_count INTEGER NOT NULL DEFAULT 0,
   is_over_seat_limit BOOLEAN NOT NULL DEFAULT FALSE,
   effective_features JSONB NOT NULL DEFAULT '{}'::jsonb,
+  product_addon_entitlements JSONB NOT NULL DEFAULT '{}'::jsonb,
   usage_policy JSONB NOT NULL DEFAULT '{}'::jsonb,
   usage_sync_status TEXT NOT NULL DEFAULT 'ok',
   usage_sync_error TEXT,
   computed_at BIGINT NOT NULL,
   version BIGINT NOT NULL DEFAULT 1
 );
+ALTER TABLE org_entitlement_snapshot
+ADD COLUMN IF NOT EXISTS product_addon_entitlements JSONB NOT NULL DEFAULT '{}'::jsonb;
 
 -- org_member_access
 CREATE TABLE IF NOT EXISTS org_member_access (

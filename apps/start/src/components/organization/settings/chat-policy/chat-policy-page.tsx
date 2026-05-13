@@ -1,7 +1,7 @@
 'use client'
 
 import { ContentPage } from '@/components/layout'
-import { useOrgFeatureAccess } from '@/lib/frontend/billing/use-org-billing'
+import { usePermissions } from '@/lib/frontend/permissions/use-permissions'
 import { m } from '@/paraglide/messages.js'
 import { ComplianceFlagsSection } from './compliance-flags-section'
 import { ModelControlsSection } from './model-controls-section'
@@ -14,8 +14,9 @@ import { useChatPolicySettings } from './use-chat-policy-settings'
  */
 export function ChatPolicySettingsPage() {
   const { payload, loading, error, updating, update } = useChatPolicySettings()
-  const providerPolicyAccess = useOrgFeatureAccess('providerPolicy')
-  const compliancePolicyAccess = useOrgFeatureAccess('compliancePolicy')
+  const { workspaceFeatureState } = usePermissions()
+  const providerPolicyAccess = workspaceFeatureState('providerPolicy')
+  const compliancePolicyAccess = workspaceFeatureState('compliancePolicy')
   const busy = loading || updating
 
   return (

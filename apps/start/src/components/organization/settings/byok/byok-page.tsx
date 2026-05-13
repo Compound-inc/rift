@@ -2,7 +2,7 @@
 
 import { ContentPage } from '@/components/layout'
 import { ByokForm } from '@/components/organization/settings/byok'
-import { useOrgFeatureAccess } from '@/lib/frontend/billing/use-org-billing'
+import { usePermissions } from '@/lib/frontend/permissions/use-permissions'
 import { useByok } from '@/lib/frontend/byok/use-byok'
 import { m } from '@/paraglide/messages.js'
 
@@ -20,7 +20,8 @@ export function ByokPage() {
     setProviderKey,
     removeProviderKey,
   } = useByok()
-  const featureAccess = useOrgFeatureAccess('byok')
+  const { workspaceFeatureState } = usePermissions()
+  const featureAccess = workspaceFeatureState('byok')
 
   return (
     <ContentPage

@@ -7,6 +7,10 @@ export const ORG_PRODUCT_CATALOG = {
     description:
       'Long-form document collaboration surfaces such as the Witting workspace.',
   },
+  hr: {
+    description:
+      'Human resources surfaces: employee directory, recruitment, payroll, and other HR workflows offered as paid addons.',
+  },
 } as const
 
 export type OrgProductKey = keyof typeof ORG_PRODUCT_CATALOG

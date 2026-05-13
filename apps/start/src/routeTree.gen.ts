@@ -35,15 +35,21 @@ import { Route as eeSingularityLayoutRouteRouteImport } from './routes/(ee)/sing
 import { Route as appLayoutWritingRouteRouteImport } from './routes/(app)/_layout/writing/route'
 import { Route as appLayoutSettingsRouteRouteImport } from './routes/(app)/_layout/settings/route'
 import { Route as appLayoutOrganizationRouteRouteImport } from './routes/(app)/_layout/organization/route'
+import { Route as appLayoutHrRouteRouteImport } from './routes/(app)/_layout/hr/route'
 import { Route as appLayoutChatRouteRouteImport } from './routes/(app)/_layout/chat/route'
 import { Route as eeSingularityLayoutIndexRouteImport } from './routes/(ee)/singularity/_layout/index'
 import { Route as appLayoutWritingIndexRouteImport } from './routes/(app)/_layout/writing/index'
 import { Route as appLayoutSettingsIndexRouteImport } from './routes/(app)/_layout/settings/index'
+import { Route as appLayoutHrIndexRouteImport } from './routes/(app)/_layout/hr/index'
 import { Route as appLayoutChatIndexRouteImport } from './routes/(app)/_layout/chat/index'
 import { Route as appLayoutSettingsSecurityRouteRouteImport } from './routes/(app)/_layout/settings/security/route'
 import { Route as appLayoutOrganizationSettingsRouteRouteImport } from './routes/(app)/_layout/organization/settings/route'
+import { Route as appLayoutHrRecruitmentRouteRouteImport } from './routes/(app)/_layout/hr/recruitment/route'
+import { Route as appLayoutHrPayrollRouteRouteImport } from './routes/(app)/_layout/hr/payroll/route'
 import { Route as appLayoutChatThreadIdRouteRouteImport } from './routes/(app)/_layout/chat/$threadId/route'
 import { Route as appLayoutOrganizationSettingsIndexRouteImport } from './routes/(app)/_layout/organization/settings/index'
+import { Route as appLayoutHrRecruitmentIndexRouteImport } from './routes/(app)/_layout/hr/recruitment/index'
+import { Route as appLayoutHrPayrollIndexRouteImport } from './routes/(app)/_layout/hr/payroll/index'
 import { Route as eeSingularityLayoutOrgsOrganizationIdRouteImport } from './routes/(ee)/singularity/_layout/orgs/$organizationId'
 import { Route as appLayoutOrganizationSettingsToolsRouteRouteImport } from './routes/(app)/_layout/organization/settings/tools/route'
 import { Route as appLayoutOrganizationSettingsSecurityRouteRouteImport } from './routes/(app)/_layout/organization/settings/security/route'
@@ -51,11 +57,13 @@ import { Route as appLayoutOrganizationSettingsProviderPolicyRouteRouteImport } 
 import { Route as appLayoutOrganizationSettingsModelsRouteRouteImport } from './routes/(app)/_layout/organization/settings/models/route'
 import { Route as appLayoutOrganizationSettingsMembersRouteRouteImport } from './routes/(app)/_layout/organization/settings/members/route'
 import { Route as appLayoutOrganizationSettingsKnowledgeRouteRouteImport } from './routes/(app)/_layout/organization/settings/knowledge/route'
+import { Route as appLayoutOrganizationSettingsHrRouteRouteImport } from './routes/(app)/_layout/organization/settings/hr/route'
 import { Route as appLayoutOrganizationSettingsCompliancePolicyRouteRouteImport } from './routes/(app)/_layout/organization/settings/compliance-policy/route'
 import { Route as appLayoutOrganizationSettingsByokRouteRouteImport } from './routes/(app)/_layout/organization/settings/byok/route'
 import { Route as appLayoutOrganizationSettingsBillingRouteRouteImport } from './routes/(app)/_layout/organization/settings/billing/route'
 import { Route as appLayoutOrganizationSettingsAnalyticsRouteRouteImport } from './routes/(app)/_layout/organization/settings/analytics/route'
 import { Route as appLayoutOrganizationSettingsModelsIndexRouteImport } from './routes/(app)/_layout/organization/settings/models/index'
+import { Route as appLayoutOrganizationSettingsHrIndexRouteImport } from './routes/(app)/_layout/organization/settings/hr/index'
 import { Route as appLayoutOrganizationSettingsModelsProviderIdRouteRouteImport } from './routes/(app)/_layout/organization/settings/models/$providerId/route'
 
 const SetupRouteRoute = SetupRouteRouteImport.update({
@@ -190,6 +198,11 @@ const appLayoutOrganizationRouteRoute =
     path: '/organization',
     getParentRoute: () => appLayoutRouteRoute,
   } as any)
+const appLayoutHrRouteRoute = appLayoutHrRouteRouteImport.update({
+  id: '/hr',
+  path: '/hr',
+  getParentRoute: () => appLayoutRouteRoute,
+} as any)
 const appLayoutChatRouteRoute = appLayoutChatRouteRouteImport.update({
   id: '/chat',
   path: '/chat',
@@ -211,6 +224,11 @@ const appLayoutSettingsIndexRoute = appLayoutSettingsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => appLayoutSettingsRouteRoute,
 } as any)
+const appLayoutHrIndexRoute = appLayoutHrIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => appLayoutHrRouteRoute,
+} as any)
 const appLayoutChatIndexRoute = appLayoutChatIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -228,6 +246,17 @@ const appLayoutOrganizationSettingsRouteRoute =
     path: '/settings',
     getParentRoute: () => appLayoutOrganizationRouteRoute,
   } as any)
+const appLayoutHrRecruitmentRouteRoute =
+  appLayoutHrRecruitmentRouteRouteImport.update({
+    id: '/recruitment',
+    path: '/recruitment',
+    getParentRoute: () => appLayoutHrRouteRoute,
+  } as any)
+const appLayoutHrPayrollRouteRoute = appLayoutHrPayrollRouteRouteImport.update({
+  id: '/payroll',
+  path: '/payroll',
+  getParentRoute: () => appLayoutHrRouteRoute,
+} as any)
 const appLayoutChatThreadIdRouteRoute =
   appLayoutChatThreadIdRouteRouteImport.update({
     id: '/$threadId',
@@ -240,6 +269,17 @@ const appLayoutOrganizationSettingsIndexRoute =
     path: '/',
     getParentRoute: () => appLayoutOrganizationSettingsRouteRoute,
   } as any)
+const appLayoutHrRecruitmentIndexRoute =
+  appLayoutHrRecruitmentIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => appLayoutHrRecruitmentRouteRoute,
+  } as any)
+const appLayoutHrPayrollIndexRoute = appLayoutHrPayrollIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => appLayoutHrPayrollRouteRoute,
+} as any)
 const eeSingularityLayoutOrgsOrganizationIdRoute =
   eeSingularityLayoutOrgsOrganizationIdRouteImport.update({
     id: '/orgs/$organizationId',
@@ -282,6 +322,12 @@ const appLayoutOrganizationSettingsKnowledgeRouteRoute =
     path: '/knowledge',
     getParentRoute: () => appLayoutOrganizationSettingsRouteRoute,
   } as any)
+const appLayoutOrganizationSettingsHrRouteRoute =
+  appLayoutOrganizationSettingsHrRouteRouteImport.update({
+    id: '/hr',
+    path: '/hr',
+    getParentRoute: () => appLayoutOrganizationSettingsRouteRoute,
+  } as any)
 const appLayoutOrganizationSettingsCompliancePolicyRouteRoute =
   appLayoutOrganizationSettingsCompliancePolicyRouteRouteImport.update({
     id: '/compliance-policy',
@@ -312,6 +358,12 @@ const appLayoutOrganizationSettingsModelsIndexRoute =
     path: '/',
     getParentRoute: () => appLayoutOrganizationSettingsModelsRouteRoute,
   } as any)
+const appLayoutOrganizationSettingsHrIndexRoute =
+  appLayoutOrganizationSettingsHrIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => appLayoutOrganizationSettingsHrRouteRoute,
+  } as any)
 const appLayoutOrganizationSettingsModelsProviderIdRouteRoute =
   appLayoutOrganizationSettingsModelsProviderIdRouteRouteImport.update({
     id: '/$providerId',
@@ -331,6 +383,7 @@ export interface FileRoutesByFullPath {
   '/legal/privacy': typeof LegalPrivacyRouteRoute
   '/legal/terms': typeof LegalTermsRouteRoute
   '/chat': typeof appLayoutChatRouteRouteWithChildren
+  '/hr': typeof appLayoutHrRouteRouteWithChildren
   '/organization': typeof appLayoutOrganizationRouteRouteWithChildren
   '/settings': typeof appLayoutSettingsRouteRouteWithChildren
   '/writing': typeof appLayoutWritingRouteRouteWithChildren
@@ -347,9 +400,12 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/': typeof appLayoutIndexRoute
   '/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
+  '/hr/payroll': typeof appLayoutHrPayrollRouteRouteWithChildren
+  '/hr/recruitment': typeof appLayoutHrRecruitmentRouteRouteWithChildren
   '/organization/settings': typeof appLayoutOrganizationSettingsRouteRouteWithChildren
   '/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/chat/': typeof appLayoutChatIndexRoute
+  '/hr/': typeof appLayoutHrIndexRoute
   '/settings/': typeof appLayoutSettingsIndexRoute
   '/writing/': typeof appLayoutWritingIndexRoute
   '/singularity/': typeof eeSingularityLayoutIndexRoute
@@ -357,6 +413,7 @@ export interface FileRoutesByFullPath {
   '/organization/settings/billing': typeof appLayoutOrganizationSettingsBillingRouteRoute
   '/organization/settings/byok': typeof appLayoutOrganizationSettingsByokRouteRoute
   '/organization/settings/compliance-policy': typeof appLayoutOrganizationSettingsCompliancePolicyRouteRoute
+  '/organization/settings/hr': typeof appLayoutOrganizationSettingsHrRouteRouteWithChildren
   '/organization/settings/knowledge': typeof appLayoutOrganizationSettingsKnowledgeRouteRoute
   '/organization/settings/members': typeof appLayoutOrganizationSettingsMembersRouteRoute
   '/organization/settings/models': typeof appLayoutOrganizationSettingsModelsRouteRouteWithChildren
@@ -364,8 +421,11 @@ export interface FileRoutesByFullPath {
   '/organization/settings/security': typeof appLayoutOrganizationSettingsSecurityRouteRoute
   '/organization/settings/tools': typeof appLayoutOrganizationSettingsToolsRouteRoute
   '/singularity/orgs/$organizationId': typeof eeSingularityLayoutOrgsOrganizationIdRoute
+  '/hr/payroll/': typeof appLayoutHrPayrollIndexRoute
+  '/hr/recruitment/': typeof appLayoutHrRecruitmentIndexRoute
   '/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
   '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
+  '/organization/settings/hr/': typeof appLayoutOrganizationSettingsHrIndexRoute
   '/organization/settings/models/': typeof appLayoutOrganizationSettingsModelsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -394,6 +454,7 @@ export interface FileRoutesByTo {
   '/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
   '/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/chat': typeof appLayoutChatIndexRoute
+  '/hr': typeof appLayoutHrIndexRoute
   '/settings': typeof appLayoutSettingsIndexRoute
   '/writing': typeof appLayoutWritingIndexRoute
   '/singularity': typeof eeSingularityLayoutIndexRoute
@@ -407,8 +468,11 @@ export interface FileRoutesByTo {
   '/organization/settings/security': typeof appLayoutOrganizationSettingsSecurityRouteRoute
   '/organization/settings/tools': typeof appLayoutOrganizationSettingsToolsRouteRoute
   '/singularity/orgs/$organizationId': typeof eeSingularityLayoutOrgsOrganizationIdRoute
+  '/hr/payroll': typeof appLayoutHrPayrollIndexRoute
+  '/hr/recruitment': typeof appLayoutHrRecruitmentIndexRoute
   '/organization/settings': typeof appLayoutOrganizationSettingsIndexRoute
   '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
+  '/organization/settings/hr': typeof appLayoutOrganizationSettingsHrIndexRoute
   '/organization/settings/models': typeof appLayoutOrganizationSettingsModelsIndexRoute
 }
 export interface FileRoutesById {
@@ -425,6 +489,7 @@ export interface FileRoutesById {
   '/legal/privacy': typeof LegalPrivacyRouteRoute
   '/legal/terms': typeof LegalTermsRouteRoute
   '/(app)/_layout/chat': typeof appLayoutChatRouteRouteWithChildren
+  '/(app)/_layout/hr': typeof appLayoutHrRouteRouteWithChildren
   '/(app)/_layout/organization': typeof appLayoutOrganizationRouteRouteWithChildren
   '/(app)/_layout/settings': typeof appLayoutSettingsRouteRouteWithChildren
   '/(app)/_layout/writing': typeof appLayoutWritingRouteRouteWithChildren
@@ -441,9 +506,12 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/(app)/_layout/': typeof appLayoutIndexRoute
   '/(app)/_layout/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
+  '/(app)/_layout/hr/payroll': typeof appLayoutHrPayrollRouteRouteWithChildren
+  '/(app)/_layout/hr/recruitment': typeof appLayoutHrRecruitmentRouteRouteWithChildren
   '/(app)/_layout/organization/settings': typeof appLayoutOrganizationSettingsRouteRouteWithChildren
   '/(app)/_layout/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/(app)/_layout/chat/': typeof appLayoutChatIndexRoute
+  '/(app)/_layout/hr/': typeof appLayoutHrIndexRoute
   '/(app)/_layout/settings/': typeof appLayoutSettingsIndexRoute
   '/(app)/_layout/writing/': typeof appLayoutWritingIndexRoute
   '/(ee)/singularity/_layout/': typeof eeSingularityLayoutIndexRoute
@@ -451,6 +519,7 @@ export interface FileRoutesById {
   '/(app)/_layout/organization/settings/billing': typeof appLayoutOrganizationSettingsBillingRouteRoute
   '/(app)/_layout/organization/settings/byok': typeof appLayoutOrganizationSettingsByokRouteRoute
   '/(app)/_layout/organization/settings/compliance-policy': typeof appLayoutOrganizationSettingsCompliancePolicyRouteRoute
+  '/(app)/_layout/organization/settings/hr': typeof appLayoutOrganizationSettingsHrRouteRouteWithChildren
   '/(app)/_layout/organization/settings/knowledge': typeof appLayoutOrganizationSettingsKnowledgeRouteRoute
   '/(app)/_layout/organization/settings/members': typeof appLayoutOrganizationSettingsMembersRouteRoute
   '/(app)/_layout/organization/settings/models': typeof appLayoutOrganizationSettingsModelsRouteRouteWithChildren
@@ -458,8 +527,11 @@ export interface FileRoutesById {
   '/(app)/_layout/organization/settings/security': typeof appLayoutOrganizationSettingsSecurityRouteRoute
   '/(app)/_layout/organization/settings/tools': typeof appLayoutOrganizationSettingsToolsRouteRoute
   '/(ee)/singularity/_layout/orgs/$organizationId': typeof eeSingularityLayoutOrgsOrganizationIdRoute
+  '/(app)/_layout/hr/payroll/': typeof appLayoutHrPayrollIndexRoute
+  '/(app)/_layout/hr/recruitment/': typeof appLayoutHrRecruitmentIndexRoute
   '/(app)/_layout/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
   '/(app)/_layout/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
+  '/(app)/_layout/organization/settings/hr/': typeof appLayoutOrganizationSettingsHrIndexRoute
   '/(app)/_layout/organization/settings/models/': typeof appLayoutOrganizationSettingsModelsIndexRoute
 }
 export interface FileRouteTypes {
@@ -476,6 +548,7 @@ export interface FileRouteTypes {
     | '/legal/privacy'
     | '/legal/terms'
     | '/chat'
+    | '/hr'
     | '/organization'
     | '/settings'
     | '/writing'
@@ -492,9 +565,12 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/'
     | '/chat/$threadId'
+    | '/hr/payroll'
+    | '/hr/recruitment'
     | '/organization/settings'
     | '/settings/security'
     | '/chat/'
+    | '/hr/'
     | '/settings/'
     | '/writing/'
     | '/singularity/'
@@ -502,6 +578,7 @@ export interface FileRouteTypes {
     | '/organization/settings/billing'
     | '/organization/settings/byok'
     | '/organization/settings/compliance-policy'
+    | '/organization/settings/hr'
     | '/organization/settings/knowledge'
     | '/organization/settings/members'
     | '/organization/settings/models'
@@ -509,8 +586,11 @@ export interface FileRouteTypes {
     | '/organization/settings/security'
     | '/organization/settings/tools'
     | '/singularity/orgs/$organizationId'
+    | '/hr/payroll/'
+    | '/hr/recruitment/'
     | '/organization/settings/'
     | '/organization/settings/models/$providerId'
+    | '/organization/settings/hr/'
     | '/organization/settings/models/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -539,6 +619,7 @@ export interface FileRouteTypes {
     | '/chat/$threadId'
     | '/settings/security'
     | '/chat'
+    | '/hr'
     | '/settings'
     | '/writing'
     | '/singularity'
@@ -552,8 +633,11 @@ export interface FileRouteTypes {
     | '/organization/settings/security'
     | '/organization/settings/tools'
     | '/singularity/orgs/$organizationId'
+    | '/hr/payroll'
+    | '/hr/recruitment'
     | '/organization/settings'
     | '/organization/settings/models/$providerId'
+    | '/organization/settings/hr'
     | '/organization/settings/models'
   id:
     | '__root__'
@@ -569,6 +653,7 @@ export interface FileRouteTypes {
     | '/legal/privacy'
     | '/legal/terms'
     | '/(app)/_layout/chat'
+    | '/(app)/_layout/hr'
     | '/(app)/_layout/organization'
     | '/(app)/_layout/settings'
     | '/(app)/_layout/writing'
@@ -585,9 +670,12 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/(app)/_layout/'
     | '/(app)/_layout/chat/$threadId'
+    | '/(app)/_layout/hr/payroll'
+    | '/(app)/_layout/hr/recruitment'
     | '/(app)/_layout/organization/settings'
     | '/(app)/_layout/settings/security'
     | '/(app)/_layout/chat/'
+    | '/(app)/_layout/hr/'
     | '/(app)/_layout/settings/'
     | '/(app)/_layout/writing/'
     | '/(ee)/singularity/_layout/'
@@ -595,6 +683,7 @@ export interface FileRouteTypes {
     | '/(app)/_layout/organization/settings/billing'
     | '/(app)/_layout/organization/settings/byok'
     | '/(app)/_layout/organization/settings/compliance-policy'
+    | '/(app)/_layout/organization/settings/hr'
     | '/(app)/_layout/organization/settings/knowledge'
     | '/(app)/_layout/organization/settings/members'
     | '/(app)/_layout/organization/settings/models'
@@ -602,8 +691,11 @@ export interface FileRouteTypes {
     | '/(app)/_layout/organization/settings/security'
     | '/(app)/_layout/organization/settings/tools'
     | '/(ee)/singularity/_layout/orgs/$organizationId'
+    | '/(app)/_layout/hr/payroll/'
+    | '/(app)/_layout/hr/recruitment/'
     | '/(app)/_layout/organization/settings/'
     | '/(app)/_layout/organization/settings/models/$providerId'
+    | '/(app)/_layout/organization/settings/hr/'
     | '/(app)/_layout/organization/settings/models/'
   fileRoutesById: FileRoutesById
 }
@@ -812,6 +904,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appLayoutOrganizationRouteRouteImport
       parentRoute: typeof appLayoutRouteRoute
     }
+    '/(app)/_layout/hr': {
+      id: '/(app)/_layout/hr'
+      path: '/hr'
+      fullPath: '/hr'
+      preLoaderRoute: typeof appLayoutHrRouteRouteImport
+      parentRoute: typeof appLayoutRouteRoute
+    }
     '/(app)/_layout/chat': {
       id: '/(app)/_layout/chat'
       path: '/chat'
@@ -840,6 +939,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appLayoutSettingsIndexRouteImport
       parentRoute: typeof appLayoutSettingsRouteRoute
     }
+    '/(app)/_layout/hr/': {
+      id: '/(app)/_layout/hr/'
+      path: '/'
+      fullPath: '/hr/'
+      preLoaderRoute: typeof appLayoutHrIndexRouteImport
+      parentRoute: typeof appLayoutHrRouteRoute
+    }
     '/(app)/_layout/chat/': {
       id: '/(app)/_layout/chat/'
       path: '/'
@@ -861,6 +967,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appLayoutOrganizationSettingsRouteRouteImport
       parentRoute: typeof appLayoutOrganizationRouteRoute
     }
+    '/(app)/_layout/hr/recruitment': {
+      id: '/(app)/_layout/hr/recruitment'
+      path: '/recruitment'
+      fullPath: '/hr/recruitment'
+      preLoaderRoute: typeof appLayoutHrRecruitmentRouteRouteImport
+      parentRoute: typeof appLayoutHrRouteRoute
+    }
+    '/(app)/_layout/hr/payroll': {
+      id: '/(app)/_layout/hr/payroll'
+      path: '/payroll'
+      fullPath: '/hr/payroll'
+      preLoaderRoute: typeof appLayoutHrPayrollRouteRouteImport
+      parentRoute: typeof appLayoutHrRouteRoute
+    }
     '/(app)/_layout/chat/$threadId': {
       id: '/(app)/_layout/chat/$threadId'
       path: '/$threadId'
@@ -874,6 +994,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/organization/settings/'
       preLoaderRoute: typeof appLayoutOrganizationSettingsIndexRouteImport
       parentRoute: typeof appLayoutOrganizationSettingsRouteRoute
+    }
+    '/(app)/_layout/hr/recruitment/': {
+      id: '/(app)/_layout/hr/recruitment/'
+      path: '/'
+      fullPath: '/hr/recruitment/'
+      preLoaderRoute: typeof appLayoutHrRecruitmentIndexRouteImport
+      parentRoute: typeof appLayoutHrRecruitmentRouteRoute
+    }
+    '/(app)/_layout/hr/payroll/': {
+      id: '/(app)/_layout/hr/payroll/'
+      path: '/'
+      fullPath: '/hr/payroll/'
+      preLoaderRoute: typeof appLayoutHrPayrollIndexRouteImport
+      parentRoute: typeof appLayoutHrPayrollRouteRoute
     }
     '/(ee)/singularity/_layout/orgs/$organizationId': {
       id: '/(ee)/singularity/_layout/orgs/$organizationId'
@@ -924,6 +1058,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appLayoutOrganizationSettingsKnowledgeRouteRouteImport
       parentRoute: typeof appLayoutOrganizationSettingsRouteRoute
     }
+    '/(app)/_layout/organization/settings/hr': {
+      id: '/(app)/_layout/organization/settings/hr'
+      path: '/hr'
+      fullPath: '/organization/settings/hr'
+      preLoaderRoute: typeof appLayoutOrganizationSettingsHrRouteRouteImport
+      parentRoute: typeof appLayoutOrganizationSettingsRouteRoute
+    }
     '/(app)/_layout/organization/settings/compliance-policy': {
       id: '/(app)/_layout/organization/settings/compliance-policy'
       path: '/compliance-policy'
@@ -958,6 +1099,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/organization/settings/models/'
       preLoaderRoute: typeof appLayoutOrganizationSettingsModelsIndexRouteImport
       parentRoute: typeof appLayoutOrganizationSettingsModelsRouteRoute
+    }
+    '/(app)/_layout/organization/settings/hr/': {
+      id: '/(app)/_layout/organization/settings/hr/'
+      path: '/'
+      fullPath: '/organization/settings/hr/'
+      preLoaderRoute: typeof appLayoutOrganizationSettingsHrIndexRouteImport
+      parentRoute: typeof appLayoutOrganizationSettingsHrRouteRoute
     }
     '/(app)/_layout/organization/settings/models/$providerId': {
       id: '/(app)/_layout/organization/settings/models/$providerId'
@@ -998,6 +1146,65 @@ const appLayoutChatRouteRouteChildren: appLayoutChatRouteRouteChildren = {
 const appLayoutChatRouteRouteWithChildren =
   appLayoutChatRouteRoute._addFileChildren(appLayoutChatRouteRouteChildren)
 
+interface appLayoutHrPayrollRouteRouteChildren {
+  appLayoutHrPayrollIndexRoute: typeof appLayoutHrPayrollIndexRoute
+}
+
+const appLayoutHrPayrollRouteRouteChildren: appLayoutHrPayrollRouteRouteChildren =
+  {
+    appLayoutHrPayrollIndexRoute: appLayoutHrPayrollIndexRoute,
+  }
+
+const appLayoutHrPayrollRouteRouteWithChildren =
+  appLayoutHrPayrollRouteRoute._addFileChildren(
+    appLayoutHrPayrollRouteRouteChildren,
+  )
+
+interface appLayoutHrRecruitmentRouteRouteChildren {
+  appLayoutHrRecruitmentIndexRoute: typeof appLayoutHrRecruitmentIndexRoute
+}
+
+const appLayoutHrRecruitmentRouteRouteChildren: appLayoutHrRecruitmentRouteRouteChildren =
+  {
+    appLayoutHrRecruitmentIndexRoute: appLayoutHrRecruitmentIndexRoute,
+  }
+
+const appLayoutHrRecruitmentRouteRouteWithChildren =
+  appLayoutHrRecruitmentRouteRoute._addFileChildren(
+    appLayoutHrRecruitmentRouteRouteChildren,
+  )
+
+interface appLayoutHrRouteRouteChildren {
+  appLayoutHrPayrollRouteRoute: typeof appLayoutHrPayrollRouteRouteWithChildren
+  appLayoutHrRecruitmentRouteRoute: typeof appLayoutHrRecruitmentRouteRouteWithChildren
+  appLayoutHrIndexRoute: typeof appLayoutHrIndexRoute
+}
+
+const appLayoutHrRouteRouteChildren: appLayoutHrRouteRouteChildren = {
+  appLayoutHrPayrollRouteRoute: appLayoutHrPayrollRouteRouteWithChildren,
+  appLayoutHrRecruitmentRouteRoute:
+    appLayoutHrRecruitmentRouteRouteWithChildren,
+  appLayoutHrIndexRoute: appLayoutHrIndexRoute,
+}
+
+const appLayoutHrRouteRouteWithChildren =
+  appLayoutHrRouteRoute._addFileChildren(appLayoutHrRouteRouteChildren)
+
+interface appLayoutOrganizationSettingsHrRouteRouteChildren {
+  appLayoutOrganizationSettingsHrIndexRoute: typeof appLayoutOrganizationSettingsHrIndexRoute
+}
+
+const appLayoutOrganizationSettingsHrRouteRouteChildren: appLayoutOrganizationSettingsHrRouteRouteChildren =
+  {
+    appLayoutOrganizationSettingsHrIndexRoute:
+      appLayoutOrganizationSettingsHrIndexRoute,
+  }
+
+const appLayoutOrganizationSettingsHrRouteRouteWithChildren =
+  appLayoutOrganizationSettingsHrRouteRoute._addFileChildren(
+    appLayoutOrganizationSettingsHrRouteRouteChildren,
+  )
+
 interface appLayoutOrganizationSettingsModelsRouteRouteChildren {
   appLayoutOrganizationSettingsModelsProviderIdRouteRoute: typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
   appLayoutOrganizationSettingsModelsIndexRoute: typeof appLayoutOrganizationSettingsModelsIndexRoute
@@ -1021,6 +1228,7 @@ interface appLayoutOrganizationSettingsRouteRouteChildren {
   appLayoutOrganizationSettingsBillingRouteRoute: typeof appLayoutOrganizationSettingsBillingRouteRoute
   appLayoutOrganizationSettingsByokRouteRoute: typeof appLayoutOrganizationSettingsByokRouteRoute
   appLayoutOrganizationSettingsCompliancePolicyRouteRoute: typeof appLayoutOrganizationSettingsCompliancePolicyRouteRoute
+  appLayoutOrganizationSettingsHrRouteRoute: typeof appLayoutOrganizationSettingsHrRouteRouteWithChildren
   appLayoutOrganizationSettingsKnowledgeRouteRoute: typeof appLayoutOrganizationSettingsKnowledgeRouteRoute
   appLayoutOrganizationSettingsMembersRouteRoute: typeof appLayoutOrganizationSettingsMembersRouteRoute
   appLayoutOrganizationSettingsModelsRouteRoute: typeof appLayoutOrganizationSettingsModelsRouteRouteWithChildren
@@ -1040,6 +1248,8 @@ const appLayoutOrganizationSettingsRouteRouteChildren: appLayoutOrganizationSett
       appLayoutOrganizationSettingsByokRouteRoute,
     appLayoutOrganizationSettingsCompliancePolicyRouteRoute:
       appLayoutOrganizationSettingsCompliancePolicyRouteRoute,
+    appLayoutOrganizationSettingsHrRouteRoute:
+      appLayoutOrganizationSettingsHrRouteRouteWithChildren,
     appLayoutOrganizationSettingsKnowledgeRouteRoute:
       appLayoutOrganizationSettingsKnowledgeRouteRoute,
     appLayoutOrganizationSettingsMembersRouteRoute:
@@ -1107,6 +1317,7 @@ const appLayoutWritingRouteRouteWithChildren =
 
 interface appLayoutRouteRouteChildren {
   appLayoutChatRouteRoute: typeof appLayoutChatRouteRouteWithChildren
+  appLayoutHrRouteRoute: typeof appLayoutHrRouteRouteWithChildren
   appLayoutOrganizationRouteRoute: typeof appLayoutOrganizationRouteRouteWithChildren
   appLayoutSettingsRouteRoute: typeof appLayoutSettingsRouteRouteWithChildren
   appLayoutWritingRouteRoute: typeof appLayoutWritingRouteRouteWithChildren
@@ -1116,6 +1327,7 @@ interface appLayoutRouteRouteChildren {
 
 const appLayoutRouteRouteChildren: appLayoutRouteRouteChildren = {
   appLayoutChatRouteRoute: appLayoutChatRouteRouteWithChildren,
+  appLayoutHrRouteRoute: appLayoutHrRouteRouteWithChildren,
   appLayoutOrganizationRouteRoute: appLayoutOrganizationRouteRouteWithChildren,
   appLayoutSettingsRouteRoute: appLayoutSettingsRouteRouteWithChildren,
   appLayoutWritingRouteRoute: appLayoutWritingRouteRouteWithChildren,
