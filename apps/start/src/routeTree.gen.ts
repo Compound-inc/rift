@@ -64,6 +64,8 @@ import { Route as appLayoutOrganizationSettingsBillingRouteRouteImport } from '.
 import { Route as appLayoutOrganizationSettingsAnalyticsRouteRouteImport } from './routes/(app)/_layout/organization/settings/analytics/route'
 import { Route as appLayoutOrganizationSettingsModelsIndexRouteImport } from './routes/(app)/_layout/organization/settings/models/index'
 import { Route as appLayoutOrganizationSettingsHrIndexRouteImport } from './routes/(app)/_layout/organization/settings/hr/index'
+import { Route as appLayoutHrRecruitmentPositionsIndexRouteImport } from './routes/(app)/_layout/hr/recruitment/positions/index'
+import { Route as appLayoutHrRecruitmentPositionsPositionIdRouteImport } from './routes/(app)/_layout/hr/recruitment/positions/$positionId'
 import { Route as appLayoutOrganizationSettingsModelsProviderIdRouteRouteImport } from './routes/(app)/_layout/organization/settings/models/$providerId/route'
 
 const SetupRouteRoute = SetupRouteRouteImport.update({
@@ -364,6 +366,18 @@ const appLayoutOrganizationSettingsHrIndexRoute =
     path: '/',
     getParentRoute: () => appLayoutOrganizationSettingsHrRouteRoute,
   } as any)
+const appLayoutHrRecruitmentPositionsIndexRoute =
+  appLayoutHrRecruitmentPositionsIndexRouteImport.update({
+    id: '/positions/',
+    path: '/positions/',
+    getParentRoute: () => appLayoutHrRecruitmentRouteRoute,
+  } as any)
+const appLayoutHrRecruitmentPositionsPositionIdRoute =
+  appLayoutHrRecruitmentPositionsPositionIdRouteImport.update({
+    id: '/positions/$positionId',
+    path: '/positions/$positionId',
+    getParentRoute: () => appLayoutHrRecruitmentRouteRoute,
+  } as any)
 const appLayoutOrganizationSettingsModelsProviderIdRouteRoute =
   appLayoutOrganizationSettingsModelsProviderIdRouteRouteImport.update({
     id: '/$providerId',
@@ -425,6 +439,8 @@ export interface FileRoutesByFullPath {
   '/hr/recruitment/': typeof appLayoutHrRecruitmentIndexRoute
   '/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
   '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
+  '/hr/recruitment/positions/$positionId': typeof appLayoutHrRecruitmentPositionsPositionIdRoute
+  '/hr/recruitment/positions/': typeof appLayoutHrRecruitmentPositionsIndexRoute
   '/organization/settings/hr/': typeof appLayoutOrganizationSettingsHrIndexRoute
   '/organization/settings/models/': typeof appLayoutOrganizationSettingsModelsIndexRoute
 }
@@ -472,6 +488,8 @@ export interface FileRoutesByTo {
   '/hr/recruitment': typeof appLayoutHrRecruitmentIndexRoute
   '/organization/settings': typeof appLayoutOrganizationSettingsIndexRoute
   '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
+  '/hr/recruitment/positions/$positionId': typeof appLayoutHrRecruitmentPositionsPositionIdRoute
+  '/hr/recruitment/positions': typeof appLayoutHrRecruitmentPositionsIndexRoute
   '/organization/settings/hr': typeof appLayoutOrganizationSettingsHrIndexRoute
   '/organization/settings/models': typeof appLayoutOrganizationSettingsModelsIndexRoute
 }
@@ -531,6 +549,8 @@ export interface FileRoutesById {
   '/(app)/_layout/hr/recruitment/': typeof appLayoutHrRecruitmentIndexRoute
   '/(app)/_layout/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
   '/(app)/_layout/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
+  '/(app)/_layout/hr/recruitment/positions/$positionId': typeof appLayoutHrRecruitmentPositionsPositionIdRoute
+  '/(app)/_layout/hr/recruitment/positions/': typeof appLayoutHrRecruitmentPositionsIndexRoute
   '/(app)/_layout/organization/settings/hr/': typeof appLayoutOrganizationSettingsHrIndexRoute
   '/(app)/_layout/organization/settings/models/': typeof appLayoutOrganizationSettingsModelsIndexRoute
 }
@@ -590,6 +610,8 @@ export interface FileRouteTypes {
     | '/hr/recruitment/'
     | '/organization/settings/'
     | '/organization/settings/models/$providerId'
+    | '/hr/recruitment/positions/$positionId'
+    | '/hr/recruitment/positions/'
     | '/organization/settings/hr/'
     | '/organization/settings/models/'
   fileRoutesByTo: FileRoutesByTo
@@ -637,6 +659,8 @@ export interface FileRouteTypes {
     | '/hr/recruitment'
     | '/organization/settings'
     | '/organization/settings/models/$providerId'
+    | '/hr/recruitment/positions/$positionId'
+    | '/hr/recruitment/positions'
     | '/organization/settings/hr'
     | '/organization/settings/models'
   id:
@@ -695,6 +719,8 @@ export interface FileRouteTypes {
     | '/(app)/_layout/hr/recruitment/'
     | '/(app)/_layout/organization/settings/'
     | '/(app)/_layout/organization/settings/models/$providerId'
+    | '/(app)/_layout/hr/recruitment/positions/$positionId'
+    | '/(app)/_layout/hr/recruitment/positions/'
     | '/(app)/_layout/organization/settings/hr/'
     | '/(app)/_layout/organization/settings/models/'
   fileRoutesById: FileRoutesById
@@ -1107,6 +1133,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appLayoutOrganizationSettingsHrIndexRouteImport
       parentRoute: typeof appLayoutOrganizationSettingsHrRouteRoute
     }
+    '/(app)/_layout/hr/recruitment/positions/': {
+      id: '/(app)/_layout/hr/recruitment/positions/'
+      path: '/positions'
+      fullPath: '/hr/recruitment/positions/'
+      preLoaderRoute: typeof appLayoutHrRecruitmentPositionsIndexRouteImport
+      parentRoute: typeof appLayoutHrRecruitmentRouteRoute
+    }
+    '/(app)/_layout/hr/recruitment/positions/$positionId': {
+      id: '/(app)/_layout/hr/recruitment/positions/$positionId'
+      path: '/positions/$positionId'
+      fullPath: '/hr/recruitment/positions/$positionId'
+      preLoaderRoute: typeof appLayoutHrRecruitmentPositionsPositionIdRouteImport
+      parentRoute: typeof appLayoutHrRecruitmentRouteRoute
+    }
     '/(app)/_layout/organization/settings/models/$providerId': {
       id: '/(app)/_layout/organization/settings/models/$providerId'
       path: '/$providerId'
@@ -1162,11 +1202,17 @@ const appLayoutHrPayrollRouteRouteWithChildren =
 
 interface appLayoutHrRecruitmentRouteRouteChildren {
   appLayoutHrRecruitmentIndexRoute: typeof appLayoutHrRecruitmentIndexRoute
+  appLayoutHrRecruitmentPositionsPositionIdRoute: typeof appLayoutHrRecruitmentPositionsPositionIdRoute
+  appLayoutHrRecruitmentPositionsIndexRoute: typeof appLayoutHrRecruitmentPositionsIndexRoute
 }
 
 const appLayoutHrRecruitmentRouteRouteChildren: appLayoutHrRecruitmentRouteRouteChildren =
   {
     appLayoutHrRecruitmentIndexRoute: appLayoutHrRecruitmentIndexRoute,
+    appLayoutHrRecruitmentPositionsPositionIdRoute:
+      appLayoutHrRecruitmentPositionsPositionIdRoute,
+    appLayoutHrRecruitmentPositionsIndexRoute:
+      appLayoutHrRecruitmentPositionsIndexRoute,
   }
 
 const appLayoutHrRecruitmentRouteRouteWithChildren =
