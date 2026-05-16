@@ -51,15 +51,22 @@ export function HrSettingsPage() {
   const { canRaw } = usePermissions()
   const coreEntitled = canRaw('product.hr.core')
   const recruitmentEntitled = canRaw('product.hr.recruitment')
+  const backgroundCheckEntitled = canRaw('product.hr.background-check')
   const payrollEntitled = canRaw('product.hr.payroll')
 
   const entitledAddons = React.useMemo<HrAddonKey[]>(() => {
     const result: HrAddonKey[] = []
     if (coreEntitled) result.push('core')
     if (recruitmentEntitled) result.push('recruitment')
+    if (backgroundCheckEntitled) result.push('background-check')
     if (payrollEntitled) result.push('payroll')
     return result
-  }, [coreEntitled, payrollEntitled, recruitmentEntitled])
+  }, [
+    backgroundCheckEntitled,
+    coreEntitled,
+    payrollEntitled,
+    recruitmentEntitled,
+  ])
 
   const policyRef = React.useRef(policy ?? EMPTY_ORG_PRODUCT_POLICY)
   React.useEffect(() => {

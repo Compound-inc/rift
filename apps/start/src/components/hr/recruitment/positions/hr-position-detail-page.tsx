@@ -20,19 +20,17 @@ import Users from 'lucide-react/dist/esm/icons/users'
 import UserPlus from 'lucide-react/dist/esm/icons/user-plus'
 import { ContentPage } from '@/components/layout'
 import {
-  
   getArrangementLabel,
   getEmploymentTypeLabel,
-  resolvePositionStatusPresentation
+  resolvePositionStatusPresentation,
 } from './hr-positions.logic'
-import type {HrPosition} from './hr-positions.logic';
+import type { HrPosition } from './hr-positions.logic'
 import {
   resolveCandidateStagePresentation,
-  useHrPositionCandidates,
+  useHrPositionApplications,
 } from './hr-position-candidates.logic'
-
-/**
- * Detail surface for a single position. Renders a compact summary header,
+import { HrBulkCvUploader } from './hr-bulk-cv-uploader'
+import { HrCleanCvsButton } from './hr-clean-cvs-button'
  * pipeline counters that mirror the home funnel, and a candidates table.
  *
  * The component is intentionally read-only for now; the "Add candidate" CTA
@@ -42,7 +40,7 @@ import {
 export function HrPositionDetailPage({ position }: { position: HrPosition }) {
   const status = resolvePositionStatusPresentation(position.status)
   const StatusIcon = status.icon
-  const candidates = useHrPositionCandidates(position.id)
+  const { candidates } = useHrPositionApplications(position.id)
 
   return (
     <ContentPage>
@@ -145,6 +143,22 @@ export function HrPositionDetailPage({ position }: { position: HrPosition }) {
         </section>
 
         <section
+          aria-label="Bulk upload"
+          className="rounded-xl border border-border-base bg-surface-overlay p-4"
+        >
+          <header className="mb-3">
+            <h2 className="text-sm font-medium text-foreground-strong">
+              Bulk CV upload
+            </h2>
+            <p className="text-xs text-foreground-tertiary">
+              Drop multiple resumes at once. We extract emails, dedupe
+              candidates, and start the pipeline workflow per CV.
+            </p>
+          </header>
+          <HrBulkCvUploader positionId={position.id} />
+        </section>
+
+        <section
           aria-label="Candidates"
           className="flex flex-col overflow-hidden rounded-xl border border-border-base bg-surface-raised shadow-[0_1px_0_0_rgb(0_0_0_/_0.02)]"
         >
@@ -158,6 +172,7 @@ export function HrPositionDetailPage({ position }: { position: HrPosition }) {
                 {candidates.length}
               </span>
             </div>
+            <HrCleanCvsButton positionId={position.id} />
           </header>
 
           {candidates.length === 0 ? (
@@ -183,6 +198,9 @@ export function HrPositionDetailPage({ position }: { position: HrPosition }) {
                     Source
                   </TableHead>
                   <TableHead className="bg-transparent px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-foreground-tertiary">
+                    Score
+                  </TableHead>
+                  <TableHead className="bg-transparent px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-foreground-tertiary">
                     Applied
                   </TableHead>
                 </TableRow>
@@ -195,7 +213,7 @@ export function HrPositionDetailPage({ position }: { position: HrPosition }) {
                   const StageIcon = stage.icon
                   return (
                     <TableRow
-                      key={candidate.id}
+                      key={candidate.applicationId}
                       className="border-border-light"
                     >
                       <TableCell className="px-4 py-3">
@@ -203,9 +221,14 @@ export function HrPositionDetailPage({ position }: { position: HrPosition }) {
                           <span className="font-medium text-foreground-strong">
                             {candidate.name}
                           </span>
-                          <span className="text-xs text-foreground-tertiary">
+                          <span className="line-clamp-2 text-xs text-foreground-tertiary">
                             {candidate.headline}
                           </span>
+                          {candidate.location ? (
+                            <span className="text-xs text-foreground-tertiary">
+                              {candidate.location}
+                            </span>
+                          ) : null}
                         </div>
                       </TableCell>
                       <TableCell className="px-4 py-3">
@@ -221,6 +244,14 @@ export function HrPositionDetailPage({ position }: { position: HrPosition }) {
                       </TableCell>
                       <TableCell className="px-4 py-3 text-foreground-primary">
                         {candidate.source}
+                      </TableCell>
+                      <TableCell
+                        title={candidate.affinityRationale ?? undefined}
+                        className="px-4 py-3 text-right tabular-nums text-foreground-primary"
+                      >
+                        {candidate.affinityScore === null
+                          ? '—'
+                          : `${candidate.affinityScore}/100`}
                       </TableCell>
                       <TableCell className="px-4 py-3 text-right tabular-nums text-foreground-primary">
                         {candidate.appliedAt}

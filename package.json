@@ -9,7 +9,9 @@
   ],
   "packageManager": "bun@1.2.23",
   "scripts": {
-    "dev": "turbo run dev zero-cache --filter=tanstack --ui tui",
+    "dev": "turbo run dev --filter=tanstack",
+    "dev:all": "turbo run dev zero-cache --filter=tanstack --ui tui",
+    "dev:zero": "turbo run zero-cache --filter=tanstack",
     "build": "turbo run build --filter=tanstack",
     "start": "bun run --filter tanstack start",
     "lint": "turbo run lint",

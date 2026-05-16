@@ -1,4 +1,10 @@
-import { Briefcase, ClipboardList, Receipt, Users } from 'lucide-react'
+import {
+  Briefcase,
+  ClipboardList,
+  Receipt,
+  ShieldCheck,
+  Users,
+} from 'lucide-react'
 import { useMemo } from 'react'
 import { isAreaPath } from '@/utils/nav-utils'
 import { usePermissions } from '@/lib/frontend/permissions/use-permissions'
@@ -24,6 +30,7 @@ export const isHrPath = (pathname: string) => isAreaPath(pathname, HR_HREF)
 function HrAreaContent({ pathname }: { pathname: string }) {
   const { can } = usePermissions()
   const recruitmentEnabled = can('product.hr.recruitment')
+  const backgroundCheckEnabled = can('product.hr.background-check')
   const payrollEnabled = can('product.hr.payroll')
 
   const sections = useMemo<NavSection[]>(() => {
@@ -44,6 +51,14 @@ function HrAreaContent({ pathname }: { pathname: string }) {
       })
     }
 
+    if (backgroundCheckEnabled) {
+      items.push({
+        name: 'Background checks',
+        icon: ShieldCheck,
+        href: `${HR_HREF}/background-check`,
+      })
+    }
+
     if (payrollEnabled) {
       items.push({
         name: 'Payroll',
@@ -53,7 +68,7 @@ function HrAreaContent({ pathname }: { pathname: string }) {
     }
 
     return [{ name: '', items }]
-  }, [payrollEnabled, recruitmentEnabled])
+  }, [backgroundCheckEnabled, payrollEnabled, recruitmentEnabled])
 
   return (
     <SidebarAreaLayout title="HR" sections={sections} pathname={pathname} />
@@ -64,7 +79,7 @@ export const hrNavArea = () => ({
   title: 'HR',
   href: HR_HREF,
   description:
-    'Human resources workspace with paid addons for recruitment and payroll.',
+    'Human resources workspace with paid addons for recruitment, background checks, and payroll.',
   icon: Users,
   ContentComponent: HrAreaContent,
 })

@@ -366,6 +366,242 @@ const attachment = table('attachment')
   .primaryKey('id')
 
 // ---------------------------------------------------------------------------
+// HR Recruitment tables
+// ---------------------------------------------------------------------------
+
+const hrPosition = table('hrPosition')
+  .from('hr_position')
+  .columns({
+    id: string(),
+    organizationId: string().from('organization_id'),
+    title: string(),
+    department: string(),
+    location: string(),
+    arrangement: enumeration<'remote' | 'hybrid' | 'onsite'>(),
+    employmentType: enumeration<
+      'full_time' | 'part_time' | 'contract' | 'internship'
+    >().from('employment_type'),
+    status: enumeration<'draft' | 'open' | 'paused' | 'filled' | 'archived'>(),
+    description: string(),
+    hiringManager: string().from('hiring_manager'),
+    compensation: string(),
+    descriptionEmbedding: json<readonly number[]>()
+      .from('description_embedding')
+      .optional(),
+    descriptionEmbeddingModel: string()
+      .from('description_embedding_model')
+      .optional(),
+    descriptionEmbeddingDimensions: number()
+      .from('description_embedding_dimensions')
+      .optional(),
+    descriptionEmbeddingUpdatedAt: number()
+      .from('description_embedding_updated_at')
+      .optional(),
+    tags: json<readonly string[]>(),
+    recommendedTestKinds: json<readonly string[]>().from(
+      'recommended_test_kinds',
+    ),
+    archivedAt: number().from('archived_at').optional(),
+    archivedBy: string().from('archived_by').optional(),
+    createdAt: number().from('created_at'),
+    updatedAt: number().from('updated_at'),
+    createdBy: string().from('created_by'),
+  })
+  .primaryKey('id')
+
+const hrTestTemplate = table('hrTestTemplate')
+  .from('hr_test_template')
+  .columns({
+    id: string(),
+    organizationId: string().from('organization_id'),
+    kind: enumeration<
+      | 'technical'
+      | 'honesty'
+      | 'background'
+      | 'language'
+      | 'behavioral'
+      | 'custom'
+    >(),
+    title: string(),
+    description: string(),
+    defaultPassingScore: number().from('default_passing_score'),
+    questions:
+      json<readonly Record<string, string | number | boolean | null>[]>(),
+    isBuiltIn: boolean().from('is_built_in'),
+    archivedAt: number().from('archived_at').optional(),
+    createdAt: number().from('created_at'),
+    updatedAt: number().from('updated_at'),
+  })
+  .primaryKey('id')
+
+const hrPositionTestRequirement = table('hrPositionTestRequirement')
+  .from('hr_position_test_requirement')
+  .columns({
+    id: string(),
+    organizationId: string().from('organization_id'),
+    positionId: string().from('position_id'),
+    testTemplateId: string().from('test_template_id'),
+    minimumScore: number().from('minimum_score').optional(),
+    weight: number(),
+    isRequired: boolean().from('is_required'),
+    createdAt: number().from('created_at'),
+    updatedAt: number().from('updated_at'),
+  })
+  .primaryKey('id')
+
+const hrCandidate = table('hrCandidate')
+  .from('hr_candidate')
+  .columns({
+    id: string(),
+    organizationId: string().from('organization_id'),
+    normalizedEmail: string().from('normalized_email').optional(),
+    email: string().optional(),
+    displayName: string().from('display_name'),
+    phone: string().optional(),
+    latestCvAttachmentId: string().from('latest_cv_attachment_id').optional(),
+    latestCvText: string().from('latest_cv_text').optional(),
+    latestCvEmbedding: json<readonly number[]>()
+      .from('latest_cv_embedding')
+      .optional(),
+    latestCvEmbeddingModel: string()
+      .from('latest_cv_embedding_model')
+      .optional(),
+    latestCvEmbeddingDimensions: number()
+      .from('latest_cv_embedding_dimensions')
+      .optional(),
+    latestCvIndexedAt: number().from('latest_cv_indexed_at').optional(),
+    aliases: json<readonly { name?: string; email?: string }[]>(),
+    tags: json<readonly string[]>(),
+    mergedIntoCandidateId: string().from('merged_into_candidate_id').optional(),
+    needsContactReview: boolean().from('needs_contact_review'),
+    archivedAt: number().from('archived_at').optional(),
+    archivedBy: string().from('archived_by').optional(),
+    notes: string().optional(),
+    location: string().optional(),
+    headline: string().optional(),
+    summary: string().optional(),
+    yearsOfExperience: number().from('years_of_experience').optional(),
+    skills: json<readonly string[]>(),
+    languages: json<readonly string[]>(),
+    highestDegree: string().from('highest_degree').optional(),
+    profileSource: string().from('profile_source').optional(),
+    createdAt: number().from('created_at'),
+    updatedAt: number().from('updated_at'),
+  })
+  .primaryKey('id')
+
+const hrApplication = table('hrApplication')
+  .from('hr_application')
+  .columns({
+    id: string(),
+    organizationId: string().from('organization_id'),
+    candidateId: string().from('candidate_id'),
+    positionId: string().from('position_id'),
+    stage: enumeration<
+      | 'uploaded'
+      | 'scoring'
+      | 'awaiting_test'
+      | 'evaluating'
+      | 'awaiting_verification'
+      | 'advanced'
+      | 'rejected'
+      | 'hired'
+    >(),
+    affinityScore: number().from('affinity_score').optional(),
+    affinityRationale: string().from('affinity_rationale').optional(),
+    affinitySignals: json<Record<string, string | number | boolean | null>>()
+      .from('affinity_signals')
+      .optional(),
+    affinityModel: string().from('affinity_model').optional(),
+    cvAttachmentId: string().from('cv_attachment_id').optional(),
+    cvText: string().from('cv_text').optional(),
+    cvEmbedding: json<readonly number[]>().from('cv_embedding').optional(),
+    cvEmbeddingModel: string().from('cv_embedding_model').optional(),
+    aiProfileSnapshot: json<Record<string, string | number | boolean | null>>()
+      .from('ai_profile_snapshot')
+      .optional(),
+    aiSignals: json<Record<string, string | number | boolean | null>>()
+      .from('ai_signals')
+      .optional(),
+    workflowRunId: string().from('workflow_run_id').optional(),
+    lastTransitionAt: number().from('last_transition_at').optional(),
+    lastError: string().from('last_error').optional(),
+    rejectionReason: string().from('rejection_reason').optional(),
+    hiredAt: number().from('hired_at').optional(),
+    archivedAt: number().from('archived_at').optional(),
+    archivedBy: string().from('archived_by').optional(),
+    createdAt: number().from('created_at'),
+    updatedAt: number().from('updated_at'),
+  })
+  .primaryKey('id')
+
+const hrTestDispatch = table('hrTestDispatch')
+  .from('hr_test_dispatch')
+  .columns({
+    id: string(),
+    organizationId: string().from('organization_id'),
+    applicationId: string().from('application_id'),
+    testTemplateId: string().from('test_template_id'),
+    dispatchedVia: string().from('dispatched_via'),
+    status: enumeration<'sent' | 'completed' | 'expired' | 'cancelled'>(),
+    resumeWebhookUrl: string().from('resume_webhook_url').optional(),
+    idempotencyKey: string().from('idempotency_key'),
+    expiresAt: number().from('expires_at').optional(),
+    dispatchedAt: number().from('dispatched_at'),
+    completedAt: number().from('completed_at').optional(),
+    createdAt: number().from('created_at'),
+    updatedAt: number().from('updated_at'),
+  })
+  .primaryKey('id')
+
+const hrTestResponse = table('hrTestResponse')
+  .from('hr_test_response')
+  .columns({
+    id: string(),
+    organizationId: string().from('organization_id'),
+    dispatchId: string().from('dispatch_id'),
+    applicationId: string().from('application_id'),
+    answers:
+      json<readonly Record<string, string | number | boolean | null>[]>(),
+    score: number().optional(),
+    scoredBy: enumeration<'auto' | 'manual' | 'pending'>().from('scored_by'),
+    passed: boolean().optional(),
+    submittedAt: number().from('submitted_at'),
+    createdAt: number().from('created_at'),
+    updatedAt: number().from('updated_at'),
+  })
+  .primaryKey('id')
+
+const hrBackgroundCheck = table('hrBackgroundCheck')
+  .from('hr_background_check')
+  .columns({
+    id: string(),
+    organizationId: string().from('organization_id'),
+    applicationId: string().from('application_id'),
+    candidateId: string().from('candidate_id'),
+    provider: string(),
+    status: enumeration<
+      'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled'
+    >(),
+    passed: boolean().optional(),
+    creditScore: number().from('credit_score').optional(),
+    legalFlags:
+      json<
+        readonly { code: string; severity: string; message: string }[]
+      >().from('legal_flags'),
+    rawPayload: json<Record<string, string | number | boolean | null>>()
+      .from('raw_payload')
+      .optional(),
+    resumeWebhookUrl: string().from('resume_webhook_url').optional(),
+    idempotencyKey: string().from('idempotency_key'),
+    requestedAt: number().from('requested_at'),
+    completedAt: number().from('completed_at').optional(),
+    createdAt: number().from('created_at'),
+    updatedAt: number().from('updated_at'),
+  })
+  .primaryKey('id')
+
+// ---------------------------------------------------------------------------
 // Relationships (optional; use for .related() in ZQL)
 // ---------------------------------------------------------------------------
 
@@ -498,6 +734,165 @@ const messageRelationships = relationships(message, ({ one }) => ({
 }))
 
 // ---------------------------------------------------------------------------
+// HR Recruitment relationships
+// ---------------------------------------------------------------------------
+
+const hrPositionRelationships = relationships(hrPosition, ({ many, one }) => ({
+  organization: one({
+    sourceField: ['organizationId'],
+    destField: ['id'],
+    destSchema: organization,
+  }),
+  applications: many({
+    sourceField: ['id'],
+    destSchema: hrApplication,
+    destField: ['positionId'],
+  }),
+  testRequirements: many({
+    sourceField: ['id'],
+    destSchema: hrPositionTestRequirement,
+    destField: ['positionId'],
+  }),
+}))
+
+const hrCandidateRelationships = relationships(
+  hrCandidate,
+  ({ many, one }) => ({
+    organization: one({
+      sourceField: ['organizationId'],
+      destField: ['id'],
+      destSchema: organization,
+    }),
+    applications: many({
+      sourceField: ['id'],
+      destSchema: hrApplication,
+      destField: ['candidateId'],
+    }),
+  }),
+)
+
+const hrApplicationRelationships = relationships(
+  hrApplication,
+  ({ many, one }) => ({
+    organization: one({
+      sourceField: ['organizationId'],
+      destField: ['id'],
+      destSchema: organization,
+    }),
+    position: one({
+      sourceField: ['positionId'],
+      destField: ['id'],
+      destSchema: hrPosition,
+    }),
+    candidate: one({
+      sourceField: ['candidateId'],
+      destField: ['id'],
+      destSchema: hrCandidate,
+    }),
+    testDispatches: many({
+      sourceField: ['id'],
+      destSchema: hrTestDispatch,
+      destField: ['applicationId'],
+    }),
+    testResponses: many({
+      sourceField: ['id'],
+      destSchema: hrTestResponse,
+      destField: ['applicationId'],
+    }),
+    backgroundCheck: one({
+      sourceField: ['id'],
+      destField: ['applicationId'],
+      destSchema: hrBackgroundCheck,
+    }),
+  }),
+)
+
+const hrTestTemplateRelationships = relationships(
+  hrTestTemplate,
+  ({ many, one }) => ({
+    organization: one({
+      sourceField: ['organizationId'],
+      destField: ['id'],
+      destSchema: organization,
+    }),
+    positionRequirements: many({
+      sourceField: ['id'],
+      destSchema: hrPositionTestRequirement,
+      destField: ['testTemplateId'],
+    }),
+  }),
+)
+
+const hrPositionTestRequirementRelationships = relationships(
+  hrPositionTestRequirement,
+  ({ one }) => ({
+    position: one({
+      sourceField: ['positionId'],
+      destField: ['id'],
+      destSchema: hrPosition,
+    }),
+    testTemplate: one({
+      sourceField: ['testTemplateId'],
+      destField: ['id'],
+      destSchema: hrTestTemplate,
+    }),
+  }),
+)
+
+const hrTestDispatchRelationships = relationships(
+  hrTestDispatch,
+  ({ many, one }) => ({
+    application: one({
+      sourceField: ['applicationId'],
+      destField: ['id'],
+      destSchema: hrApplication,
+    }),
+    testTemplate: one({
+      sourceField: ['testTemplateId'],
+      destField: ['id'],
+      destSchema: hrTestTemplate,
+    }),
+    responses: many({
+      sourceField: ['id'],
+      destSchema: hrTestResponse,
+      destField: ['dispatchId'],
+    }),
+  }),
+)
+
+const hrTestResponseRelationships = relationships(
+  hrTestResponse,
+  ({ one }) => ({
+    application: one({
+      sourceField: ['applicationId'],
+      destField: ['id'],
+      destSchema: hrApplication,
+    }),
+    dispatch: one({
+      sourceField: ['dispatchId'],
+      destField: ['id'],
+      destSchema: hrTestDispatch,
+    }),
+  }),
+)
+
+const hrBackgroundCheckRelationships = relationships(
+  hrBackgroundCheck,
+  ({ one }) => ({
+    application: one({
+      sourceField: ['applicationId'],
+      destField: ['id'],
+      destSchema: hrApplication,
+    }),
+    candidate: one({
+      sourceField: ['candidateId'],
+      destField: ['id'],
+      destSchema: hrCandidate,
+    }),
+  }),
+)
+
+// ---------------------------------------------------------------------------
 // Schema export and default types
 // ---------------------------------------------------------------------------
 
@@ -517,6 +912,14 @@ export const schema = createSchema({
     thread,
     message,
     attachment,
+    hrPosition,
+    hrTestTemplate,
+    hrPositionTestRequirement,
+    hrCandidate,
+    hrApplication,
+    hrTestDispatch,
+    hrTestResponse,
+    hrBackgroundCheck,
   ],
   relationships: [
     organizationRelationships,
@@ -527,6 +930,14 @@ export const schema = createSchema({
     orgSubscriptionRelationships,
     orgUserUsageSummaryRelationships,
     messageRelationships,
+    hrPositionRelationships,
+    hrCandidateRelationships,
+    hrApplicationRelationships,
+    hrTestTemplateRelationships,
+    hrPositionTestRequirementRelationships,
+    hrTestDispatchRelationships,
+    hrTestResponseRelationships,
+    hrBackgroundCheckRelationships,
   ],
 })
 

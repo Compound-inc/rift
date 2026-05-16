@@ -10,6 +10,7 @@ import UserCheck from 'lucide-react/dist/esm/icons/user-check'
 import UserPlus from 'lucide-react/dist/esm/icons/user-plus'
 import CheckCircle2 from 'lucide-react/dist/esm/icons/check-circle-2'
 import type { ComponentType, SVGProps } from 'react'
+import { m } from '@/paraglide/messages.js'
 
 export type HrStatCard = {
   readonly id: string
@@ -54,30 +55,30 @@ export function useHrHomePageLogic(): HrHomePageViewModel {
     () => [
       {
         id: 'headcount',
-        label: 'Headcount',
+        label: m.hr_stat_headcount_label(),
         value: '235',
-        suffix: 'Total',
+        suffix: m.hr_stat_headcount_suffix(),
         icon: Users,
       },
       {
         id: 'open-roles',
-        label: 'Open Roles',
+        label: m.hr_stat_open_roles_label(),
         value: '18',
-        suffix: 'Active',
+        suffix: m.hr_stat_open_roles_suffix(),
         icon: Briefcase,
       },
       {
         id: 'payroll',
-        label: 'Payroll',
+        label: m.hr_stat_payroll_label(),
         value: '$487,250',
-        suffix: 'MTD',
+        suffix: m.hr_stat_payroll_suffix(),
         icon: Wallet,
       },
       {
         id: 'turnover',
-        label: 'Turnover',
+        label: m.hr_stat_turnover_label(),
         value: '4.2',
-        suffix: '% YTD',
+        suffix: m.hr_stat_turnover_suffix(),
         icon: TrendingDown,
       },
     ],
@@ -86,20 +87,19 @@ export function useHrHomePageLogic(): HrHomePageViewModel {
 
   const pipeline = useMemo<readonly HrPipelineStage[]>(
     () => [
-      { id: 'applied', label: 'Applied', count: 1247 },
-      { id: 'screened', label: 'Screened', count: 482 },
-      { id: 'interviewed', label: 'Interviewed', count: 184 },
-      { id: 'offers', label: 'Offers', count: 42 },
-      { id: 'hired', label: 'Hired', count: 28 },
+      { id: 'applied', label: m.hr_pipeline_applied(), count: 1247 },
+      { id: 'screened', label: m.hr_pipeline_screened(), count: 482 },
+      { id: 'interviewed', label: m.hr_pipeline_interviewed(), count: 184 },
+      { id: 'offers', label: m.hr_pipeline_offers(), count: 42 },
+      { id: 'hired', label: m.hr_pipeline_hired(), count: 28 },
     ],
     [],
   )
 
   const insight = useMemo<HrPipelineInsight>(
     () => ({
-      message:
-        '36 candidates completed screening but never booked an interview.',
-      cta: 'Send a follow-up',
+      message: m.hr_pipeline_insight_message(),
+      cta: m.hr_pipeline_insight_cta(),
       href: '/hr/recruitment',
     }),
     [],
@@ -162,19 +162,19 @@ export function resolveCandidateStatusPresentation(status: HrCandidateStatus): {
   switch (status) {
     case 'hired':
       return {
-        label: 'Hired',
+        label: m.hr_candidate_status_hired(),
         icon: CheckCircle2,
         className: 'text-foreground-success',
       }
     case 'interviewing':
       return {
-        label: 'Interviewing',
+        label: m.hr_candidate_status_interviewing(),
         icon: PhoneCall,
         className: 'text-foreground-info',
       }
     case 'offer_sent':
       return {
-        label: 'Offer sent',
+        label: m.hr_candidate_status_offer_sent(),
         icon: UserPlus,
         className: 'text-foreground-warning',
       }

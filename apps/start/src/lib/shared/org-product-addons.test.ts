@@ -14,19 +14,30 @@ describe('ORG_PRODUCT_ADDON_CATALOG', () => {
     expect(ORG_PRODUCT_ADDON_CATALOG).toHaveProperty('hr')
   })
 
-  it('declares HR core, recruitment, and payroll addons; the addon-level keys remain a simple shape for future work', () => {
+  it('declares HR core, recruitment, background-check, and payroll addons; new orgConfigurableSettingKeys flow into the existing settings UI without schema work', () => {
     const hrAddons = ORG_PRODUCT_ADDON_CATALOG.hr.addons
     expect(hrAddons).toHaveProperty('core')
     expect(hrAddons).toHaveProperty('recruitment')
+    expect(hrAddons).toHaveProperty('background-check')
     expect(hrAddons).toHaveProperty('payroll')
 
-    // The settings scaffolding is intentionally empty for now; the HR
-    // settings page falls back to a pure capability toggle per addon.
-    // Test guards the invariant so re-adding real settings here requires
-    // an explicit update.
     expect(hrAddons.core.orgConfigurableSettingKeys).toHaveLength(0)
-    expect(hrAddons.recruitment.orgConfigurableSettingKeys).toHaveLength(0)
     expect(hrAddons.payroll.orgConfigurableSettingKeys).toHaveLength(0)
+    expect(hrAddons.recruitment.orgConfigurableSettingKeys).toContain(
+      'recruitment.aiRerankEnabled',
+    )
+    expect(hrAddons.recruitment.orgConfigurableSettingKeys).toContain(
+      'recruitment.aiRerankTopK',
+    )
+    expect(hrAddons.recruitment.orgConfigurableSettingKeys).toContain(
+      'recruitment.autoArchiveAfterDays',
+    )
+    expect(hrAddons['background-check'].orgConfigurableSettingKeys).toContain(
+      'background-check.creditScoreEnabled',
+    )
+    expect(hrAddons['background-check'].orgConfigurableSettingKeys).toContain(
+      'background-check.legalBuroEnabled',
+    )
   })
 
   it('leaves chat without addons until it opts in; writing and hr declare their addons', () => {
@@ -50,6 +61,7 @@ describe('getProductAddonEntitlementIdsForProduct', () => {
       'hr',
       'hr.core',
       'hr.recruitment',
+      'hr.background-check',
       'hr.payroll',
     ])
     expect(getProductAddonEntitlementIdsForProduct('writing')).toEqual([

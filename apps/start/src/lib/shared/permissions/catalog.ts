@@ -68,7 +68,21 @@ export const PRODUCT_PERMISSION_CATALOG = {
     productLeaves: [],
     addonLeaves: {
       core: [],
-      recruitment: [],
+
+      recruitment: [
+        'positions.view',
+        'positions.create',
+        'positions.update',
+        'positions.archive',
+        'candidates.view',
+        'candidates.archive',
+        'applications.view',
+        'applications.advance',
+        'applications.reject',
+        'tests.manage',
+        'cv.upload',
+      ],
+      'background-check': ['reports.view', 'reports.request'],
       payroll: [],
     },
   },

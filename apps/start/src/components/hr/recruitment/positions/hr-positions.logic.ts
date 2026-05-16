@@ -10,16 +10,19 @@ import PauseCircle from 'lucide-react/dist/esm/icons/pause-circle'
 import UserPlus from 'lucide-react/dist/esm/icons/user-plus'
 import Users from 'lucide-react/dist/esm/icons/users'
 import type { ComponentType, SVGProps } from 'react'
-
-export type HrPositionStatus = 'open' | 'paused' | 'filled' | 'draft'
-
-export type HrPositionEmploymentType =
-  | 'full_time'
-  | 'part_time'
-  | 'contract'
-  | 'internship'
-
-export type HrPositionWorkArrangement = 'remote' | 'hybrid' | 'onsite'
+import {
+  useHrApplicationsForPosition,
+  useHrPositions,
+} from '@/lib/frontend/hr/recruitment'
+import type {
+  HrApplicationView,
+  HrPositionView,
+} from '@/lib/frontend/hr/recruitment'
+import type {
+  HrPositionEmploymentType,
+  HrPositionStatus,
+  HrPositionWorkArrangement,
+} from '@/lib/shared/hr/recruitment'
 
 export type HrPositionPipelineCounts = {
   readonly applied: number
@@ -45,6 +48,8 @@ export type HrPosition = {
   readonly pipeline: HrPositionPipelineCounts
 }
 
+export type { HrPositionStatus }
+
 export type HrPositionStatCard = {
   readonly id: string
   readonly label: string
@@ -56,181 +61,100 @@ export type HrPositionStatCard = {
 export type HrPositionsViewModel = {
   readonly stats: readonly HrPositionStatCard[]
   readonly positions: readonly HrPosition[]
+  readonly loading: boolean
+}
+
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000
+const ONE_DAY_MS = 24 * 60 * 60 * 1000
+
+function daysOpenSince(timestamp: number): number {
+  if (!timestamp) return 0
+  return Math.max(0, Math.round((Date.now() - timestamp) / ONE_DAY_MS))
+}
+
+function formatOpenedAt(timestamp: number, status: HrPositionStatus): string {
+  if (status === 'draft' || !timestamp) return '—'
+  return new Date(timestamp).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+function buildPipelineCounts(
+  applications: readonly HrApplicationView[],
+): HrPositionPipelineCounts {
+  let applied = 0
+  let screened = 0
+  let interviewing = 0
+  let offer = 0
+  for (const application of applications) {
+    if (application.archivedAt) continue
+    switch (application.stage) {
+      case 'uploaded':
+      case 'scoring':
+        applied += 1
+        break
+      case 'awaiting_test':
+      case 'evaluating':
+        screened += 1
+        break
+      case 'awaiting_verification':
+        interviewing += 1
+        break
+      case 'advanced':
+        offer += 1
+        break
+      default:
+        break
+    }
+  }
+  return { applied, screened, interviewing, offer }
+}
+
+function buildHrPosition(input: {
+  readonly position: HrPositionView
+  readonly applications: readonly HrApplicationView[]
+}): HrPosition {
+  const counts = buildPipelineCounts(input.applications)
+  const total = input.applications.filter(
+    (application) => application.archivedAt === null,
+  )
+  const applicants = total.length
+  const newThisWeek = total.filter(
+    (application) => application.updatedAt > Date.now() - ONE_WEEK_MS,
+  ).length
+  return {
+    id: input.position.id,
+    title: input.position.title,
+    department: input.position.department,
+    location: input.position.location,
+    arrangement: input.position.arrangement,
+    employmentType: input.position.employmentType,
+    status: input.position.status,
+    applicants,
+    newThisWeek,
+    openedAt: formatOpenedAt(input.position.createdAt, input.position.status),
+    daysOpen:
+      input.position.status === 'draft'
+        ? 0
+        : daysOpenSince(input.position.createdAt),
+    hiringManager: input.position.hiringManager || '—',
+    compensation: input.position.compensation || '—',
+    pipeline: counts,
+  }
 }
 
 export function useHrPositionsViewModel(): HrPositionsViewModel {
+  const { positions: rawPositions, loading } = useHrPositions()
+  const compositePositions = useMemo(() => rawPositions, [rawPositions])
+
   const positions = useMemo<readonly HrPosition[]>(
-    () => [
-      {
-        id: 'pos-senior-product-engineer',
-        title: 'Senior Product Engineer',
-        department: 'Engineering',
-        location: 'San Francisco, CA',
-        arrangement: 'hybrid',
-        employmentType: 'full_time',
-        status: 'open',
-        applicants: 142,
-        newThisWeek: 18,
-        openedAt: 'Dec 12, 2025',
-        daysOpen: 21,
-        hiringManager: 'Priya Shah',
-        compensation: '$170k – $210k',
-        pipeline: {
-          applied: 142,
-          screened: 48,
-          interviewing: 14,
-          offer: 2,
-        },
-      },
-      {
-        id: 'pos-staff-designer',
-        title: 'Staff Designer',
-        department: 'Design',
-        location: 'Remote · Americas',
-        arrangement: 'remote',
-        employmentType: 'full_time',
-        status: 'open',
-        applicants: 87,
-        newThisWeek: 9,
-        openedAt: 'Dec 18, 2025',
-        daysOpen: 15,
-        hiringManager: 'Marcus Alvarez',
-        compensation: '$185k – $215k',
-        pipeline: {
-          applied: 87,
-          screened: 31,
-          interviewing: 8,
-          offer: 1,
-        },
-      },
-      {
-        id: 'pos-engineering-manager',
-        title: 'Engineering Manager, Platform',
-        department: 'Engineering',
-        location: 'New York, NY',
-        arrangement: 'onsite',
-        employmentType: 'full_time',
-        status: 'open',
-        applicants: 56,
-        newThisWeek: 5,
-        openedAt: 'Nov 28, 2025',
-        daysOpen: 35,
-        hiringManager: 'Elena Park',
-        compensation: '$220k – $255k',
-        pipeline: {
-          applied: 56,
-          screened: 22,
-          interviewing: 9,
-          offer: 3,
-        },
-      },
-      {
-        id: 'pos-revops-lead',
-        title: 'Revenue Operations Lead',
-        department: 'Revenue',
-        location: 'Austin, TX',
-        arrangement: 'hybrid',
-        employmentType: 'full_time',
-        status: 'paused',
-        applicants: 34,
-        newThisWeek: 0,
-        openedAt: 'Nov 5, 2025',
-        daysOpen: 58,
-        hiringManager: 'Jordan Rivera',
-        compensation: '$150k – $175k',
-        pipeline: {
-          applied: 34,
-          screened: 12,
-          interviewing: 3,
-          offer: 0,
-        },
-      },
-      {
-        id: 'pos-platform-engineer',
-        title: 'Platform Engineer',
-        department: 'Engineering',
-        location: 'Remote · EMEA',
-        arrangement: 'remote',
-        employmentType: 'full_time',
-        status: 'open',
-        applicants: 119,
-        newThisWeek: 22,
-        openedAt: 'Dec 22, 2025',
-        daysOpen: 11,
-        hiringManager: 'Kai Patel',
-        compensation: '$160k – $190k',
-        pipeline: {
-          applied: 119,
-          screened: 37,
-          interviewing: 11,
-          offer: 1,
-        },
-      },
-      {
-        id: 'pos-content-strategist',
-        title: 'Content Strategist',
-        department: 'Marketing',
-        location: 'Remote · Americas',
-        arrangement: 'remote',
-        employmentType: 'contract',
-        status: 'filled',
-        applicants: 64,
-        newThisWeek: 0,
-        openedAt: 'Oct 10, 2025',
-        daysOpen: 84,
-        hiringManager: 'Amelia Chen',
-        compensation: '$110/hr',
-        pipeline: {
-          applied: 64,
-          screened: 19,
-          interviewing: 6,
-          offer: 1,
-        },
-      },
-      {
-        id: 'pos-finance-analyst',
-        title: 'Finance Analyst',
-        department: 'Finance',
-        location: 'New York, NY',
-        arrangement: 'hybrid',
-        employmentType: 'full_time',
-        status: 'draft',
-        applicants: 0,
-        newThisWeek: 0,
-        openedAt: '—',
-        daysOpen: 0,
-        hiringManager: 'Elena Park',
-        compensation: '$120k – $145k',
-        pipeline: {
-          applied: 0,
-          screened: 0,
-          interviewing: 0,
-          offer: 0,
-        },
-      },
-      {
-        id: 'pos-summer-engineering-intern',
-        title: 'Summer Engineering Intern',
-        department: 'Engineering',
-        location: 'San Francisco, CA',
-        arrangement: 'onsite',
-        employmentType: 'internship',
-        status: 'open',
-        applicants: 211,
-        newThisWeek: 41,
-        openedAt: 'Dec 30, 2025',
-        daysOpen: 4,
-        hiringManager: 'Priya Shah',
-        compensation: '$45/hr',
-        pipeline: {
-          applied: 211,
-          screened: 74,
-          interviewing: 12,
-          offer: 0,
-        },
-      },
-    ],
-    [],
+    () =>
+      compositePositions.map((position) =>
+        buildHrPosition({ position, applications: [] }),
+      ),
+    [compositePositions],
   )
 
   const stats = useMemo<readonly HrPositionStatCard[]>(() => {
@@ -280,7 +204,32 @@ export function useHrPositionsViewModel(): HrPositionsViewModel {
     ]
   }, [positions])
 
-  return { stats, positions }
+  return { stats, positions, loading }
+}
+
+export function useHrPositionDetailViewModel(positionId: string | null): {
+  readonly position: HrPosition | null
+  readonly applications: readonly HrApplicationView[]
+  readonly loading: boolean
+} {
+  const { positions, loading: positionsLoading } = useHrPositions()
+  const { applications, loading: applicationsLoading } =
+    useHrApplicationsForPosition({
+      positionId: positionId ?? '__missing__',
+    })
+  const matched = useMemo(
+    () => positions.find((entry) => entry.id === positionId) ?? null,
+    [positions, positionId],
+  )
+  const composed = useMemo(() => {
+    if (!matched) return null
+    return buildHrPosition({ position: matched, applications })
+  }, [matched, applications])
+  return {
+    position: composed,
+    applications,
+    loading: positionsLoading || applicationsLoading,
+  }
 }
 
 export function resolvePositionStatusPresentation(status: HrPositionStatus): {
@@ -322,6 +271,14 @@ export function resolvePositionStatusPresentation(status: HrPositionStatus): {
         chipClassName:
           'border-border-light bg-surface-overlay text-foreground-secondary',
       }
+    case 'archived':
+      return {
+        label: 'Archived',
+        icon: PauseCircle,
+        className: 'text-foreground-tertiary',
+        chipClassName:
+          'border-border-light bg-surface-overlay text-foreground-tertiary',
+      }
   }
 }
 
@@ -357,4 +314,5 @@ export const POSITION_STATUS_FILTERS: ReadonlyArray<{
   { value: 'paused', label: 'Paused' },
   { value: 'filled', label: 'Filled' },
   { value: 'draft', label: 'Drafts' },
+  { value: 'archived', label: 'Archived' },
 ]

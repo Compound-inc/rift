@@ -5,6 +5,7 @@ import ArrowRight from 'lucide-react/dist/esm/icons/arrow-right'
 import Sparkles from 'lucide-react/dist/esm/icons/sparkles'
 import { Link } from '@tanstack/react-router'
 import { cn } from '@rift/utils'
+import { m } from '@/paraglide/messages.js'
 import type { HrPipelineInsight, HrPipelineStage } from './hr-home-page.logic'
 
 export function HrPipelineFunnel({
@@ -99,7 +100,7 @@ function FunnelInsightBar({ insight }: { insight: HrPipelineInsight }) {
         className="size-4 text-[color:var(--accent-primary)]"
       />
       <span className="text-foreground-primary">
-        <span className="font-medium text-foreground-strong">Insight:</span>{' '}
+        <span className="font-medium text-foreground-strong">{m.hr_pipeline_insight()}</span>{' '}
         {insight.message}
       </span>
       <span aria-hidden className="text-foreground-tertiary">

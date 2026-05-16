@@ -1,6 +1,11 @@
 {
   "version": "1.0.0",
   "steps": {
+    "node_modules/workflow/dist/stdlib.js": {
+      "fetch": {
+        "stepId": "step//workflow@4.2.4//fetch"
+      }
+    },
     "node_modules/workflow/dist/internal/builtins.js": {
       "__builtin_response_array_buffer": {
         "stepId": "__builtin_response_array_buffer"
@@ -11,8 +16,93 @@
       "__builtin_response_text": {
         "stepId": "__builtin_response_text"
       }
+    },
+    "src/lib/backend/hr/recruitment/workflows/steps.ts": {
+      "computeAffinityStep": {
+        "stepId": "step//./src/lib/backend/hr/recruitment/workflows/steps//computeAffinityStep"
+      },
+      "dispatchTestStep": {
+        "stepId": "step//./src/lib/backend/hr/recruitment/workflows/steps//dispatchTestStep"
+      },
+      "finalizeApplicationStep": {
+        "stepId": "step//./src/lib/backend/hr/recruitment/workflows/steps//finalizeApplicationStep"
+      },
+      "ingestCvStep": {
+        "stepId": "step//./src/lib/backend/hr/recruitment/workflows/steps//ingestCvStep"
+      },
+      "recordBackgroundCheckResultStep": {
+        "stepId": "step//./src/lib/backend/hr/recruitment/workflows/steps//recordBackgroundCheckResultStep"
+      },
+      "recordTestResultStep": {
+        "stepId": "step//./src/lib/backend/hr/recruitment/workflows/steps//recordTestResultStep"
+      },
+      "requireBackgroundCheckAddonStep": {
+        "stepId": "step//./src/lib/backend/hr/recruitment/workflows/steps//requireBackgroundCheckAddonStep"
+      }
     }
   },
-  "workflows": {},
+  "workflows": {
+    "src/lib/backend/hr/recruitment/workflows/candidate-pipeline.ts": {
+      "candidatePipelineWorkflow": {
+        "workflowId": "workflow//./src/lib/backend/hr/recruitment/workflows/candidate-pipeline//candidatePipelineWorkflow",
+        "graph": {
+          "nodes": [
+            {
+              "id": "start",
+              "type": "workflowStart",
+              "data": {
+                "label": "Start: candidatePipelineWorkflow",
+                "nodeKind": "workflow_start"
+              }
+            },
+            {
+              "id": "node_0",
+              "type": "primitive",
+              "data": {
+                "label": "createHook",
+                "nodeKind": "primitive"
+              }
+            },
+            {
+              "id": "node_1",
+              "type": "primitive",
+              "data": {
+                "label": "createHook",
+                "nodeKind": "primitive"
+              }
+            },
+            {
+              "id": "end",
+              "type": "workflowEnd",
+              "data": {
+                "label": "Return",
+                "nodeKind": "workflow_end"
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "e_start_node_0",
+              "source": "start",
+              "target": "node_0",
+              "type": "default"
+            },
+            {
+              "id": "e_node_0_node_1",
+              "source": "node_0",
+              "target": "node_1",
+              "type": "default"
+            },
+            {
+              "id": "e_node_1_end",
+              "source": "node_1",
+              "target": "end",
+              "type": "default"
+            }
+          ]
+        }
+      }
+    }
+  },
   "classes": {}
 }

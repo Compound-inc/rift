@@ -46,10 +46,12 @@ import { Route as appLayoutSettingsSecurityRouteRouteImport } from './routes/(ap
 import { Route as appLayoutOrganizationSettingsRouteRouteImport } from './routes/(app)/_layout/organization/settings/route'
 import { Route as appLayoutHrRecruitmentRouteRouteImport } from './routes/(app)/_layout/hr/recruitment/route'
 import { Route as appLayoutHrPayrollRouteRouteImport } from './routes/(app)/_layout/hr/payroll/route'
+import { Route as appLayoutHrBackgroundCheckRouteRouteImport } from './routes/(app)/_layout/hr/background-check/route'
 import { Route as appLayoutChatThreadIdRouteRouteImport } from './routes/(app)/_layout/chat/$threadId/route'
 import { Route as appLayoutOrganizationSettingsIndexRouteImport } from './routes/(app)/_layout/organization/settings/index'
 import { Route as appLayoutHrRecruitmentIndexRouteImport } from './routes/(app)/_layout/hr/recruitment/index'
 import { Route as appLayoutHrPayrollIndexRouteImport } from './routes/(app)/_layout/hr/payroll/index'
+import { Route as appLayoutHrBackgroundCheckIndexRouteImport } from './routes/(app)/_layout/hr/background-check/index'
 import { Route as eeSingularityLayoutOrgsOrganizationIdRouteImport } from './routes/(ee)/singularity/_layout/orgs/$organizationId'
 import { Route as appLayoutOrganizationSettingsToolsRouteRouteImport } from './routes/(app)/_layout/organization/settings/tools/route'
 import { Route as appLayoutOrganizationSettingsSecurityRouteRouteImport } from './routes/(app)/_layout/organization/settings/security/route'
@@ -66,7 +68,10 @@ import { Route as appLayoutOrganizationSettingsModelsIndexRouteImport } from './
 import { Route as appLayoutOrganizationSettingsHrIndexRouteImport } from './routes/(app)/_layout/organization/settings/hr/index'
 import { Route as appLayoutHrRecruitmentPositionsIndexRouteImport } from './routes/(app)/_layout/hr/recruitment/positions/index'
 import { Route as appLayoutHrRecruitmentPositionsPositionIdRouteImport } from './routes/(app)/_layout/hr/recruitment/positions/$positionId'
+import { Route as ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRouteImport } from './routes/api/hr/recruitment/test-dispatches/$dispatchId/complete/route'
 import { Route as appLayoutOrganizationSettingsModelsProviderIdRouteRouteImport } from './routes/(app)/_layout/organization/settings/models/$providerId/route'
+import { Route as ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRouteImport } from './routes/api/hr/recruitment/positions/$positionId/applications/clear/route'
+import { Route as ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRouteImport } from './routes/api/hr/recruitment/positions/$positionId/applications/bulk-upload/route'
 
 const SetupRouteRoute = SetupRouteRouteImport.update({
   id: '/setup',
@@ -259,6 +264,12 @@ const appLayoutHrPayrollRouteRoute = appLayoutHrPayrollRouteRouteImport.update({
   path: '/payroll',
   getParentRoute: () => appLayoutHrRouteRoute,
 } as any)
+const appLayoutHrBackgroundCheckRouteRoute =
+  appLayoutHrBackgroundCheckRouteRouteImport.update({
+    id: '/background-check',
+    path: '/background-check',
+    getParentRoute: () => appLayoutHrRouteRoute,
+  } as any)
 const appLayoutChatThreadIdRouteRoute =
   appLayoutChatThreadIdRouteRouteImport.update({
     id: '/$threadId',
@@ -282,6 +293,12 @@ const appLayoutHrPayrollIndexRoute = appLayoutHrPayrollIndexRouteImport.update({
   path: '/',
   getParentRoute: () => appLayoutHrPayrollRouteRoute,
 } as any)
+const appLayoutHrBackgroundCheckIndexRoute =
+  appLayoutHrBackgroundCheckIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => appLayoutHrBackgroundCheckRouteRoute,
+  } as any)
 const eeSingularityLayoutOrgsOrganizationIdRoute =
   eeSingularityLayoutOrgsOrganizationIdRouteImport.update({
     id: '/orgs/$organizationId',
@@ -378,12 +395,32 @@ const appLayoutHrRecruitmentPositionsPositionIdRoute =
     path: '/positions/$positionId',
     getParentRoute: () => appLayoutHrRecruitmentRouteRoute,
   } as any)
+const ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRoute =
+  ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRouteImport.update({
+    id: '/api/hr/recruitment/test-dispatches/$dispatchId/complete',
+    path: '/api/hr/recruitment/test-dispatches/$dispatchId/complete',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const appLayoutOrganizationSettingsModelsProviderIdRouteRoute =
   appLayoutOrganizationSettingsModelsProviderIdRouteRouteImport.update({
     id: '/$providerId',
     path: '/$providerId',
     getParentRoute: () => appLayoutOrganizationSettingsModelsRouteRoute,
   } as any)
+const ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRoute =
+  ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRouteImport.update({
+    id: '/api/hr/recruitment/positions/$positionId/applications/clear',
+    path: '/api/hr/recruitment/positions/$positionId/applications/clear',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRoute =
+  ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRouteImport.update(
+    {
+      id: '/api/hr/recruitment/positions/$positionId/applications/bulk-upload',
+      path: '/api/hr/recruitment/positions/$positionId/applications/bulk-upload',
+      getParentRoute: () => rootRouteImport,
+    } as any,
+  )
 
 export interface FileRoutesByFullPath {
   '/auth': typeof AuthRouteRouteWithChildren
@@ -414,6 +451,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/': typeof appLayoutIndexRoute
   '/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
+  '/hr/background-check': typeof appLayoutHrBackgroundCheckRouteRouteWithChildren
   '/hr/payroll': typeof appLayoutHrPayrollRouteRouteWithChildren
   '/hr/recruitment': typeof appLayoutHrRecruitmentRouteRouteWithChildren
   '/organization/settings': typeof appLayoutOrganizationSettingsRouteRouteWithChildren
@@ -435,14 +473,18 @@ export interface FileRoutesByFullPath {
   '/organization/settings/security': typeof appLayoutOrganizationSettingsSecurityRouteRoute
   '/organization/settings/tools': typeof appLayoutOrganizationSettingsToolsRouteRoute
   '/singularity/orgs/$organizationId': typeof eeSingularityLayoutOrgsOrganizationIdRoute
+  '/hr/background-check/': typeof appLayoutHrBackgroundCheckIndexRoute
   '/hr/payroll/': typeof appLayoutHrPayrollIndexRoute
   '/hr/recruitment/': typeof appLayoutHrRecruitmentIndexRoute
   '/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
   '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
+  '/api/hr/recruitment/test-dispatches/$dispatchId/complete': typeof ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRoute
   '/hr/recruitment/positions/$positionId': typeof appLayoutHrRecruitmentPositionsPositionIdRoute
   '/hr/recruitment/positions/': typeof appLayoutHrRecruitmentPositionsIndexRoute
   '/organization/settings/hr/': typeof appLayoutOrganizationSettingsHrIndexRoute
   '/organization/settings/models/': typeof appLayoutOrganizationSettingsModelsIndexRoute
+  '/api/hr/recruitment/positions/$positionId/applications/bulk-upload': typeof ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRoute
+  '/api/hr/recruitment/positions/$positionId/applications/clear': typeof ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRouteRouteWithChildren
@@ -484,14 +526,18 @@ export interface FileRoutesByTo {
   '/organization/settings/security': typeof appLayoutOrganizationSettingsSecurityRouteRoute
   '/organization/settings/tools': typeof appLayoutOrganizationSettingsToolsRouteRoute
   '/singularity/orgs/$organizationId': typeof eeSingularityLayoutOrgsOrganizationIdRoute
+  '/hr/background-check': typeof appLayoutHrBackgroundCheckIndexRoute
   '/hr/payroll': typeof appLayoutHrPayrollIndexRoute
   '/hr/recruitment': typeof appLayoutHrRecruitmentIndexRoute
   '/organization/settings': typeof appLayoutOrganizationSettingsIndexRoute
   '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
+  '/api/hr/recruitment/test-dispatches/$dispatchId/complete': typeof ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRoute
   '/hr/recruitment/positions/$positionId': typeof appLayoutHrRecruitmentPositionsPositionIdRoute
   '/hr/recruitment/positions': typeof appLayoutHrRecruitmentPositionsIndexRoute
   '/organization/settings/hr': typeof appLayoutOrganizationSettingsHrIndexRoute
   '/organization/settings/models': typeof appLayoutOrganizationSettingsModelsIndexRoute
+  '/api/hr/recruitment/positions/$positionId/applications/bulk-upload': typeof ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRoute
+  '/api/hr/recruitment/positions/$positionId/applications/clear': typeof ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -524,6 +570,7 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/(app)/_layout/': typeof appLayoutIndexRoute
   '/(app)/_layout/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
+  '/(app)/_layout/hr/background-check': typeof appLayoutHrBackgroundCheckRouteRouteWithChildren
   '/(app)/_layout/hr/payroll': typeof appLayoutHrPayrollRouteRouteWithChildren
   '/(app)/_layout/hr/recruitment': typeof appLayoutHrRecruitmentRouteRouteWithChildren
   '/(app)/_layout/organization/settings': typeof appLayoutOrganizationSettingsRouteRouteWithChildren
@@ -545,14 +592,18 @@ export interface FileRoutesById {
   '/(app)/_layout/organization/settings/security': typeof appLayoutOrganizationSettingsSecurityRouteRoute
   '/(app)/_layout/organization/settings/tools': typeof appLayoutOrganizationSettingsToolsRouteRoute
   '/(ee)/singularity/_layout/orgs/$organizationId': typeof eeSingularityLayoutOrgsOrganizationIdRoute
+  '/(app)/_layout/hr/background-check/': typeof appLayoutHrBackgroundCheckIndexRoute
   '/(app)/_layout/hr/payroll/': typeof appLayoutHrPayrollIndexRoute
   '/(app)/_layout/hr/recruitment/': typeof appLayoutHrRecruitmentIndexRoute
   '/(app)/_layout/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
   '/(app)/_layout/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
+  '/api/hr/recruitment/test-dispatches/$dispatchId/complete': typeof ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRoute
   '/(app)/_layout/hr/recruitment/positions/$positionId': typeof appLayoutHrRecruitmentPositionsPositionIdRoute
   '/(app)/_layout/hr/recruitment/positions/': typeof appLayoutHrRecruitmentPositionsIndexRoute
   '/(app)/_layout/organization/settings/hr/': typeof appLayoutOrganizationSettingsHrIndexRoute
   '/(app)/_layout/organization/settings/models/': typeof appLayoutOrganizationSettingsModelsIndexRoute
+  '/api/hr/recruitment/positions/$positionId/applications/bulk-upload': typeof ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRoute
+  '/api/hr/recruitment/positions/$positionId/applications/clear': typeof ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -585,6 +636,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/'
     | '/chat/$threadId'
+    | '/hr/background-check'
     | '/hr/payroll'
     | '/hr/recruitment'
     | '/organization/settings'
@@ -606,14 +658,18 @@ export interface FileRouteTypes {
     | '/organization/settings/security'
     | '/organization/settings/tools'
     | '/singularity/orgs/$organizationId'
+    | '/hr/background-check/'
     | '/hr/payroll/'
     | '/hr/recruitment/'
     | '/organization/settings/'
     | '/organization/settings/models/$providerId'
+    | '/api/hr/recruitment/test-dispatches/$dispatchId/complete'
     | '/hr/recruitment/positions/$positionId'
     | '/hr/recruitment/positions/'
     | '/organization/settings/hr/'
     | '/organization/settings/models/'
+    | '/api/hr/recruitment/positions/$positionId/applications/bulk-upload'
+    | '/api/hr/recruitment/positions/$positionId/applications/clear'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
@@ -655,14 +711,18 @@ export interface FileRouteTypes {
     | '/organization/settings/security'
     | '/organization/settings/tools'
     | '/singularity/orgs/$organizationId'
+    | '/hr/background-check'
     | '/hr/payroll'
     | '/hr/recruitment'
     | '/organization/settings'
     | '/organization/settings/models/$providerId'
+    | '/api/hr/recruitment/test-dispatches/$dispatchId/complete'
     | '/hr/recruitment/positions/$positionId'
     | '/hr/recruitment/positions'
     | '/organization/settings/hr'
     | '/organization/settings/models'
+    | '/api/hr/recruitment/positions/$positionId/applications/bulk-upload'
+    | '/api/hr/recruitment/positions/$positionId/applications/clear'
   id:
     | '__root__'
     | '/auth'
@@ -694,6 +754,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/(app)/_layout/'
     | '/(app)/_layout/chat/$threadId'
+    | '/(app)/_layout/hr/background-check'
     | '/(app)/_layout/hr/payroll'
     | '/(app)/_layout/hr/recruitment'
     | '/(app)/_layout/organization/settings'
@@ -715,14 +776,18 @@ export interface FileRouteTypes {
     | '/(app)/_layout/organization/settings/security'
     | '/(app)/_layout/organization/settings/tools'
     | '/(ee)/singularity/_layout/orgs/$organizationId'
+    | '/(app)/_layout/hr/background-check/'
     | '/(app)/_layout/hr/payroll/'
     | '/(app)/_layout/hr/recruitment/'
     | '/(app)/_layout/organization/settings/'
     | '/(app)/_layout/organization/settings/models/$providerId'
+    | '/api/hr/recruitment/test-dispatches/$dispatchId/complete'
     | '/(app)/_layout/hr/recruitment/positions/$positionId'
     | '/(app)/_layout/hr/recruitment/positions/'
     | '/(app)/_layout/organization/settings/hr/'
     | '/(app)/_layout/organization/settings/models/'
+    | '/api/hr/recruitment/positions/$positionId/applications/bulk-upload'
+    | '/api/hr/recruitment/positions/$positionId/applications/clear'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -744,6 +809,9 @@ export interface RootRouteChildren {
   ApiZeroQueryRouteRoute: typeof ApiZeroQueryRouteRoute
   ApiZeroTokenRouteRoute: typeof ApiZeroTokenRouteRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRoute: typeof ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRoute
+  ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRoute: typeof ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRoute
+  ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRoute: typeof ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1007,6 +1075,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appLayoutHrPayrollRouteRouteImport
       parentRoute: typeof appLayoutHrRouteRoute
     }
+    '/(app)/_layout/hr/background-check': {
+      id: '/(app)/_layout/hr/background-check'
+      path: '/background-check'
+      fullPath: '/hr/background-check'
+      preLoaderRoute: typeof appLayoutHrBackgroundCheckRouteRouteImport
+      parentRoute: typeof appLayoutHrRouteRoute
+    }
     '/(app)/_layout/chat/$threadId': {
       id: '/(app)/_layout/chat/$threadId'
       path: '/$threadId'
@@ -1034,6 +1109,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/hr/payroll/'
       preLoaderRoute: typeof appLayoutHrPayrollIndexRouteImport
       parentRoute: typeof appLayoutHrPayrollRouteRoute
+    }
+    '/(app)/_layout/hr/background-check/': {
+      id: '/(app)/_layout/hr/background-check/'
+      path: '/'
+      fullPath: '/hr/background-check/'
+      preLoaderRoute: typeof appLayoutHrBackgroundCheckIndexRouteImport
+      parentRoute: typeof appLayoutHrBackgroundCheckRouteRoute
     }
     '/(ee)/singularity/_layout/orgs/$organizationId': {
       id: '/(ee)/singularity/_layout/orgs/$organizationId'
@@ -1147,12 +1229,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appLayoutHrRecruitmentPositionsPositionIdRouteImport
       parentRoute: typeof appLayoutHrRecruitmentRouteRoute
     }
+    '/api/hr/recruitment/test-dispatches/$dispatchId/complete': {
+      id: '/api/hr/recruitment/test-dispatches/$dispatchId/complete'
+      path: '/api/hr/recruitment/test-dispatches/$dispatchId/complete'
+      fullPath: '/api/hr/recruitment/test-dispatches/$dispatchId/complete'
+      preLoaderRoute: typeof ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/(app)/_layout/organization/settings/models/$providerId': {
       id: '/(app)/_layout/organization/settings/models/$providerId'
       path: '/$providerId'
       fullPath: '/organization/settings/models/$providerId'
       preLoaderRoute: typeof appLayoutOrganizationSettingsModelsProviderIdRouteRouteImport
       parentRoute: typeof appLayoutOrganizationSettingsModelsRouteRoute
+    }
+    '/api/hr/recruitment/positions/$positionId/applications/clear': {
+      id: '/api/hr/recruitment/positions/$positionId/applications/clear'
+      path: '/api/hr/recruitment/positions/$positionId/applications/clear'
+      fullPath: '/api/hr/recruitment/positions/$positionId/applications/clear'
+      preLoaderRoute: typeof ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/hr/recruitment/positions/$positionId/applications/bulk-upload': {
+      id: '/api/hr/recruitment/positions/$positionId/applications/bulk-upload'
+      path: '/api/hr/recruitment/positions/$positionId/applications/bulk-upload'
+      fullPath: '/api/hr/recruitment/positions/$positionId/applications/bulk-upload'
+      preLoaderRoute: typeof ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -1185,6 +1288,20 @@ const appLayoutChatRouteRouteChildren: appLayoutChatRouteRouteChildren = {
 
 const appLayoutChatRouteRouteWithChildren =
   appLayoutChatRouteRoute._addFileChildren(appLayoutChatRouteRouteChildren)
+
+interface appLayoutHrBackgroundCheckRouteRouteChildren {
+  appLayoutHrBackgroundCheckIndexRoute: typeof appLayoutHrBackgroundCheckIndexRoute
+}
+
+const appLayoutHrBackgroundCheckRouteRouteChildren: appLayoutHrBackgroundCheckRouteRouteChildren =
+  {
+    appLayoutHrBackgroundCheckIndexRoute: appLayoutHrBackgroundCheckIndexRoute,
+  }
+
+const appLayoutHrBackgroundCheckRouteRouteWithChildren =
+  appLayoutHrBackgroundCheckRouteRoute._addFileChildren(
+    appLayoutHrBackgroundCheckRouteRouteChildren,
+  )
 
 interface appLayoutHrPayrollRouteRouteChildren {
   appLayoutHrPayrollIndexRoute: typeof appLayoutHrPayrollIndexRoute
@@ -1221,12 +1338,15 @@ const appLayoutHrRecruitmentRouteRouteWithChildren =
   )
 
 interface appLayoutHrRouteRouteChildren {
+  appLayoutHrBackgroundCheckRouteRoute: typeof appLayoutHrBackgroundCheckRouteRouteWithChildren
   appLayoutHrPayrollRouteRoute: typeof appLayoutHrPayrollRouteRouteWithChildren
   appLayoutHrRecruitmentRouteRoute: typeof appLayoutHrRecruitmentRouteRouteWithChildren
   appLayoutHrIndexRoute: typeof appLayoutHrIndexRoute
 }
 
 const appLayoutHrRouteRouteChildren: appLayoutHrRouteRouteChildren = {
+  appLayoutHrBackgroundCheckRouteRoute:
+    appLayoutHrBackgroundCheckRouteRouteWithChildren,
   appLayoutHrPayrollRouteRoute: appLayoutHrPayrollRouteRouteWithChildren,
   appLayoutHrRecruitmentRouteRoute:
     appLayoutHrRecruitmentRouteRouteWithChildren,
@@ -1421,6 +1541,12 @@ const rootRouteChildren: RootRouteChildren = {
   ApiZeroQueryRouteRoute: ApiZeroQueryRouteRoute,
   ApiZeroTokenRouteRoute: ApiZeroTokenRouteRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRoute:
+    ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRoute,
+  ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRoute:
+    ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRoute,
+  ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRoute:
+    ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

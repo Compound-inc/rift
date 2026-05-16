@@ -15,8 +15,13 @@ import {
 import { Textarea } from '@rift/ui/textarea'
 import { toast } from 'sonner'
 import Plus from 'lucide-react/dist/esm/icons/plus'
+import { createPosition } from '@/lib/frontend/hr/recruitment'
 
-export function HrCreatePositionDialog() {
+export function HrCreatePositionDialog({
+  onCreated,
+}: {
+  onCreated?: (positionId: string) => void
+}) {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [department, setDepartment] = useState('')
@@ -26,8 +31,10 @@ export function HrCreatePositionDialog() {
   const [hiringManager, setHiringManager] = useState('')
   const [compensation, setCompensation] = useState('')
   const [description, setDescription] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const submitDisabled =
+    submitting ||
     title.trim().length === 0 ||
     department.trim().length === 0 ||
     location.trim().length === 0
@@ -49,10 +56,33 @@ export function HrCreatePositionDialog() {
   }
 
   const handleSubmit = async () => {
-    await new Promise((resolve) => setTimeout(resolve, 600))
-    toast.success(`${title.trim()} added to drafts`)
-    setOpen(false)
-    reset()
+    setSubmitting(true)
+    try {
+      const created = await createPosition({
+        data: {
+          title: title.trim(),
+          department: department.trim(),
+          location: location.trim(),
+          arrangement,
+          employmentType,
+          status: 'open',
+          hiringManager: hiringManager.trim() || undefined,
+          compensation: compensation.trim() || undefined,
+          description: description.trim() || undefined,
+          tags: [department.trim().toLowerCase()].filter(Boolean),
+        },
+      })
+      toast.success(`${created.title} added.`)
+      onCreated?.(created.id)
+      setOpen(false)
+      reset()
+    } catch (cause) {
+      toast.error(
+        cause instanceof Error ? cause.message : 'Failed to create position.',
+      )
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -67,7 +97,7 @@ export function HrCreatePositionDialog() {
       }
       title="Open a new position"
       description="Draft the role now, publish it when the team is aligned."
-      buttonText="Create position"
+      buttonText={submitting ? 'Creating…' : 'Create position'}
       submitButtonDisabled={submitDisabled}
       handleSubmit={handleSubmit}
     >

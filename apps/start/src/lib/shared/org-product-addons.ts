@@ -36,8 +36,23 @@ export const ORG_PRODUCT_ADDON_CATALOG = {
       recruitment: {
         label: 'Recruitment',
         description:
-          'Candidate pipeline, job postings, and interview scheduling workflows.',
-        orgConfigurableSettingKeys: [] as const,
+          'Candidate pipeline, job postings, bulk CV ingest, AI affinity scoring, and assessment workflows.',
+        orgConfigurableSettingKeys: [
+          'recruitment.aiRerankEnabled',
+          'recruitment.aiRerankTopK',
+          'recruitment.autoArchiveAfterDays',
+          'recruitment.testTimeoutDays',
+        ] as const,
+      },
+      'background-check': {
+        label: 'Background Check',
+        description:
+          'Credit and legal verification for shortlisted recruitment candidates. Runs as the final stage of the recruitment pipeline.',
+        orgConfigurableSettingKeys: [
+          'background-check.creditScoreEnabled',
+          'background-check.legalBuroEnabled',
+          'background-check.providerKey',
+        ] as const,
       },
       payroll: {
         label: 'Payroll',

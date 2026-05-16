@@ -1,6 +1,7 @@
 import { defineQueriesWithType } from '@rocicorp/zero'
 import type { Schema } from './schema'
 import { chatQueryDefinitions } from './queries/chat.queries'
+import { hrRecruitmentQueryDefinitions } from './queries/hr-recruitment.queries'
 import { orgBillingQueryDefinitions } from './queries/org-billing.queries'
 import { orgKnowledgeQueryDefinitions } from './queries/org-knowledge.queries'
 import { orgProductPolicyQueryDefinitions } from './queries/org-product-policy.queries'
@@ -13,6 +14,7 @@ import { orgPolicyQueryDefinitions } from './queries/org-policy.queries'
  */
 export const queries = defineQueriesWithType<Schema>()({
   ...chatQueryDefinitions,
+  ...hrRecruitmentQueryDefinitions,
   ...orgBillingQueryDefinitions,
   ...orgKnowledgeQueryDefinitions,
   ...orgProductPolicyQueryDefinitions,

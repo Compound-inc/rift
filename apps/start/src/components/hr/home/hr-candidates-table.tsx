@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from '@rift/ui/table'
+import { m } from '@/paraglide/messages.js'
 import type { HrCandidateRow } from './hr-home-page.logic'
 import { resolveCandidateStatusPresentation } from './hr-home-page.logic'
 
@@ -27,26 +28,28 @@ export function HrCandidatesTable({
         'flex flex-col overflow-hidden rounded-xl border border-border-base bg-surface-raised shadow-[0_1px_0_0_rgb(0_0_0_/_0.02)]',
         className,
       )}
-      aria-label={title}
+      aria-label={title ?? m.hr_candidates_table_title()}
     >
       <header className="border-b border-border-light px-4 py-3">
-        <h2 className="text-sm font-medium text-foreground-strong">{title}</h2>
+        <h2 className="text-sm font-medium text-foreground-strong">
+          {title ?? m.hr_candidates_table_title()}
+        </h2>
       </header>
 
       <Table className="text-sm">
         <TableHeader>
           <TableRow className="border-border-light bg-surface-overlay hover:bg-surface-overlay">
             <TableHead className="bg-transparent px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-foreground-tertiary">
-              Candidate
+              {m.hr_candidates_table_header_candidate()}
             </TableHead>
             <TableHead className="bg-transparent px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-foreground-tertiary">
-              Applied
+              {m.hr_candidates_table_header_applied()}
             </TableHead>
             <TableHead className="bg-transparent px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-foreground-tertiary">
-              Status
+              {m.hr_candidates_table_header_status()}
             </TableHead>
             <TableHead className="bg-transparent px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-foreground-tertiary">
-              Offer value
+              {m.hr_candidates_table_header_offer_value()}
             </TableHead>
           </TableRow>
         </TableHeader>
