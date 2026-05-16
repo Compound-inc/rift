@@ -33,21 +33,21 @@ export type {
   ExtractContactInput,
   HrCvIngestServiceShape,
 } from './services/cv-ingest.service'
-export { HrCandidateTestDispatcherService } from './services/candidate-test-dispatcher.service'
+export { HrEvaluationDispatcherService } from './services/evaluation-dispatcher.service'
 export type {
-  DispatchTestInput,
-  DispatchTestResult,
-  HrCandidateTestDispatcherServiceShape,
-} from './services/candidate-test-dispatcher.service'
+  DispatchEvaluationInput,
+  DispatchEvaluationOutcome,
+  HrEvaluationDispatcherServiceShape,
+} from './services/evaluation-dispatcher.service'
+export {
+  buildEvaluationDispatchUrl,
+  signEvaluationDispatchToken,
+  verifyEvaluationDispatchToken,
+} from './services/evaluation-urls'
 export { HrPositionService } from './services/position.service'
 export type {
   CreatePositionInput,
   HrPositionServiceShape,
   UpdatePositionInput,
 } from './services/position.service'
-export { HrTestTemplateService } from './services/test-template.service'
-export type {
-  CreateTestTemplateInput,
-  HrTestTemplateServiceShape,
-} from './services/test-template.service'
 export { HrRecruitmentRuntime } from './runtime/hr-recruitment-runtime'

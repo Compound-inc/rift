@@ -11,7 +11,6 @@ import { Effect } from 'effect'
 import {
   HrPositionService,
   HrRecruitmentRuntime,
-  HrTestTemplateService,
 } from '@/lib/backend/hr/recruitment'
 import { PermissionService } from '@/lib/backend/permissions/services/permission.service'
 import { PermissionsRuntime } from '@/lib/backend/permissions/runtime/permissions-runtime'
@@ -20,8 +19,6 @@ import {
   PermissionDeniedError,
   PermissionResolveError,
 } from '@/lib/backend/permissions/domain/errors'
-
-const REQUEST_ID_PREFIX = 'hr.recruitment'
 
 class HrRecruitmentUnauthorizedError extends Error {
   readonly statusCode = 401
@@ -98,13 +95,6 @@ export async function createPositionAction(input: CreatePositionAction) {
   return HrRecruitmentRuntime.run(
     Effect.gen(function* () {
       const positionService = yield* HrPositionService
-      const testTemplateService = yield* HrTestTemplateService
-      // Seed the built-in test template catalog the first time
-      // recruitment is used in this org. Idempotent.
-      yield* testTemplateService.ensureBuiltInsForOrg({
-        organizationId: auth.organizationId,
-        requestId: `${REQUEST_ID_PREFIX}.seed`,
-      })
       return yield* positionService.create({
         organizationId: auth.organizationId,
         userId: auth.userId,

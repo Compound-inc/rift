@@ -53,10 +53,10 @@ function rejectionLabel(reason: string | null): string {
       return 'Rejected · CV did not include extractable text'
     case 'cv-unidentifiable':
       return 'Rejected · could not identify the candidate from the CV'
-    case 'test-failed':
-      return 'Rejected · failed the assessment'
-    case 'test-timeout':
-      return 'Rejected · assessment expired without submission'
+    case 'evaluation-failed':
+      return 'Rejected · failed the evaluation'
+    case 'evaluation-timeout':
+      return 'Rejected · evaluation expired without submission'
     case 'background-check-failed':
       return 'Rejected · failed the background check'
     case 'background-check-timeout':

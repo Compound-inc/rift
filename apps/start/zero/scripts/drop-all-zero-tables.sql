@@ -8,7 +8,6 @@ DROP TABLE IF EXISTS attachments;
 DROP TABLE IF EXISTS messages;
 DROP TABLE IF EXISTS threads;
 DROP TABLE IF EXISTS org_policy;
-DROP TABLE IF EXISTS org_product_config;
 DROP TABLE IF EXISTS org_product_policy;
 DROP TABLE IF EXISTS org_member_access;
 DROP TABLE IF EXISTS org_entitlement_snapshot;

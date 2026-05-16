@@ -51,7 +51,7 @@ export type AnalyzeCvInput = {
     readonly title: string
     readonly description: string
     readonly tags: readonly string[]
-    readonly recommendedTestKinds: readonly string[]
+    readonly recommendedEvaluationKinds: readonly string[]
   }
 }
 

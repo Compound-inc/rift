@@ -398,10 +398,10 @@ export class HrApplicationService extends ServiceMap.Service<
                 input.signals ? jsonValue(client, input.signals) : null
               },
               affinity_model = ${input.model},
-              cv_embedding = ${
+              cv_embedding = COALESCE(${
                 input.embedding ? jsonValue(client, input.embedding) : null
-              },
-              cv_embedding_model = ${input.embeddingModel ?? null},
+              }, cv_embedding),
+              cv_embedding_model = COALESCE(${input.embeddingModel ?? null}, cv_embedding_model),
               updated_at = ${now}
             where id = ${input.applicationId}
               and organization_id = ${input.organizationId}
@@ -574,7 +574,7 @@ export class HrApplicationService extends ServiceMap.Service<
         Effect.fn('HrApplicationService.hardDeleteForPosition')((input) =>
           Effect.gen(function* () {
             yield* client`
-              delete from hr_test_response
+              delete from hr_evaluation_response
               where organization_id = ${input.organizationId}
                 and application_id in (
                   select id from hr_application
@@ -587,13 +587,13 @@ export class HrApplicationService extends ServiceMap.Service<
                   organizationId: input.organizationId,
                   requestId: input.requestId,
                   operation: 'hardDeleteApplicationsForPosition.responses',
-                  message: 'Failed to delete test responses.',
+                  message: 'Failed to delete evaluation responses.',
                   cause,
                 }),
               ),
             )
             yield* client`
-              delete from hr_test_dispatch
+              delete from hr_evaluation_dispatch
               where organization_id = ${input.organizationId}
                 and application_id in (
                   select id from hr_application
@@ -606,7 +606,7 @@ export class HrApplicationService extends ServiceMap.Service<
                   organizationId: input.organizationId,
                   requestId: input.requestId,
                   operation: 'hardDeleteApplicationsForPosition.dispatches',
-                  message: 'Failed to delete test dispatches.',
+                  message: 'Failed to delete evaluation dispatches.',
                   cause,
                 }),
               ),

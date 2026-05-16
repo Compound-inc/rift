@@ -1,9 +1,9 @@
 import type {
   HrApplicationStage,
+  HrEvaluationKind,
   HrPositionEmploymentType,
   HrPositionStatus,
   HrPositionWorkArrangement,
-  HrTestKind,
 } from '@/lib/shared/hr/recruitment'
 
 export type HrPositionRow = {
@@ -19,7 +19,8 @@ export type HrPositionRow = {
   readonly hiringManager: string
   readonly compensation: string
   readonly tags: readonly string[]
-  readonly recommendedTestKinds: readonly HrTestKind[]
+
+  readonly recommendedEvaluationKinds: readonly HrEvaluationKind[]
   readonly descriptionEmbedding: readonly number[] | null
   readonly descriptionEmbeddingModel: string | null
   readonly descriptionEmbeddingDimensions: number | null
@@ -79,6 +80,11 @@ export type HrApplicationRow = {
   readonly affinityModel: string | null
   readonly cvAttachmentId: string | null
   readonly cvText: string | null
+  /**
+   * Snapshot of the CV embedding captured at application creation /
+   * affinity scoring time. Frozen with the application so a later
+   * candidate re-extraction does not rewrite historical scoring inputs.
+   */
   readonly cvEmbedding: readonly number[] | null
   readonly cvEmbeddingModel: string | null
   readonly workflowRunId: string | null
@@ -92,47 +98,29 @@ export type HrApplicationRow = {
   readonly updatedAt: number
 }
 
-export type HrTestTemplateRow = {
-  readonly id: string
-  readonly organizationId: string
-  readonly kind: HrTestKind
-  readonly title: string
-  readonly description: string
-  readonly defaultPassingScore: number
-  readonly questions: readonly Record<
-    string,
-    string | number | boolean | null
-  >[]
-  readonly isBuiltIn: boolean
-  readonly archivedAt: number | null
-  readonly createdAt: number
-  readonly updatedAt: number
-}
-
-export type HrPositionTestRequirementRow = {
-  readonly id: string
-  readonly organizationId: string
-  readonly positionId: string
-  readonly testTemplateId: string
-  readonly minimumScore: number | null
-  readonly weight: number
-  readonly isRequired: boolean
-  readonly createdAt: number
-  readonly updatedAt: number
-}
-
-export type HrTestDispatchRow = {
+/**
+ * Evaluation dispatch row. The `evaluationCatalogId` field is the id
+ * of an entry in `lib/shared/hr/recruitment/evaluation-catalog.ts`.
+ */
+export type HrEvaluationDispatchRow = {
   readonly id: string
   readonly organizationId: string
   readonly applicationId: string
-  readonly testTemplateId: string
+  readonly evaluationCatalogId: string
   readonly dispatchedVia: string
   readonly status: 'sent' | 'completed' | 'expired' | 'cancelled'
-  readonly resumeWebhookUrl: string | null
+  /** Hook token used by the workflow's `resumeHook(...)` call. */
+  readonly resumeHookToken: string | null
   readonly idempotencyKey: string
   readonly expiresAt: number | null
   readonly dispatchedAt: number
   readonly completedAt: number | null
+  /**
+   * Signed URL the admin / candidate follows in the browser to take
+   * the evaluation. Persisted at dispatch time so re-issued URLs match
+   * the original (the email channel will reuse it verbatim).
+   */
+  readonly completionUrl: string | null
   readonly createdAt: number
   readonly updatedAt: number
 }

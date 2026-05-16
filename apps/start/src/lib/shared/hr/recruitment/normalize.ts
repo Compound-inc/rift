@@ -1,10 +1,10 @@
-import { isHrApplicationStage, isHrTestKind } from './types'
+import { isHrApplicationStage, isHrEvaluationKind } from './types'
 import type {
   HrApplicationStage,
+  HrEvaluationKind,
   HrPositionEmploymentType,
   HrPositionStatus,
   HrPositionWorkArrangement,
-  HrTestKind,
 } from './types'
 
 const MAX_TITLE_LENGTH = 200
@@ -115,11 +115,11 @@ export function normalizeApplicationStage(
   return 'uploaded'
 }
 
-export function normalizeTestKind(
+export function normalizeEvaluationKind(
   value: string | null | undefined,
-): HrTestKind {
-  if (value && isHrTestKind(value)) return value
-  return 'custom'
+): HrEvaluationKind {
+  if (value && isHrEvaluationKind(value)) return value
+  return 'behavioral'
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/

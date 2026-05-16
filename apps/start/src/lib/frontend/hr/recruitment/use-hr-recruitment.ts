@@ -5,10 +5,10 @@ import { useQuery } from '@rocicorp/zero/react'
 import { queries } from '@/integrations/zero'
 import type {
   HrApplicationStage,
+  HrEvaluationKind,
   HrPositionEmploymentType,
   HrPositionStatus,
   HrPositionWorkArrangement,
-  HrTestKind,
 } from '@/lib/shared/hr/recruitment'
 
 export type HrPositionView = {
@@ -23,7 +23,7 @@ export type HrPositionView = {
   readonly hiringManager: string
   readonly compensation: string
   readonly tags: readonly string[]
-  readonly recommendedTestKinds: readonly HrTestKind[]
+  readonly recommendedEvaluationKinds: readonly HrEvaluationKind[]
   readonly archivedAt: number | null
   readonly createdAt: number
   readonly updatedAt: number
@@ -63,6 +63,16 @@ export type HrCandidateView = {
   readonly profileSource: string | null
 }
 
+export type HrEvaluationDispatchView = {
+  readonly id: string
+  readonly applicationId: string
+  readonly evaluationCatalogId: string
+  readonly status: 'sent' | 'completed' | 'expired' | 'cancelled'
+  readonly completionUrl: string | null
+  readonly dispatchedAt: number
+  readonly completedAt: number | null
+}
+
 function asPosition(row: Record<string, unknown>): HrPositionView {
   return {
     id: String(row.id ?? ''),
@@ -77,8 +87,8 @@ function asPosition(row: Record<string, unknown>): HrPositionView {
     hiringManager: String(row.hiringManager ?? ''),
     compensation: String(row.compensation ?? ''),
     tags: Array.isArray(row.tags) ? (row.tags as readonly string[]) : [],
-    recommendedTestKinds: Array.isArray(row.recommendedTestKinds)
-      ? (row.recommendedTestKinds as readonly HrTestKind[])
+    recommendedEvaluationKinds: Array.isArray(row.recommendedEvaluationKinds)
+      ? (row.recommendedEvaluationKinds as readonly HrEvaluationKind[])
       : [],
     archivedAt: typeof row.archivedAt === 'number' ? row.archivedAt : null,
     createdAt: typeof row.createdAt === 'number' ? row.createdAt : 0,
@@ -197,6 +207,54 @@ export function useHrCandidates(input?: {
   )
   return {
     candidates,
+    loading: result.type !== 'complete',
+  }
+}
+
+function asEvaluationDispatch(
+  row: Record<string, unknown>,
+): HrEvaluationDispatchView {
+  const status = (() => {
+    const value = row.status
+    if (
+      value === 'sent' ||
+      value === 'completed' ||
+      value === 'expired' ||
+      value === 'cancelled'
+    ) {
+      return value
+    }
+    return 'sent' as const
+  })()
+  return {
+    id: String(row.id ?? ''),
+    applicationId: String(row.applicationId ?? ''),
+    evaluationCatalogId: String(row.evaluationCatalogId ?? ''),
+    status,
+    completionUrl:
+      typeof row.completionUrl === 'string' ? row.completionUrl : null,
+    dispatchedAt: typeof row.dispatchedAt === 'number' ? row.dispatchedAt : 0,
+    completedAt: typeof row.completedAt === 'number' ? row.completedAt : null,
+  }
+}
+
+export function useHrEvaluationDispatchesForApplication(input: {
+  readonly applicationId: string
+}) {
+  const [rows, result] = useQuery(
+    queries.hrEvaluationDispatches.byApplication({
+      applicationId: input.applicationId,
+    }),
+  )
+  const dispatches = useMemo(
+    () =>
+      (rows ?? []).map((row) =>
+        asEvaluationDispatch(row as Record<string, unknown>),
+      ),
+    [rows],
+  )
+  return {
+    dispatches,
     loading: result.type !== 'complete',
   }
 }

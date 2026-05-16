@@ -42,11 +42,11 @@ export class HrApplicationNotFoundError extends Schema.TaggedErrorClass<HrApplic
   },
 ) {}
 
-export class HrTestTemplateNotFoundError extends Schema.TaggedErrorClass<HrTestTemplateNotFoundError>()(
-  'HrTestTemplateNotFoundError',
+export class HrEvaluationNotFoundError extends Schema.TaggedErrorClass<HrEvaluationNotFoundError>()(
+  'HrEvaluationNotFoundError',
   {
     ...BaseFields,
-    testTemplateId: Schema.String,
+    evaluationCatalogId: Schema.String,
   },
 ) {}
 
@@ -69,12 +69,12 @@ export class HrAffinityScoringError extends Schema.TaggedErrorClass<HrAffinitySc
   },
 ) {}
 
-export class HrTestDispatchError extends Schema.TaggedErrorClass<HrTestDispatchError>()(
-  'HrTestDispatchError',
+export class HrEvaluationDispatchError extends Schema.TaggedErrorClass<HrEvaluationDispatchError>()(
+  'HrEvaluationDispatchError',
   {
     ...BaseFields,
     applicationId: Schema.String,
-    testTemplateId: Schema.optional(Schema.String),
+    evaluationCatalogId: Schema.optional(Schema.String),
     cause: Schema.optional(Schema.String),
   },
 ) {}
@@ -104,9 +104,9 @@ export type HrRecruitmentDomainError =
   | HrPositionNotFoundError
   | HrCandidateNotFoundError
   | HrApplicationNotFoundError
-  | HrTestTemplateNotFoundError
+  | HrEvaluationNotFoundError
   | HrApplicationStageConflictError
   | HrAffinityScoringError
-  | HrTestDispatchError
+  | HrEvaluationDispatchError
   | HrPersistenceError
   | HrCrossOrgAccessError

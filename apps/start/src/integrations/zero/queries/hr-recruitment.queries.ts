@@ -22,8 +22,8 @@ const candidatesListArgs = z.object({
   includeArchived: z.boolean().optional(),
 })
 
-const testTemplatesListArgs = z.object({
-  includeArchived: z.boolean().optional(),
+const evaluationDispatchesByApplicationArgs = z.object({
+  applicationId: z.string().min(1),
 })
 
 export const hrRecruitmentQueryDefinitions = {
@@ -78,20 +78,17 @@ export const hrRecruitmentQueryDefinitions = {
       return q.orderBy('updatedAt', 'desc')
     }),
   },
-  hrTestTemplates: {
-    list: defineQuery(testTemplatesListArgs, ({ args, ctx }) => {
-      const scoped = getOrgContext(ctx)
-      if (!scoped) {
-        return zql.hrTestTemplate.where('organizationId', MISSING_ORG)
-      }
-      let q = zql.hrTestTemplate.where('organizationId', scoped.organizationId)
-      if (!args.includeArchived) {
-        q = q.where('archivedAt', 'IS', null)
-      }
-      return q
-        .orderBy('isBuiltIn', 'desc')
-        .orderBy('kind', 'asc')
-        .orderBy('updatedAt', 'desc')
-    }),
+  hrEvaluationDispatches: {
+    byApplication: defineQuery(
+      evaluationDispatchesByApplicationArgs,
+      ({ args, ctx }) => {
+        const scoped = getOrgContext(ctx)
+        const orgFilter = scoped?.organizationId ?? MISSING_ORG
+        return zql.hrEvaluationDispatch
+          .where('organizationId', orgFilter)
+          .where('applicationId', args.applicationId)
+          .orderBy('dispatchedAt', 'desc')
+      },
+    ),
   },
 }

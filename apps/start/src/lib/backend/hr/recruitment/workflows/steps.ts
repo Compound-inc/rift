@@ -7,19 +7,18 @@ import { FatalError } from 'workflow'
 import type {
   BackgroundCheckPayload,
   CandidatePipelineWorkflowInput,
-  DispatchTestResult,
+  DispatchEvaluationResult,
+  EvaluationSubmissionPayload,
   FinalizeApplicationOutcome,
-  TestSubmissionPayload,
 } from '@/lib/shared/hr/recruitment'
-import { HR_TEST_KIND_CATALOG } from '@/lib/shared/hr/recruitment'
+import { pickDefaultEvaluationForPosition } from '@/lib/shared/hr/recruitment'
 import {
   HrApplicationService,
   HrCandidateService,
-  HrCandidateTestDispatcherService,
   HrCvAiExtractorService,
+  HrEvaluationDispatcherService,
   HrPositionService,
   HrRecruitmentRuntime,
-  HrTestTemplateService,
 } from '@/lib/backend/hr/recruitment'
 import {
   describeHrCause,
@@ -137,8 +136,7 @@ export async function ingestCvStep(input: StepInput): Promise<void> {
  * vector / cosine columns stay on the schema for future logic but are
  * not used today. If the AI returns an "unidentified candidate"
  * (placeholder name + no email + no skills) the application is
- * rejected with `cv-unidentifiable` so the row reads cleanly instead
- * of pushing the verbose rationale into the candidates table.
+ * rejected immediately.
  */
 export async function computeAffinityStep(
   input: StepInput,
@@ -201,7 +199,7 @@ export async function computeAffinityStep(
           title: position.title,
           description: position.description,
           tags: [...position.tags],
-          recommendedTestKinds: [...position.recommendedTestKinds],
+          recommendedEvaluationKinds: [...position.recommendedEvaluationKinds],
         },
       })
 
@@ -267,11 +265,7 @@ export async function computeAffinityStep(
   })
 }
 
-/**
- * JSON-safe snapshot of the AI analysis stored on the application row,
- * so the application drawer can show "what the AI saw at scoring time"
- * even after the candidate's master profile evolves.
- */
+/** JSON-safe snapshot stored on the application row. */
 function aiSnapshotForApplication(analysis: {
   readonly profile: {
     readonly displayName: string
@@ -301,112 +295,72 @@ function aiSnapshotForApplication(analysis: {
 }
 
 /**
- * Picks a test template id for the dispatch step. Today every
- * application gets a single default screening test; when the
- * per-position requirements editor lands, this step is replaced by a
- * query against `hr_position_test_requirement`.
+ * Picks the evaluation catalog id for the dispatch. Today this maps
+ * the position's first recommended kind to a catalog entry; when the
+ * per-position selection UI lands the workflow reads the chosen id
+ * from a position-scoped mapping instead.
  */
-export async function resolveDefaultTestTemplateStep(
+export async function resolveDefaultEvaluationStep(
   input: StepInput,
-): Promise<{ testTemplateId: string; testTitle: string }> {
+): Promise<{ evaluationCatalogId: string }> {
   'use step'
   return await runStep({
-    stepName: 'resolveDefaultTestTemplate',
+    stepName: 'resolveDefaultEvaluation',
     request: input,
     fatalErrorTags: ['HrPositionNotFoundError', 'HrCrossOrgAccessError'],
     program: Effect.gen(function* () {
       const positionService = yield* HrPositionService
-      const templateService = yield* HrTestTemplateService
-
-      yield* templateService.ensureBuiltInsForOrg({
-        organizationId: input.organizationId,
-        requestId: input.requestId,
-      })
-
       const position = yield* positionService.findById({
         organizationId: input.organizationId,
         positionId: input.positionId,
         requestId: input.requestId,
       })
-      const templates = yield* templateService.listForOrg({
-        organizationId: input.organizationId,
-        requestId: input.requestId,
-      })
-
-      const recommendedKind = position.recommendedTestKinds[0] ?? 'behavioral'
-      const matched =
-        templates.find(
-          (template) => template.kind === recommendedKind && template.isBuiltIn,
-        ) ??
-        templates.find((template) => template.isBuiltIn) ??
-        templates[0]
-      if (!matched) {
-        return yield* Effect.fail(
-          new Error(
-            'No test templates available for org; built-in seeding may have failed.',
-          ),
-        )
-      }
       return {
-        testTemplateId: matched.id,
-        testTitle: matched.title ?? HR_TEST_KIND_CATALOG[matched.kind].label,
+        evaluationCatalogId: pickDefaultEvaluationForPosition({
+          recommendedKinds: position.recommendedEvaluationKinds,
+        }),
       }
     }),
   })
 }
 
 /**
- * Dispatches a test for the application. Idempotent on
- * `idempotencyKey` so SDK retries cannot send a test twice. Reads the
- * candidate row inside the step so the dispatcher logs carry the real
- * candidate identity.
+ * Dispatches the evaluation. Idempotent on `idempotencyKey` so SDK
+ * retries cannot send an evaluation twice.
  */
-export async function dispatchTestStep(
+export async function dispatchEvaluationStep(
   input: StepInput & {
-    readonly testTemplateId: string
-    readonly testTitle: string
-    readonly resumeWebhookUrl: string
+    readonly evaluationCatalogId: string
+    readonly resumeHookToken: string
     readonly idempotencyKey: string
   },
-): Promise<DispatchTestResult> {
+): Promise<DispatchEvaluationResult> {
   'use step'
   return await runStep({
-    stepName: 'dispatchTest',
+    stepName: 'dispatchEvaluation',
     request: input,
     fatalErrorTags: [
-      'HrTestTemplateNotFoundError',
       'HrApplicationNotFoundError',
       'HrCandidateNotFoundError',
       'HrCrossOrgAccessError',
     ],
     program: Effect.gen(function* () {
-      const candidateService = yield* HrCandidateService
-      const dispatcher = yield* HrCandidateTestDispatcherService
-      const candidate = yield* candidateService.findById({
-        organizationId: input.organizationId,
-        candidateId: input.candidateId,
-        requestId: input.requestId,
-      })
+      const dispatcher = yield* HrEvaluationDispatcherService
       const result = yield* dispatcher.dispatch({
         organizationId: input.organizationId,
         requestId: input.requestId,
         applicationId: input.applicationId,
-        testTemplateId: input.testTemplateId,
-        candidateEmail: candidate.email,
-        candidateDisplayName:
-          candidate.displayName.trim().length > 0
-            ? candidate.displayName
-            : 'Candidate',
-        resumeWebhookUrl: input.resumeWebhookUrl,
+        evaluationCatalogId: input.evaluationCatalogId,
+        resumeHookToken: input.resumeHookToken,
         idempotencyKey: input.idempotencyKey,
-        expiresAt: Date.now() + input.testTimeoutDays * 24 * 60 * 60 * 1000,
-        testTitle: input.testTitle,
+        expiresAt:
+          Date.now() + input.evaluationTimeoutDays * 24 * 60 * 60 * 1000,
       })
       return {
         dispatchId: result.dispatch.id,
-        testTemplateId: result.dispatch.testTemplateId,
-        resumeWebhookUrl:
-          result.dispatch.resumeWebhookUrl ?? input.resumeWebhookUrl,
+        evaluationCatalogId: result.dispatch.evaluationCatalogId,
+        resumeHookToken:
+          result.dispatch.resumeHookToken ?? input.resumeHookToken,
         idempotencyKey: result.dispatch.idempotencyKey,
       }
     }),
@@ -414,12 +368,12 @@ export async function dispatchTestStep(
 }
 
 /** Records the candidate's submission and advances the stage. */
-export async function recordTestResultStep(
-  input: StepInput & { readonly submission: TestSubmissionPayload },
+export async function recordEvaluationResultStep(
+  input: StepInput & { readonly submission: EvaluationSubmissionPayload },
 ): Promise<void> {
   'use step'
   await runStep({
-    stepName: 'recordTestResult',
+    stepName: 'recordEvaluationResult',
     request: input,
     fatalErrorTags: ['HrApplicationNotFoundError', 'HrCrossOrgAccessError'],
     program: Effect.gen(function* () {
@@ -434,7 +388,9 @@ export async function recordTestResultStep(
         applicationId: input.applicationId,
         requestId: input.requestId,
         nextStage: input.submission.passed ? 'evaluating' : 'rejected',
-        rejectionReason: input.submission.passed ? undefined : 'test-failed',
+        rejectionReason: input.submission.passed
+          ? undefined
+          : 'evaluation-failed',
       })
     }),
   })
@@ -479,7 +435,7 @@ export async function requireBackgroundCheckAddonStep(
   }
 }
 
-/** Persists the result of the background-check webhook. */
+/** Persists the result of the background-check hook. */
 export async function recordBackgroundCheckResultStep(
   input: StepInput & { readonly result: BackgroundCheckPayload },
 ): Promise<void> {

@@ -88,21 +88,16 @@ async function main(): Promise<void> {
     console.log('  Creating publication for zero-cache replication...')
     await runSql(
       pool,
-      `CREATE PUBLICATION zero_data FOR TABLE "user", organization, member, threads, messages, org_policy, org_product_config, org_product_policy, attachments, org_billing_account, org_subscription, org_entitlement_snapshot, org_member_access`,
+      `CREATE PUBLICATION zero_data FOR TABLE "user", organization, member, threads, messages, org_policy, org_product_policy, attachments, org_billing_account, org_subscription, org_entitlement_snapshot, org_member_access`,
       'CREATE PUBLICATION zero_data',
     )
 
     console.log('3. Removing Zero replica files (zero-cache local SQLite)...')
-    const replicaPath =
-      process.env.ZERO_REPLICA_FILE || join(appDir, 'zero.db')
+    const replicaPath = process.env.ZERO_REPLICA_FILE || join(appDir, 'zero.db')
     const replicaBase = replicaPath.endsWith('.db')
       ? replicaPath.slice(0, -3)
       : replicaPath
-    const toRemove = [
-      replicaPath,
-      `${replicaBase}-wal`,
-      `${replicaBase}-shm`,
-    ]
+    const toRemove = [replicaPath, `${replicaBase}-wal`, `${replicaBase}-shm`]
     for (const p of toRemove) {
       try {
         await unlink(p)

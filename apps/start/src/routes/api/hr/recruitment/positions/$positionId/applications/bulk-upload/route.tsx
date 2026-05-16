@@ -7,7 +7,6 @@ import {
   HrCvIngestService,
   HrPositionService,
   HrRecruitmentRuntime,
-  HrTestTemplateService,
 } from '@/lib/backend/hr/recruitment'
 import { MarkdownConversionService } from '@/lib/backend/file/services/markdown-conversion.service'
 import { readDirectTextFileContent } from '@/lib/backend/file/services/plain-text-file'
@@ -172,13 +171,7 @@ export const Route = createFileRoute(
                 const applicationService = yield* HrApplicationService
                 const cvIngest = yield* HrCvIngestService
                 const positionService = yield* HrPositionService
-                const templateService = yield* HrTestTemplateService
                 const markdownConversion = yield* MarkdownConversionService
-
-                yield* templateService.ensureBuiltInsForOrg({
-                  organizationId: auth.organizationId,
-                  requestId: `${REQUEST_ID_PREFIX}.seed.${requestId}`,
-                })
 
                 const position = yield* positionService.findById({
                   organizationId: auth.organizationId,
@@ -330,9 +323,7 @@ export const Route = createFileRoute(
                     positionId: entry.positionId,
                     hasBackgroundCheckAddon,
                     runIdempotencyKey,
-                    testTimeoutDays: 7,
-                    aiRerankEnabled: true,
-                    aiRerankTopK: 10,
+                    evaluationTimeoutDays: 7,
                     requestId: `${REQUEST_ID_PREFIX}.workflow.${entry.applicationId}`,
                   },
                 ])

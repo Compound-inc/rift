@@ -2,7 +2,6 @@
  * Shared HR recruitment domain types.
  */
 
-/** Lifecycle for a job opening. Mirrors the `hr_position.status` check. */
 export type HrPositionStatus =
   | 'draft'
   | 'open'
@@ -60,24 +59,27 @@ export const HR_TERMINAL_APPLICATION_STAGES = new Set<HrApplicationStage>([
   'hired',
 ])
 
-export type HrTestKind =
+/**
+ * Evaluation kinds. Custom org-defined evaluations land in a future
+ * iteration; the kind union stays closed for now to keep the catalog
+ * authoritative.
+ */
+export type HrEvaluationKind =
   | 'technical'
   | 'honesty'
   | 'background'
   | 'language'
   | 'behavioral'
-  | 'custom'
 
-export const HR_TEST_KINDS: readonly HrTestKind[] = [
+export const HR_EVALUATION_KINDS: readonly HrEvaluationKind[] = [
   'technical',
   'honesty',
   'background',
   'language',
   'behavioral',
-  'custom',
 ] as const
 
-export type HrTestDispatchStatus =
+export type HrEvaluationDispatchStatus =
   | 'sent'
   | 'completed'
   | 'expired'
@@ -90,31 +92,12 @@ export type HrBackgroundCheckStatus =
   | 'failed'
   | 'cancelled'
 
-/**
- * Compact summary used by the affinity scorer to feed both stages.
- * Holds only what is safe to ship across a workflow `use step` boundary
- * (everything is JSON-serializable).
- */
-export type HrPositionRequirementSummary = {
-  readonly id: string
-  readonly title: string
-  readonly description: string
-  readonly tags: readonly string[]
-  readonly recommendedTestKinds: readonly HrTestKind[]
-}
-
-export type HrCvSummary = {
-  readonly applicationId: string
-  readonly candidateId: string
-  readonly cvText: string
-}
-
 export type HrAffinityResult = {
   /** Final composite score, 0..100. */
   readonly score: number
   /** One-paragraph human-readable rationale, optional. */
   readonly rationale?: string
-  /** Stable signal map used by the UI drawer (e.g. `embeddingScore`). */
+  /** Stable signal map used by the UI drawer. */
   readonly signals: Record<string, string | number | boolean | null>
   /** Identifier of the model / heuristic that produced the score. */
   readonly model: string
@@ -126,6 +109,6 @@ export function isHrApplicationStage(
   return (HR_APPLICATION_STAGES as readonly string[]).includes(value)
 }
 
-export function isHrTestKind(value: string): value is HrTestKind {
-  return (HR_TEST_KINDS as readonly string[]).includes(value)
+export function isHrEvaluationKind(value: string): value is HrEvaluationKind {
+  return (HR_EVALUATION_KINDS as readonly string[]).includes(value)
 }

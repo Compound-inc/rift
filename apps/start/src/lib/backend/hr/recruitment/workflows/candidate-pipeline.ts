@@ -1,26 +1,24 @@
 /**
  * Candidate pipeline workflow.
  *
- * Workflow files run inside the Workflow SDK sandbox: no full Node
- * runtime
- *
+ * Workflow files run inside the Workflow SDK sandbox
  */
 
 import { sleep, createHook } from 'workflow'
 import type {
   BackgroundCheckPayload,
   CandidatePipelineWorkflowInput,
-  TestSubmissionPayload,
+  EvaluationSubmissionPayload,
 } from '@/lib/shared/hr/recruitment'
 import {
   computeAffinityStep,
-  dispatchTestStep,
+  dispatchEvaluationStep,
   finalizeApplicationStep,
   ingestCvStep,
   recordBackgroundCheckResultStep,
-  recordTestResultStep,
+  recordEvaluationResultStep,
   requireBackgroundCheckAddonStep,
-  resolveDefaultTestTemplateStep,
+  resolveDefaultEvaluationStep,
 } from './steps'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
@@ -62,34 +60,33 @@ export async function candidatePipelineWorkflow(
   }
   if (affinity.stage === 'rejected') return
 
-  const template = await resolveDefaultTestTemplateStep(input)
+  const evaluation = await resolveDefaultEvaluationStep(input)
 
-  const testHookToken = `hr.recruitment.test:${input.runIdempotencyKey}`
-  const testCompletion = createHook<TestSubmissionPayload>({
-    token: testHookToken,
+  const evaluationHookToken = `hr.recruitment.evaluation:${input.runIdempotencyKey}`
+  const evaluationCompletion = createHook<EvaluationSubmissionPayload>({
+    token: evaluationHookToken,
   })
-  await dispatchTestStep({
+  await dispatchEvaluationStep({
     ...input,
-    testTemplateId: template.testTemplateId,
-    testTitle: template.testTitle,
-    resumeWebhookUrl: testHookToken,
-    idempotencyKey: `${input.runIdempotencyKey}:test`,
+    evaluationCatalogId: evaluation.evaluationCatalogId,
+    resumeHookToken: evaluationHookToken,
+    idempotencyKey: `${input.runIdempotencyKey}:evaluation`,
   })
 
   const submission = await awaitHookOrSleep({
-    hook: testCompletion,
-    timeoutMs: input.testTimeoutDays * MS_PER_DAY,
+    hook: evaluationCompletion,
+    timeoutMs: input.evaluationTimeoutDays * MS_PER_DAY,
   })
   if (submission.kind === 'timeout') {
     await finalizeApplicationStep({
       ...input,
       outcome: 'rejected',
-      reason: 'test-timeout',
+      reason: 'evaluation-timeout',
     })
     return
   }
 
-  await recordTestResultStep({ ...input, submission: submission.value })
+  await recordEvaluationResultStep({ ...input, submission: submission.value })
   if (!submission.value.passed) return
 
   if (!input.hasBackgroundCheckAddon) {
@@ -104,7 +101,7 @@ export async function candidatePipelineWorkflow(
   })
   const verificationResult = await awaitHookOrSleep({
     hook: verification,
-    timeoutMs: input.testTimeoutDays * MS_PER_DAY,
+    timeoutMs: input.evaluationTimeoutDays * MS_PER_DAY,
   })
   if (verificationResult.kind === 'timeout') {
     await finalizeApplicationStep({

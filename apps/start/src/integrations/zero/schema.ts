@@ -385,6 +385,10 @@ const hrPosition = table('hrPosition')
     description: string(),
     hiringManager: string().from('hiring_manager'),
     compensation: string(),
+    tags: json<readonly string[]>(),
+    recommendedEvaluationKinds: json<readonly string[]>().from(
+      'recommended_evaluation_kinds',
+    ),
     descriptionEmbedding: json<readonly number[]>()
       .from('description_embedding')
       .optional(),
@@ -397,55 +401,11 @@ const hrPosition = table('hrPosition')
     descriptionEmbeddingUpdatedAt: number()
       .from('description_embedding_updated_at')
       .optional(),
-    tags: json<readonly string[]>(),
-    recommendedTestKinds: json<readonly string[]>().from(
-      'recommended_test_kinds',
-    ),
     archivedAt: number().from('archived_at').optional(),
     archivedBy: string().from('archived_by').optional(),
     createdAt: number().from('created_at'),
     updatedAt: number().from('updated_at'),
     createdBy: string().from('created_by'),
-  })
-  .primaryKey('id')
-
-const hrTestTemplate = table('hrTestTemplate')
-  .from('hr_test_template')
-  .columns({
-    id: string(),
-    organizationId: string().from('organization_id'),
-    kind: enumeration<
-      | 'technical'
-      | 'honesty'
-      | 'background'
-      | 'language'
-      | 'behavioral'
-      | 'custom'
-    >(),
-    title: string(),
-    description: string(),
-    defaultPassingScore: number().from('default_passing_score'),
-    questions:
-      json<readonly Record<string, string | number | boolean | null>[]>(),
-    isBuiltIn: boolean().from('is_built_in'),
-    archivedAt: number().from('archived_at').optional(),
-    createdAt: number().from('created_at'),
-    updatedAt: number().from('updated_at'),
-  })
-  .primaryKey('id')
-
-const hrPositionTestRequirement = table('hrPositionTestRequirement')
-  .from('hr_position_test_requirement')
-  .columns({
-    id: string(),
-    organizationId: string().from('organization_id'),
-    positionId: string().from('position_id'),
-    testTemplateId: string().from('test_template_id'),
-    minimumScore: number().from('minimum_score').optional(),
-    weight: number(),
-    isRequired: boolean().from('is_required'),
-    createdAt: number().from('created_at'),
-    updatedAt: number().from('updated_at'),
   })
   .primaryKey('id')
 
@@ -535,17 +495,18 @@ const hrApplication = table('hrApplication')
   })
   .primaryKey('id')
 
-const hrTestDispatch = table('hrTestDispatch')
-  .from('hr_test_dispatch')
+const hrEvaluationDispatch = table('hrEvaluationDispatch')
+  .from('hr_evaluation_dispatch')
   .columns({
     id: string(),
     organizationId: string().from('organization_id'),
     applicationId: string().from('application_id'),
-    testTemplateId: string().from('test_template_id'),
+    evaluationCatalogId: string().from('evaluation_catalog_id'),
     dispatchedVia: string().from('dispatched_via'),
     status: enumeration<'sent' | 'completed' | 'expired' | 'cancelled'>(),
-    resumeWebhookUrl: string().from('resume_webhook_url').optional(),
+    resumeHookToken: string().from('resume_hook_token').optional(),
     idempotencyKey: string().from('idempotency_key'),
+    completionUrl: string().from('completion_url').optional(),
     expiresAt: number().from('expires_at').optional(),
     dispatchedAt: number().from('dispatched_at'),
     completedAt: number().from('completed_at').optional(),
@@ -554,8 +515,8 @@ const hrTestDispatch = table('hrTestDispatch')
   })
   .primaryKey('id')
 
-const hrTestResponse = table('hrTestResponse')
-  .from('hr_test_response')
+const hrEvaluationResponse = table('hrEvaluationResponse')
+  .from('hr_evaluation_response')
   .columns({
     id: string(),
     organizationId: string().from('organization_id'),
@@ -748,11 +709,6 @@ const hrPositionRelationships = relationships(hrPosition, ({ many, one }) => ({
     destSchema: hrApplication,
     destField: ['positionId'],
   }),
-  testRequirements: many({
-    sourceField: ['id'],
-    destSchema: hrPositionTestRequirement,
-    destField: ['positionId'],
-  }),
 }))
 
 const hrCandidateRelationships = relationships(
@@ -789,14 +745,14 @@ const hrApplicationRelationships = relationships(
       destField: ['id'],
       destSchema: hrCandidate,
     }),
-    testDispatches: many({
+    evaluationDispatches: many({
       sourceField: ['id'],
-      destSchema: hrTestDispatch,
+      destSchema: hrEvaluationDispatch,
       destField: ['applicationId'],
     }),
-    testResponses: many({
+    evaluationResponses: many({
       sourceField: ['id'],
-      destSchema: hrTestResponse,
+      destSchema: hrEvaluationResponse,
       destField: ['applicationId'],
     }),
     backgroundCheck: one({
@@ -807,61 +763,24 @@ const hrApplicationRelationships = relationships(
   }),
 )
 
-const hrTestTemplateRelationships = relationships(
-  hrTestTemplate,
-  ({ many, one }) => ({
-    organization: one({
-      sourceField: ['organizationId'],
-      destField: ['id'],
-      destSchema: organization,
-    }),
-    positionRequirements: many({
-      sourceField: ['id'],
-      destSchema: hrPositionTestRequirement,
-      destField: ['testTemplateId'],
-    }),
-  }),
-)
-
-const hrPositionTestRequirementRelationships = relationships(
-  hrPositionTestRequirement,
-  ({ one }) => ({
-    position: one({
-      sourceField: ['positionId'],
-      destField: ['id'],
-      destSchema: hrPosition,
-    }),
-    testTemplate: one({
-      sourceField: ['testTemplateId'],
-      destField: ['id'],
-      destSchema: hrTestTemplate,
-    }),
-  }),
-)
-
-const hrTestDispatchRelationships = relationships(
-  hrTestDispatch,
+const hrEvaluationDispatchRelationships = relationships(
+  hrEvaluationDispatch,
   ({ many, one }) => ({
     application: one({
       sourceField: ['applicationId'],
       destField: ['id'],
       destSchema: hrApplication,
     }),
-    testTemplate: one({
-      sourceField: ['testTemplateId'],
-      destField: ['id'],
-      destSchema: hrTestTemplate,
-    }),
     responses: many({
       sourceField: ['id'],
-      destSchema: hrTestResponse,
+      destSchema: hrEvaluationResponse,
       destField: ['dispatchId'],
     }),
   }),
 )
 
-const hrTestResponseRelationships = relationships(
-  hrTestResponse,
+const hrEvaluationResponseRelationships = relationships(
+  hrEvaluationResponse,
   ({ one }) => ({
     application: one({
       sourceField: ['applicationId'],
@@ -871,7 +790,7 @@ const hrTestResponseRelationships = relationships(
     dispatch: one({
       sourceField: ['dispatchId'],
       destField: ['id'],
-      destSchema: hrTestDispatch,
+      destSchema: hrEvaluationDispatch,
     }),
   }),
 )
@@ -913,12 +832,10 @@ export const schema = createSchema({
     message,
     attachment,
     hrPosition,
-    hrTestTemplate,
-    hrPositionTestRequirement,
     hrCandidate,
     hrApplication,
-    hrTestDispatch,
-    hrTestResponse,
+    hrEvaluationDispatch,
+    hrEvaluationResponse,
     hrBackgroundCheck,
   ],
   relationships: [
@@ -933,10 +850,8 @@ export const schema = createSchema({
     hrPositionRelationships,
     hrCandidateRelationships,
     hrApplicationRelationships,
-    hrTestTemplateRelationships,
-    hrPositionTestRequirementRelationships,
-    hrTestDispatchRelationships,
-    hrTestResponseRelationships,
+    hrEvaluationDispatchRelationships,
+    hrEvaluationResponseRelationships,
     hrBackgroundCheckRelationships,
   ],
 })

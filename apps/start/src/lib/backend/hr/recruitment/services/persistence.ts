@@ -4,27 +4,24 @@ import type { UpstreamSqlClient } from '@/lib/backend/server-effect'
 import type {
   HrApplicationRow,
   HrCandidateRow,
+  HrEvaluationDispatchRow,
   HrPositionRow,
-  HrPositionTestRequirementRow,
-  HrTestDispatchRow,
-  HrTestTemplateRow,
 } from '../domain/types'
-import { isHrApplicationStage, isHrTestKind } from '@/lib/shared/hr/recruitment'
+import {
+  isHrApplicationStage,
+  isHrEvaluationKind,
+} from '@/lib/shared/hr/recruitment'
 import type {
   HrApplicationStage,
+  HrEvaluationKind,
   HrPositionEmploymentType,
   HrPositionStatus,
   HrPositionWorkArrangement,
-  HrTestKind,
 } from '@/lib/shared/hr/recruitment'
 
 /**
  * Database row mappers shared by the recruitment services.
- *
- * Helpers live in this module so every service shares the same row
- * shape, every JSON column gets normalized identically, and the
- * org-isolation guard is identical across reads. Tests stub the
- * `UpstreamSqlClient` directly.
+ * Tests stub the `UpstreamSqlClient` directly.
  */
 
 type RawRow = Record<string, unknown>
@@ -115,23 +112,8 @@ function toAliasArray(
   return result
 }
 
-function toQuestionArray(
-  value: unknown,
-): readonly Record<string, string | number | boolean | null>[] {
-  if (typeof value === 'string') {
-    try {
-      return toQuestionArray(JSON.parse(value))
-    } catch {
-      return []
-    }
-  }
-  if (!Array.isArray(value)) return []
-  const result: Record<string, string | number | boolean | null>[] = []
-  for (const entry of value) {
-    const normalized = toJsonObjectOrNull(entry)
-    if (normalized) result.push(normalized)
-  }
-  return result
+function toEvaluationKindArray(value: unknown): readonly HrEvaluationKind[] {
+  return toStringArray(value).filter(isHrEvaluationKind)
 }
 
 function toEmbeddingArray(value: unknown): readonly number[] | null {
@@ -149,10 +131,6 @@ function toEmbeddingArray(value: unknown): readonly number[] | null {
     }
   }
   return null
-}
-
-function toTestKindArray(value: unknown): readonly HrTestKind[] {
-  return toStringArray(value).filter(isHrTestKind)
 }
 
 function normalizeStatus(value: unknown): HrPositionStatus {
@@ -194,13 +172,6 @@ function normalizeStage(value: unknown): HrApplicationStage {
   return 'uploaded'
 }
 
-function normalizeKind(value: unknown): HrTestKind {
-  if (typeof value === 'string' && isHrTestKind(value)) {
-    return value
-  }
-  return 'custom'
-}
-
 export function toHrPositionRow(row: RawRow): HrPositionRow {
   return {
     id: String(row.id),
@@ -215,7 +186,9 @@ export function toHrPositionRow(row: RawRow): HrPositionRow {
     hiringManager: String(row.hiring_manager ?? ''),
     compensation: String(row.compensation ?? ''),
     tags: toStringArray(row.tags),
-    recommendedTestKinds: toTestKindArray(row.recommended_test_kinds),
+    recommendedEvaluationKinds: toEvaluationKindArray(
+      row.recommended_evaluation_kinds,
+    ),
     descriptionEmbedding: toEmbeddingArray(row.description_embedding),
     descriptionEmbeddingModel: toStringOrNull(row.description_embedding_model),
     descriptionEmbeddingDimensions: toNumberOrNull(
@@ -295,39 +268,9 @@ export function toHrApplicationRow(row: RawRow): HrApplicationRow {
   }
 }
 
-export function toHrTestTemplateRow(row: RawRow): HrTestTemplateRow {
-  return {
-    id: String(row.id),
-    organizationId: String(row.organization_id),
-    kind: normalizeKind(row.kind),
-    title: String(row.title ?? ''),
-    description: String(row.description ?? ''),
-    defaultPassingScore: toNumberOrNull(row.default_passing_score) ?? 70,
-    questions: toQuestionArray(row.questions),
-    isBuiltIn: toBooleanOrFalse(row.is_built_in),
-    archivedAt: toNumberOrNull(row.archived_at),
-    createdAt: toNumberOrNull(row.created_at) ?? Date.now(),
-    updatedAt: toNumberOrNull(row.updated_at) ?? Date.now(),
-  }
-}
-
-export function toHrPositionTestRequirementRow(
+export function toHrEvaluationDispatchRow(
   row: RawRow,
-): HrPositionTestRequirementRow {
-  return {
-    id: String(row.id),
-    organizationId: String(row.organization_id),
-    positionId: String(row.position_id),
-    testTemplateId: String(row.test_template_id),
-    minimumScore: toNumberOrNull(row.minimum_score),
-    weight: toNumberOrNull(row.weight) ?? 1,
-    isRequired: toBooleanOrFalse(row.is_required),
-    createdAt: toNumberOrNull(row.created_at) ?? Date.now(),
-    updatedAt: toNumberOrNull(row.updated_at) ?? Date.now(),
-  }
-}
-
-export function toHrTestDispatchRow(row: RawRow): HrTestDispatchRow {
+): HrEvaluationDispatchRow {
   const status = (() => {
     if (
       row.status === 'sent' ||
@@ -343,33 +286,25 @@ export function toHrTestDispatchRow(row: RawRow): HrTestDispatchRow {
     id: String(row.id),
     organizationId: String(row.organization_id),
     applicationId: String(row.application_id),
-    testTemplateId: String(row.test_template_id),
-    dispatchedVia: String(row.dispatched_via ?? 'console_stub'),
+    evaluationCatalogId: String(row.evaluation_catalog_id),
+    dispatchedVia: String(row.dispatched_via ?? 'inline_link'),
     status,
-    resumeWebhookUrl: toStringOrNull(row.resume_webhook_url),
+    resumeHookToken: toStringOrNull(row.resume_hook_token),
     idempotencyKey: String(row.idempotency_key ?? ''),
     expiresAt: toNumberOrNull(row.expires_at),
     dispatchedAt: toNumberOrNull(row.dispatched_at) ?? Date.now(),
     completedAt: toNumberOrNull(row.completed_at),
+    completionUrl: toStringOrNull(row.completion_url),
     createdAt: toNumberOrNull(row.created_at) ?? Date.now(),
     updatedAt: toNumberOrNull(row.updated_at) ?? Date.now(),
   }
 }
 
-/**
- * Helper for inserting / updating columns whose runtime shape is JSON.
- * Uses the shared `sqlJson` encoder so column writes use the postgres
- * `JSON` adapter and we never accidentally double-encode.
- */
+/** Wrap a value for an `@effect/sql-pg` JSON column. */
 export function jsonValue(client: UpstreamSqlClient, value: unknown) {
   return sqlJson(client, value)
 }
 
-/**
- * Wraps a `client<...>``query`` Promise with an Effect that maps any
- * SQL failure to the recruitment persistence-error factory the caller
- * provides. Centralizing the wiring keeps each service operation tight.
- */
 export function runQuery<TRow>(input: {
   readonly run: () => Promise<readonly TRow[]>
   readonly toError: (cause: unknown) => Error

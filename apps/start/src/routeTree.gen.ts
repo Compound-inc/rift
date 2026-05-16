@@ -68,7 +68,7 @@ import { Route as appLayoutOrganizationSettingsModelsIndexRouteImport } from './
 import { Route as appLayoutOrganizationSettingsHrIndexRouteImport } from './routes/(app)/_layout/organization/settings/hr/index'
 import { Route as appLayoutHrRecruitmentPositionsIndexRouteImport } from './routes/(app)/_layout/hr/recruitment/positions/index'
 import { Route as appLayoutHrRecruitmentPositionsPositionIdRouteImport } from './routes/(app)/_layout/hr/recruitment/positions/$positionId'
-import { Route as ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRouteImport } from './routes/api/hr/recruitment/test-dispatches/$dispatchId/complete/route'
+import { Route as ApiHrRecruitmentEvaluationsDispatchIdTakeRouteRouteImport } from './routes/api/hr/recruitment/evaluations/$dispatchId/take/route'
 import { Route as appLayoutOrganizationSettingsModelsProviderIdRouteRouteImport } from './routes/(app)/_layout/organization/settings/models/$providerId/route'
 import { Route as ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRouteImport } from './routes/api/hr/recruitment/positions/$positionId/applications/clear/route'
 import { Route as ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRouteImport } from './routes/api/hr/recruitment/positions/$positionId/applications/bulk-upload/route'
@@ -395,10 +395,10 @@ const appLayoutHrRecruitmentPositionsPositionIdRoute =
     path: '/positions/$positionId',
     getParentRoute: () => appLayoutHrRecruitmentRouteRoute,
   } as any)
-const ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRoute =
-  ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRouteImport.update({
-    id: '/api/hr/recruitment/test-dispatches/$dispatchId/complete',
-    path: '/api/hr/recruitment/test-dispatches/$dispatchId/complete',
+const ApiHrRecruitmentEvaluationsDispatchIdTakeRouteRoute =
+  ApiHrRecruitmentEvaluationsDispatchIdTakeRouteRouteImport.update({
+    id: '/api/hr/recruitment/evaluations/$dispatchId/take',
+    path: '/api/hr/recruitment/evaluations/$dispatchId/take',
     getParentRoute: () => rootRouteImport,
   } as any)
 const appLayoutOrganizationSettingsModelsProviderIdRouteRoute =
@@ -478,7 +478,7 @@ export interface FileRoutesByFullPath {
   '/hr/recruitment/': typeof appLayoutHrRecruitmentIndexRoute
   '/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
   '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
-  '/api/hr/recruitment/test-dispatches/$dispatchId/complete': typeof ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRoute
+  '/api/hr/recruitment/evaluations/$dispatchId/take': typeof ApiHrRecruitmentEvaluationsDispatchIdTakeRouteRoute
   '/hr/recruitment/positions/$positionId': typeof appLayoutHrRecruitmentPositionsPositionIdRoute
   '/hr/recruitment/positions/': typeof appLayoutHrRecruitmentPositionsIndexRoute
   '/organization/settings/hr/': typeof appLayoutOrganizationSettingsHrIndexRoute
@@ -531,7 +531,7 @@ export interface FileRoutesByTo {
   '/hr/recruitment': typeof appLayoutHrRecruitmentIndexRoute
   '/organization/settings': typeof appLayoutOrganizationSettingsIndexRoute
   '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
-  '/api/hr/recruitment/test-dispatches/$dispatchId/complete': typeof ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRoute
+  '/api/hr/recruitment/evaluations/$dispatchId/take': typeof ApiHrRecruitmentEvaluationsDispatchIdTakeRouteRoute
   '/hr/recruitment/positions/$positionId': typeof appLayoutHrRecruitmentPositionsPositionIdRoute
   '/hr/recruitment/positions': typeof appLayoutHrRecruitmentPositionsIndexRoute
   '/organization/settings/hr': typeof appLayoutOrganizationSettingsHrIndexRoute
@@ -597,7 +597,7 @@ export interface FileRoutesById {
   '/(app)/_layout/hr/recruitment/': typeof appLayoutHrRecruitmentIndexRoute
   '/(app)/_layout/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
   '/(app)/_layout/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
-  '/api/hr/recruitment/test-dispatches/$dispatchId/complete': typeof ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRoute
+  '/api/hr/recruitment/evaluations/$dispatchId/take': typeof ApiHrRecruitmentEvaluationsDispatchIdTakeRouteRoute
   '/(app)/_layout/hr/recruitment/positions/$positionId': typeof appLayoutHrRecruitmentPositionsPositionIdRoute
   '/(app)/_layout/hr/recruitment/positions/': typeof appLayoutHrRecruitmentPositionsIndexRoute
   '/(app)/_layout/organization/settings/hr/': typeof appLayoutOrganizationSettingsHrIndexRoute
@@ -663,7 +663,7 @@ export interface FileRouteTypes {
     | '/hr/recruitment/'
     | '/organization/settings/'
     | '/organization/settings/models/$providerId'
-    | '/api/hr/recruitment/test-dispatches/$dispatchId/complete'
+    | '/api/hr/recruitment/evaluations/$dispatchId/take'
     | '/hr/recruitment/positions/$positionId'
     | '/hr/recruitment/positions/'
     | '/organization/settings/hr/'
@@ -716,7 +716,7 @@ export interface FileRouteTypes {
     | '/hr/recruitment'
     | '/organization/settings'
     | '/organization/settings/models/$providerId'
-    | '/api/hr/recruitment/test-dispatches/$dispatchId/complete'
+    | '/api/hr/recruitment/evaluations/$dispatchId/take'
     | '/hr/recruitment/positions/$positionId'
     | '/hr/recruitment/positions'
     | '/organization/settings/hr'
@@ -781,7 +781,7 @@ export interface FileRouteTypes {
     | '/(app)/_layout/hr/recruitment/'
     | '/(app)/_layout/organization/settings/'
     | '/(app)/_layout/organization/settings/models/$providerId'
-    | '/api/hr/recruitment/test-dispatches/$dispatchId/complete'
+    | '/api/hr/recruitment/evaluations/$dispatchId/take'
     | '/(app)/_layout/hr/recruitment/positions/$positionId'
     | '/(app)/_layout/hr/recruitment/positions/'
     | '/(app)/_layout/organization/settings/hr/'
@@ -809,7 +809,7 @@ export interface RootRouteChildren {
   ApiZeroQueryRouteRoute: typeof ApiZeroQueryRouteRoute
   ApiZeroTokenRouteRoute: typeof ApiZeroTokenRouteRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
-  ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRoute: typeof ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRoute
+  ApiHrRecruitmentEvaluationsDispatchIdTakeRouteRoute: typeof ApiHrRecruitmentEvaluationsDispatchIdTakeRouteRoute
   ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRoute: typeof ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRoute
   ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRoute: typeof ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRoute
 }
@@ -1229,11 +1229,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appLayoutHrRecruitmentPositionsPositionIdRouteImport
       parentRoute: typeof appLayoutHrRecruitmentRouteRoute
     }
-    '/api/hr/recruitment/test-dispatches/$dispatchId/complete': {
-      id: '/api/hr/recruitment/test-dispatches/$dispatchId/complete'
-      path: '/api/hr/recruitment/test-dispatches/$dispatchId/complete'
-      fullPath: '/api/hr/recruitment/test-dispatches/$dispatchId/complete'
-      preLoaderRoute: typeof ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRouteImport
+    '/api/hr/recruitment/evaluations/$dispatchId/take': {
+      id: '/api/hr/recruitment/evaluations/$dispatchId/take'
+      path: '/api/hr/recruitment/evaluations/$dispatchId/take'
+      fullPath: '/api/hr/recruitment/evaluations/$dispatchId/take'
+      preLoaderRoute: typeof ApiHrRecruitmentEvaluationsDispatchIdTakeRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(app)/_layout/organization/settings/models/$providerId': {
@@ -1541,8 +1541,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiZeroQueryRouteRoute: ApiZeroQueryRouteRoute,
   ApiZeroTokenRouteRoute: ApiZeroTokenRouteRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
-  ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRoute:
-    ApiHrRecruitmentTestDispatchesDispatchIdCompleteRouteRoute,
+  ApiHrRecruitmentEvaluationsDispatchIdTakeRouteRoute:
+    ApiHrRecruitmentEvaluationsDispatchIdTakeRouteRoute,
   ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRoute:
     ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRoute,
   ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRoute:

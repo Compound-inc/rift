@@ -31,12 +31,8 @@ import {
 } from './hr-position-candidates.logic'
 import { HrBulkCvUploader } from './hr-bulk-cv-uploader'
 import { HrCleanCvsButton } from './hr-clean-cvs-button'
- * pipeline counters that mirror the home funnel, and a candidates table.
- *
- * The component is intentionally read-only for now; the "Add candidate" CTA
- * is a stub so the empty-state and the visual rhythm of the page can be
- * reviewed before any data layer lands.
- */
+import { HrEvaluationLink } from './hr-evaluation-link'
+
 export function HrPositionDetailPage({ position }: { position: HrPosition }) {
   const status = resolvePositionStatusPresentation(position.status)
   const StatusIcon = status.icon
@@ -232,15 +228,20 @@ export function HrPositionDetailPage({ position }: { position: HrPosition }) {
                         </div>
                       </TableCell>
                       <TableCell className="px-4 py-3">
-                        <span
-                          className={cn(
-                            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium',
-                            stage.chipClassName,
-                          )}
-                        >
-                          <StageIcon aria-hidden className="size-3" />
-                          {stage.label}
-                        </span>
+                        <div className="flex flex-col gap-1">
+                          <span
+                            className={cn(
+                              'inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium',
+                              stage.chipClassName,
+                            )}
+                          >
+                            <StageIcon aria-hidden className="size-3" />
+                            {stage.label}
+                          </span>
+                          <HrEvaluationLink
+                            applicationId={candidate.applicationId}
+                          />
+                        </div>
                       </TableCell>
                       <TableCell className="px-4 py-3 text-foreground-primary">
                         {candidate.source}

@@ -28,8 +28,8 @@ describe('HR Recruitment service layers (memory)', () => {
     expect(result.organizationId).toBe('org-1')
     expect(result.title).toBe('Senior Banking Analyst')
     // Banking + finance tags auto-recommend honesty + background tests.
-    expect(result.recommendedTestKinds).toContain('honesty')
-    expect(result.recommendedTestKinds).toContain('background')
+    expect(result.recommendedEvaluationKinds).toContain('honesty')
+    expect(result.recommendedEvaluationKinds).toContain('background')
   })
 
   it('refuses to read a position from a different org', async () => {
@@ -125,7 +125,7 @@ describe('HR Recruitment service layers (memory)', () => {
           title: position.title,
           description: position.description,
           tags: [],
-          recommendedTestKinds: [],
+          recommendedEvaluationKinds: [],
         },
       })
       const updated = yield* applicationService.setAffinity({

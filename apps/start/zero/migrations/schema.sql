@@ -800,15 +800,19 @@ CREATE TABLE IF NOT EXISTS hr_position (
   description TEXT NOT NULL DEFAULT '',
   hiring_manager TEXT NOT NULL DEFAULT '',
   compensation TEXT NOT NULL DEFAULT '',
-  -- The position description embedding is cached here so stage-1 affinity
-  -- scoring (cosine similarity) does not have to re-embed the position for
-  -- every CV upload. Refreshed whenever description / requirements change.
+  tags JSONB NOT NULL DEFAULT '[]'::jsonb,
+  -- Catalog ids (e.g. `screening-technical-v1`) the workflow will dispatch.
+  -- Stored as JSON to allow per-position ordering and easy expansion.
+  recommended_evaluation_kinds JSONB NOT NULL DEFAULT '[]'::jsonb,
+  -- Cached embedding of the position description. The pipeline keeps it
+  -- around so future stage-1 cosine-similarity prefilters do not have
+  -- to re-embed the JD for every CV upload. Refreshed when the
+  -- description / requirements change. AI scoring is the source of
+  -- truth today; this is reserved for the upcoming hybrid path.
   description_embedding JSONB,
   description_embedding_model TEXT,
   description_embedding_dimensions INTEGER,
   description_embedding_updated_at BIGINT,
-  tags JSONB NOT NULL DEFAULT '[]'::jsonb,
-  recommended_test_kinds JSONB NOT NULL DEFAULT '[]'::jsonb,
   archived_at BIGINT,
   archived_by TEXT,
   created_at BIGINT NOT NULL,
@@ -833,59 +837,6 @@ CREATE INDEX IF NOT EXISTS hr_position_org_archived_at
   ON hr_position (organization_id, archived_at);
 
 -- ---------------------------------------------------------------------------
--- Test templates (built-in catalog seeded per org + custom additions)
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS hr_test_template (
-  id TEXT PRIMARY KEY,
-  organization_id TEXT NOT NULL REFERENCES organization(id) ON DELETE CASCADE,
-  kind TEXT NOT NULL,
-  title TEXT NOT NULL,
-  description TEXT NOT NULL DEFAULT '',
-  -- Default minimum score (0..100) for "passing" the test. Per-position
-  -- thresholds override this in `hr_position_test_requirement`.
-  default_passing_score INTEGER NOT NULL DEFAULT 70,
-  -- Question payload is opaque JSON so we can evolve question shapes
-  -- (multiple choice, free text, scenario) without schema migrations.
-  questions JSONB NOT NULL DEFAULT '[]'::jsonb,
-  is_built_in BOOLEAN NOT NULL DEFAULT FALSE,
-  archived_at BIGINT,
-  created_at BIGINT NOT NULL,
-  updated_at BIGINT NOT NULL,
-  CONSTRAINT hr_test_template_kind_check CHECK (
-    kind IN ('technical', 'honesty', 'background', 'language', 'behavioral', 'custom')
-  )
-);
-
-CREATE INDEX IF NOT EXISTS hr_test_template_org_kind
-  ON hr_test_template (organization_id, kind);
-CREATE INDEX IF NOT EXISTS hr_test_template_org_archived
-  ON hr_test_template (organization_id, archived_at);
-
--- ---------------------------------------------------------------------------
--- Position ↔ Test requirements (which tests this position needs)
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS hr_position_test_requirement (
-  id TEXT PRIMARY KEY,
-  organization_id TEXT NOT NULL REFERENCES organization(id) ON DELETE CASCADE,
-  position_id TEXT NOT NULL REFERENCES hr_position(id) ON DELETE CASCADE,
-  test_template_id TEXT NOT NULL REFERENCES hr_test_template(id) ON DELETE RESTRICT,
-  -- Score the candidate must reach for the workflow to advance to the
-  -- next gate. NULL means "use the template default".
-  minimum_score INTEGER,
-  -- Weight contribution to the final composite score (0..1). The scorer
-  -- normalizes weights across the position's required tests.
-  weight DOUBLE PRECISION NOT NULL DEFAULT 1.0,
-  is_required BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at BIGINT NOT NULL,
-  updated_at BIGINT NOT NULL
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS hr_position_test_requirement_position_template
-  ON hr_position_test_requirement (position_id, test_template_id);
-CREATE INDEX IF NOT EXISTS hr_position_test_requirement_org_position
-  ON hr_position_test_requirement (organization_id, position_id);
-
--- ---------------------------------------------------------------------------
 -- Candidates (org-isolated profiles deduped by normalized email)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS hr_candidate (
@@ -903,6 +854,9 @@ CREATE TABLE IF NOT EXISTS hr_candidate (
   -- never rewrites historical applications.
   latest_cv_attachment_id TEXT,
   latest_cv_text TEXT,
+  -- Cached embedding of the latest CV. Like the position embedding,
+  -- this is reserved for the upcoming hybrid affinity path; the AI
+  -- extractor remains the source of truth for ranking today.
   latest_cv_embedding JSONB,
   latest_cv_embedding_model TEXT,
   latest_cv_embedding_dimensions INTEGER,
@@ -919,6 +873,17 @@ CREATE TABLE IF NOT EXISTS hr_candidate (
   archived_at BIGINT,
   archived_by TEXT,
   notes TEXT,
+  -- AI-extracted profile fields populated by the candidate-pipeline
+  -- workflow's CV extractor. All nullable: rows pre-AI or with extraction
+  -- failures keep null and the UI falls back to attachment metadata.
+  location TEXT,
+  headline TEXT,
+  summary TEXT,
+  years_of_experience INTEGER,
+  skills JSONB NOT NULL DEFAULT '[]'::jsonb,
+  languages JSONB NOT NULL DEFAULT '[]'::jsonb,
+  highest_degree TEXT,
+  profile_source TEXT,
   created_at BIGINT NOT NULL,
   updated_at BIGINT NOT NULL
 );
@@ -949,8 +914,17 @@ CREATE TABLE IF NOT EXISTS hr_application (
   affinity_model TEXT,
   cv_attachment_id TEXT,
   cv_text TEXT,
+  -- Snapshot of the CV embedding at the moment of application creation.
+  -- Frozen with the application so re-extracting the candidate row
+  -- later (newer CV) never rewrites historical scoring inputs.
   cv_embedding JSONB,
   cv_embedding_model TEXT,
+  -- Snapshot of the AI-extracted candidate profile at the moment this
+  -- application was created. Lets the UI explain WHY the candidate
+  -- ranked the way they did even if the candidate row gets re-extracted
+  -- later from a newer CV.
+  ai_profile_snapshot JSONB,
+  ai_signals JSONB,
   -- Workflow run id is captured the moment the candidate-pipeline workflow
   -- starts. Used for cross-referencing in the workflow inspector and for
   -- defensive guards when retrying / aborting.
@@ -989,52 +963,62 @@ CREATE INDEX IF NOT EXISTS hr_application_workflow_run
   ON hr_application (workflow_run_id) WHERE workflow_run_id IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
--- Test dispatches and responses
+-- Evaluation dispatches and responses
+--
+-- Evaluation catalog ids are sourced from the hardcoded catalog in
+-- `lib/shared/hr/recruitment/evaluation-catalog.ts` (e.g.
+-- `screening-technical-v1`). The dispatcher persists the signed
+-- completion URL on the row so the candidates UI can surface a "Take
+-- evaluation" link inline; future email channels reuse the same URL.
 -- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS hr_test_dispatch (
+CREATE TABLE IF NOT EXISTS hr_evaluation_dispatch (
   id TEXT PRIMARY KEY,
   organization_id TEXT NOT NULL REFERENCES organization(id) ON DELETE CASCADE,
   application_id TEXT NOT NULL REFERENCES hr_application(id) ON DELETE CASCADE,
-  test_template_id TEXT NOT NULL REFERENCES hr_test_template(id) ON DELETE RESTRICT,
-  -- Vehicle used to hand the test to the candidate. Today only the
-  -- `console_stub` channel exists; real email/SMS adapters land later
-  -- behind the same dispatcher service.
-  dispatched_via TEXT NOT NULL DEFAULT 'console_stub',
+  -- Catalog id from `lib/shared/hr/recruitment/evaluation-catalog.ts`.
+  -- No FK; the catalog lives in code, not in a table.
+  evaluation_catalog_id TEXT NOT NULL,
+  -- Vehicle used to hand the evaluation to the candidate. Today only
+  -- `inline_link` exists (admin clicks the URL stored on this row);
+  -- email/SMS adapters land later behind the same dispatcher.
+  dispatched_via TEXT NOT NULL DEFAULT 'inline_link',
   status TEXT NOT NULL DEFAULT 'sent',
-  -- Workflow webhook URL captured at dispatch time. The completion route
-  -- uses this URL to resume the suspended workflow once the candidate
-  -- submits answers. Storing it here keeps the workflow SDK out of the
-  -- HTTP layer.
-  resume_webhook_url TEXT,
+  -- Hook token used by the workflow's `resumeHook(...)` call when the
+  -- candidate completes the evaluation. Storing it here keeps the
+  -- workflow SDK out of the HTTP layer.
+  resume_hook_token TEXT,
   -- Idempotency key for retry-safe dispatches. Steps record this before
   -- performing the side effect; a replay of the same step short-circuits
   -- if the key already exists.
   idempotency_key TEXT NOT NULL,
+  -- Signed URL persisted at dispatch time so the UI can surface it
+  -- inline and any future email adapter reuses the exact same URL.
+  completion_url TEXT,
   expires_at BIGINT,
   dispatched_at BIGINT NOT NULL,
   completed_at BIGINT,
   created_at BIGINT NOT NULL,
   updated_at BIGINT NOT NULL,
-  CONSTRAINT hr_test_dispatch_status_check CHECK (
+  CONSTRAINT hr_evaluation_dispatch_status_check CHECK (
     status IN ('sent', 'completed', 'expired', 'cancelled')
   )
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS hr_test_dispatch_idempotency
-  ON hr_test_dispatch (organization_id, idempotency_key);
-CREATE INDEX IF NOT EXISTS hr_test_dispatch_org_application
-  ON hr_test_dispatch (organization_id, application_id);
-CREATE INDEX IF NOT EXISTS hr_test_dispatch_status
-  ON hr_test_dispatch (organization_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS hr_evaluation_dispatch_idempotency
+  ON hr_evaluation_dispatch (organization_id, idempotency_key);
+CREATE INDEX IF NOT EXISTS hr_evaluation_dispatch_org_application
+  ON hr_evaluation_dispatch (organization_id, application_id);
+CREATE INDEX IF NOT EXISTS hr_evaluation_dispatch_status
+  ON hr_evaluation_dispatch (organization_id, status);
 
-CREATE TABLE IF NOT EXISTS hr_test_response (
+CREATE TABLE IF NOT EXISTS hr_evaluation_response (
   id TEXT PRIMARY KEY,
   organization_id TEXT NOT NULL REFERENCES organization(id) ON DELETE CASCADE,
-  dispatch_id TEXT NOT NULL REFERENCES hr_test_dispatch(id) ON DELETE CASCADE,
+  dispatch_id TEXT NOT NULL REFERENCES hr_evaluation_dispatch(id) ON DELETE CASCADE,
   application_id TEXT NOT NULL REFERENCES hr_application(id) ON DELETE CASCADE,
-  -- Submitted answers. Shape mirrors the questions JSON on the template.
+  -- Submitted answers. Shape mirrors the catalog questions JSON.
   answers JSONB NOT NULL DEFAULT '[]'::jsonb,
-  -- Computed score 0..100. Null while pending grading (manual or AI).
+  -- Computed score 0..100 from the catalog scorer. Null while pending.
   score INTEGER,
   -- Auto/Manual signal. Manual entries reflect a human reviewer override.
   scored_by TEXT NOT NULL DEFAULT 'auto',
@@ -1042,15 +1026,15 @@ CREATE TABLE IF NOT EXISTS hr_test_response (
   submitted_at BIGINT NOT NULL,
   created_at BIGINT NOT NULL,
   updated_at BIGINT NOT NULL,
-  CONSTRAINT hr_test_response_scored_by_check CHECK (
+  CONSTRAINT hr_evaluation_response_scored_by_check CHECK (
     scored_by IN ('auto', 'manual', 'pending')
   )
 );
 
-CREATE INDEX IF NOT EXISTS hr_test_response_org_application
-  ON hr_test_response (organization_id, application_id);
-CREATE INDEX IF NOT EXISTS hr_test_response_dispatch
-  ON hr_test_response (dispatch_id);
+CREATE INDEX IF NOT EXISTS hr_evaluation_response_org_application
+  ON hr_evaluation_response (organization_id, application_id);
+CREATE INDEX IF NOT EXISTS hr_evaluation_response_dispatch
+  ON hr_evaluation_response (dispatch_id);
 
 -- ---------------------------------------------------------------------------
 -- Background checks (separate addon; rows only created when the workflow
@@ -1089,30 +1073,3 @@ CREATE UNIQUE INDEX IF NOT EXISTS hr_background_check_application
   ON hr_background_check (application_id);
 CREATE INDEX IF NOT EXISTS hr_background_check_org_status
   ON hr_background_check (organization_id, status);
--- HR Recruitment AI profile columns.
---
--- Adds AI-extracted profile fields to `hr_candidate` and an AI
--- analysis blob to `hr_application`. The candidate columns power the
--- "show the person's name" UX (replacing the file name) and let us
--- dedupe by email when the AI extractor finds one. The application
--- column captures the AI rationale + signals that the affinity score
--- was based on so the UI can explain WHY the candidate ranked the
--- way they did.
---
--- All columns are nullable: existing rows stay untouched and the
--- workflow's metadata-only fallback continues to work when AI is
--- disabled or fails.
-
-ALTER TABLE hr_candidate
-  ADD COLUMN IF NOT EXISTS location TEXT,
-  ADD COLUMN IF NOT EXISTS headline TEXT,
-  ADD COLUMN IF NOT EXISTS summary TEXT,
-  ADD COLUMN IF NOT EXISTS years_of_experience INTEGER,
-  ADD COLUMN IF NOT EXISTS skills JSONB NOT NULL DEFAULT '[]'::jsonb,
-  ADD COLUMN IF NOT EXISTS languages JSONB NOT NULL DEFAULT '[]'::jsonb,
-  ADD COLUMN IF NOT EXISTS highest_degree TEXT,
-  ADD COLUMN IF NOT EXISTS profile_source TEXT;
-
-ALTER TABLE hr_application
-  ADD COLUMN IF NOT EXISTS ai_profile_snapshot JSONB,
-  ADD COLUMN IF NOT EXISTS ai_signals JSONB;
