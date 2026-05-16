@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SetupRouteRouteImport } from './routes/setup/route'
+import { Route as QrRouteRouteImport } from './routes/qr/route'
 import { Route as PricingRouteRouteImport } from './routes/pricing/route'
 import { Route as HealthRouteRouteImport } from './routes/health/route'
 import { Route as AuthRouteRouteImport } from './routes/auth/route'
@@ -59,6 +60,11 @@ import { Route as appLayoutOrganizationSettingsModelsProviderIdRouteRouteImport 
 const SetupRouteRoute = SetupRouteRouteImport.update({
   id: '/setup',
   path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QrRouteRoute = QrRouteRouteImport.update({
+  id: '/qr',
+  path: '/qr',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PricingRouteRoute = PricingRouteRouteImport.update({
@@ -311,6 +317,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRouteRouteWithChildren
   '/health': typeof HealthRouteRoute
   '/pricing': typeof PricingRouteRoute
+  '/qr': typeof QrRouteRoute
   '/setup': typeof SetupRouteRoute
   '/api/chat': typeof ApiChatRouteRoute
   '/auth/sign-in': typeof AuthSignInRouteRoute
@@ -358,6 +365,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRouteRouteWithChildren
   '/health': typeof HealthRouteRoute
   '/pricing': typeof PricingRouteRoute
+  '/qr': typeof QrRouteRoute
   '/setup': typeof SetupRouteRoute
   '/api/chat': typeof ApiChatRouteRoute
   '/auth/sign-in': typeof AuthSignInRouteRoute
@@ -401,6 +409,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRouteRouteWithChildren
   '/health': typeof HealthRouteRoute
   '/pricing': typeof PricingRouteRoute
+  '/qr': typeof QrRouteRoute
   '/setup': typeof SetupRouteRoute
   '/(app)/_layout': typeof appLayoutRouteRouteWithChildren
   '/api/chat': typeof ApiChatRouteRoute
@@ -451,6 +460,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/health'
     | '/pricing'
+    | '/qr'
     | '/setup'
     | '/api/chat'
     | '/auth/sign-in'
@@ -498,6 +508,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/health'
     | '/pricing'
+    | '/qr'
     | '/setup'
     | '/api/chat'
     | '/auth/sign-in'
@@ -540,6 +551,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/health'
     | '/pricing'
+    | '/qr'
     | '/setup'
     | '/(app)/_layout'
     | '/api/chat'
@@ -589,6 +601,7 @@ export interface RootRouteChildren {
   AuthRouteRoute: typeof AuthRouteRouteWithChildren
   HealthRouteRoute: typeof HealthRouteRoute
   PricingRouteRoute: typeof PricingRouteRoute
+  QrRouteRoute: typeof QrRouteRoute
   SetupRouteRoute: typeof SetupRouteRoute
   appLayoutRouteRoute: typeof appLayoutRouteRouteWithChildren
   ApiChatRouteRoute: typeof ApiChatRouteRoute
@@ -613,6 +626,13 @@ declare module '@tanstack/react-router' {
       path: '/setup'
       fullPath: '/setup'
       preLoaderRoute: typeof SetupRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/qr': {
+      id: '/qr'
+      path: '/qr'
+      fullPath: '/qr'
+      preLoaderRoute: typeof QrRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pricing': {
@@ -1097,6 +1117,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRouteRoute: AuthRouteRouteWithChildren,
   HealthRouteRoute: HealthRouteRoute,
   PricingRouteRoute: PricingRouteRoute,
+  QrRouteRoute: QrRouteRoute,
   SetupRouteRoute: SetupRouteRoute,
   appLayoutRouteRoute: appLayoutRouteRouteWithChildren,
   ApiChatRouteRoute: ApiChatRouteRoute,
