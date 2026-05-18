@@ -68,6 +68,15 @@ const ORG_KNOWLEDGE_ALLOWED_MIME_TYPES = new Set([
 
 const ORG_KNOWLEDGE_ALLOWED_EXTENSIONS = new Set(['pdf', 'md', 'markdown'])
 
+const HR_CV_ALLOWED_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/x-pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+])
+
+const HR_CV_ALLOWED_EXTENSIONS = new Set(['pdf', 'doc', 'docx'])
+
 const AVATAR_ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
   'image/png',
@@ -118,6 +127,20 @@ export const ORG_KNOWLEDGE_UPLOAD_POLICY: UploadValidationPolicy = {
   allowedMimeTypes: ORG_KNOWLEDGE_ALLOWED_MIME_TYPES,
   allowedExtensions: ORG_KNOWLEDGE_ALLOWED_EXTENSIONS,
   maxSizeBytes: ORG_KNOWLEDGE_MAX_UPLOAD_SIZE_BYTES,
+}
+
+export const HR_CV_UPLOAD_POLICY: UploadValidationPolicy = {
+  acceptedFileTypes: [
+    '.pdf',
+    '.doc',
+    '.docx',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ].join(','),
+  allowedMimeTypes: HR_CV_ALLOWED_MIME_TYPES,
+  allowedExtensions: HR_CV_ALLOWED_EXTENSIONS,
+  maxSizeBytes: CHAT_ATTACHMENT_MAX_UPLOAD_SIZE_BYTES,
 }
 
 export const AVATAR_UPLOAD_POLICY: UploadValidationPolicy = {

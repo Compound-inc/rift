@@ -29,6 +29,7 @@ import type { HrPosition } from './hr-positions.logic'
 import { useHrPositionApplications } from './hr-position-detail.logic'
 import { HrCleanCvsButton } from './hr-clean-cvs-button'
 import { resolveApplicationStagePresentation } from '../application'
+import { HR_CV_UPLOAD_POLICY } from '@/lib/shared/upload/upload-validation'
 import { toast } from 'sonner'
 
 export function HrPositionDetailPage({ position }: { position: HrPosition }) {
@@ -143,7 +144,7 @@ export function HrPositionDetailPage({ position }: { position: HrPosition }) {
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept=".pdf,.txt,.md,.doc,.docx"
+                accept={HR_CV_UPLOAD_POLICY.acceptedFileTypes}
                 className="sr-only"
                 onChange={(event) => {
                   void handleFiles(event.target.files)

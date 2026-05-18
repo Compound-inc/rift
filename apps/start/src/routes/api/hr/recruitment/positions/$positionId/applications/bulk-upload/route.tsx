@@ -16,6 +16,10 @@ import { requireOrgAuth } from '@/lib/backend/server-effect/http/server-auth'
 import { candidatePipelineWorkflow } from '@/lib/backend/hr/recruitment/workflows/candidate-pipeline'
 import { uploadService } from '@/lib/backend/upload/upload.service'
 import {
+  HR_CV_UPLOAD_POLICY,
+  getUploadValidationError,
+} from '@/lib/shared/upload/upload-validation'
+import {
   addHrWideEventBreadcrumb,
   createHrRecruitmentWideEvent,
   describeHrCause,
@@ -124,6 +128,32 @@ export const Route = createFileRoute(
             )
           }
 
+          const invalidFile = files.find((file) =>
+            getUploadValidationError(file, HR_CV_UPLOAD_POLICY),
+          )
+          if (invalidFile) {
+            const validationError = getUploadValidationError(
+              invalidFile,
+              HR_CV_UPLOAD_POLICY,
+            )
+            finalizeHrWideEventFailure(wideEvent, {
+              status: 400,
+              errorTag: 'UnsupportedCvFileType',
+              message: validationError ?? 'Only PDF and Word documents are supported',
+            })
+            await drainWideEventSafely(wideEvent)
+            return Response.json(
+              {
+                error: `${invalidFile.name}: ${
+                  validationError ?? 'Only PDF and Word documents are supported'
+                }`,
+                requestId,
+                errorTag: 'UnsupportedCvFileType',
+              },
+              { status: 400 },
+            )
+          }
+
           const positionId = params.positionId
           if (!positionId) {
             finalizeHrWideEventFailure(wideEvent, {
@@ -190,6 +220,7 @@ export const Route = createFileRoute(
                       uploadService.upload({
                         userId: auth.userId,
                         file,
+                        validationPolicy: HR_CV_UPLOAD_POLICY,
                       }),
                     catch: (cause) =>
                       new Error(
