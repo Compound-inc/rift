@@ -6,6 +6,7 @@ import type { ChatAttachment } from '@/lib/shared/chat-contracts/attachments'
 import { ORG_KNOWLEDGE_KIND } from '@/lib/shared/org-knowledge'
 import { MessagePersistenceError } from '@/lib/backend/chat/domain/errors'
 import { zql } from '@/lib/backend/chat/infra/zero/db'
+import { uploadService } from '@/lib/backend/upload/upload.service'
 import type { OrgKnowledgeRepositoryService } from '@/lib/backend/org-knowledge/services/org-knowledge-repository.service'
 import type { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
 import type { AttachmentRecordService } from '@/lib/backend/chat/services/attachment-record.service'
@@ -517,7 +518,9 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
             (attachment) => ({
               id: attachment.id,
               key: attachment.fileKey,
-              url: attachment.attachmentUrl,
+              url: uploadService.buildAccessibleObjectUrl({
+                key: attachment.fileKey,
+              }),
               name: attachment.fileName,
               size: attachment.fileSize,
               contentType: attachment.mimeType,
@@ -557,7 +560,9 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
               type: 'file' as const,
               mediaType: attachment.mimeType,
               filename: attachment.fileName,
-              url: attachment.attachmentUrl,
+              url: uploadService.buildAccessibleObjectUrl({
+                key: attachment.fileKey,
+              }),
             })),
           ]
 

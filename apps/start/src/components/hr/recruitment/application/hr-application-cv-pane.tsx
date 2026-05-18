@@ -94,15 +94,34 @@ type CvResolveState =
   | { readonly status: 'unsupported'; readonly url: string }
 
 function CvPdfFrame({ url }: { readonly url: string }) {
+  const sandbox = getPdfFrameSandbox(url)
+
   return (
     <iframe
       title="CV preview"
       src={url}
       className="h-full min-h-[480px] w-full flex-1 border-0"
-      sandbox="allow-same-origin"
+      sandbox={sandbox}
       referrerPolicy="no-referrer"
     />
   )
+}
+
+function getPdfFrameSandbox(url: string) {
+  if (typeof window === 'undefined') return 'allow-scripts'
+
+  try {
+    const frameUrl = new URL(url, window.location.href)
+    if (frameUrl.origin === window.location.origin) return 'allow-scripts'
+  } catch {
+    return 'allow-scripts'
+  }
+
+  /**
+   * Browser PDF viewers are script-driven in Chromium/WebKit. External storage
+   * origins are isolated from Rift, so same-origin is acceptable there.
+   */
+  return 'allow-same-origin allow-scripts'
 }
 
 function CvLoadingState() {

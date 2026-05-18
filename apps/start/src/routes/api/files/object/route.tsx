@@ -29,6 +29,10 @@ export const Route = createFileRoute('/api/files/object')({
       GET: async ({ request }) => {
         const url = new URL(request.url)
         const key = url.searchParams.get('key')?.trim() ?? ''
+        const expiresAt = Number.parseInt(
+          url.searchParams.get('exp')?.trim() ?? '',
+          10,
+        )
         const signature = url.searchParams.get('sig')?.trim() ?? ''
 
         if (!isLikelyValidStorageKey(key)) {
@@ -38,15 +42,18 @@ export const Route = createFileRoute('/api/files/object')({
           })
         }
 
-        if (!signature || !verifyStorageKeySignature({ key, signature })) {
-          return new Response(JSON.stringify({ error: 'Invalid file signature' }), {
+        if (
+          !signature ||
+          !verifyStorageKeySignature({ key, expiresAt, signature })
+        ) {
+          return new Response(JSON.stringify({ error: 'Invalid or expired file signature' }), {
             status: 403,
             headers: { 'Content-Type': 'application/json' },
           })
         }
 
         try {
-          return uploadService.readObjectByKey({ key })
+          return await uploadService.readObjectByKey({ key })
         } catch (error) {
           if (error instanceof UploadServiceError) {
             return new Response(JSON.stringify({ error: error.message }), {
@@ -54,6 +61,11 @@ export const Route = createFileRoute('/api/files/object')({
               headers: { 'Content-Type': 'application/json' },
             })
           }
+
+          console.error('[files.object] Failed to fetch object', {
+            key,
+            cause: error instanceof Error ? error.message : String(error),
+          })
 
           return new Response(JSON.stringify({ error: 'Failed to fetch object' }), {
             status: 500,

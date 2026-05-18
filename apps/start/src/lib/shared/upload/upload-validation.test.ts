@@ -3,7 +3,9 @@ import {
   CHAT_ATTACHMENT_UPLOAD_POLICY,
   ORG_KNOWLEDGE_UPLOAD_POLICY,
   getUploadValidationError,
+  hasPdfMagicBytes,
   isAcceptedUploadFile,
+  isPdfUpload,
 } from './upload-validation'
 
 describe('upload validation policies', () => {
@@ -40,14 +42,14 @@ describe('upload validation policies', () => {
     expect(getUploadValidationError(file, ORG_KNOWLEDGE_UPLOAD_POLICY)).toBeNull()
   })
 
-  it('rejects markdown files for general chat attachments', () => {
+  it('accepts markdown files for general chat attachments', () => {
     const file = {
       name: 'handbook.md',
       type: 'text/markdown',
       size: 128,
     } satisfies Pick<File, 'name' | 'type' | 'size'>
 
-    expect(isAcceptedUploadFile(file, CHAT_ATTACHMENT_UPLOAD_POLICY)).toBe(false)
+    expect(isAcceptedUploadFile(file, CHAT_ATTACHMENT_UPLOAD_POLICY)).toBe(true)
   })
 
   it('rejects empty org knowledge uploads', () => {
@@ -58,5 +60,16 @@ describe('upload validation policies', () => {
     } satisfies Pick<File, 'name' | 'type' | 'size'>
 
     expect(getUploadValidationError(file, ORG_KNOWLEDGE_UPLOAD_POLICY)).toBe('File is empty')
+  })
+
+  it('detects PDF-labeled uploads by type or extension', () => {
+    expect(isPdfUpload({ name: 'cv.pdf', type: 'application/octet-stream' })).toBe(true)
+    expect(isPdfUpload({ name: 'cv.bin', type: 'application/pdf' })).toBe(true)
+    expect(isPdfUpload({ name: 'cv.txt', type: 'text/plain' })).toBe(false)
+  })
+
+  it('validates PDF magic bytes', async () => {
+    await expect(hasPdfMagicBytes(new Blob(['%PDF-1.7']))).resolves.toBe(true)
+    await expect(hasPdfMagicBytes(new Blob(['<html></html>']))).resolves.toBe(false)
   })
 })

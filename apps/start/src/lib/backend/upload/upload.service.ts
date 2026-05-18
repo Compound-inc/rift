@@ -5,6 +5,8 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import {
   CHAT_ATTACHMENT_UPLOAD_POLICY,
   getUploadValidationError,
+  hasPdfMagicBytes,
+  isPdfUpload,
 } from '@/lib/shared/upload/upload-validation'
 import { resolveUploadStorageConfig } from './storage-config'
 
@@ -29,6 +31,7 @@ type BunRuntimeLike = {
 }
 
 const UPLOAD_PREFIX = 'uploads'
+const DEFAULT_SIGNED_FILE_URL_TTL_SECONDS = 10 * 60
 let cachedUploadStorageConfig: UploadStorageConfig | null = null
 let cachedUploadClient: BunS3ClientLike | null = null
 
@@ -119,17 +122,32 @@ function readUploadSigningSecret(): string | null {
   return trimmed.length > 0 ? trimmed : null
 }
 
-function signStorageKey(key: string, secret: string): string {
-  return createHmac('sha256', secret).update(key).digest('hex')
+function signStorageKey(input: {
+  key: string
+  expiresAt: number
+  secret: string
+}): string {
+  return createHmac('sha256', input.secret)
+    .update(`${input.key}\n${input.expiresAt}`)
+    .digest('hex')
 }
 
 export function verifyStorageKeySignature(input: {
   key: string
+  expiresAt: number
   signature: string
+  now?: number
 }): boolean {
   const secret = readUploadSigningSecret()
   if (!secret) return false
-  const expected = signStorageKey(input.key, secret)
+  if (!Number.isSafeInteger(input.expiresAt)) return false
+  if (input.expiresAt <= Math.floor((input.now ?? Date.now()) / 1000)) return false
+
+  const expected = signStorageKey({
+    key: input.key,
+    expiresAt: input.expiresAt,
+    secret,
+  })
 
   const providedBuffer = Buffer.from(input.signature, 'utf8')
   const expectedBuffer = Buffer.from(expected, 'utf8')
@@ -146,9 +164,14 @@ function buildProxyFileUrl(fileKey: string, publicBaseUrl: string): string {
     )
   }
 
+  const expiresAt = Math.floor(Date.now() / 1000) + DEFAULT_SIGNED_FILE_URL_TTL_SECONDS
   const url = new URL(publicBaseUrl)
   url.searchParams.set('key', fileKey)
-  url.searchParams.set('sig', signStorageKey(fileKey, secret))
+  url.searchParams.set('exp', String(expiresAt))
+  url.searchParams.set(
+    'sig',
+    signStorageKey({ key: fileKey, expiresAt, secret }),
+  )
   return url.toString()
 }
 
@@ -177,15 +200,17 @@ export class UploadService {
    * Fetches an object from the configured S3-compatible backend and returns it
    * as a web `Response` payload.
    */
-  readObjectByKey(params: { key: string }): Response {
+  async readObjectByKey(params: { key: string }): Promise<Response> {
     const config = getUploadStorageConfig()
     const objectFile = getUploadClient().file(params.key)
     const contentType = resolveResponseContentType(params.key)
+    const body = await objectFile.arrayBuffer()
 
-    return new Response(objectFile, {
+    return new Response(body, {
       status: 200,
       headers: {
-        'Cache-Control': 'private, max-age=300',
+        'Cache-Control': 'private, no-store',
+        'Content-Disposition': buildContentDisposition(params.key),
         'Content-Type': contentType,
         // Prevent the browser from MIME-sniffing the response body. Without
         // this, a file uploaded as `.pdf` whose body is HTML could execute
@@ -223,6 +248,13 @@ export class UploadService {
         validationError === 'File is empty'
           ? 'Uploaded file is empty'
           : validationError,
+        400,
+      )
+    }
+
+    if (isPdfUpload(file) && !(await hasPdfMagicBytes(file))) {
+      throw new UploadServiceError(
+        'Uploaded PDF is invalid or has a mismatched file type',
         400,
       )
     }

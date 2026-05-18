@@ -6,6 +6,7 @@ import {
 } from '@/lib/backend/chat/domain/errors'
 import { getUserMessageText } from '@/lib/backend/chat/domain/schemas'
 import { zql } from '@/lib/backend/chat/infra/zero/db'
+import { uploadService } from '@/lib/backend/upload/upload.service'
 import type { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
 import type { AttachmentRagService } from '@/lib/backend/chat/services/rag'
 import { resolveCanonicalBranch } from '@/lib/shared/chat-branching/branch-resolver'
@@ -99,7 +100,9 @@ export const makeAppendUserMessageOperation = (dependencies: {
                   linkedAttachments.push({
                     id: existingAttachment.id,
                     key: existingAttachment.fileKey,
-                    url: existingAttachment.attachmentUrl,
+                    url: uploadService.buildAccessibleObjectUrl({
+                      key: existingAttachment.fileKey,
+                    }),
                     name: existingAttachment.fileName,
                     size: existingAttachment.fileSize,
                     contentType: existingAttachment.mimeType,

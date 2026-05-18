@@ -71,14 +71,18 @@ function resolveCloudflareR2Config(): UploadStorageConfig {
   const accessKeyId = readEnv(['R2_ACCESS_KEY_ID'])
   const secretAccessKey = readEnv(['R2_SECRET_ACCESS_KEY'])
   const bucket = readEnv(['R2_BUCKET_NAME'])
-  const publicBaseUrl = readEnv(['R2_PUBLIC_BASE_URL'])
+  const configuredPublicBaseUrl = readEnv(['R2_PUBLIC_BASE_URL'])
+  const appBaseUrl = resolveAppBaseUrl()
+  const publicBaseUrl =
+    configuredPublicBaseUrl ??
+    (appBaseUrl ? `${appBaseUrl.replace(/\/$/, '')}/api/files/object` : null)
 
   const missing = [
     !accountId ? 'R2_ACCOUNT_ID' : null,
     !accessKeyId ? 'R2_ACCESS_KEY_ID' : null,
     !secretAccessKey ? 'R2_SECRET_ACCESS_KEY' : null,
     !bucket ? 'R2_BUCKET_NAME' : null,
-    !publicBaseUrl ? 'R2_PUBLIC_BASE_URL' : null,
+    !publicBaseUrl ? 'R2_PUBLIC_BASE_URL or BETTER_AUTH_URL' : null,
   ].filter((key): key is string => key != null)
 
   if (missing.length > 0) {
@@ -96,7 +100,9 @@ function resolveCloudflareR2Config(): UploadStorageConfig {
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     region: 'auto',
     publicBaseUrl: publicBaseUrl as string,
-    publicUrlMode: 'path',
+    publicUrlMode: isProxyObjectBaseUrl(publicBaseUrl as string)
+      ? 'proxy_query'
+      : 'path',
   }
 }
 

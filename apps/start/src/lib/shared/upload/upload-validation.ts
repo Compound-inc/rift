@@ -195,3 +195,16 @@ export function getUploadValidationError(
   }
   return null
 }
+
+export function isPdfUpload(file: Pick<File, 'name' | 'type'>): boolean {
+  return (
+    normalizeMimeType(file.type) === 'application/pdf' ||
+    normalizeMimeType(file.type) === 'application/x-pdf' ||
+    getFileExtension(file.name) === 'pdf'
+  )
+}
+
+export async function hasPdfMagicBytes(file: Blob): Promise<boolean> {
+  const header = await file.slice(0, 5).text()
+  return header === '%PDF-'
+}
