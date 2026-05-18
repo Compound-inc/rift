@@ -5,7 +5,7 @@ import {
   setCapability,
 } from '@/lib/shared/permissions'
 import {
-  resolveProductAddonEntitlements,
+  resolveProductEntitlements,
   resolveWorkspaceEffectiveFeatures,
 } from '@/lib/shared/access-control'
 import { PermissionService } from './permission.service'
@@ -20,7 +20,7 @@ describe('PermissionService.layerMemory', () => {
         effectiveFeatures: resolveWorkspaceEffectiveFeatures({
           planId: 'enterprise',
         }),
-        productAddonEntitlements: resolveProductAddonEntitlements({
+        productAddonEntitlements: resolveProductEntitlements({
           addonGrants: { hr: true, 'hr.recruitment': true },
         }),
       },
@@ -60,7 +60,7 @@ describe('PermissionService.layerMemory', () => {
   it('returns a context whose can()/check() mirrors the bundle resolver', async () => {
     const bundle = {
       ...EMPTY_PERMISSION_BUNDLE,
-      productAddonEntitlements: resolveProductAddonEntitlements({
+      productAddonEntitlements: resolveProductEntitlements({
         addonGrants: { hr: true },
       }),
     }

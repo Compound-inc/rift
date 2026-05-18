@@ -15,16 +15,16 @@ leaf permissions behind one typesafe key.
 ```
 workspace.<featureId>                          // plan-gated workspace feature
 product.<productKey>                           // product umbrella
-product.<productKey>.<addonKey>                // paid addon
-product.<productKey>.<addonKey>.<leaf>         // fine-grained leaf permission
-product.<productKey>.<leaf>                    // product-level leaf without addon context
+product.<productKey>.<addonPath>               // paid addon, supports nested paths
+product.<productKey>.<addonPath>:<leaf>         // fine-grained leaf permission
+product.<productKey>:<leaf>                    // product-level leaf without addon context
 ```
 
 Every valid key is encoded in the `PermissionKey` union type, which is
 derived from:
 
 - `WORKSPACE_FEATURE_IDS` for `workspace.*` keys
-- `ORG_PRODUCT_ADDON_CATALOG` for `product.<productKey>.<addonKey>` keys
+- `ORG_PRODUCT_ADDON_CATALOG` for `product.<productKey>.<addonPath>` keys
 - `PRODUCT_PERMISSION_CATALOG` for leaf keys
 
 Adding a new entry to any of those catalogs auto-extends the union. Typos
@@ -47,7 +47,7 @@ this resource, this action."
 For any requested key the resolver applies these layers, top-to-bottom.
 The first denial wins:
 
-1. **Ancestor walk.** A leaf like `product.hr.recruitment.candidates.view`
+1. **Ancestor walk.** A leaf like `product.hr.recruitment:candidates.view`
    requires its ancestors (`product.hr.recruitment`, `product.hr`) to
    resolve allowed. An ancestor denial short-circuits with
    `reason: 'ancestor-denied'`.
@@ -55,10 +55,10 @@ The first denial wins:
    `getWorkspaceFeatureAccessState`. Denies are `reason:
 'plan-insufficient'`.
 3. **Product entitlement.** For `product.<productKey>` (and
-   `product.<productKey>.<addonKey>`), the snapshot-backed entitlement
+   `product.<productKey>.<addonPath>`), the snapshot-backed entitlement
    map must contain `true`. Denies are `reason: 'not-entitled'`.
 4. **Org-admin capability.** `OrgProductPolicy.capabilities['enabled']`
-   or `OrgProductPolicy.capabilities['<addonKey>.enabled']` must not be
+   or `OrgProductPolicy.capabilities['<addonPath>.enabled']` must not be
    `false`. Denies are `reason: 'disabled-by-admin'`.
 5. **Role permission (future).** Leaf keys consult an explicit
    role-permission set. When the set is empty (today's default), leaves
@@ -135,7 +135,7 @@ security-sensitive operations.
 
 Tests use `PermissionService.layerMemory(bundle)` with a deterministic
 bundle built via `EMPTY_PERMISSION_BUNDLE` + `setCapability` +
-`resolveProductAddonEntitlements` + `resolveWorkspaceEffectiveFeatures`.
+`resolveProductEntitlements` + `resolveWorkspaceEffectiveFeatures`.
 
 ## 6. Adding a new permission
 
@@ -150,10 +150,11 @@ bundle built via `EMPTY_PERMISSION_BUNDLE` + `setCapability` +
 See `PRODUCTS_AND_ADDONS.md`. Permission keys update automatically once
 the catalog entry lands.
 
-### A new leaf permission (e.g. `product.hr.recruitment.candidates.view`)
+### A new leaf permission (e.g. `product.hr.recruitment:candidates.view`)
 
 1. Add the leaf string to
-   `PRODUCT_PERMISSION_CATALOG.hr.addonLeaves.recruitment`.
+   `PRODUCT_PERMISSION_CATALOG.hr.addonLeaves.recruitment` (or a nested
+   addon path such as `recruitment.background-check`).
 2. The `PermissionKey` union and runtime list pick it up automatically.
 3. When the role selector UI lands, populate `PermissionBundle.rolePermissions`
    with the granted leaf keys for the active user. Until then, every

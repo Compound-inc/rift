@@ -239,7 +239,7 @@ export async function setSingularityOrganizationAddonEntitlementsAction(input: {
       SingularityRuntime.run(
         Effect.gen(function* () {
           const service = yield* SingularityAdminService
-          yield* service.setProductAddonEntitlements({
+          yield* service.setProductEntitlements({
             organizationId: input.organizationId,
             actorUserId: authContext.userId,
             grants: input.grants,

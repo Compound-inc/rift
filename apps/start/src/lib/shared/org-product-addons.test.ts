@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   ORG_PRODUCT_ADDON_CATALOG,
-  getProductAddonEntitlementIdsForProduct,
+  getProductAddonDefinition,
+  getProductAddonPathsForProduct,
+  getProductEntitlementIdsForProduct,
   isKnownProductAddon,
   isOrgProductAddonKey,
-  toProductAddonEntitlementId,
+  toProductEntitlementId,
 } from './org-product-addons'
 
 describe('ORG_PRODUCT_ADDON_CATALOG', () => {
@@ -14,70 +16,68 @@ describe('ORG_PRODUCT_ADDON_CATALOG', () => {
     expect(ORG_PRODUCT_ADDON_CATALOG).toHaveProperty('hr')
   })
 
-  it('declares HR core, recruitment, background-check, and payroll addons; new orgConfigurableSettingKeys flow into the existing settings UI without schema work', () => {
-    const hrAddons = ORG_PRODUCT_ADDON_CATALOG.hr.addons
-    expect(hrAddons).toHaveProperty('core')
-    expect(hrAddons).toHaveProperty('recruitment')
-    expect(hrAddons).toHaveProperty('background-check')
-    expect(hrAddons).toHaveProperty('payroll')
-
-    expect(hrAddons.core.orgConfigurableSettingKeys).toHaveLength(0)
-    expect(hrAddons.payroll.orgConfigurableSettingKeys).toHaveLength(0)
-    expect(hrAddons.recruitment.orgConfigurableSettingKeys).toContain(
-      'recruitment.aiRerankEnabled',
-    )
-    expect(hrAddons.recruitment.orgConfigurableSettingKeys).toContain(
-      'recruitment.aiRerankTopK',
-    )
-    expect(hrAddons.recruitment.orgConfigurableSettingKeys).toContain(
-      'recruitment.autoArchiveAfterDays',
-    )
-    expect(hrAddons['background-check'].orgConfigurableSettingKeys).toContain(
-      'background-check.creditScoreEnabled',
-    )
-    expect(hrAddons['background-check'].orgConfigurableSettingKeys).toContain(
-      'background-check.legalBuroEnabled',
+  it('models products as core access plus extra addon branches', () => {
+    expect(ORG_PRODUCT_ADDON_CATALOG.chat.addons).toEqual({})
+    expect(ORG_PRODUCT_ADDON_CATALOG.writing.addons).toEqual({})
+    expect(ORG_PRODUCT_ADDON_CATALOG.hr.addons).not.toHaveProperty('core')
+    expect(ORG_PRODUCT_ADDON_CATALOG.hr.addons).toHaveProperty('recruitment')
+    expect(ORG_PRODUCT_ADDON_CATALOG.hr.addons).toHaveProperty('payroll')
+    expect(ORG_PRODUCT_ADDON_CATALOG.hr.addons.recruitment.children).toHaveProperty(
+      'background-check',
     )
   })
 
-  it('leaves chat without addons until it opts in; writing and hr declare their addons', () => {
-    // `chat` remains empty — it has no addons yet. `writing` starts
-    // with a single `core` addon so access to the product is manually
-    // granted (mirrors the HR model). Update this test when chat gets
-    // its first paid addon or when writing ships another one.
-    expect(Object.keys(ORG_PRODUCT_ADDON_CATALOG.chat.addons)).toHaveLength(0)
-    expect(Object.keys(ORG_PRODUCT_ADDON_CATALOG.writing.addons)).toEqual([
-      'core',
-    ])
-    expect(
-      Object.keys(ORG_PRODUCT_ADDON_CATALOG.hr.addons).length,
-    ).toBeGreaterThan(0)
+  it('keeps nested addon settings keyed by full addon path', () => {
+    const recruitment = getProductAddonDefinition('hr', 'recruitment')
+    const backgroundCheck = getProductAddonDefinition(
+      'hr',
+      'recruitment.background-check',
+    )
+
+    expect(recruitment.orgConfigurableSettingKeys).toContain(
+      'recruitment.aiRerankEnabled',
+    )
+    expect(recruitment.orgConfigurableSettingKeys).toContain(
+      'recruitment.aiRerankTopK',
+    )
+    expect(backgroundCheck.orgConfigurableSettingKeys).toContain(
+      'recruitment.background-check.creditScoreEnabled',
+    )
+    expect(backgroundCheck.orgConfigurableSettingKeys).toContain(
+      'recruitment.background-check.legalBuroEnabled',
+    )
   })
 })
 
-describe('getProductAddonEntitlementIdsForProduct', () => {
-  it('returns the umbrella id first followed by every sub-addon id', () => {
-    expect(getProductAddonEntitlementIdsForProduct('hr')).toEqual([
-      'hr',
-      'hr.core',
-      'hr.recruitment',
-      'hr.background-check',
-      'hr.payroll',
-    ])
-    expect(getProductAddonEntitlementIdsForProduct('writing')).toEqual([
-      'writing',
-      'writing.core',
+describe('getProductAddonPathsForProduct / getProductEntitlementIdsForProduct', () => {
+  it('flattens the tree into stable dotted addon paths', () => {
+    expect(getProductAddonPathsForProduct('hr')).toEqual([
+      'recruitment',
+      'recruitment.background-check',
+      'payroll',
     ])
   })
 
-  it('returns only the umbrella id for products without addons', () => {
-    expect(getProductAddonEntitlementIdsForProduct('chat')).toEqual(['chat'])
+  it('returns the umbrella id first followed by every nested addon id', () => {
+    expect(getProductEntitlementIdsForProduct('hr')).toEqual([
+      'hr',
+      'hr.recruitment',
+      'hr.recruitment.background-check',
+      'hr.payroll',
+    ])
+    expect(getProductEntitlementIdsForProduct('writing')).toEqual(['writing'])
+    expect(getProductEntitlementIdsForProduct('chat')).toEqual(['chat'])
   })
 })
 
 describe('isOrgProductAddonKey / isKnownProductAddon', () => {
-  it('narrows string input against the catalog', () => {
+  it('narrows string input against nested addon paths', () => {
     expect(isOrgProductAddonKey('hr', 'recruitment')).toBe(true)
+    expect(isOrgProductAddonKey('hr', 'recruitment.background-check')).toBe(
+      true,
+    )
+    expect(isOrgProductAddonKey('hr', 'background-check')).toBe(false)
+    expect(isOrgProductAddonKey('hr', 'core')).toBe(false)
     expect(isOrgProductAddonKey('hr', 'unknown-addon')).toBe(false)
   })
 
@@ -86,7 +86,13 @@ describe('isOrgProductAddonKey / isKnownProductAddon', () => {
       isKnownProductAddon({ productKey: 'hr', addonKey: 'recruitment' }),
     ).toBe(true)
     expect(
-      isKnownProductAddon({ productKey: 'hr', addonKey: 'unknown-addon' }),
+      isKnownProductAddon({
+        productKey: 'hr',
+        addonKey: 'recruitment.background-check',
+      }),
+    ).toBe(true)
+    expect(
+      isKnownProductAddon({ productKey: 'hr', addonKey: 'background-check' }),
     ).toBe(false)
     expect(
       isKnownProductAddon({
@@ -97,14 +103,15 @@ describe('isOrgProductAddonKey / isKnownProductAddon', () => {
   })
 })
 
-describe('toProductAddonEntitlementId', () => {
+describe('toProductEntitlementId', () => {
   it('returns the bare product key for umbrella entitlements', () => {
-    expect(toProductAddonEntitlementId('hr')).toBe('hr')
+    expect(toProductEntitlementId('hr')).toBe('hr')
   })
 
-  it('joins product and addon with a dot for sub-addon entitlements', () => {
-    expect(toProductAddonEntitlementId('hr', 'recruitment')).toBe(
-      'hr.recruitment',
+  it('joins product and addon path with dots for nested entitlements', () => {
+    expect(toProductEntitlementId('hr', 'recruitment')).toBe('hr.recruitment')
+    expect(toProductEntitlementId('hr', 'recruitment.background-check')).toBe(
+      'hr.recruitment.background-check',
     )
   })
 })

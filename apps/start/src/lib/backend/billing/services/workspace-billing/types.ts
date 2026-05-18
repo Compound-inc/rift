@@ -12,7 +12,7 @@ import type {
   WorkspaceBillingSeatLimitExceededError,
 } from '../../domain/errors'
 import type {
-  ProductAddonEntitlements,
+  ProductEntitlements,
   SelfServeWorkspacePlanId,
   StripeManagedWorkspacePlanId,
   WorkspacePlanId,
@@ -59,7 +59,7 @@ export type OrgSeatAvailability = OrgMemberCounts & {
   seatCount: number
   isOverSeatLimit: boolean
   effectiveFeatures: EffectiveFeatures
-  productAddonEntitlements: ProductAddonEntitlements
+  productAddonEntitlements: ProductEntitlements
   usagePolicy: UsagePolicySnapshot
   usageSyncStatus: 'ok' | 'degraded'
   usageSyncError: string | null

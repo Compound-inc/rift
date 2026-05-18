@@ -6,7 +6,7 @@ import { authClient } from '@/lib/frontend/auth/auth-client'
 import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 import { queries } from '@/integrations/zero'
 import type {
-  ProductAddonEntitlements,
+  ProductEntitlements,
   SelfServeWorkspacePlanId,
   WorkspaceFeatureId,
   WorkspacePlanId,
@@ -47,7 +47,7 @@ type BillingEntitlementRow = {
   pendingInvitationCount: number
   isOverSeatLimit: boolean
   effectiveFeatures?: Record<WorkspaceFeatureId, boolean>
-  productAddonEntitlements?: ProductAddonEntitlements
+  productAddonEntitlements?: ProductEntitlements
 }
 
 type BillingMemberAccessRow = {

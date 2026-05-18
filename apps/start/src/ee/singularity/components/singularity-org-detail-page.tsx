@@ -39,7 +39,7 @@ import {
 } from '@rift/ui/select'
 import { MoreVertical, UserPlus } from 'lucide-react'
 import {
-  PRODUCT_ADDON_ENTITLEMENT_IDS,
+  PRODUCT_ENTITLEMENT_IDS,
   WORKSPACE_FEATURE_IDS,
   WORKSPACE_PLANS,
 } from '@/lib/shared/access-control'
@@ -1192,14 +1192,14 @@ export function SingularityOrgDetailPage({
                     and triggers an entitlement snapshot recompute. Plan
                     defaults in{' '}
                     <code className="font-mono text-[0.72rem]">
-                      PLAN_DEFAULT_PRODUCT_ADDONS
+                      PLAN_DEFAULT_PRODUCT_ENTITLEMENTS
                     </code>{' '}
                     serve as the base; explicit grants here override them.
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  {PRODUCT_ADDON_ENTITLEMENT_IDS.map((entitlementId) => (
+                  {PRODUCT_ENTITLEMENT_IDS.map((entitlementId) => (
                     <div
                       key={entitlementId}
                       className="flex items-center justify-between gap-4 rounded-xl border border-border-light/70 bg-surface-overlay/60 px-4 py-3"

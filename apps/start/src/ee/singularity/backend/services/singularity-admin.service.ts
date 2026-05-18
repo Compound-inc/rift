@@ -16,7 +16,7 @@ import {
   resolveWorkspaceEffectiveFeatures,
 } from '@/lib/shared/access-control'
 import type {
-  ProductAddonEntitlementId,
+  ProductEntitlementId,
   WorkspaceFeatureId,
   WorkspacePlanId,
 } from '@/lib/shared/access-control'
@@ -42,7 +42,7 @@ import {
   readOrganizationExistsEffect,
   readOrganizationMemberRoleEffect,
 } from './singularity-admin/queries'
-import { setProductAddonEntitlementsOperation } from './singularity-admin/operations/set-product-addon-entitlements'
+import { setProductEntitlementsOperation } from './singularity-admin/operations/set-product-addon-entitlements'
 
 export type SingularityAdminServiceShape = {
   readonly listOrganizations: () => Effect.Effect<
@@ -97,10 +97,10 @@ export type SingularityAdminServiceShape = {
     | SingularityPersistenceError
   >
 
-  readonly setProductAddonEntitlements: (input: {
+  readonly setProductEntitlements: (input: {
     organizationId: string
     actorUserId: string
-    grants: Partial<Record<ProductAddonEntitlementId, boolean>>
+    grants: Partial<Record<ProductEntitlementId, boolean>>
   }) => Effect.Effect<
     void,
     | SingularityNotFoundError
@@ -573,11 +573,11 @@ export class SingularityAdminService extends ServiceMap.Service<
             }),
         ),
 
-        setProductAddonEntitlements: Effect.fn(
-          'SingularityAdminService.setProductAddonEntitlements',
+        setProductEntitlements: Effect.fn(
+          'SingularityAdminService.setProductEntitlements',
         )(({ organizationId, actorUserId, grants }) =>
           provideSql(
-            setProductAddonEntitlementsOperation({
+            setProductEntitlementsOperation({
               organizationId,
               actorUserId,
               grants,

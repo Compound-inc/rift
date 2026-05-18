@@ -30,7 +30,9 @@ export const isHrPath = (pathname: string) => isAreaPath(pathname, HR_HREF)
 function HrAreaContent({ pathname }: { pathname: string }) {
   const { can } = usePermissions()
   const recruitmentEnabled = can('product.hr.recruitment')
-  const backgroundCheckEnabled = can('product.hr.background-check')
+  const backgroundCheckEnabled = can(
+    'product.hr.recruitment.background-check',
+  )
   const payrollEnabled = can('product.hr.payroll')
 
   const sections = useMemo<NavSection[]>(() => {
@@ -55,7 +57,7 @@ function HrAreaContent({ pathname }: { pathname: string }) {
       items.push({
         name: 'Background checks',
         icon: ShieldCheck,
-        href: `${HR_HREF}/background-check`,
+        href: `${HR_HREF}/recruitment/background-check`,
       })
     }
 

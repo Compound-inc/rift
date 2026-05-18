@@ -23,10 +23,13 @@ describe('productCapabilityKey', () => {
     expect(productCapabilityKey({})).toBe('enabled')
   })
 
-  it('joins addon key with ".enabled" for sub-addon capabilities', () => {
+  it('joins addon paths with ".enabled" for addon capabilities', () => {
     expect(productCapabilityKey({ addonKey: 'recruitment' })).toBe(
       'recruitment.enabled',
     )
+    expect(
+      productCapabilityKey({ addonKey: 'recruitment.background-check' }),
+    ).toBe('recruitment.background-check.enabled')
   })
 })
 
@@ -56,6 +59,15 @@ describe('readOrgProductCapability', () => {
         policy: policyWith({ 'recruitment.enabled': false }),
         productKey: 'hr',
         addonKey: 'recruitment',
+      }),
+    ).toBe(false)
+    expect(
+      readOrgProductCapability({
+        policy: policyWith({
+          'recruitment.background-check.enabled': false,
+        }),
+        productKey: 'hr',
+        addonKey: 'recruitment.background-check',
       }),
     ).toBe(false)
   })

@@ -1,11 +1,11 @@
 import { PgClient } from '@effect/sql-pg'
 import { Effect } from 'effect'
 import {
-  resolveProductAddonEntitlements,
+  resolveProductEntitlements,
   resolveWorkspaceEffectiveFeatures,
 } from '@/lib/shared/access-control'
 import type {
-  ProductAddonEntitlements,
+  ProductEntitlements,
   SelfServeWorkspacePlanId,
   WorkspacePlanId,
 } from '@/lib/shared/access-control'
@@ -475,7 +475,7 @@ const upsertEntitlementSnapshotWithClientEffect = Effect.fn(
         planId,
         featureOverrides: manualMetadata.featureOverrides,
       })
-      const productAddonEntitlements = resolveProductAddonEntitlements({
+      const productAddonEntitlements = resolveProductEntitlements({
         planId,
         addonGrants: manualMetadata.addonGrants,
       })
@@ -638,7 +638,7 @@ export const readEntitlementSnapshotEffect = Effect.fn(
           typeof resolveWorkspaceEffectiveFeatures
         >,
         productAddonEntitlements: (row.productAddonEntitlements ??
-          {}) as ProductAddonEntitlements,
+          {}) as ProductEntitlements,
         usagePolicy: row.usagePolicy,
         usageSyncStatus: row.usageSyncStatus,
         usageSyncError: row.usageSyncError,

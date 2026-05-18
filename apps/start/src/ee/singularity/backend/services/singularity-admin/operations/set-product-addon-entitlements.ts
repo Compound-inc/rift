@@ -12,8 +12,8 @@ import {
   asRecord,
   coerceManualSubscriptionMetadata,
 } from '@/lib/backend/billing/services/workspace-billing/shared'
-import { isProductAddonEntitlementId } from '@/lib/shared/access-control'
-import type { ProductAddonEntitlementId } from '@/lib/shared/access-control'
+import { isProductEntitlementId } from '@/lib/shared/access-control'
+import type { ProductEntitlementId } from '@/lib/shared/access-control'
 import {
   SingularityNotFoundError,
   SingularityPersistenceError,
@@ -22,17 +22,17 @@ import {
 import { readOrganizationExistsEffect } from '../queries'
 
 type RawAddonGrants =
-  | Partial<Record<ProductAddonEntitlementId, boolean>>
+  | Partial<Record<ProductEntitlementId, boolean>>
   | Record<string, boolean>
 
 export function normalizeAddonGrants(
   grants: RawAddonGrants,
-): Partial<Record<ProductAddonEntitlementId, boolean>> {
-  const normalized: Partial<Record<ProductAddonEntitlementId, boolean>> = {}
+): Partial<Record<ProductEntitlementId, boolean>> {
+  const normalized: Partial<Record<ProductEntitlementId, boolean>> = {}
 
   for (const [rawKey, value] of Object.entries(grants)) {
     if (typeof value !== 'boolean') continue
-    if (!isProductAddonEntitlementId(rawKey)) continue
+    if (!isProductEntitlementId(rawKey)) continue
     normalized[rawKey] = value
   }
 
@@ -43,7 +43,7 @@ export function buildAddonGrantMetadata(input: {
   readonly currentMetadata: Record<string, unknown>
   readonly actorUserId: string
   readonly now: number
-  readonly addonGrants: Partial<Record<ProductAddonEntitlementId, boolean>>
+  readonly addonGrants: Partial<Record<ProductEntitlementId, boolean>>
 }): Record<string, unknown> {
   return {
     ...input.currentMetadata,
@@ -66,8 +66,8 @@ function toPersistenceError(
   })
 }
 
-export const setProductAddonEntitlementsOperation = Effect.fn(
-  'SingularityAdminService.setProductAddonEntitlements',
+export const setProductEntitlementsOperation = Effect.fn(
+  'SingularityAdminService.setProductEntitlements',
 )(
   (input: {
     readonly organizationId: string

@@ -23,7 +23,7 @@ Each product is built from **four** layers. Keep them separated.
 
 3. **Capabilities (org-admin toggle)** — an opt-out switch the org admin
    can flip per product or per addon, stored as
-   `OrgProductPolicy.capabilities['<addonKey>.enabled']` (or just
+   `OrgProductPolicy.capabilities['<addonPath>.enabled']` (or just
    `'enabled'` for the umbrella product). Default is `true`. Composes as
    **AND** with the entitlement: an addon is only _available_ when the
    org is entitled AND the capability is on.
@@ -40,29 +40,32 @@ Each product is built from **four** layers. Keep them separated.
 
 ## 2. Naming Conventions
 
-Entitlement IDs use a flat dotted namespace.
+Entitlement IDs use a flat dotted namespace derived from the product's addon tree.
 
 - Umbrella entitlement for a product: the bare product key. Example: `hr`.
-- Sub-addon entitlement: `<productKey>.<addonKey>`. Example:
-  `hr.recruitment`, `hr.payroll`.
+- Addon entitlement: `<productKey>.<addonPath>`. Examples:
+  `hr.recruitment`, `hr.recruitment.background-check`, `hr.payroll`.
 - Capability keys (stored in `OrgProductPolicy.capabilities`) use
-  `enabled` for the umbrella and `<addonKey>.enabled` for sub-addons.
-  Example: `recruitment.enabled`.
+  `enabled` for the umbrella and `<addonPath>.enabled` for addons.
+  Examples: `recruitment.enabled`, `recruitment.background-check.enabled`.
 - Org-configurable setting keys (stored in `OrgProductPolicy.settings`)
-  use `<addonKey>.<settingKey>`. Example:
+  use `<addonPath>.<settingKey>`. Example:
   `recruitment.autoArchiveAfterDays`.
+
+The product entitlement itself grants access to core product features; do not
+model core features as a `core` addon.
 
 This convention scales uniformly to future addons on `chat` and `writing`
 (e.g. `chat.voiceMode`, `writing.aiEditor`) without any schema changes.
 
 ## 3. Entitlement Resolution
 
-Product-addon entitlements are resolved by layering two maps inside
-`resolveProductAddonEntitlements`:
+Product entitlements are resolved by layering two maps inside
+`resolveProductEntitlements`:
 
-1. **Plan defaults** (`PLAN_DEFAULT_PRODUCT_ADDONS`) — what the org's plan
+1. **Plan defaults** (`PLAN_DEFAULT_PRODUCT_ENTITLEMENTS`) — what the org's plan
    includes by default. For example, a future "pro" plan could include
-   the HR umbrella by setting `pro: { hr: true, 'hr.core': true }`.
+   the HR umbrella by setting `pro: { hr: true, 'hr.recruitment': true }`.
 
 2. **Explicit grants** (`org_subscription.metadata.addonGrants`) — what
    the Singularity admin or billing pipeline has granted or explicitly
@@ -92,9 +95,9 @@ cannot widen the entitlement surface.
 ```
 apps/start/src/lib/shared/org-products.ts                 # product catalog (layer 1)
 apps/start/src/lib/shared/org-product-addons.ts           # addon catalog (layer 2/3/4 metadata)
-apps/start/src/lib/shared/access-control/index.ts         # PLAN_DEFAULT_PRODUCT_ADDONS,
-                                                          # ProductAddonEntitlementId union,
-                                                          # resolveProductAddonEntitlements (layer 2)
+apps/start/src/lib/shared/access-control/index.ts         # PLAN_DEFAULT_PRODUCT_ENTITLEMENTS,
+                                                          # ProductEntitlementId union,
+                                                          # resolveProductEntitlements (layer 2)
 apps/start/src/lib/shared/org-product-capabilities.ts     # productCapabilityKey + readOrgProductCapability (layer 3)
 apps/start/src/lib/shared/org-product-policy.ts           # org policy shape (layer 4)
 
@@ -119,7 +122,7 @@ Platform-admin (Singularity) controls the addon entitlements from:
 
 ```
 apps/start/src/ee/singularity/backend/services/singularity-admin.service.ts
-  # service that exposes setProductAddonEntitlements (Effect.fn)
+  # service that exposes setProductEntitlements (Effect.fn)
 apps/start/src/ee/singularity/backend/services/singularity-admin/operations/
   set-product-addon-entitlements.ts   # operation module (playbook §2 split)
 apps/start/src/ee/singularity/frontend/singularity.functions.ts
@@ -140,7 +143,7 @@ apps/start/src/ee/singularity/components/
 Never blur the boundary. Any flag that the org admin should be able to
 flip is a capability or policy. Any flag that only the platform admin can
 grant is an entitlement. Any flag that follows plan tier lives in
-`PLAN_DEFAULT_PRODUCT_ADDONS` (never in workspace feature plan maps).
+`PLAN_DEFAULT_PRODUCT_ENTITLEMENTS` (never in workspace feature plan maps).
 
 ## 6. Adding a New Product — Checklist
 
@@ -150,19 +153,19 @@ Use this when introducing a brand-new product alongside `chat`, `writing`,
 1. **Catalog entry.** Add the product key and a short description to
    `ORG_PRODUCT_CATALOG` in `src/lib/shared/org-products.ts`.
 2. **Addon catalog entry.** Add an entry to `ORG_PRODUCT_ADDON_CATALOG` in
-   `src/lib/shared/org-product-addons.ts`, even if the initial addon list
-   is just the umbrella. Each addon declares `label`, `description`, and
-   an array `orgConfigurableSettingKeys` that names the org-editable
-   setting keys (use an empty array until real settings exist).
-3. **Entitlement ids (automatic).** The `ProductAddonEntitlementId` union
-   and the `PRODUCT_ADDON_ENTITLEMENT_IDS` runtime list in
+   `src/lib/shared/org-product-addons.ts`. Products with only core access use
+   an empty addon tree. Each addon declares `label`, `description`, optional
+   nested `children`, and an array `orgConfigurableSettingKeys` that names the
+   org-editable setting keys (use an empty array until real settings exist).
+3. **Entitlement ids (automatic).** The `ProductEntitlementId` union
+   and the `PRODUCT_ENTITLEMENT_IDS` runtime list in
    `src/lib/shared/access-control/index.ts` are derived automatically
    from the catalog. Verify with the tests in
    `access-control/access-control.test.ts` and
    `org-product-addons.test.ts`.
 4. **Plan defaults (optional).** If a plan includes the product by
    default, add the entitlement ids to that plan's entry in
-   `PLAN_DEFAULT_PRODUCT_ADDONS`. Leave this alone if the product is
+   `PLAN_DEFAULT_PRODUCT_ENTITLEMENTS`. Leave this alone if the product is
    strictly paid-addon / manually granted.
 5. **Sidebar nav file.** Create
    `src/routes/(app)/_layout/<product>/-<product>-nav.tsx` exporting
@@ -170,7 +173,7 @@ Use this when introducing a brand-new product alongside `chat`, `writing`,
    `<product>NavArea` function. Use the `ContentComponent` slot when
    sub-nav items depend on per-addon availability (see
    `hr/-hr-nav.tsx`). Gate sub-nav items with
-   `useProductAvailability('<product>', '<addonKey>')`, not the raw
+   `useProductAvailability('<product>', '<addonPath>')`, not the raw
    entitlement hook.
 6. **Register the area.** Add the area key to `NAV_AREAS` in
    `src/components/layout/sidebar/app-sidebar-nav.config.tsx` and the
@@ -183,7 +186,7 @@ Use this when introducing a brand-new product alongside `chat`, `writing`,
    (umbrella guard using `useProductAvailability('<product>')`),
    `src/routes/(app)/_layout/<product>/index.tsx` (landing page), and
    one folder per addon with its own guard (on the specific sub-addon
-   via `useProductAvailability('<product>', '<addonKey>')`) +
+   via `useProductAvailability('<product>', '<addonPath>')`) +
    placeholder page. Regenerate `routeTree.gen.ts` via
    `bun --bun vite build` (or the dev server) so the file-route factory
    accepts the new paths.
@@ -196,7 +199,7 @@ Use this when introducing a brand-new product alongside `chat`, `writing`,
    `OrgSettingsNavContent`). Create
    `src/routes/(app)/_layout/organization/settings/<product>/route.tsx`
    and `index.tsx`. CRITICAL: this route must guard on the raw
-   **entitlement** (`useProductAddonEntitlement`), NOT availability —
+   **entitlement** (`useProductEntitlement`), NOT availability —
    otherwise the admin can lock themselves out by turning the
    capability off.
 10. **Settings page.** Create
@@ -204,7 +207,7 @@ Use this when introducing a brand-new product alongside `chat`, `writing`,
     At minimum it should render one capability toggle per entitled
     addon (see `hr-settings-page.tsx` for the current scaffold).
     Additional configuration lands via the same pattern using
-    `OrgProductPolicy.settings['<addonKey>.<settingKey>']`.
+    `OrgProductPolicy.settings['<addonPath>.<settingKey>']`.
 11. **Tests.** Cover catalog shape, entitlement resolver defaults, plan
     defaults (if any), capability default-true, route redirect when
     entitlement OR capability is off, settings page renders only
@@ -220,15 +223,15 @@ addon, or similar.
    `ORG_PRODUCT_ADDON_CATALOG` with `label`, `description`, and any
    `orgConfigurableSettingKeys` (empty array until real settings
    exist).
-2. **Entitlement id (automatic).** `PRODUCT_ADDON_ENTITLEMENT_IDS` and
-   the `ProductAddonEntitlementId` union pick up the new key
+2. **Entitlement id (automatic).** `PRODUCT_ENTITLEMENT_IDS` and
+   the `ProductEntitlementId` union pick up the new key
    automatically.
 3. **Plan defaults (optional).** If the addon is included in any plan by
    default, add the entitlement id to that plan's entry in
-   `PLAN_DEFAULT_PRODUCT_ADDONS`.
+   `PLAN_DEFAULT_PRODUCT_ENTITLEMENTS`.
 4. **Sidebar sub-item.** If the addon deserves its own sidebar entry,
    add it to the product's nav file, gated on
-   `useProductAvailability('<productKey>', '<addonKey>')`.
+   `useProductAvailability('<productKey>', '<addonPath>')`.
 5. **Route (optional).** If the addon has its own route, create
    `src/routes/(app)/_layout/<product>/<addon>/route.tsx` with a
    `useProductAvailability` guard + `index.tsx` as the page.
@@ -245,13 +248,13 @@ Schema changes are not required. The entitlement snapshot stores a flat
 
 ## 8. Activating Entitlements
 
-Product-addon entitlements are set by the platform admin (or inherited
+Product entitlements are set by the platform admin (or inherited
 from the plan default). Org admins never write them. Activation goes
 through the Singularity admin UI:
 
 The Singularity org-detail page exposes an **Addon Entitlements** card
 listing every entitlement id with a toggle. Saving calls the backend
-`SingularityAdminService.setProductAddonEntitlements` effect, which:
+`SingularityAdminService.setProductEntitlements` effect, which:
 
 1. Reads the active `org_subscription` row for the org.
 2. Merges the new grants into
@@ -324,7 +327,7 @@ permission resolver.
 2. **Mapping product addons into `ORG_FEATURE_MINIMUM_PLANS`.** That map
    is for plan-gated workspace features (`byok`, `singleSignOn`, etc.)
    and auto-unlocks everything above a plan rank. Product addons either
-   live in `PLAN_DEFAULT_PRODUCT_ADDONS` (plan inclusion) or are
+   live in `PLAN_DEFAULT_PRODUCT_ENTITLEMENTS` (plan inclusion) or are
    explicit grants only.
 3. **New snapshot columns per product.** The
    `product_addon_entitlements` JSONB column is a flat map keyed by
@@ -349,7 +352,7 @@ At minimum, the following must be covered:
 
 1. Catalog entries exist and shape matches
    (`org-product-addons.test.ts`).
-2. `resolveProductAddonEntitlements` defaults the new id to `false`,
+2. `resolveProductEntitlements` defaults the new id to `false`,
    honors plan defaults, and allows explicit grants to override either
    direction.
 3. `readOrgProductCapability` defaults the capability to `true` and

@@ -2,9 +2,9 @@ import { isSelfHosted } from '@/utils/app-feature-flags'
 import { AI_CATALOG } from '@/lib/shared/ai-catalog'
 import {
   ORG_PRODUCT_ADDON_CATALOG,
-  getProductAddonEntitlementIdsForProduct,
+  getProductEntitlementIdsForProduct,
 } from '@/lib/shared/org-product-addons'
-import type { OrgProductAddonKey } from '@/lib/shared/org-product-addons'
+import type { OrgProductAddonPath } from '@/lib/shared/org-product-addons'
 import type { OrgProductKey } from '@/lib/shared/org-products'
 
 export type WorkspacePlanId =
@@ -469,42 +469,39 @@ export function getModelAccess(input: {
 }
 
 // ---------------------------------------------------------------------------
-// Product addon entitlements
+// Product entitlements
 // ---------------------------------------------------------------------------
 
 /**
- * Template-literal union of every valid product-addon entitlement id.
- * Derived from the product catalog + addon catalog, so adding a new addon
- * automatically extends this union with no manual edits here.
+ * Template-literal union of every valid product-tree entitlement id. A bare
+ * product id grants that product's core features; dotted ids grant extra addon
+ * branches under the product tree.
  */
-export type ProductAddonEntitlementId = {
-  [K in OrgProductKey]: OrgProductAddonKey<K> extends never
+export type ProductEntitlementId = {
+  [K in OrgProductKey]: OrgProductAddonPath<K> extends never
     ? K
-    : K | `${K}.${OrgProductAddonKey<K>}`
+    : K | `${K}.${OrgProductAddonPath<K>}`
 }[OrgProductKey]
 
-export const PRODUCT_ADDON_ENTITLEMENT_IDS: readonly ProductAddonEntitlementId[] =
-  (Object.keys(ORG_PRODUCT_ADDON_CATALOG) as OrgProductKey[]).flatMap(
-    (productKey) => getProductAddonEntitlementIdsForProduct(productKey),
-  ) as readonly ProductAddonEntitlementId[]
+export const PRODUCT_ENTITLEMENT_IDS: readonly ProductEntitlementId[] = (
+  Object.keys(ORG_PRODUCT_ADDON_CATALOG) as OrgProductKey[]
+).flatMap((productKey) =>
+  getProductEntitlementIdsForProduct(productKey),
+) as readonly ProductEntitlementId[]
 
-export type ProductAddonEntitlements = Record<
-  ProductAddonEntitlementId,
-  boolean
->
+export type ProductEntitlements = Record<ProductEntitlementId, boolean>
 
 /**
  * Partial map of entitlement ids to booleans. Used for both plan defaults
- * and per-org explicit grants. `true` means granted, `false` means
- * explicitly revoked (so a plan-default `true` can be overridden off for a
- * specific org), `undefined`/missing means "inherit the layer below".
+ * and per-org explicit grants. `true` means granted, `false` means explicitly
+ * revoked, `undefined`/missing means "inherit the layer below".
  */
-export type ProductAddonGrants = Partial<
-  Record<ProductAddonEntitlementId, boolean>
+export type ProductEntitlementGrants = Partial<
+  Record<ProductEntitlementId, boolean>
 >
 
-export const PLAN_DEFAULT_PRODUCT_ADDONS: Readonly<
-  Record<WorkspacePlanId, ProductAddonGrants>
+export const PLAN_DEFAULT_PRODUCT_ENTITLEMENTS: Readonly<
+  Record<WorkspacePlanId, ProductEntitlementGrants>
 > = {
   free: {},
   plus: {},
@@ -515,28 +512,21 @@ export const PLAN_DEFAULT_PRODUCT_ADDONS: Readonly<
 }
 
 /**
- * Resolves the final product-addon entitlement map for an organization by
- * layering the plan defaults with the explicit grants persisted on the
- * subscription.
- *
- * - `planId` controls the base layer (`PLAN_DEFAULT_PRODUCT_ADDONS`).
- * - `addonGrants` is the explicit per-org layer; when a grant is a boolean
- *   it replaces whatever the plan defaulted to, when it is missing the
- *   plan default survives.
- *
+ * Resolves the final product entitlement map for an organization by layering
+ * plan defaults with explicit grants persisted on the subscription.
  */
-export function resolveProductAddonEntitlements(input: {
+export function resolveProductEntitlements(input: {
   readonly planId?: WorkspacePlanId | null
-  readonly addonGrants?: ProductAddonGrants | null
-}): ProductAddonEntitlements {
+  readonly addonGrants?: ProductEntitlementGrants | null
+}): ProductEntitlements {
   const resolved = Object.fromEntries(
-    PRODUCT_ADDON_ENTITLEMENT_IDS.map((id) => [id, false]),
-  ) as ProductAddonEntitlements
+    PRODUCT_ENTITLEMENT_IDS.map((id) => [id, false]),
+  ) as ProductEntitlements
 
   const planId: WorkspacePlanId = input.planId ?? 'free'
-  const planDefaults = PLAN_DEFAULT_PRODUCT_ADDONS[planId] ?? {}
+  const planDefaults = PLAN_DEFAULT_PRODUCT_ENTITLEMENTS[planId] ?? {}
 
-  for (const id of PRODUCT_ADDON_ENTITLEMENT_IDS) {
+  for (const id of PRODUCT_ENTITLEMENT_IDS) {
     const planDefault = planDefaults[id]
     if (typeof planDefault === 'boolean') {
       resolved[id] = planDefault
@@ -544,7 +534,7 @@ export function resolveProductAddonEntitlements(input: {
   }
 
   if (input.addonGrants) {
-    for (const id of PRODUCT_ADDON_ENTITLEMENT_IDS) {
+    for (const id of PRODUCT_ENTITLEMENT_IDS) {
       const grant = input.addonGrants[id]
       if (typeof grant === 'boolean') {
         resolved[id] = grant
@@ -555,30 +545,28 @@ export function resolveProductAddonEntitlements(input: {
   return resolved
 }
 
-export function isProductAddonEntitlementId(
+export function isProductEntitlementId(
   value: string,
-): value is ProductAddonEntitlementId {
-  return (PRODUCT_ADDON_ENTITLEMENT_IDS as readonly string[]).includes(value)
+): value is ProductEntitlementId {
+  return (PRODUCT_ENTITLEMENT_IDS as readonly string[]).includes(value)
 }
 
 /**
- * Helper for reading a single entitlement from a resolved
- * entitlements map without repeating dot-key construction at call sites.
+ * Helper for reading a single entitlement from a resolved entitlements map
+ * without repeating dot-key construction at call sites.
  */
-export function readProductAddonEntitlement<
-  TProduct extends OrgProductKey,
->(input: {
-  readonly entitlements: ProductAddonEntitlements | null | undefined
+export function readProductEntitlement<TProduct extends OrgProductKey>(input: {
+  readonly entitlements: ProductEntitlements | null | undefined
   readonly productKey: TProduct
-  readonly addonKey?: OrgProductAddonKey<TProduct>
+  readonly addonPath?: OrgProductAddonPath<TProduct>
 }): boolean {
   if (!input.entitlements) {
     return false
   }
 
   const id = (
-    input.addonKey ? `${input.productKey}.${input.addonKey}` : input.productKey
-  ) as ProductAddonEntitlementId
+    input.addonPath ? `${input.productKey}.${input.addonPath}` : input.productKey
+  ) as ProductEntitlementId
 
   return input.entitlements[id] === true
 }

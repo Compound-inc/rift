@@ -101,7 +101,7 @@ async function createOrganizationForUser(input: {
 /**
  * Writes the supplied addon grants into an active
  * `workspace_subscription_${orgId}` row for the organization. Mirrors the
- * write that `SingularityAdminService.setProductAddonEntitlements` performs
+ * write that `SingularityAdminService.setProductEntitlements` performs
  * inside its transaction, isolated here so the test only exercises the
  * metadata → snapshot pipeline without depending on the full service
  * wiring. We target the Singularity-managed subscription id (not the

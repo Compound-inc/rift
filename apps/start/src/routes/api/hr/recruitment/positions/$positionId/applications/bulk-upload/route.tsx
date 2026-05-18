@@ -177,7 +177,7 @@ export const Route = createFileRoute(
                   organizationId: auth.organizationId,
                   userId: auth.userId,
                 })
-                return ctx.can('product.hr.background-check')
+                return ctx.can('product.hr.recruitment.background-check')
               }),
             )
           } catch {

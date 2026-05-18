@@ -4,6 +4,28 @@ A workspace covering recruitment, HR, and adjacent product surfaces. This file i
 
 ## Language
 
+### Product access
+
+**Product entitlement**:
+A platform-granted organization access right for a product or addon; the product entitlement includes access to that product's core features.
+_Avoid_: Feature flag, admin toggle, capability, core addon.
+
+**Capability**:
+An organization-admin-controlled opt-out switch for an entitled product or addon.
+_Avoid_: Entitlement, grant, purchase.
+
+**Nested addon**:
+An addon whose access depends on a parent addon in the same product tree.
+_Avoid_: Sibling addon, sub feature.
+
+**Addon key**:
+One segment of an addon identity within a product tree.
+_Avoid_: Addon id, sub feature key.
+
+**Addon path**:
+The full nested addon identity within a product tree.
+_Avoid_: Addon key when referring to more than one segment.
+
 ### Recruitment
 
 **Position**:
@@ -44,6 +66,9 @@ _Avoid_: CV ingest, applicant import.
 
 ## Relationships
 
+- A **Product entitlement** gives access to the product's core features; core features are not modeled as addons
+- A **Nested addon** requires every ancestor **Product entitlement** and **Capability** in its product tree before an organization can access it
+- A leaf permission belongs to the product or addon path before the colon in its permission key
 - A **Candidate** has zero or more **Applications**, possibly concurrent
 - An **Application** belongs to exactly one **Candidate** and exactly one **Position**
 - A **Position** has zero or more **Applications**
@@ -59,3 +84,6 @@ _Avoid_: CV ingest, applicant import.
 - "AI verdict" was used to mean the Affinity score plus its rationale. Resolved: use **Affinity score** as the canonical name; "rationale" is a field on it.
 - "Candidate" vs "applicant" — resolved: a person is always a **Candidate**; the act of applying to a Position is an **Application**.
 - "Background check" is overloaded. The HR evaluation catalog lists `background` as one **Evaluation** kind (a questionnaire-style assessment dispatched to a Candidate). The third-party report (provider, credit score, legal flags) is a separate concept tracked on its own table. Resolved: the report is a **Background check**; the questionnaire is a **Background evaluation**. They render in separate blocks on the Application detail page.
+- "Background Check addon" was implemented as a sibling of **Recruitment**, but the domain model treats it as a **Nested addon** under **Recruitment**. Resolved: **Background Check** access requires the HR and Recruitment entitlements.
+- "Core addon" was used for baseline product access. Resolved: a **Product entitlement** grants core product access; addons are only extra feature branches.
+- "Core addon" was used for baseline product access. Resolved: the **Product entitlement** itself grants core product access; addons are only additional purchasable feature branches.

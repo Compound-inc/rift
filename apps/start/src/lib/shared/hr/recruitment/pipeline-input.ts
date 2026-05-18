@@ -17,7 +17,7 @@ export type CandidatePipelineWorkflowInput = {
   readonly candidateId: string
   /** Position id (org-scoped). */
   readonly positionId: string
-  /** Whether the org currently has the `hr.background-check` addon. */
+  /** Whether the org currently has the `hr.recruitment.background-check` addon. */
   readonly hasBackgroundCheckAddon: boolean
   /** Idempotency salt unique to this run. */
   readonly runIdempotencyKey: string

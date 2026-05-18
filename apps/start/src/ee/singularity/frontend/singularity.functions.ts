@@ -3,12 +3,12 @@ import { z } from 'zod'
 import { MANUAL_BILLING_INTERVALS } from '@/lib/backend/billing/services/workspace-billing/shared'
 import type { ManualBillingInterval } from '@/lib/backend/billing/services/workspace-billing/shared'
 import {
-  isProductAddonEntitlementId,
+  isProductEntitlementId,
   isWorkspacePlanId,
   WORKSPACE_FEATURE_IDS,
 } from '@/lib/shared/access-control'
 import type {
-  ProductAddonEntitlementId,
+  ProductEntitlementId,
   WorkspaceFeatureId,
   WorkspacePlanId,
 } from '@/lib/shared/access-control'
@@ -171,13 +171,13 @@ const SetAddonEntitlementsSchema = z.object({
 
 function parseSetAddonEntitlementsInput(input: unknown): {
   organizationId: string
-  grants: Partial<Record<ProductAddonEntitlementId, boolean>>
+  grants: Partial<Record<ProductEntitlementId, boolean>>
 } {
   const parsed = SetAddonEntitlementsSchema.parse(input)
-  const normalized: Partial<Record<ProductAddonEntitlementId, boolean>> = {}
+  const normalized: Partial<Record<ProductEntitlementId, boolean>> = {}
 
   for (const [rawKey, value] of Object.entries(parsed.grants)) {
-    if (!isProductAddonEntitlementId(rawKey)) continue
+    if (!isProductEntitlementId(rawKey)) continue
     normalized[rawKey] = value
   }
 

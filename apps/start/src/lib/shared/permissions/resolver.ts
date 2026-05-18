@@ -29,14 +29,14 @@ import type { OrgProductAddonKey } from '@/lib/shared/org-product-addons'
 import type { OrgProductKey } from '@/lib/shared/org-products'
 import type {
   PaidWorkspacePlanId,
-  ProductAddonEntitlements,
+  ProductEntitlements,
   WorkspaceEffectiveFeatures,
   WorkspacePlanId,
 } from '@/lib/shared/access-control'
 import {
   getFeatureAccessGateMessage,
   getWorkspaceFeatureAccessState,
-  resolveProductAddonEntitlements,
+  resolveProductEntitlements,
   resolveWorkspaceEffectiveFeatures,
 } from '@/lib/shared/access-control'
 import type { DecodedPermissionKey, PermissionKey } from './catalog'
@@ -57,7 +57,7 @@ export type OrgProductCapabilitiesMap = Readonly<
 export type PermissionBundle = {
   readonly planId: WorkspacePlanId
   readonly effectiveFeatures: WorkspaceEffectiveFeatures
-  readonly productAddonEntitlements: ProductAddonEntitlements
+  readonly productAddonEntitlements: ProductEntitlements
   /**
    * Per-product capability toggles. Missing products and missing keys
    * default to `true` (see `readOrgProductCapability`).
@@ -75,7 +75,7 @@ export type PermissionBundle = {
 export const EMPTY_PERMISSION_BUNDLE: PermissionBundle = {
   planId: 'free',
   effectiveFeatures: resolveWorkspaceEffectiveFeatures({ planId: 'free' }),
-  productAddonEntitlements: resolveProductAddonEntitlements({ planId: 'free' }),
+  productAddonEntitlements: resolveProductEntitlements({ planId: 'free' }),
   productCapabilities: {},
   rolePermissions: new Set<string>(),
 }
@@ -201,8 +201,8 @@ function resolveDecoded(
   }
 
   const leafKey = decoded.addonKey
-    ? `product.${decoded.productKey}.${decoded.addonKey}.${decoded.leaf}`
-    : `product.${decoded.productKey}.${decoded.leaf}`
+    ? `product.${decoded.productKey}.${decoded.addonKey}:${decoded.leaf}`
+    : `product.${decoded.productKey}:${decoded.leaf}`
   return bundle.rolePermissions.has(leafKey) ? ALLOW : deny('role-denied')
 }
 

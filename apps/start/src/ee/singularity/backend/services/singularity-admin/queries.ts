@@ -1,14 +1,14 @@
 import { PgClient } from '@effect/sql-pg'
 import { Effect } from 'effect'
 import {
-  PRODUCT_ADDON_ENTITLEMENT_IDS,
+  PRODUCT_ENTITLEMENT_IDS,
   WORKSPACE_FEATURE_IDS,
-  resolveProductAddonEntitlements,
+  resolveProductEntitlements,
   resolveWorkspaceEffectiveFeatures,
 } from '@/lib/shared/access-control'
 import type {
-  ProductAddonEntitlementId,
-  ProductAddonEntitlements,
+  ProductEntitlementId,
+  ProductEntitlements,
   WorkspaceEffectiveFeatures,
   WorkspacePlanId,
 } from '@/lib/shared/access-control'
@@ -166,22 +166,22 @@ function toEffectiveFeatures(input: {
   })
 }
 
-function toProductAddonEntitlements(input: {
+function toProductEntitlements(input: {
   planId: WorkspacePlanId
   snapshotValue: unknown
   metadataValue: unknown
-}): ProductAddonEntitlements {
+}): ProductEntitlements {
   const metadataGrants = coerceManualSubscriptionMetadata(
     input.metadataValue,
   ).addonGrants
-  const resolved = resolveProductAddonEntitlements({
+  const resolved = resolveProductEntitlements({
     planId: input.planId,
     addonGrants: metadataGrants,
   })
 
   if (typeof input.snapshotValue === 'object' && input.snapshotValue !== null) {
     const snapshotMap = input.snapshotValue as Record<string, unknown>
-    for (const id of PRODUCT_ADDON_ENTITLEMENT_IDS) {
+    for (const id of PRODUCT_ENTITLEMENT_IDS) {
       const value = snapshotMap[id]
       if (typeof value === 'boolean') {
         resolved[id] = value
@@ -194,7 +194,7 @@ function toProductAddonEntitlements(input: {
 
 function toAddonGrants(
   value: unknown,
-): Partial<Record<ProductAddonEntitlementId, boolean>> {
+): Partial<Record<ProductEntitlementId, boolean>> {
   return coerceManualSubscriptionMetadata(value).addonGrants ?? {}
 }
 
@@ -437,7 +437,7 @@ export const getOrganizationProfileEffect = Effect.fn(
           snapshotValue: summary.effectiveFeatures,
           metadataValue: summary.subscriptionMetadata,
         }),
-        productAddonEntitlements: toProductAddonEntitlements({
+        productAddonEntitlements: toProductEntitlements({
           planId: summary.planId ?? 'free',
           snapshotValue: summary.productAddonEntitlements,
           metadataValue: summary.subscriptionMetadata,

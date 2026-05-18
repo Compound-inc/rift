@@ -24,7 +24,7 @@ import type {
 } from '@/lib/shared/permissions'
 import {
   coerceWorkspacePlanId,
-  resolveProductAddonEntitlements,
+  resolveProductEntitlements,
   resolveWorkspaceEffectiveFeatures,
 } from '@/lib/shared/access-control'
 import { PermissionDeniedError, PermissionResolveError } from '../domain/errors'
@@ -159,7 +159,7 @@ export class PermissionService extends ServiceMap.Service<
               })) as PermissionBundle['effectiveFeatures']
             const productAddonEntitlements =
               (snapshotRow?.productAddonEntitlements ??
-                resolveProductAddonEntitlements({
+                resolveProductEntitlements({
                   planId,
                   addonGrants: coerceManualSubscriptionMetadata(
                     subscriptionRow?.metadata,

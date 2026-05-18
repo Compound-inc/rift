@@ -43,11 +43,11 @@ import type {
 import {
   coerceWorkspacePlanId,
   getWorkspaceFeatureAccessState,
-  resolveProductAddonEntitlements,
+  resolveProductEntitlements,
   resolveWorkspaceEffectiveFeatures,
 } from '@/lib/shared/access-control'
 import type {
-  ProductAddonEntitlements,
+  ProductEntitlements,
   WorkspaceEffectiveFeatures,
   WorkspaceFeatureAccessState,
   WorkspaceFeatureId,
@@ -62,7 +62,7 @@ type BillingSummaryRow = {
   entitlementSnapshots?: readonly {
     planId?: string | null
     effectiveFeatures?: WorkspaceEffectiveFeatures | null
-    productAddonEntitlements?: ProductAddonEntitlements | null
+    productAddonEntitlements?: ProductEntitlements | null
   }[]
   productPolicies?: readonly {
     productKey: string
@@ -108,7 +108,7 @@ function buildBundleFromRow(input: {
 
   const productAddonEntitlements =
     snapshot?.productAddonEntitlements ??
-    resolveProductAddonEntitlements({ planId })
+    resolveProductEntitlements({ planId })
 
   const productCapabilities = buildProductCapabilitiesMap(row.productPolicies)
 

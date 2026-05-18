@@ -1,31 +1,23 @@
 /**
  * Central permission catalog.
  *
- * This file declares every permission key the app knows about and the
- * resolution metadata each key needs. The catalog is pure data — every
- * other module (frontend hook, backend service, Singularity admin)
- * derives its types and runtime list from here.
+ * Product access keys use dotted entitlement paths:
+ *   product.<productKey>
+ *   product.<productKey>.<addonPath>
  *
- * Key syntax:
- *
- *   workspace.<featureId>                          // plan-gated workspace feature
- *   product.<productKey>                           // product umbrella (entitlement + capability)
- *   product.<productKey>.<addonKey>                // paid addon (entitlement + capability)
- *   product.<productKey>.<addonKey>.<leaf>         // fine-grained leaf permission
- *   product.<productKey>.<leaf>                    // product-level leaf without addon context
- *
- * Leaves are resource-action pairs (`candidates.view`, `jobs.publish`).
- * Adding a leaf is a one-line edit to `PRODUCT_PERMISSION_CATALOG`; the
- * union type updates automatically.
- *
- * See `apps/start/PERMISSIONS.md` for the full model.
+ * Product leaf permissions use a colon to separate the entitlement path from
+ * the role leaf, avoiding ambiguity with nested addon paths:
+ *   product.<productKey>:<leaf>
+ *   product.<productKey>.<addonPath>:<leaf>
  */
 
 import {
   ORG_PRODUCT_ADDON_CATALOG,
-  getProductAddonEntitlementIdsForProduct,
+  getProductAddonPathsForProduct,
+  getProductEntitlementIdsForProduct,
+  isOrgProductAddonKey,
 } from '@/lib/shared/org-product-addons'
-import type { OrgProductAddonKey } from '@/lib/shared/org-product-addons'
+import type { OrgProductAddonPath } from '@/lib/shared/org-product-addons'
 import { WORKSPACE_FEATURE_IDS } from '@/lib/shared/access-control'
 import type { WorkspaceFeatureId } from '@/lib/shared/access-control'
 import type { OrgProductKey } from '@/lib/shared/org-products'
@@ -33,11 +25,6 @@ import type { OrgProductKey } from '@/lib/shared/org-products'
 // ---------------------------------------------------------------------------
 // Product leaf permissions
 // ---------------------------------------------------------------------------
-//
-// The leaf catalog is empty today. When a real leaf permission lands
-// (e.g. `candidates.view` for HR Recruitment), add it to the relevant
-// product + addon entry below. The union type and runtime list pick up
-// every entry automatically.
 
 type ProductLeafPermissions = {
   readonly productLeaves: readonly string[]
@@ -45,13 +32,8 @@ type ProductLeafPermissions = {
 }
 
 /**
- * Declarative map of leaf permissions per product and per addon. Each
- * entry is a string like `candidates.view` that will be joined onto the
- * product key (`product.<productKey>.<addonKey>.<leaf>`).
- *
- * Empty arrays until real leaves are needed. Design intent: the role
- * selector UI the org admin will eventually use iterates this catalog to
- * build its permission tree, so the shape here directly drives that UI.
+ * Declarative map of role leaves per product and addon path. Addon leaves are
+ * keyed by full addon path so nested addons can own distinct role permissions.
  */
 export const PRODUCT_PERMISSION_CATALOG = {
   chat: {
@@ -60,15 +42,11 @@ export const PRODUCT_PERMISSION_CATALOG = {
   },
   writing: {
     productLeaves: [],
-    addonLeaves: {
-      core: [],
-    },
+    addonLeaves: {},
   },
   hr: {
     productLeaves: [],
     addonLeaves: {
-      core: [],
-
       recruitment: [
         'positions.view',
         'positions.create',
@@ -82,7 +60,7 @@ export const PRODUCT_PERMISSION_CATALOG = {
         'tests.manage',
         'cv.upload',
       ],
-      'background-check': ['reports.view', 'reports.request'],
+      'recruitment.background-check': ['reports.view', 'reports.request'],
       payroll: [],
     },
   },
@@ -97,41 +75,37 @@ type ProductLeavesOf<TProduct extends OrgProductKey> =
 
 type AddonLeavesOf<
   TProduct extends OrgProductKey,
-  TAddon extends OrgProductAddonKey<TProduct>,
+  TAddon extends OrgProductAddonPath<TProduct>,
 > = TAddon extends keyof (typeof PRODUCT_PERMISSION_CATALOG)[TProduct]['addonLeaves']
   ? (typeof PRODUCT_PERMISSION_CATALOG)[TProduct]['addonLeaves'][TAddon] extends readonly (infer TLeaf)[]
     ? TLeaf & string
     : never
   : never
 
-/**
- * Template-literal union covering every valid permission key. Derived
- * from the three catalogs so adding new entries auto-extends this union
- */
 export type WorkspacePermissionKey = `workspace.${WorkspaceFeatureId}`
 
 export type ProductUmbrellaPermissionKey = `product.${OrgProductKey}`
 
 export type ProductAddonPermissionKey = {
-  [TProduct in OrgProductKey]: OrgProductAddonKey<TProduct> extends never
+  [TProduct in OrgProductKey]: OrgProductAddonPath<TProduct> extends never
     ? never
-    : `product.${TProduct}.${OrgProductAddonKey<TProduct>}`
+    : `product.${TProduct}.${OrgProductAddonPath<TProduct>}`
 }[OrgProductKey]
 
 type LeafKeysForProduct<TProduct extends OrgProductKey> =
   | (ProductLeavesOf<TProduct> extends string
-      ? `product.${TProduct}.${ProductLeavesOf<TProduct>}`
+      ? `product.${TProduct}:${ProductLeavesOf<TProduct>}`
       : never)
-  | (OrgProductAddonKey<TProduct> extends never
+  | (OrgProductAddonPath<TProduct> extends never
       ? never
       : {
-          [TAddon in OrgProductAddonKey<TProduct>]: AddonLeavesOf<
+          [TAddon in OrgProductAddonPath<TProduct>]: AddonLeavesOf<
             TProduct,
             TAddon
           > extends string
-            ? `product.${TProduct}.${TAddon}.${AddonLeavesOf<TProduct, TAddon>}`
+            ? `product.${TProduct}.${TAddon}:${AddonLeavesOf<TProduct, TAddon>}`
             : never
-        }[OrgProductAddonKey<TProduct>])
+        }[OrgProductAddonPath<TProduct>])
 
 export type ProductLeafPermissionKey = {
   [TProduct in OrgProductKey]: LeafKeysForProduct<TProduct>
@@ -146,10 +120,6 @@ export type PermissionKey =
 // ---------------------------------------------------------------------------
 // Runtime enumeration
 // ---------------------------------------------------------------------------
-//
-// The runtime list is only used by tests, docs, and the (future) role
-// selector UI. The resolver never walks this list directly — it decodes
-// the key into its parts and consults the right source of truth.
 
 function buildPermissionKeyList(): readonly PermissionKey[] {
   const workspace = WORKSPACE_FEATURE_IDS.map(
@@ -161,7 +131,7 @@ function buildPermissionKeyList(): readonly PermissionKey[] {
   const productUmbrellas = products.map((productKey) => `product.${productKey}`)
 
   const productAddons = products.flatMap((productKey) =>
-    getProductAddonEntitlementIdsForProduct(productKey)
+    getProductEntitlementIdsForProduct(productKey)
       .filter((id) => id !== productKey)
       .map((id) => `product.${id}` as ProductAddonPermissionKey),
   )
@@ -169,13 +139,13 @@ function buildPermissionKeyList(): readonly PermissionKey[] {
   const productLeaves = products.flatMap((productKey) => {
     const entry = PRODUCT_PERMISSION_CATALOG[productKey]
     const direct = entry.productLeaves.map(
-      (leaf) => `product.${productKey}.${leaf}` as ProductLeafPermissionKey,
+      (leaf) => `product.${productKey}:${leaf}` as ProductLeafPermissionKey,
     )
     const addon = Object.entries(entry.addonLeaves).flatMap(
-      ([addonKey, leaves]) =>
+      ([addonPath, leaves]) =>
         leaves.map(
           (leaf) =>
-            `product.${productKey}.${addonKey}.${leaf}` as ProductLeafPermissionKey,
+            `product.${productKey}.${addonPath}:${leaf}` as ProductLeafPermissionKey,
         ),
     )
     return [...direct, ...addon]
@@ -214,11 +184,38 @@ export type DecodedPermissionKey =
       readonly leaf: string
     }
 
+function isKnownProductKey(value: string): value is OrgProductKey {
+  return value in ORG_PRODUCT_ADDON_CATALOG
+}
+
+type DecodedProductAccessKey = Extract<
+  DecodedPermissionKey,
+  { readonly kind: 'product-umbrella' | 'product-addon' }
+>
+
+function decodeProductAccessPath(path: string): DecodedProductAccessKey | null {
+  const segments = path.split('.')
+  const productKey = segments[0]
+  if (!isKnownProductKey(productKey)) {
+    return null
+  }
+
+  if (segments.length === 1) {
+    return { kind: 'product-umbrella', productKey }
+  }
+
+  const addonPath = segments.slice(1).join('.')
+  if (isOrgProductAddonKey(productKey, addonPath)) {
+    return { kind: 'product-addon', productKey, addonKey: addonPath }
+  }
+
+  return null
+}
+
 /**
- * Decodes a `PermissionKey` string into its structured parts. Returns
- * `null` for strings that do not match any known pattern. The resolver
- * uses this to decide which ancestor chain and which stores to consult
- * without hard-coding key parsing in every branch.
+ * Decodes a permission key into structured parts. Product leaves must use the
+ * colon form (`product.hr.recruitment:applications.view`) so addon path parsing
+ * never conflicts with dotted leaf names.
  */
 export function decodePermissionKey(key: string): DecodedPermissionKey | null {
   if (key.startsWith('workspace.')) {
@@ -234,62 +231,59 @@ export function decodePermissionKey(key: string): DecodedPermissionKey | null {
   }
 
   const rest = key.slice('product.'.length)
-  const segments = rest.split('.')
-  const productKey = segments[0] as OrgProductKey
-  if (!(productKey in PRODUCT_PERMISSION_CATALOG)) {
+  const [accessPath, leaf, ...extra] = rest.split(':')
+  if (extra.length > 0) {
     return null
   }
 
-  if (segments.length === 1) {
-    return { kind: 'product-umbrella', productKey }
-  }
-
-  const second = segments[1]
-  const addonsOfProduct = ORG_PRODUCT_ADDON_CATALOG[productKey].addons
-  const productLeaves = PRODUCT_PERMISSION_CATALOG[productKey].productLeaves
-
-  // `product.<p>.<addon>`
-  if (segments.length === 2) {
-    if (second in addonsOfProduct) {
-      return { kind: 'product-addon', productKey, addonKey: second }
-    }
-    if ((productLeaves as readonly string[]).includes(second)) {
-      return { kind: 'product-leaf', productKey, addonKey: null, leaf: second }
-    }
+  const decodedAccess = decodeProductAccessPath(accessPath)
+  if (!decodedAccess) {
     return null
   }
 
-  // `product.<p>.<addon>.<leaf>` (addon-scoped leaf)
-  if (second in addonsOfProduct) {
-    const leaf = segments.slice(2).join('.')
-    const allowedLeaves =
-      PRODUCT_PERMISSION_CATALOG[productKey].addonLeaves[
-        second as keyof (typeof PRODUCT_PERMISSION_CATALOG)[typeof productKey]['addonLeaves']
-      ] ?? []
-    if ((allowedLeaves as readonly string[]).includes(leaf)) {
+  if (leaf === undefined) {
+    return decodedAccess
+  }
+
+  if (!leaf) {
+    return null
+  }
+
+  const catalogEntry = PRODUCT_PERMISSION_CATALOG[decodedAccess.productKey]
+  const productLeaves = catalogEntry.productLeaves
+
+  if (decodedAccess.kind === 'product-umbrella') {
+    if ((productLeaves as readonly string[]).includes(leaf)) {
       return {
         kind: 'product-leaf',
-        productKey,
-        addonKey: second,
+        productKey: decodedAccess.productKey,
+        addonKey: null,
         leaf,
       }
     }
     return null
   }
 
-  // `product.<p>.<leaf-with-dots>` — product-level multi-segment leaf
-  const leaf = segments.slice(1).join('.')
-  if ((productLeaves as readonly string[]).includes(leaf)) {
-    return { kind: 'product-leaf', productKey, addonKey: null, leaf }
+  const addonLeaves =
+    (catalogEntry.addonLeaves as Readonly<Record<string, readonly string[]>>)[
+      decodedAccess.addonKey
+    ] ?? []
+
+  if (addonLeaves.includes(leaf)) {
+    return {
+      kind: 'product-leaf',
+      productKey: decodedAccess.productKey,
+      addonKey: decodedAccess.addonKey,
+      leaf,
+    }
   }
 
   return null
 }
 
 /**
- * Returns the ancestor chain of a decoded key, ordered from most general
- * to most specific. Callers walk this chain to short-circuit on the
- * first ancestor that fails (`ancestor-denied` reason).
+ * Returns the ancestor chain ordered from most general to most specific.
+ * Nested addon paths contribute every intermediate entitlement path.
  */
 export function getAncestorKeys(
   decoded: DecodedPermissionKey,
@@ -298,19 +292,38 @@ export function getAncestorKeys(
     return []
   }
 
-  if (decoded.kind === 'product-addon') {
-    return [`product.${decoded.productKey}` as PermissionKey]
-  }
-
   const ancestors: PermissionKey[] = [
     `product.${decoded.productKey}` as PermissionKey,
   ]
-  if (decoded.addonKey) {
-    ancestors.push(
-      `product.${decoded.productKey}.${decoded.addonKey}` as PermissionKey,
-    )
+
+  const addonPath = decoded.addonKey
+
+  if (!addonPath) {
+    return ancestors
   }
+
+  const segments = addonPath.split('.')
+  const paths = segments.map((_, index) =>
+    segments.slice(0, index + 1).join('.'),
+  )
+
+  const addonAncestors =
+    decoded.kind === 'product-addon' ? paths.slice(0, -1) : paths
+
+  for (const path of addonAncestors) {
+    ancestors.push(`product.${decoded.productKey}.${path}` as PermissionKey)
+  }
+
   return ancestors
+}
+
+export function getProductAddonPermissionKeys(
+  productKey: OrgProductKey,
+): readonly ProductAddonPermissionKey[] {
+  return getProductAddonPathsForProduct(productKey).map(
+    (addonPath) =>
+      `product.${productKey}.${addonPath}` as ProductAddonPermissionKey,
+  )
 }
 
 // Runtime guard for untrusted strings (URL params, external APIs, etc.).

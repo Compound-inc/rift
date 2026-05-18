@@ -22,7 +22,10 @@ import { Form } from '@rift/ui/form'
 import { ContentPage } from '@/components/layout'
 import { useOrgProductPolicy } from '@/lib/frontend/organizations/use-org-product-policy'
 import { usePermissions } from '@/lib/frontend/permissions/use-permissions'
-import { ORG_PRODUCT_ADDON_CATALOG } from '@/lib/shared/org-product-addons'
+import {
+  getProductAddonDefinition,
+  getProductAddonPathsForProduct,
+} from '@/lib/shared/org-product-addons'
 import {
   productCapabilityKey,
   readOrgProductCapability,
@@ -49,24 +52,23 @@ function withUpdatedCapabilities(
 export function HrSettingsPage() {
   const { policy, loading, saving, setPolicy } = useOrgProductPolicy('hr')
   const { canRaw } = usePermissions()
-  const coreEntitled = canRaw('product.hr.core')
   const recruitmentEntitled = canRaw('product.hr.recruitment')
-  const backgroundCheckEntitled = canRaw('product.hr.background-check')
+  const backgroundCheckEntitled = canRaw(
+    'product.hr.recruitment.background-check',
+  )
   const payrollEntitled = canRaw('product.hr.payroll')
 
   const entitledAddons = React.useMemo<HrAddonKey[]>(() => {
-    const result: HrAddonKey[] = []
-    if (coreEntitled) result.push('core')
-    if (recruitmentEntitled) result.push('recruitment')
-    if (backgroundCheckEntitled) result.push('background-check')
-    if (payrollEntitled) result.push('payroll')
-    return result
-  }, [
-    backgroundCheckEntitled,
-    coreEntitled,
-    payrollEntitled,
-    recruitmentEntitled,
-  ])
+    const entitlementByPath: Partial<Record<HrAddonKey, boolean>> = {
+      recruitment: recruitmentEntitled,
+      'recruitment.background-check': backgroundCheckEntitled,
+      payroll: payrollEntitled,
+    }
+
+    return getProductAddonPathsForProduct('hr').filter(
+      (addonPath) => entitlementByPath[addonPath] === true,
+    )
+  }, [backgroundCheckEntitled, payrollEntitled, recruitmentEntitled])
 
   const policyRef = React.useRef(policy ?? EMPTY_ORG_PRODUCT_POLICY)
   React.useEffect(() => {
@@ -108,7 +110,7 @@ export function HrSettingsPage() {
         description="Turn individual HR addons on or off for this organization. Platform-granted entitlements still apply; this toggle is an additional kill switch."
         toggleSection={{
           items: entitledAddons.map((addonKey) => {
-            const definition = ORG_PRODUCT_ADDON_CATALOG.hr.addons[addonKey]
+            const definition = getProductAddonDefinition('hr', addonKey)
             const capability = readOrgProductCapability({
               policy,
               productKey: 'hr',

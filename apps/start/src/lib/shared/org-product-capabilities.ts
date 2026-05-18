@@ -1,5 +1,5 @@
 import type { OrgProductPolicy } from './org-product-policy'
-import type { OrgProductAddonKey } from './org-product-addons'
+import type { OrgProductAddonPath } from './org-product-addons'
 import type { OrgProductKey } from './org-products'
 
 export function productCapabilityKey(input: {
@@ -13,7 +13,7 @@ export function readOrgProductCapability<
 >(input: {
   readonly policy: OrgProductPolicy | null | undefined
   readonly productKey: TProduct
-  readonly addonKey?: OrgProductAddonKey<TProduct>
+  readonly addonKey?: OrgProductAddonPath<TProduct>
 }): boolean {
   if (!input.policy) {
     return true

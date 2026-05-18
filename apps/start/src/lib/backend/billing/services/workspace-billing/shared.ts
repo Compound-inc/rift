@@ -3,10 +3,10 @@ import {
   WORKSPACE_FEATURE_IDS,
   coerceWorkspacePlanId,
   getWorkspacePlanRank,
-  isProductAddonEntitlementId,
+  isProductEntitlementId,
 } from '@/lib/shared/access-control'
 import type {
-  ProductAddonEntitlementId,
+  ProductEntitlementId,
   SelfServeWorkspacePlanId,
   StripeManagedWorkspacePlanId,
   WorkspaceFeatureId,
@@ -45,7 +45,7 @@ export type ManualSubscriptionMetadata = {
   internalNote?: string
   billingReference?: string
   featureOverrides?: Partial<Record<WorkspaceFeatureId, boolean>>
-  addonGrants?: Partial<Record<ProductAddonEntitlementId, boolean>>
+  addonGrants?: Partial<Record<ProductEntitlementId, boolean>>
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -94,11 +94,11 @@ export function coerceManualSubscriptionMetadata(
   }
 
   const addonGrantsValue = value.addonGrants
-  const addonGrants: Partial<Record<ProductAddonEntitlementId, boolean>> = {}
+  const addonGrants: Partial<Record<ProductEntitlementId, boolean>> = {}
 
   if (isRecord(addonGrantsValue)) {
     for (const [key, grant] of Object.entries(addonGrantsValue)) {
-      if (typeof grant === 'boolean' && isProductAddonEntitlementId(key)) {
+      if (typeof grant === 'boolean' && isProductEntitlementId(key)) {
         addonGrants[key] = grant
       }
     }

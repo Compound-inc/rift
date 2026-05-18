@@ -8,11 +8,11 @@ import type { ManualBillingInterval } from '@/lib/backend/billing/services/works
 import {
   getPlanEffectiveFeatures,
   getWorkspacePlan,
-  PRODUCT_ADDON_ENTITLEMENT_IDS,
+  PRODUCT_ENTITLEMENT_IDS,
   WORKSPACE_FEATURE_IDS,
 } from '@/lib/shared/access-control'
 import type {
-  ProductAddonEntitlementId,
+  ProductEntitlementId,
   WorkspaceFeatureId,
   WorkspacePlanId,
 } from '@/lib/shared/access-control'
@@ -39,7 +39,7 @@ export type SingularityOrgDetailPageLogicResult = {
   selectedInternalNote: string
   selectedBillingReference: string
   selectedFeatureAccess: Record<WorkspaceFeatureId, boolean>
-  selectedAddonEntitlements: Record<ProductAddonEntitlementId, boolean>
+  selectedAddonEntitlements: Record<ProductEntitlementId, boolean>
   isSeatCountValid: boolean
   isUsageLimitValid: boolean
   isPending: boolean
@@ -58,7 +58,7 @@ export type SingularityOrgDetailPageLogicResult = {
     value: boolean,
   ) => void
   setSelectedAddonEntitlement: (
-    entitlementId: ProductAddonEntitlementId,
+    entitlementId: ProductEntitlementId,
     value: boolean,
   ) => void
   resetSelectedOverridesToPlanDefaults: () => void
@@ -107,9 +107,9 @@ function buildFeatureAccessState(
 
 function buildAddonEntitlementState(
   organization: SingularityOrganizationDetail,
-): Record<ProductAddonEntitlementId, boolean> {
+): Record<ProductEntitlementId, boolean> {
   return Object.fromEntries(
-    PRODUCT_ADDON_ENTITLEMENT_IDS.map((id) => {
+    PRODUCT_ENTITLEMENT_IDS.map((id) => {
       const explicitGrant = organization.addonGrants[id]
       const resolved = organization.productAddonEntitlements[id]
       return [
@@ -117,7 +117,7 @@ function buildAddonEntitlementState(
         typeof explicitGrant === 'boolean' ? explicitGrant : Boolean(resolved),
       ]
     }),
-  ) as Record<ProductAddonEntitlementId, boolean>
+  ) as Record<ProductEntitlementId, boolean>
 }
 
 function buildPlanDefaultFeatureAccess(
@@ -189,7 +189,7 @@ export function useSingularityOrgDetailPageLogic(
     Record<WorkspaceFeatureId, boolean>
   >(() => buildFeatureAccessState(organization))
   const [selectedAddonEntitlementsState, setSelectedAddonEntitlementsState] =
-    useState<Record<ProductAddonEntitlementId, boolean>>(() =>
+    useState<Record<ProductEntitlementId, boolean>>(() =>
       buildAddonEntitlementState(organization),
     )
   const [isPending, startTransition] = useTransition()

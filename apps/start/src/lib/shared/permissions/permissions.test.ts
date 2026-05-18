@@ -12,7 +12,7 @@ import {
 } from './index'
 import type { PermissionBundle, PermissionKey } from './index'
 import {
-  resolveProductAddonEntitlements,
+  resolveProductEntitlements,
   resolveWorkspaceEffectiveFeatures,
 } from '@/lib/shared/access-control'
 
@@ -37,8 +37,13 @@ describe('PERMISSION_KEYS catalog', () => {
     expect(PERMISSION_KEYS).toContain('product.chat' as PermissionKey)
     expect(PERMISSION_KEYS).toContain('product.hr.recruitment' as PermissionKey)
     expect(PERMISSION_KEYS).toContain('product.hr.payroll' as PermissionKey)
-    expect(PERMISSION_KEYS).toContain('product.hr.core' as PermissionKey)
-    expect(PERMISSION_KEYS).toContain('product.writing.core' as PermissionKey)
+    expect(PERMISSION_KEYS).toContain(
+      'product.hr.recruitment.background-check' as PermissionKey,
+    )
+    expect(PERMISSION_KEYS).not.toContain('product.hr.core' as PermissionKey)
+    expect(PERMISSION_KEYS).not.toContain(
+      'product.writing.core' as PermissionKey,
+    )
   })
 })
 
@@ -63,10 +68,39 @@ describe('decodePermissionKey', () => {
       productKey: 'hr',
       addonKey: 'recruitment',
     })
+    expect(
+      decodePermissionKey('product.hr.recruitment.background-check'),
+    ).toEqual({
+      kind: 'product-addon',
+      productKey: 'hr',
+      addonKey: 'recruitment.background-check',
+    })
+  })
+
+  it('decodes colon leaf permissions', () => {
+    expect(
+      decodePermissionKey('product.hr.recruitment:applications.view'),
+    ).toEqual({
+      kind: 'product-leaf',
+      productKey: 'hr',
+      addonKey: 'recruitment',
+      leaf: 'applications.view',
+    })
+    expect(
+      decodePermissionKey(
+        'product.hr.recruitment.background-check:reports.view',
+      ),
+    ).toEqual({
+      kind: 'product-leaf',
+      productKey: 'hr',
+      addonKey: 'recruitment.background-check',
+      leaf: 'reports.view',
+    })
   })
 
   it('rejects unknown permission strings', () => {
     expect(decodePermissionKey('product.hr.ghost')).toBeNull()
+    expect(decodePermissionKey('product.hr.recruitment.applications.view')).toBeNull()
     expect(decodePermissionKey('workspace.unknown')).toBeNull()
     expect(decodePermissionKey('garbage')).toBeNull()
   })
@@ -78,10 +112,15 @@ describe('getAncestorKeys', () => {
     expect(getAncestorKeys(decodePermissionKey('product.hr')!)).toEqual([])
   })
 
-  it('returns the product umbrella ancestor for addon keys', () => {
+  it('returns every parent entitlement ancestor for nested addon keys', () => {
     expect(
       getAncestorKeys(decodePermissionKey('product.hr.recruitment')!),
     ).toEqual(['product.hr'])
+    expect(
+      getAncestorKeys(
+        decodePermissionKey('product.hr.recruitment.background-check')!,
+      ),
+    ).toEqual(['product.hr', 'product.hr.recruitment'])
   })
 })
 
@@ -89,6 +128,10 @@ describe('isPermissionKey', () => {
   it('narrows valid keys', () => {
     expect(isPermissionKey('product.hr')).toBe(true)
     expect(isPermissionKey('product.hr.recruitment')).toBe(true)
+    expect(isPermissionKey('product.hr.recruitment.background-check')).toBe(true)
+    expect(isPermissionKey('product.hr.recruitment:applications.view')).toBe(
+      true,
+    )
     expect(isPermissionKey('workspace.byok')).toBe(true)
   })
 
@@ -110,7 +153,7 @@ describe('resolvePermission', () => {
 
   it('denies a sub-addon on its own when umbrella is granted', () => {
     const bundle = makeBundle({
-      productAddonEntitlements: resolveProductAddonEntitlements({
+      productAddonEntitlements: resolveProductEntitlements({
         addonGrants: { hr: true },
       }),
     })
@@ -118,21 +161,29 @@ describe('resolvePermission', () => {
     expect(result).toEqual({ allowed: false, reason: 'not-entitled' })
   })
 
-  it('allows when both entitlement layers are set', () => {
+  it('allows when every ancestor entitlement is set', () => {
     const bundle = makeBundle({
-      productAddonEntitlements: resolveProductAddonEntitlements({
-        addonGrants: { hr: true, 'hr.recruitment': true },
+      productAddonEntitlements: resolveProductEntitlements({
+        addonGrants: {
+          hr: true,
+          'hr.recruitment': true,
+          'hr.recruitment.background-check': true,
+        },
       }),
     })
     expect(resolvePermission(bundle, 'product.hr').allowed).toBe(true)
     expect(resolvePermission(bundle, 'product.hr.recruitment').allowed).toBe(
       true,
     )
+    expect(
+      resolvePermission(bundle, 'product.hr.recruitment.background-check')
+        .allowed,
+    ).toBe(true)
   })
 
   it('treats capability off as disabled-by-admin', () => {
     let bundle = makeBundle({
-      productAddonEntitlements: resolveProductAddonEntitlements({
+      productAddonEntitlements: resolveProductEntitlements({
         addonGrants: { hr: true, 'hr.recruitment': true },
       }),
     })
@@ -153,7 +204,7 @@ describe('resolvePermission', () => {
 
   it('respects the sub-addon capability independently of the umbrella', () => {
     let bundle = makeBundle({
-      productAddonEntitlements: resolveProductAddonEntitlements({
+      productAddonEntitlements: resolveProductEntitlements({
         addonGrants: { hr: true, 'hr.recruitment': true },
       }),
     })
@@ -168,6 +219,27 @@ describe('resolvePermission', () => {
       allowed: false,
       reason: 'disabled-by-admin',
     })
+  })
+
+  it('denies nested addons when a parent capability is disabled', () => {
+    let bundle = makeBundle({
+      productAddonEntitlements: resolveProductEntitlements({
+        addonGrants: {
+          hr: true,
+          'hr.recruitment': true,
+          'hr.recruitment.background-check': true,
+        },
+      }),
+    })
+    bundle = setCapability({
+      bundle,
+      productKey: 'hr',
+      addonKey: 'recruitment',
+      enabled: false,
+    })
+    expect(
+      resolvePermission(bundle, 'product.hr.recruitment.background-check'),
+    ).toEqual({ allowed: false, reason: 'ancestor-denied' })
   })
 
   it('denies workspace permission when plan lacks the feature and attaches minimum-plan context', () => {
@@ -206,7 +278,7 @@ describe('resolvePermissionRaw', () => {
     // `resolvePermission` would deny via ancestor-denied; the raw
     // resolver shows the direct entitlement state.
     const ancestorBundle = makeBundle({
-      productAddonEntitlements: resolveProductAddonEntitlements({
+      productAddonEntitlements: resolveProductEntitlements({
         addonGrants: { 'hr.recruitment': true },
       }),
     })
@@ -229,7 +301,7 @@ describe('resolvePermissionRaw', () => {
     // `disabled-by-admin`; raw check still allows because the settings
     // page needs to render the toggle.
     let capabilityBundle = makeBundle({
-      productAddonEntitlements: resolveProductAddonEntitlements({
+      productAddonEntitlements: resolveProductEntitlements({
         addonGrants: { hr: true, 'hr.recruitment': true },
       }),
     })

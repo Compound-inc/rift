@@ -415,7 +415,7 @@ describe('SingularityAdminService', () => {
     await Effect.runPromise(
       Effect.gen(function* () {
         const service = yield* SingularityAdminService
-        yield* service.setProductAddonEntitlements({
+        yield* service.setProductEntitlements({
           organizationId: 'org-1',
           actorUserId: 'user-1',
           grants: {
@@ -458,7 +458,7 @@ describe('SingularityAdminService', () => {
       Effect.runPromise(
         Effect.gen(function* () {
           const service = yield* SingularityAdminService
-          yield* service.setProductAddonEntitlements({
+          yield* service.setProductEntitlements({
             organizationId: 'org-missing',
             actorUserId: 'user-1',
             grants: { hr: true },
@@ -478,7 +478,7 @@ describe('SingularityAdminService', () => {
       Effect.runPromise(
         Effect.gen(function* () {
           const service = yield* SingularityAdminService
-          yield* service.setProductAddonEntitlements({
+          yield* service.setProductEntitlements({
             organizationId: 'org-1',
             actorUserId: 'user-1',
             grants: { hr: true },
