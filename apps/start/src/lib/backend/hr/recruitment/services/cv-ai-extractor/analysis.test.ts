@@ -1,7 +1,7 @@
-import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 import {
   buildMemoryAnalysis,
+  CvAiAnalysisOutputSchema,
   CvAiRawAnalysisSchema,
   normalizeCvAiAnalysis,
 } from './analysis'
@@ -24,24 +24,56 @@ const baseRawAnalysis: CvAiRawAnalysis = {
   redFlags: [],
 }
 
+function hasJsonSchemaKeyword(value: unknown, keyword: string): boolean {
+  if (Array.isArray(value)) {
+    return value.some((item) => hasJsonSchemaKeyword(item, keyword))
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.entries(value).some(
+      ([key, item]) => key === keyword || hasJsonSchemaKeyword(item, keyword),
+    )
+  }
+
+  return false
+}
+
 describe('CV AI analysis helpers', () => {
-  it('rejects invalid Affinity scores instead of clamping or rounding them', () => {
+  it('uses a gateway-compatible response schema for the Affinity score', async () => {
+    const jsonSchema = await CvAiAnalysisOutputSchema.jsonSchema
+
+    expect(jsonSchema.properties?.score).toMatchObject({
+      type: 'integer',
+      minimum: 0,
+      maximum: 100,
+    })
+    expect(hasJsonSchemaKeyword(jsonSchema, 'allOf')).toBe(false)
+  })
+
+  it('rejects invalid Affinity scores instead of clamping or rounding them', async () => {
     expect(() =>
-      Schema.decodeUnknownSync(CvAiRawAnalysisSchema)({
+      CvAiRawAnalysisSchema.parse({
         ...baseRawAnalysis,
         score: 101,
       }),
     ).toThrow()
 
+    const outputValidation = await CvAiAnalysisOutputSchema.validate?.({
+      ...baseRawAnalysis,
+      score: 101,
+    })
+
+    expect(outputValidation).toMatchObject({ success: false })
+
     expect(() =>
-      Schema.decodeUnknownSync(CvAiRawAnalysisSchema)({
+      CvAiRawAnalysisSchema.parse({
         ...baseRawAnalysis,
         score: -1,
       }),
     ).toThrow()
 
     expect(() =>
-      Schema.decodeUnknownSync(CvAiRawAnalysisSchema)({
+      CvAiRawAnalysisSchema.parse({
         ...baseRawAnalysis,
         score: 72.5,
       }),

@@ -1,4 +1,5 @@
-import { Schema } from 'effect'
+import { zodSchema } from 'ai'
+import { z } from 'zod'
 
 export type HrCandidateAiProfile = {
   readonly displayName: string
@@ -35,61 +36,60 @@ export type AnalyzeCvInput = {
 }
 
 const nullableString = (description: string) =>
-  Schema.NullOr(Schema.String).annotate({ description })
+  z.string().nullable().describe(description)
 
 const stringArray = (description: string) =>
-  Schema.Array(Schema.String).annotate({ description })
+  z.array(z.string()).describe(description)
 
 /**
- * Contract given to the AI model and used to validate the structured response.
- *
- * The score is intentionally validated rather than corrected: an out-of-range
- * Affinity score means the model did not satisfy the business contract and the
- * scoring step should fail/retry instead of silently changing the result.
+ * AI output contract.
  */
-export const CvAiRawAnalysisSchema = Schema.Struct({
-  displayName: Schema.String.annotate({
-    description:
-      'Candidate full name from the CV. "Unknown candidate" if you cannot find it.',
-  }),
-  email: nullableString('Primary email from the CV, or null.'),
-  phone: nullableString('Phone number, or null.'),
-  location: nullableString('City + country, or null.'),
-  headline: nullableString(
-    'Short professional headline like "Senior Backend Engineer", or null.',
-  ),
-  summary: nullableString(
-    'Two- or three-sentence summary of the candidate, or null.',
-  ),
-  yearsOfExperience: Schema.NullOr(Schema.Number).annotate({
-    description: 'Total years of professional experience, or null.',
-  }),
-  skills: stringArray('Core skills (lowercase preferred).'),
-  languages: stringArray('Spoken / written languages.'),
-  highestDegree: nullableString('Highest education credential, or null.'),
-  score: Schema.Number.check(
-    Schema.isFinite(),
-    Schema.isInt(),
-    Schema.isBetween({ minimum: 0, maximum: 100 }),
-  ).annotate({
-    description:
-      'Integer Affinity score 0..100 for THIS specific position. 70+ = strong match; below 30 = does not fit.',
-  }),
-  rationale: Schema.String.annotate({
-    description:
-      'Two- to four-sentence rationale citing concrete CV evidence for the score.',
-  }),
-  strengths: stringArray('Concrete strengths informing the score.'),
-  redFlags: stringArray(
-    'Concrete concerns informing the score (empty if none).',
-  ),
-})
+export const CvAiRawAnalysisSchema = z
+  .object({
+    displayName: z
+      .string()
+      .describe(
+        'Candidate full name from the CV. "Unknown candidate" if you cannot find it.',
+      ),
+    email: nullableString('Primary email from the CV, or null.'),
+    phone: nullableString('Phone number, or null.'),
+    location: nullableString('City + country, or null.'),
+    headline: nullableString(
+      'Short professional headline like "Senior Backend Engineer", or null.',
+    ),
+    summary: nullableString(
+      'Two- or three-sentence summary of the candidate, or null.',
+    ),
+    yearsOfExperience: z
+      .number()
+      .nullable()
+      .describe('Total years of professional experience, or null.'),
+    skills: stringArray('Core skills (lowercase preferred).'),
+    languages: stringArray('Spoken / written languages.'),
+    highestDegree: nullableString('Highest education credential, or null.'),
+    score: z
+      .number()
+      .int()
+      .min(0)
+      .max(100)
+      .describe(
+        'Integer Affinity score 0..100 for THIS specific position. 70+ = strong match; below 30 = does not fit.',
+      ),
+    rationale: z
+      .string()
+      .describe(
+        'Two- to four-sentence rationale citing concrete CV evidence for the score.',
+      ),
+    strengths: stringArray('Concrete strengths informing the score.'),
+    redFlags: stringArray(
+      'Concrete concerns informing the score (empty if none).',
+    ),
+  })
+  .strict()
 
-export const CvAiAnalysisOutputSchema = Schema.toStandardJSONSchemaV1(
-  Schema.toStandardSchemaV1(CvAiRawAnalysisSchema),
-)
+export const CvAiAnalysisOutputSchema = zodSchema(CvAiRawAnalysisSchema)
 
-export type CvAiRawAnalysis = Schema.Schema.Type<typeof CvAiRawAnalysisSchema>
+export type CvAiRawAnalysis = z.infer<typeof CvAiRawAnalysisSchema>
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
