@@ -4,9 +4,7 @@ These rules are enforced automatically by [Tripwire](https://tripwire.sh). Contr
 
 ## What we check
 
-- **Account age** — accounts younger than 30 days are blocked.
-- **PR rate limit** — more than 5 PRs per day from a single contributor are blocked.
-- **Cryptocurrency addresses** — content containing wallet addresses (BTC, ETH, SOL, XMR, DASH) is blocked.
+_No rules are currently enabled._
 
 ---
 
