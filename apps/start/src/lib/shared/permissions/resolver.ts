@@ -17,11 +17,11 @@
  * Resolution order for any key:
  *   1. Ancestors (walk up the permission tree; first failing ancestor
  *      short-circuits with `ancestor-denied`).
- *   2. Workspace: plan rank + effective features.
- *   3. Product umbrella/addon: entitlement (from snapshot) AND capability
+ *   2. Workspace features: plan rank + effective features.
+ *   3. Workspace administration leaves: role permission set.
+ *   4. Product umbrella/addon: entitlement (from snapshot) AND capability
  *      (from org product policy).
- *   4. Product leaf: falls back to `true` when no role permission bundle
- *      is plugged in (today's state — foundation for future role gating).
+ *   5. Product leaf: entitlement/capability ancestors AND role permission set.
  */
 
 import { ORG_PRODUCT_ADDON_CATALOG } from '@/lib/shared/org-product-addons'
@@ -64,12 +64,12 @@ export type PermissionBundle = {
    */
   readonly productCapabilities: OrgProductCapabilitiesMap
   /**
-   * Role-based leaf permissions the current actor holds. Empty today —
-   * foundation for future org role selectors. When a leaf permission key
-   * is resolved and this set is empty, the resolver returns `allowed`
-   * (no role system plugged in yet).
+   * Role-based leaf permissions the current actor holds. `null` means the
+   * role layer has not been plugged in and leaves inherit their ancestor
+   * decision for backwards compatibility. An empty Set is an intentional
+   * deny-all role layer.
    */
-  readonly rolePermissions: ReadonlySet<string>
+  readonly rolePermissions: ReadonlySet<string> | null
 }
 
 export const EMPTY_PERMISSION_BUNDLE: PermissionBundle = {
@@ -77,7 +77,7 @@ export const EMPTY_PERMISSION_BUNDLE: PermissionBundle = {
   effectiveFeatures: resolveWorkspaceEffectiveFeatures({ planId: 'free' }),
   productAddonEntitlements: resolveProductEntitlements({ planId: 'free' }),
   productCapabilities: {},
-  rolePermissions: new Set<string>(),
+  rolePermissions: null,
 }
 
 export type PermissionReason =
@@ -147,6 +147,12 @@ function resolveDecoded(
     })
   }
 
+  if (decoded.kind === 'workspace-admin-leaf') {
+    if (bundle.rolePermissions === null) return ALLOW
+    const leafKey = `workspace:${decoded.leaf}`
+    return bundle.rolePermissions.has(leafKey) ? ALLOW : deny('role-denied')
+  }
+
   if (decoded.kind === 'product-umbrella') {
     const entitled =
       bundle.productAddonEntitlements[decoded.productKey] === true
@@ -192,11 +198,10 @@ function resolveDecoded(
   }
 
   // product-leaf
-  // Foundation for role-based gating. When the role set is empty, leaves
-  // inherit their ancestor decision (allowed) so the feature works today.
-  // Once role checking is plugged in, this branch tightens to require an
-  // explicit role permission entry.
-  if (bundle.rolePermissions.size === 0) {
+  // When the role layer is not hydrated, leaves inherit their ancestor
+  // decision so older callers keep working during migrations. Once the
+  // layer is hydrated, every leaf requires an explicit role grant.
+  if (bundle.rolePermissions === null) {
     return ALLOW
   }
 

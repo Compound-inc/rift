@@ -1,8 +1,12 @@
 export {
   PERMISSION_KEYS,
   PRODUCT_PERMISSION_CATALOG,
+  WORKSPACE_ADMIN_PERMISSION_LEAVES,
   decodePermissionKey,
   getAncestorKeys,
+  getChildLeafPermissionKeys,
+  getLeafPermissionKeys,
+  isLeafPermissionKey,
   isPermissionKey,
 } from './catalog'
 export type {
@@ -11,6 +15,7 @@ export type {
   ProductAddonPermissionKey,
   ProductLeafPermissionKey,
   ProductUmbrellaPermissionKey,
+  WorkspaceAdminPermissionKey,
   WorkspacePermissionKey,
 } from './catalog'
 export {

@@ -22,6 +22,10 @@ import {
   syncWorkspaceSubscriptionFromAuth,
 } from '@/lib/backend/billing/integrations/auth-billing-hooks'
 import { toInvitationSeatLimitApiError } from '@/lib/backend/billing/domain/api-errors'
+import {
+  ORGANIZATION_SYSTEM_ROLES,
+  organizationAccessControl,
+} from '@/lib/shared/auth/org-access-control'
 import { isAdminRole } from '@/lib/shared/auth/roles'
 import { runUpstreamPostgresEffect } from '@/lib/backend/server-effect/runtime/upstream-postgres-runtime'
 import { authPool } from '@/lib/backend/auth/infra/auth-pool'
@@ -508,6 +512,12 @@ export const auth = betterAuth({
         ]
       : []),
     organizationPlugin({
+      ac: organizationAccessControl,
+      roles: ORGANIZATION_SYSTEM_ROLES,
+      dynamicAccessControl: {
+        enabled: true,
+        maximumRolesPerOrganization: 50,
+      },
       allowUserToCreateOrganization: async (user) => !user.isAnonymous,
       /**
        * Keep workspace sprawl bounded per account.

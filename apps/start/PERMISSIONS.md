@@ -14,6 +14,7 @@ leaf permissions behind one typesafe key.
 
 ```
 workspace.<featureId>                          // plan-gated workspace feature
+workspace:<resource.action>                    // organization-admin leaf permission
 product.<productKey>                           // product umbrella
 product.<productKey>.<addonPath>               // paid addon, supports nested paths
 product.<productKey>.<addonPath>:<leaf>         // fine-grained leaf permission
@@ -23,7 +24,8 @@ product.<productKey>:<leaf>                    // product-level leaf without add
 Every valid key is encoded in the `PermissionKey` union type, which is
 derived from:
 
-- `WORKSPACE_FEATURE_IDS` for `workspace.*` keys
+- `WORKSPACE_FEATURE_IDS` for plan-gated `workspace.*` keys
+- `WORKSPACE_ADMIN_PERMISSION_LEAVES` for role-gated `workspace:*` keys
 - `ORG_PRODUCT_ADDON_CATALOG` for `product.<productKey>.<addonPath>` keys
 - `PRODUCT_PERMISSION_CATALOG` for leaf keys
 
@@ -51,25 +53,27 @@ The first denial wins:
    requires its ancestors (`product.hr.recruitment`, `product.hr`) to
    resolve allowed. An ancestor denial short-circuits with
    `reason: 'ancestor-denied'`.
-2. **Workspace.** `workspace.<featureId>` consults plan rank via
+2. **Workspace feature.** `workspace.<featureId>` consults plan rank via
    `getWorkspaceFeatureAccessState`. Denies are `reason:
 'plan-insufficient'`.
-3. **Product entitlement.** For `product.<productKey>` (and
+3. **Workspace administration leaf.** `workspace:<resource.action>` consults
+   the current member's organization roles. Denies are `reason: 'role-denied'`.
+4. **Product entitlement.** For `product.<productKey>` (and
    `product.<productKey>.<addonPath>`), the snapshot-backed entitlement
    map must contain `true`. Denies are `reason: 'not-entitled'`.
-4. **Org-admin capability.** `OrgProductPolicy.capabilities['enabled']`
+5. **Org-admin capability.** `OrgProductPolicy.capabilities['enabled']`
    or `OrgProductPolicy.capabilities['<addonPath>.enabled']` must not be
    `false`. Denies are `reason: 'disabled-by-admin'`.
-5. **Role permission (future).** Leaf keys consult an explicit
-   role-permission set. When the set is empty (today's default), leaves
-   inherit their ancestor decision — which means adding role
-   enforcement later does NOT break existing leaf consumers.
+6. **Organization role permission.** Product and workspace administration leaf
+   keys consult the union of the member's organization roles. During migrations,
+   a `null` role-permission set means leaves inherit their ancestor decision;
+   once hydrated, an empty Set is an intentional deny-all role layer.
 
 ## 3. File map
 
 ```
 apps/start/src/lib/shared/permissions/
-  catalog.ts              # PermissionKey union, PRODUCT_PERMISSION_CATALOG, decoder, ancestor walker
+  catalog.ts              # PermissionKey union, PRODUCT_PERMISSION_CATALOG, workspace admin leaves, decoder, ancestor walker
   resolver.ts             # Pure resolvePermission / resolvePermissionRaw / bundle helpers
   permissions.test.ts     # Resolver, ancestor walking, bundle normalization coverage
   index.ts                # Barrel
@@ -91,8 +95,8 @@ import { usePermissions } from '@/lib/frontend/permissions/use-permissions'
 const { can, canRaw, check, workspaceFeatureState, loading } = usePermissions()
 
 // Standard user-facing gate. Walks ancestors, composes every layer.
-if (can('product.hr.recruitment')) {
-  // render sidebar, nav, landing, etc.
+if (canAnyChild('product.hr.recruitment')) {
+  // render sidebar, nav, landing, etc. when any effective child action exists
 }
 
 // Settings pages that configure a capability must use the RAW variant
@@ -195,7 +199,8 @@ following extensions land without any call-site changes:
 
 - **Org member role selector.** Populates
   `PermissionBundle.rolePermissions` with leaf keys the current role
-  has granted.
+  has granted. Better Auth dynamic organization access control owns role
+  persistence and assignment, while Rift `can()` remains the app-facing API.
 - **Group-based gating.** Adds another AND factor inside the resolver;
   consumer surfaces keep reading `can(...)`.
 - **Time-based / usage-based gating.** Same — a new AND factor with a

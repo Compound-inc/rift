@@ -287,14 +287,17 @@ export function HrPositionDetailPage({ position }: { position: HrPosition }) {
                               <span className="font-medium text-foreground-strong">
                                 {candidate.name}
                               </span>
-                              <span className="line-clamp-2 text-xs text-foreground-tertiary">
-                                {candidate.headline}
-                              </span>
-                              {candidate.location ? (
-                                <span className="text-xs text-foreground-tertiary">
-                                  {candidate.location}
+                              <div className="flex items-center gap-1.5 text-xs text-foreground-tertiary">
+                                <span className="line-clamp-2">
+                                  {candidate.headline}
                                 </span>
-                              ) : null}
+                                {candidate.location && (
+                                  <>
+                                    <span className="text-foreground-quaternary">·</span>
+                                    <span>{candidate.location}</span>
+                                  </>
+                                )}
+                              </div>
                             </>
                           )}
                         </div>

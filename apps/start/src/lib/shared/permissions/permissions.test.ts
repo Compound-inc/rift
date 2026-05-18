@@ -5,6 +5,8 @@ import {
   buildProductCapabilitiesMap,
   decodePermissionKey,
   getAncestorKeys,
+  getChildLeafPermissionKeys,
+  getLeafPermissionKeys,
   isPermissionKey,
   resolvePermission,
   resolvePermissionRaw,
@@ -26,9 +28,13 @@ function makeBundle(
 }
 
 describe('PERMISSION_KEYS catalog', () => {
-  it('includes workspace plan-gated features', () => {
+  it('includes workspace plan-gated features and administration leaves', () => {
     expect(PERMISSION_KEYS).toContain('workspace.byok' as PermissionKey)
     expect(PERMISSION_KEYS).toContain('workspace.singleSignOn' as PermissionKey)
+    expect(PERMISSION_KEYS).toContain('workspace:roles.view' as PermissionKey)
+    expect(PERMISSION_KEYS).toContain(
+      'workspace:members.assign-role' as PermissionKey,
+    )
   })
 
   it('includes every product umbrella and addon', () => {
@@ -52,6 +58,10 @@ describe('decodePermissionKey', () => {
     expect(decodePermissionKey('workspace.byok')).toEqual({
       kind: 'workspace',
       featureId: 'byok',
+    })
+    expect(decodePermissionKey('workspace:roles.view')).toEqual({
+      kind: 'workspace-admin-leaf',
+      leaf: 'roles.view',
     })
   })
 
@@ -107,8 +117,11 @@ describe('decodePermissionKey', () => {
 })
 
 describe('getAncestorKeys', () => {
-  it('returns no ancestors for workspace or umbrella keys', () => {
+  it('returns no ancestors for workspace, workspace leaf, or umbrella keys', () => {
     expect(getAncestorKeys(decodePermissionKey('workspace.byok')!)).toEqual([])
+    expect(getAncestorKeys(decodePermissionKey('workspace:roles.view')!)).toEqual(
+      [],
+    )
     expect(getAncestorKeys(decodePermissionKey('product.hr')!)).toEqual([])
   })
 
@@ -133,13 +146,30 @@ describe('isPermissionKey', () => {
       true,
     )
     expect(isPermissionKey('workspace.byok')).toBe(true)
+    expect(isPermissionKey('workspace:roles.view')).toBe(true)
   })
 
   it('rejects malformed strings', () => {
     expect(isPermissionKey('product.ghost')).toBe(false)
     expect(isPermissionKey('product.hr.unknown-addon')).toBe(false)
     expect(isPermissionKey('workspace.wat')).toBe(false)
+    expect(isPermissionKey('workspace:wat')).toBe(false)
     expect(isPermissionKey('')).toBe(false)
+  })
+})
+
+describe('permission leaf helpers', () => {
+  it('lists leaf permissions and children under a product area', () => {
+    expect(getLeafPermissionKeys()).toContain(
+      'product.hr.recruitment:applications.view',
+    )
+    expect(getLeafPermissionKeys()).toContain('workspace:roles.view')
+    expect(getChildLeafPermissionKeys('product.hr.recruitment')).toContain(
+      'product.hr.recruitment:applications.view',
+    )
+    expect(getChildLeafPermissionKeys('product.hr.recruitment')).toContain(
+      'product.hr.recruitment.background-check:reports.view',
+    )
   })
 })
 
@@ -251,6 +281,46 @@ describe('resolvePermission', () => {
     // accurate upgrade CTAs without calling access-control directly.
     expect(result.context?.minimumPlanId).toBe('enterprise')
     expect(result.context?.gateMessage).toBeDefined()
+  })
+
+  it('allows legacy leaf permissions when the role layer is not hydrated', () => {
+    const bundle = makeBundle({
+      productAddonEntitlements: resolveProductEntitlements({
+        addonGrants: { hr: true, 'hr.recruitment': true },
+      }),
+    })
+    expect(
+      resolvePermission(bundle, 'product.hr.recruitment:applications.view'),
+    ).toEqual({ allowed: true, reason: 'allowed' })
+  })
+
+  it('requires explicit role grants after the role layer is hydrated', () => {
+    const bundle = makeBundle({
+      productAddonEntitlements: resolveProductEntitlements({
+        addonGrants: { hr: true, 'hr.recruitment': true },
+      }),
+      rolePermissions: new Set(['product.hr.recruitment:applications.view']),
+    })
+    expect(
+      resolvePermission(bundle, 'product.hr.recruitment:applications.view'),
+    ).toEqual({ allowed: true, reason: 'allowed' })
+    expect(
+      resolvePermission(bundle, 'product.hr.recruitment:applications.reject'),
+    ).toEqual({ allowed: false, reason: 'role-denied' })
+  })
+
+  it('applies role grants to workspace administration leaves', () => {
+    const bundle = makeBundle({
+      rolePermissions: new Set(['workspace:roles.view']),
+    })
+    expect(resolvePermission(bundle, 'workspace:roles.view')).toEqual({
+      allowed: true,
+      reason: 'allowed',
+    })
+    expect(resolvePermission(bundle, 'workspace:roles.delete')).toEqual({
+      allowed: false,
+      reason: 'role-denied',
+    })
   })
 
   it('allows workspace permission when plan covers it', () => {

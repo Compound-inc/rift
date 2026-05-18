@@ -7,6 +7,10 @@ import {
   organizationClient, twoFactorClient 
 } from 'better-auth/client/plugins'
 import { isSelfHosted } from '@/utils/app-feature-flags'
+import {
+  ORGANIZATION_SYSTEM_ROLES,
+  organizationAccessControl,
+} from '@/lib/shared/auth/org-access-control'
 
 function resolveAuthClientBaseURL(): string {
   const trimTrailingSlash = (s: string) => s.replace(/\/+$/, '')
@@ -36,7 +40,13 @@ const baseURL = resolveAuthClientBaseURL()
 export const authClient = createAuthClient({
   baseURL,
   plugins: [
-    organizationClient(),
+    organizationClient({
+      ac: organizationAccessControl,
+      roles: ORGANIZATION_SYSTEM_ROLES,
+      dynamicAccessControl: {
+        enabled: true,
+      },
+    }),
     ...(!isSelfHosted
       ? [
           stripeClient({

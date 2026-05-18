@@ -63,6 +63,16 @@ const invitation = table('invitation')
   })
   .primaryKey('id')
 
+const organizationRole = table('organizationRole')
+  .from('organizationRole')
+  .columns({
+    id: string(),
+    organizationId: string(),
+    role: string(),
+    permission: string(),
+  })
+  .primaryKey('id')
+
 const orgPolicy = table('orgPolicy')
   .from('org_policy')
   .columns({
@@ -611,6 +621,11 @@ const organizationRelationships = relationships(organization, ({ many }) => ({
     destSchema: orgUserUsageSummary,
     destField: ['organizationId'],
   }),
+  organizationRoles: many({
+    sourceField: ['id'],
+    destSchema: organizationRole,
+    destField: ['organizationId'],
+  }),
 }))
 
 const memberRelationships = relationships(member, ({ one }) => ({
@@ -820,6 +835,7 @@ export const schema = createSchema({
     organization,
     member,
     invitation,
+    organizationRole,
     orgPolicy,
     orgProductPolicy,
     orgBillingAccount,

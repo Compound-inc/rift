@@ -13,9 +13,15 @@ import { normalizeOrgProductPolicy } from '@/lib/shared/org-product-policy'
 import {
   EMPTY_PERMISSION_BUNDLE,
   buildProductCapabilitiesMap,
+  getChildLeafPermissionKeys,
   resolvePermission,
   resolvePermissionRaw,
 } from '@/lib/shared/permissions'
+import {
+  getSystemRolePermissionKeys,
+  readRiftPermissionsFromDynamicPermission,
+  splitOrganizationRoles,
+} from '@/lib/shared/auth/org-access-control'
 import type {
   OrgProductCapabilitiesMap,
   PermissionBundle,
@@ -54,6 +60,7 @@ export type PermissionContext = {
   readonly bundle: PermissionBundle
   readonly can: (key: PermissionKey) => boolean
   readonly canRaw: (key: PermissionKey) => boolean
+  readonly canAnyChild: (key: PermissionKey) => boolean
   readonly check: (key: PermissionKey) => PermissionResult
 }
 
@@ -123,8 +130,21 @@ export class PermissionService extends ServiceMap.Service<
               planId: string | null
               metadata: Record<string, unknown> | null
             }
+            type MemberRow = {
+              role: string | null
+            }
+            type OrganizationRoleRow = {
+              role: string
+              permission: string | Record<string, unknown> | null
+            }
 
-            const [[snapshotRow], policyRows, [subscriptionRow]] =
+            const [
+              [snapshotRow],
+              policyRows,
+              [subscriptionRow],
+              [memberRow],
+              organizationRoleRows,
+            ] =
               yield* Effect.all([
                 client<SnapshotRow>`
                 select
@@ -147,6 +167,18 @@ export class PermissionService extends ServiceMap.Service<
                   and status in ('active', 'trialing', 'past_due')
                 order by updated_at desc
                 limit 1
+              `,
+                client<MemberRow>`
+                select role
+                from member
+                where "organizationId" = ${organizationId}
+                  and "userId" = ${_userId}
+                limit 1
+              `,
+                client<OrganizationRoleRow>`
+                select role, permission
+                from "organizationRole"
+                where "organizationId" = ${organizationId}
               `,
               ])
 
@@ -174,12 +206,31 @@ export class PermissionService extends ServiceMap.Service<
                   }).capabilities,
                 })),
               )
+            const memberRoles = splitOrganizationRoles(memberRow?.role)
+            const dynamicRolePermissions = new Map(
+              organizationRoleRows.map((row) =>
+                [
+                  row.role,
+                  readRiftPermissionsFromDynamicPermission(row.permission),
+                ] as const,
+              ),
+            )
+            const rolePermissions = new Set<string>()
+            for (const role of memberRoles) {
+              for (const key of getSystemRolePermissionKeys(role)) {
+                rolePermissions.add(key)
+              }
+              for (const key of dynamicRolePermissions.get(role) ?? []) {
+                rolePermissions.add(key)
+              }
+            }
+
             const bundle: PermissionBundle = {
               planId,
               effectiveFeatures,
               productAddonEntitlements,
               productCapabilities,
-              rolePermissions: EMPTY_PERMISSION_BUNDLE.rolePermissions,
+              rolePermissions,
             }
 
             return bundle
@@ -192,6 +243,10 @@ export class PermissionService extends ServiceMap.Service<
         bundle,
         can: (key) => resolvePermission(bundle, key).allowed,
         canRaw: (key) => resolvePermissionRaw(bundle, key).allowed,
+        canAnyChild: (key) =>
+          getChildLeafPermissionKeys(key as never).some(
+            (childKey) => resolvePermission(bundle, childKey).allowed,
+          ),
         check: (key) => resolvePermission(bundle, key),
       })
 
@@ -227,6 +282,10 @@ export class PermissionService extends ServiceMap.Service<
           can: (key: PermissionKey) => resolvePermission(bundle, key).allowed,
           canRaw: (key: PermissionKey) =>
             resolvePermissionRaw(bundle, key).allowed,
+          canAnyChild: (key: PermissionKey) =>
+            getChildLeafPermissionKeys(key as never).some(
+              (childKey) => resolvePermission(bundle, childKey).allowed,
+            ),
           check: (key: PermissionKey) => resolvePermission(bundle, key),
         }),
       ),
@@ -252,6 +311,7 @@ export class PermissionService extends ServiceMap.Service<
         bundle: EMPTY_PERMISSION_BUNDLE,
         can: () => true,
         canRaw: () => true,
+        canAnyChild: () => true,
         check: () => ({ allowed: true, reason: 'allowed' }) as PermissionResult,
       }),
     ),

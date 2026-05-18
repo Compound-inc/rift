@@ -67,6 +67,21 @@ export const PRODUCT_PERMISSION_CATALOG = {
 } as const satisfies Record<OrgProductKey, ProductLeafPermissions>
 
 // ---------------------------------------------------------------------------
+// Workspace administration leaf permissions
+// ---------------------------------------------------------------------------
+
+export const WORKSPACE_ADMIN_PERMISSION_LEAVES = [
+  'roles.view',
+  'roles.create',
+  'roles.update',
+  'roles.delete',
+  'members.view',
+  'members.invite',
+  'members.assign-role',
+  'members.remove',
+] as const
+
+// ---------------------------------------------------------------------------
 // Permission key derivation
 // ---------------------------------------------------------------------------
 
@@ -83,6 +98,9 @@ type AddonLeavesOf<
   : never
 
 export type WorkspacePermissionKey = `workspace.${WorkspaceFeatureId}`
+
+export type WorkspaceAdminPermissionKey =
+  `workspace:${(typeof WORKSPACE_ADMIN_PERMISSION_LEAVES)[number]}`
 
 export type ProductUmbrellaPermissionKey = `product.${OrgProductKey}`
 
@@ -113,6 +131,7 @@ export type ProductLeafPermissionKey = {
 
 export type PermissionKey =
   | WorkspacePermissionKey
+  | WorkspaceAdminPermissionKey
   | ProductUmbrellaPermissionKey
   | ProductAddonPermissionKey
   | ProductLeafPermissionKey
@@ -124,6 +143,10 @@ export type PermissionKey =
 function buildPermissionKeyList(): readonly PermissionKey[] {
   const workspace = WORKSPACE_FEATURE_IDS.map(
     (feature) => `workspace.${feature}`,
+  )
+
+  const workspaceAdmin = WORKSPACE_ADMIN_PERMISSION_LEAVES.map(
+    (leaf) => `workspace:${leaf}`,
   )
 
   const products = Object.keys(PRODUCT_PERMISSION_CATALOG) as OrgProductKey[]
@@ -153,6 +176,7 @@ function buildPermissionKeyList(): readonly PermissionKey[] {
 
   return [
     ...workspace,
+    ...workspaceAdmin,
     ...productUmbrellas,
     ...productAddons,
     ...productLeaves,
@@ -168,6 +192,7 @@ export const PERMISSION_KEYS: readonly PermissionKey[] =
 
 export type DecodedPermissionKey =
   | { readonly kind: 'workspace'; readonly featureId: WorkspaceFeatureId }
+  | { readonly kind: 'workspace-admin-leaf'; readonly leaf: string }
   | {
       readonly kind: 'product-umbrella'
       readonly productKey: OrgProductKey
@@ -222,6 +247,14 @@ export function decodePermissionKey(key: string): DecodedPermissionKey | null {
     const featureId = key.slice('workspace.'.length) as WorkspaceFeatureId
     if ((WORKSPACE_FEATURE_IDS as readonly string[]).includes(featureId)) {
       return { kind: 'workspace', featureId }
+    }
+    return null
+  }
+
+  if (key.startsWith('workspace:')) {
+    const leaf = key.slice('workspace:'.length)
+    if ((WORKSPACE_ADMIN_PERMISSION_LEAVES as readonly string[]).includes(leaf)) {
+      return { kind: 'workspace-admin-leaf', leaf }
     }
     return null
   }
@@ -288,7 +321,11 @@ export function decodePermissionKey(key: string): DecodedPermissionKey | null {
 export function getAncestorKeys(
   decoded: DecodedPermissionKey,
 ): readonly PermissionKey[] {
-  if (decoded.kind === 'workspace' || decoded.kind === 'product-umbrella') {
+  if (
+    decoded.kind === 'workspace' ||
+    decoded.kind === 'workspace-admin-leaf' ||
+    decoded.kind === 'product-umbrella'
+  ) {
     return []
   }
 
@@ -324,6 +361,47 @@ export function getProductAddonPermissionKeys(
     (addonPath) =>
       `product.${productKey}.${addonPath}` as ProductAddonPermissionKey,
   )
+}
+
+export function isLeafPermissionKey(
+  key: PermissionKey,
+): key is ProductLeafPermissionKey | WorkspaceAdminPermissionKey {
+  const decoded = decodePermissionKey(key)
+  return (
+    decoded?.kind === 'product-leaf' ||
+    decoded?.kind === 'workspace-admin-leaf'
+  )
+}
+
+export function getLeafPermissionKeys(): readonly (
+  | ProductLeafPermissionKey
+  | WorkspaceAdminPermissionKey
+)[] {
+  return PERMISSION_KEYS.filter(isLeafPermissionKey)
+}
+
+export function getChildLeafPermissionKeys(
+  parentKey: ProductUmbrellaPermissionKey | ProductAddonPermissionKey,
+): readonly ProductLeafPermissionKey[] {
+  const parent = decodePermissionKey(parentKey)
+  if (
+    !parent ||
+    parent.kind === 'workspace' ||
+    parent.kind === 'workspace-admin-leaf'
+  ) {
+    return []
+  }
+
+  return PERMISSION_KEYS.filter((key): key is ProductLeafPermissionKey => {
+    const decoded = decodePermissionKey(key)
+    if (decoded?.kind !== 'product-leaf') return false
+    if (decoded.productKey !== parent.productKey) return false
+    if (parent.kind === 'product-umbrella') return true
+    return (
+      decoded.addonKey === parent.addonKey ||
+      decoded.addonKey?.startsWith(`${parent.addonKey}.`) === true
+    )
+  })
 }
 
 // Runtime guard for untrusted strings (URL params, external APIs, etc.).

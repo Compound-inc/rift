@@ -14,6 +14,18 @@ _Avoid_: Feature flag, admin toggle, capability, core addon.
 An organization-admin-controlled opt-out switch for an entitled product or addon.
 _Avoid_: Entitlement, grant, purchase.
 
+**Organization role**:
+A named permission bundle assigned to an organization member.
+_Avoid_: Position, job role, seat type.
+
+**System role**:
+A built-in Organization role required for baseline organization administration.
+_Avoid_: Default role, hardcoded role.
+
+**Workspace administration permission**:
+A leaf permission for managing organization-level settings and membership.
+_Avoid_: Product entitlement, feature flag, Better Auth permission.
+
 **Nested addon**:
 An addon whose access depends on a parent addon in the same product tree.
 _Avoid_: Sibling addon, sub feature.
@@ -69,6 +81,13 @@ _Avoid_: CV ingest, applicant import.
 - A **Product entitlement** gives access to the product's core features; core features are not modeled as addons
 - A **Nested addon** requires every ancestor **Product entitlement** and **Capability** in its product tree before an organization can access it
 - A leaf permission belongs to the product or addon path before the colon in its permission key
+- An **Organization role** grants leaf permissions only; **Product entitlements** and workspace plan access are granted outside organization roles
+- A **System role** is an **Organization role** that cannot be deleted because it preserves organization administration and recovery paths
+- A member with multiple **Organization roles** has the union of every leaf permission granted by those roles
+- An **Organization role** may contain leaf permissions that are not currently effective because the organization lacks the required **Product entitlement** or **Capability**
+- A **Workspace administration permission** can be granted by an **Organization role** without belonging to a product or addon
+- A product or addon area is visible to a member when at least one effective leaf permission exists within that area
+- **System roles** may expand as new leaf permissions are introduced; custom **Organization roles** only grant explicitly selected leaf permissions
 - A **Candidate** has zero or more **Applications**, possibly concurrent
 - An **Application** belongs to exactly one **Candidate** and exactly one **Position**
 - A **Position** has zero or more **Applications**

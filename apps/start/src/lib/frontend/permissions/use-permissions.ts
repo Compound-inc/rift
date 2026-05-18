@@ -33,8 +33,14 @@ import {
   EMPTY_PERMISSION_BUNDLE,
   buildProductCapabilitiesMap,
   resolvePermission,
+  getChildLeafPermissionKeys,
   resolvePermissionRaw,
 } from '@/lib/shared/permissions'
+import {
+  getSystemRolePermissionKeys,
+  readRiftPermissionsFromDynamicPermission,
+  splitOrganizationRoles,
+} from '@/lib/shared/auth/org-access-control'
 import type {
   PermissionBundle,
   PermissionKey,
@@ -68,6 +74,13 @@ type BillingSummaryRow = {
     productKey: string
     capabilities?: Readonly<Record<string, unknown>> | null
   }[]
+  members?: readonly {
+    role?: string | null
+  }[]
+  organizationRoles?: readonly {
+    role: string
+    permission?: string | Record<string, readonly string[]> | null
+  }[]
 }
 
 type PermissionsContext = {
@@ -77,6 +90,8 @@ type PermissionsContext = {
   readonly canRaw: (key: PermissionKey) => boolean
   /** Full result including discriminated `reason` for richer UX copy. */
   readonly check: (key: PermissionKey) => PermissionResult
+  /** True when at least one effective leaf inside a product/addon area is allowed. */
+  readonly canAnyChild: (key: PermissionKey) => boolean
   /**
    * Workspace-feature state including upgrade-hint metadata. Use for
    * settings pages that render a locked UI when a feature is gated
@@ -112,12 +127,32 @@ function buildBundleFromRow(input: {
 
   const productCapabilities = buildProductCapabilitiesMap(row.productPolicies)
 
+  const memberRoles = splitOrganizationRoles(row.members?.[0]?.role)
+  const dynamicRolePermissions = new Map(
+    (row.organizationRoles ?? []).map(
+      (role) =>
+        [
+          role.role,
+          readRiftPermissionsFromDynamicPermission(role.permission),
+        ] as const,
+    ),
+  )
+  const rolePermissions = new Set<string>()
+  for (const role of memberRoles) {
+    for (const key of getSystemRolePermissionKeys(role)) {
+      rolePermissions.add(key)
+    }
+    for (const key of dynamicRolePermissions.get(role) ?? []) {
+      rolePermissions.add(key)
+    }
+  }
+
   return {
     planId,
     effectiveFeatures,
     productAddonEntitlements,
     productCapabilities,
-    rolePermissions: EMPTY_PERMISSION_BUNDLE.rolePermissions,
+    rolePermissions,
   }
 }
 
@@ -147,6 +182,10 @@ export function usePermissions(): PermissionsContext {
         }
         return resolvePermission(bundle, key)
       },
+      canAnyChild: (key) =>
+        getChildLeafPermissionKeys(key as never).some(
+          (childKey) => resolvePermission(bundle, childKey).allowed,
+        ),
       workspaceFeatureState: (feature) => ({
         loading,
         ...getWorkspaceFeatureAccessState({
