@@ -3,6 +3,8 @@ node_modules
 dist/
 .turbo/
 **/.turbo/
+.wrangler/
+**/.wrangler/
 *.tsbuildinfo
 .env.local
 lib/local/

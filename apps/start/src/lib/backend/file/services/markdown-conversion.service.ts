@@ -20,6 +20,7 @@ export type MarkdownConversionServiceShape = {
     readonly fileUrl: string
     readonly fileName: string
     readonly requestId: string
+    readonly sourceFile?: File
   }) => Effect.Effect<
     {
       readonly markdown: string
@@ -38,7 +39,7 @@ export class MarkdownConversionService extends ServiceMap.Service<
 >()('file-backend/MarkdownConversionService') {
   static readonly layer = Layer.succeed(this, {
     convertFromUrl: Effect.fn('MarkdownConversionService.convertFromUrl')(
-      ({ fileUrl, fileName, requestId }) =>
+      ({ fileUrl, fileName, requestId, sourceFile }) =>
         Effect.gen(function* () {
           const capabilities = getServerInstanceCapabilities()
           const workerUrl = readRequiredEnv('CF_MARKDOWN_WORKER_URL')
@@ -84,6 +85,13 @@ export class MarkdownConversionService extends ServiceMap.Service<
           ).pipe(
             Effect.flatMap(({ controller }) =>
               Effect.gen(function* () {
+                const workerRequestBody = yield* buildWorkerRequestBody({
+                  fileUrl,
+                  fileName,
+                  sourceFile,
+                  requestId,
+                })
+
                 const response = yield* Effect.tryPromise({
                   try: () =>
                     fetch(resolveWorkerConvertUrl(workerUrl), {
@@ -92,10 +100,7 @@ export class MarkdownConversionService extends ServiceMap.Service<
                         'Content-Type': 'application/json',
                         Authorization: `Bearer ${workerToken}`,
                       },
-                      body: JSON.stringify({
-                        fileUrl,
-                        fileName,
-                      }),
+                      body: JSON.stringify(workerRequestBody),
                       signal: controller.signal,
                     }),
                   catch: (error) => {
@@ -185,6 +190,35 @@ function readRequiredEnv(name: string): string | null {
   if (!raw) return null
   const trimmed = raw.trim()
   return trimmed.length > 0 ? trimmed : null
+}
+
+function buildWorkerRequestBody(input: {
+  readonly fileUrl: string
+  readonly fileName: string
+  readonly sourceFile?: File
+  readonly requestId: string
+}) {
+  return Effect.tryPromise({
+    try: async () => {
+      const sourceBase64 = input.sourceFile
+        ? Buffer.from(await input.sourceFile.arrayBuffer()).toString('base64')
+        : undefined
+
+      return {
+        fileUrl: input.fileUrl,
+        fileName: input.fileName,
+        sourceBase64,
+        mimeType: input.sourceFile?.type,
+      }
+    },
+    catch: (error) =>
+      new FileConversionError({
+        message: 'Failed to prepare markdown conversion request',
+        requestId: input.requestId,
+        statusCode: 500,
+        cause: String(error),
+      }),
+  })
 }
 
 function resolveWorkerConvertUrl(workerUrl: string): string {

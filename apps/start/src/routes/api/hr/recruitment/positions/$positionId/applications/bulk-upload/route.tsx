@@ -249,6 +249,7 @@ export const Route = createFileRoute(
                       .convertFromUrl({
                         fileUrl: uploaded.url,
                         fileName: uploaded.name,
+                        sourceFile: file,
                         requestId: `${REQUEST_ID_PREFIX}.convert.${crypto.randomUUID()}`,
                       })
                       .pipe(
