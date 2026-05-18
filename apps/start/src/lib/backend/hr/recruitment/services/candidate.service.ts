@@ -26,7 +26,7 @@ export type UpsertCandidateInput = {
   readonly organizationId: string
   readonly requestId: string
   readonly email: string | null
-  readonly displayName: string
+  readonly displayName: string | null
   readonly phone?: string | null
   readonly cvAttachmentId?: string | null
   readonly cvText?: string | null
@@ -122,6 +122,13 @@ function toCrossOrg(input: {
     resourceId: input.resourceId,
     actualOrganizationId: input.actualOrganizationId,
   })
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const cause = (error as { cause?: unknown }).cause
+  if (!cause || typeof cause !== 'object') return false
+  return (cause as { code?: unknown }).code === '23505'
 }
 
 type CandidateRawRow = Record<string, unknown>
@@ -392,41 +399,92 @@ export class HrCandidateService extends ServiceMap.Service<
               candidateId: input.candidateId,
               requestId: input.requestId,
             })
-            const now = Date.now()
-            // Adopt the AI-recovered email so future uploads can dedup.
             const incomingEmail = normalizeEmail(input.email)
-            const nextNormalizedEmail =
-              incomingEmail?.normalized ?? existing.normalizedEmail
-            const nextDisplayEmail = incomingEmail?.display ?? existing.email
             const displayName = input.displayName?.trim().length
               ? normalizeTextField(input.displayName)
               : existing.displayName
 
-            const rows = yield* client<CandidateRawRow>`
-              update hr_candidate
-              set
-                display_name = ${displayName},
-                normalized_email = ${nextNormalizedEmail},
-                email = ${nextDisplayEmail},
-                phone = ${input.phone ?? existing.phone},
-                location = ${input.location ?? existing.location},
-                headline = ${input.headline ?? existing.headline},
-                summary = ${input.summary ?? existing.summary},
-                years_of_experience = ${
-                  input.yearsOfExperience ?? existing.yearsOfExperience
-                },
-                skills = ${jsonValue(client, input.skills)},
-                languages = ${jsonValue(client, input.languages)},
-                highest_degree = ${input.highestDegree ?? existing.highestDegree},
-                profile_source = ${input.profileSource},
-                needs_contact_review = ${
-                  nextNormalizedEmail === null && existing.needsContactReview
-                },
-                updated_at = ${now}
-              where id = ${input.candidateId}
-                and organization_id = ${input.organizationId}
-              returning *
-            `.pipe(
+            // Try to adopt the AI-recovered email so future uploads can dedup.
+            // Two concurrent applyAiProfile calls for different placeholder
+            // Candidates can resolve to the same email; the SELECT below is
+            // an optimistic check, but a third workflow can still INSERT or
+            // UPDATE between our lookup and our UPDATE. The partial unique
+            // index `(organization_id, normalized_email) WHERE
+            // normalized_email IS NOT NULL` is the real source of truth —
+            // when it rejects the write we catch the unique violation and
+            // retry without adopting the email, leaving the original email
+            // in place. The previous run's row keeps the email and this row
+            // stays a placeholder until the next AI extraction.
+            const emailOwnerRows = incomingEmail
+              ? yield* client<{ id: string }>`
+                  select id from hr_candidate
+                  where organization_id = ${input.organizationId}
+                    and normalized_email = ${incomingEmail.normalized}
+                    and merged_into_candidate_id is null
+                    and id <> ${existing.id}
+                  limit 1
+                `.pipe(
+                  Effect.mapError((cause) =>
+                    toPersistenceError({
+                      organizationId: input.organizationId,
+                      requestId: input.requestId,
+                      operation: 'lookupCandidateAiEmailOwner',
+                      message: 'Failed to check candidate AI email owner.',
+                      cause,
+                    }),
+                  ),
+                )
+              : []
+
+            const runUpdate = (params: { readonly adoptEmail: boolean }) => {
+              const nextNormalizedEmail =
+                params.adoptEmail && incomingEmail
+                  ? incomingEmail.normalized
+                  : existing.normalizedEmail
+              const nextDisplayEmail =
+                params.adoptEmail && incomingEmail
+                  ? incomingEmail.display
+                  : existing.email
+              return client<CandidateRawRow>`
+                update hr_candidate
+                set
+                  display_name = ${displayName},
+                  normalized_email = ${nextNormalizedEmail},
+                  email = ${nextDisplayEmail},
+                  phone = ${input.phone ?? existing.phone},
+                  location = ${input.location ?? existing.location},
+                  headline = ${input.headline ?? existing.headline},
+                  summary = ${input.summary ?? existing.summary},
+                  years_of_experience = ${
+                    input.yearsOfExperience ?? existing.yearsOfExperience
+                  },
+                  skills = ${jsonValue(client, input.skills)},
+                  languages = ${jsonValue(client, input.languages)},
+                  highest_degree = ${input.highestDegree ?? existing.highestDegree},
+                  profile_source = ${input.profileSource},
+                  needs_contact_review = ${
+                    nextNormalizedEmail === null && existing.needsContactReview
+                  },
+                  updated_at = ${Date.now()}
+                where id = ${input.candidateId}
+                  and organization_id = ${input.organizationId}
+                returning *
+              `
+            }
+
+            // First try: adopt incoming email when our optimistic lookup
+            // shows no other owner. If a concurrent transaction races us and
+            // takes the email between our SELECT and our UPDATE, the partial
+            // unique index will reject the write with SQLSTATE 23505; we
+            // catch that and rerun the UPDATE without adopting the email.
+            const optimisticallyCanAdopt =
+              incomingEmail !== null && emailOwnerRows.length === 0
+            const rows = yield* runUpdate({
+              adoptEmail: optimisticallyCanAdopt,
+            }).pipe(
+              Effect.catchIf(isUniqueViolation, () =>
+                runUpdate({ adoptEmail: false }),
+              ),
               Effect.mapError((cause) =>
                 toPersistenceError({
                   organizationId: input.organizationId,
@@ -619,14 +677,27 @@ export class HrCandidateService extends ServiceMap.Service<
               input.candidateId,
             )
             const incomingEmail = normalizeEmail(input.email)
+            const emailOwner = incomingEmail
+              ? Array.from(rows.values()).find(
+                  (row) =>
+                    row.organizationId === input.organizationId &&
+                    row.normalizedEmail === incomingEmail.normalized &&
+                    row.mergedIntoCandidateId === null &&
+                    row.id !== existing.id,
+                )
+              : undefined
+            const canAdoptIncomingEmail = incomingEmail !== null && !emailOwner
             const next: HrCandidateRow = {
               ...existing,
               displayName: input.displayName?.trim()?.length
                 ? normalizeTextField(input.displayName)
                 : existing.displayName,
-              normalizedEmail:
-                incomingEmail?.normalized ?? existing.normalizedEmail,
-              email: incomingEmail?.display ?? existing.email,
+              normalizedEmail: canAdoptIncomingEmail
+                ? incomingEmail.normalized
+                : existing.normalizedEmail,
+              email: canAdoptIncomingEmail
+                ? incomingEmail.display
+                : existing.email,
               phone: input.phone ?? existing.phone,
               location: input.location ?? existing.location,
               headline: input.headline ?? existing.headline,
@@ -638,8 +709,10 @@ export class HrCandidateService extends ServiceMap.Service<
               highestDegree: input.highestDegree ?? existing.highestDegree,
               profileSource: input.profileSource,
               needsContactReview:
-                (incomingEmail?.normalized ?? existing.normalizedEmail) ===
-                  null && existing.needsContactReview,
+                (canAdoptIncomingEmail
+                  ? incomingEmail.normalized
+                  : existing.normalizedEmail) === null &&
+                existing.needsContactReview,
               updatedAt: Date.now(),
             }
             rows.set(existing.id, next)

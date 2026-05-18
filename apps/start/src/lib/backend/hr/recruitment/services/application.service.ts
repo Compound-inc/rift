@@ -2,13 +2,18 @@ import { PgClient } from '@effect/sql-pg'
 import { Effect, Layer, ServiceMap } from 'effect'
 import {
   HR_TERMINAL_APPLICATION_STAGES,
+  isHrApplicationSource,
   isHrApplicationStage,
+  normalizeAffinityRationale,
   normalizeApplicationStage,
   normalizeCvText,
   normalizeTextField,
   sanitizeCvForEmbedding,
 } from '@/lib/shared/hr/recruitment'
-import type { HrApplicationStage } from '@/lib/shared/hr/recruitment'
+import type {
+  HrApplicationSource,
+  HrApplicationStage,
+} from '@/lib/shared/hr/recruitment'
 import {
   HrApplicationNotFoundError,
   HrApplicationStageConflictError,
@@ -25,6 +30,7 @@ export type CreateApplicationInput = {
   readonly positionId: string
   readonly cvAttachmentId: string | null
   readonly cvText: string | null
+  readonly source?: HrApplicationSource
 }
 
 export type SetApplicationStageInput = {
@@ -169,6 +175,13 @@ function clampScore(score: number): number {
   return Math.max(0, Math.min(100, Math.round(score)))
 }
 
+function normalizeApplicationSource(
+  source: HrApplicationSource | undefined,
+): HrApplicationSource {
+  if (source && isHrApplicationSource(source)) return source
+  return 'Manual'
+}
+
 type ApplicationRawRow = Record<string, unknown>
 
 export class HrApplicationService extends ServiceMap.Service<
@@ -242,12 +255,13 @@ export class HrApplicationService extends ServiceMap.Service<
           const id = crypto.randomUUID()
           const now = Date.now()
           const cvText = normalizeCvText(input.cvText)
+          const source = normalizeApplicationSource(input.source)
           const rows = yield* client<ApplicationRawRow>`
             insert into hr_application (
               id, organization_id, candidate_id, position_id,
               stage,
               affinity_score, affinity_rationale, affinity_signals, affinity_model,
-              cv_attachment_id, cv_text, cv_embedding, cv_embedding_model,
+              cv_attachment_id, cv_text, source, cv_embedding, cv_embedding_model,
               workflow_run_id, last_transition_at, last_error,
               rejection_reason, hired_at, archived_at, archived_by,
               created_at, updated_at
@@ -256,7 +270,7 @@ export class HrApplicationService extends ServiceMap.Service<
               ${id}, ${input.organizationId}, ${input.candidateId}, ${input.positionId},
               'uploaded',
               null, null, null, null,
-              ${input.cvAttachmentId}, ${cvText ? sanitizeCvForEmbedding(cvText) : null}, null, null,
+              ${input.cvAttachmentId}, ${cvText ? sanitizeCvForEmbedding(cvText) : null}, ${source}, null, null,
               null, ${now}, null,
               null, null, null, null,
               ${now}, ${now}
@@ -264,6 +278,7 @@ export class HrApplicationService extends ServiceMap.Service<
             on conflict (position_id, candidate_id) do update set
               cv_attachment_id = excluded.cv_attachment_id,
               cv_text = excluded.cv_text,
+              source = excluded.source,
               updated_at = excluded.updated_at
             returning *
           `.pipe(
@@ -385,7 +400,7 @@ export class HrApplicationService extends ServiceMap.Service<
             update hr_application
             set
               affinity_score = ${clampScore(input.score)},
-              affinity_rationale = ${input.rationale ? normalizeTextField(input.rationale) : null},
+              affinity_rationale = ${input.rationale ? normalizeAffinityRationale(input.rationale) : null},
               affinity_signals = ${
                 input.signals ? jsonValue(client, input.signals) : null
               },
@@ -718,12 +733,14 @@ export class HrApplicationService extends ServiceMap.Service<
               row.positionId === input.positionId,
           )
           const cvText = normalizeCvText(input.cvText)
+          const source = normalizeApplicationSource(input.source)
           const now = Date.now()
           if (existing) {
             const updated: HrApplicationRow = {
               ...existing,
               cvAttachmentId: input.cvAttachmentId ?? existing.cvAttachmentId,
               cvText: cvText ?? existing.cvText,
+              source,
               updatedAt: now,
             }
             rows.set(existing.id, updated)
@@ -742,6 +759,7 @@ export class HrApplicationService extends ServiceMap.Service<
             affinityModel: null,
             cvAttachmentId: input.cvAttachmentId,
             cvText: cvText ? sanitizeCvForEmbedding(cvText) : null,
+            source,
             cvEmbedding: null,
             cvEmbeddingModel: null,
             workflowRunId: null,
@@ -851,7 +869,7 @@ export class HrApplicationService extends ServiceMap.Service<
               ...existing,
               affinityScore: clampScore(input.score),
               affinityRationale: input.rationale
-                ? normalizeTextField(input.rationale)
+                ? normalizeAffinityRationale(input.rationale)
                 : null,
               affinitySignals: input.signals ?? null,
               affinityModel: input.model,

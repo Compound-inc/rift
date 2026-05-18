@@ -1,12 +1,6 @@
 'use client'
 
 import { useMemo } from 'react'
-import PhoneCall from 'lucide-react/dist/esm/icons/phone-call'
-import UserPlus from 'lucide-react/dist/esm/icons/user-plus'
-import CheckCircle2 from 'lucide-react/dist/esm/icons/check-circle-2'
-import FileText from 'lucide-react/dist/esm/icons/file-text'
-import ShieldCheck from 'lucide-react/dist/esm/icons/shield-check'
-import type { ComponentType, SVGProps } from 'react'
 import {
   useHrApplicationsForPosition,
   useHrCandidates,
@@ -24,9 +18,19 @@ function formatAppliedAt(timestamp: number): string {
   })
 }
 
-function buildHeadline(input: {
+export function isApplicationProfilePending(input: {
   readonly stage: HrApplicationStage
-  readonly candidate: HrCandidateView | undefined
+  readonly affinityScore: number | null
+}): boolean {
+  return (
+    input.affinityScore === null &&
+    (input.stage === 'uploaded' || input.stage === 'scoring')
+  )
+}
+
+export function buildPositionCandidateHeadline(input: {
+  readonly stage: HrApplicationStage
+  readonly candidateHeadline: string | null | undefined
   readonly affinityScore: number | null
   readonly rejectionReason: string | null
   readonly affinityModel: string | null
@@ -35,11 +39,15 @@ function buildHeadline(input: {
     return rejectionLabel(input.rejectionReason)
   }
 
-  if (input.candidate?.headline) return input.candidate.headline
+  // The Candidate profile may already have an AI headline from an earlier
+  // Application. While the current Application is still scoring, the table
+  // renders a skeleton instead of showing stale persona data.
+  if (isApplicationProfilePending(input)) return ''
 
-  if (input.affinityScore === null) {
-    return 'Pipeline · scoring pending'
-  }
+  if (input.affinityScore === null) return 'Pipeline · scoring pending'
+
+  if (input.candidateHeadline) return input.candidateHeadline
+
   return `Score ${input.affinityScore}/100${
     input.affinityModel ? ` · ${input.affinityModel}` : ''
   }`
@@ -69,11 +77,18 @@ function rejectionLabel(reason: string | null): string {
   }
 }
 
+/**
+ * Row shape for the candidates table on the Position detail page.
+ * Composes Application data with the joined Candidate persona so the
+ * row can render name, headline, location, and CV-on-file flag in one
+ * pass without each `<td>` doing its own lookup.
+ */
 export type HrPositionCandidate = {
   readonly id: string
   readonly applicationId: string
   readonly name: string
   readonly headline: string
+  readonly profilePending: boolean
   readonly stage: HrApplicationStage
   readonly affinityScore: number | null
   readonly affinityRationale: string | null
@@ -84,6 +99,15 @@ export type HrPositionCandidate = {
   readonly skills: readonly string[]
 }
 
+/**
+ * View-model for the Position detail page's candidates table. Joins
+ * the Position's Applications to their Candidate personas via the
+ * org-scoped `useHrCandidates` query and returns rows ready to render.
+ *
+ * Loading is "loading until both sides have completed" so the UI
+ * doesn't flash an empty table when the Applications resolve before
+ * the Candidates do.
+ */
 export function useHrPositionApplications(positionId: string): {
   readonly candidates: readonly HrPositionCandidate[]
   readonly loading: boolean
@@ -104,34 +128,38 @@ export function useHrPositionApplications(positionId: string): {
     return applications.map((application) => {
       const candidate = candidatesById.get(application.candidateId)
       const candidateName = (candidate?.displayName ?? '').trim()
+      const profilePending = isApplicationProfilePending({
+        stage: application.stage,
+        affinityScore: application.affinityScore,
+      })
       const isRejectedUnidentified =
         application.stage === 'rejected' &&
         application.rejectionReason === 'cv-unidentifiable'
       const displayName =
-        candidateName.length > 0
-          ? candidateName
-          : isRejectedUnidentified
-            ? '—'
-            : 'Unknown candidate'
+        profilePending && candidate?.email
+          ? candidate.email
+          : candidateName.length > 0
+            ? candidateName
+            : isRejectedUnidentified
+              ? '—'
+              : 'Unknown candidate'
       return {
         id: application.candidateId,
         applicationId: application.id,
         name: displayName,
-        headline: buildHeadline({
+        headline: buildPositionCandidateHeadline({
           stage: application.stage,
-          candidate,
+          candidateHeadline: candidate?.headline,
           affinityScore: application.affinityScore,
           rejectionReason: application.rejectionReason,
           affinityModel: application.affinityModel,
         }),
+        profilePending,
         stage: application.stage,
         affinityScore: application.affinityScore,
         affinityRationale: application.affinityRationale,
         appliedAt: formatAppliedAt(application.updatedAt),
-        source:
-          candidate?.email && !candidate.needsContactReview
-            ? candidate.email
-            : 'Manual upload',
+        source: application.source || 'Manual',
         resumeOnFile: application.cvAttachmentId !== null,
         location: candidate?.location ?? null,
         skills: candidate?.skills ?? [],
@@ -142,70 +170,5 @@ export function useHrPositionApplications(positionId: string): {
   return {
     candidates,
     loading: applicationsLoading || candidatesLoading,
-  }
-}
-
-export function resolveCandidateStagePresentation(stage: HrApplicationStage): {
-  readonly label: string
-  readonly icon: ComponentType<SVGProps<SVGSVGElement>>
-  readonly chipClassName: string
-} {
-  switch (stage) {
-    case 'uploaded':
-      return {
-        label: 'Uploaded',
-        icon: FileText,
-        chipClassName:
-          'border-border-light bg-surface-overlay text-foreground-secondary',
-      }
-    case 'scoring':
-      return {
-        label: 'Scoring',
-        icon: UserPlus,
-        chipClassName:
-          'border-border-light bg-surface-info/15 text-foreground-info',
-      }
-    case 'awaiting_test':
-      return {
-        label: 'Awaiting test',
-        icon: PhoneCall,
-        chipClassName:
-          'border-border-light bg-surface-info/15 text-foreground-info',
-      }
-    case 'evaluating':
-      return {
-        label: 'Evaluating',
-        icon: PhoneCall,
-        chipClassName:
-          'border-border-light bg-surface-info/20 text-foreground-info',
-      }
-    case 'awaiting_verification':
-      return {
-        label: 'Background check',
-        icon: ShieldCheck,
-        chipClassName:
-          'border-border-light bg-surface-warning/15 text-foreground-warning',
-      }
-    case 'advanced':
-      return {
-        label: 'Advanced',
-        icon: CheckCircle2,
-        chipClassName:
-          'border-border-light bg-surface-success/15 text-foreground-success',
-      }
-    case 'hired':
-      return {
-        label: 'Hired',
-        icon: CheckCircle2,
-        chipClassName:
-          'border-border-light bg-surface-success/20 text-foreground-success',
-      }
-    case 'rejected':
-      return {
-        label: 'Rejected',
-        icon: FileText,
-        chipClassName:
-          'border-border-light bg-surface-error/15 text-foreground-error',
-      }
   }
 }

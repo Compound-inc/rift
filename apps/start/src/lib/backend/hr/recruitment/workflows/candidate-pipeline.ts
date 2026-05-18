@@ -14,7 +14,7 @@ import {
   computeAffinityStep,
   dispatchEvaluationStep,
   finalizeApplicationStep,
-  ingestCvStep,
+  markApplicationScoringStep,
   recordBackgroundCheckResultStep,
   recordEvaluationResultStep,
   requireBackgroundCheckAddonStep,
@@ -45,7 +45,7 @@ export async function candidatePipelineWorkflow(
 ): Promise<void> {
   'use workflow'
 
-  await ingestCvStep(input)
+  await markApplicationScoringStep(input)
 
   let affinity: { stage: 'awaiting_test' | 'rejected' }
   try {

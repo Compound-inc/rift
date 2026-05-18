@@ -70,8 +70,10 @@ import { Route as appLayoutHrRecruitmentPositionsIndexRouteImport } from './rout
 import { Route as appLayoutHrRecruitmentPositionsPositionIdRouteImport } from './routes/(app)/_layout/hr/recruitment/positions/$positionId'
 import { Route as ApiHrRecruitmentEvaluationsDispatchIdTakeRouteRouteImport } from './routes/api/hr/recruitment/evaluations/$dispatchId/take/route'
 import { Route as appLayoutOrganizationSettingsModelsProviderIdRouteRouteImport } from './routes/(app)/_layout/organization/settings/models/$providerId/route'
+import { Route as appLayoutHrRecruitmentCandidatesCandidateIdIndexRouteImport } from './routes/(app)/_layout/hr/recruitment/candidates/$candidateId/index'
 import { Route as ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRouteImport } from './routes/api/hr/recruitment/positions/$positionId/applications/clear/route'
 import { Route as ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRouteImport } from './routes/api/hr/recruitment/positions/$positionId/applications/bulk-upload/route'
+import { Route as appLayoutHrRecruitmentCandidatesCandidateIdApplicationsApplicationIdRouteImport } from './routes/(app)/_layout/hr/recruitment/candidates/$candidateId/applications/$applicationId'
 
 const SetupRouteRoute = SetupRouteRouteImport.update({
   id: '/setup',
@@ -407,6 +409,12 @@ const appLayoutOrganizationSettingsModelsProviderIdRouteRoute =
     path: '/$providerId',
     getParentRoute: () => appLayoutOrganizationSettingsModelsRouteRoute,
   } as any)
+const appLayoutHrRecruitmentCandidatesCandidateIdIndexRoute =
+  appLayoutHrRecruitmentCandidatesCandidateIdIndexRouteImport.update({
+    id: '/candidates/$candidateId/',
+    path: '/candidates/$candidateId/',
+    getParentRoute: () => appLayoutHrRecruitmentRouteRoute,
+  } as any)
 const ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRoute =
   ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRouteImport.update({
     id: '/api/hr/recruitment/positions/$positionId/applications/clear',
@@ -419,6 +427,14 @@ const ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRoute =
       id: '/api/hr/recruitment/positions/$positionId/applications/bulk-upload',
       path: '/api/hr/recruitment/positions/$positionId/applications/bulk-upload',
       getParentRoute: () => rootRouteImport,
+    } as any,
+  )
+const appLayoutHrRecruitmentCandidatesCandidateIdApplicationsApplicationIdRoute =
+  appLayoutHrRecruitmentCandidatesCandidateIdApplicationsApplicationIdRouteImport.update(
+    {
+      id: '/candidates/$candidateId/applications/$applicationId',
+      path: '/candidates/$candidateId/applications/$applicationId',
+      getParentRoute: () => appLayoutHrRecruitmentRouteRoute,
     } as any,
   )
 
@@ -485,6 +501,8 @@ export interface FileRoutesByFullPath {
   '/organization/settings/models/': typeof appLayoutOrganizationSettingsModelsIndexRoute
   '/api/hr/recruitment/positions/$positionId/applications/bulk-upload': typeof ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRoute
   '/api/hr/recruitment/positions/$positionId/applications/clear': typeof ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRoute
+  '/hr/recruitment/candidates/$candidateId/': typeof appLayoutHrRecruitmentCandidatesCandidateIdIndexRoute
+  '/hr/recruitment/candidates/$candidateId/applications/$applicationId': typeof appLayoutHrRecruitmentCandidatesCandidateIdApplicationsApplicationIdRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRouteRouteWithChildren
@@ -538,6 +556,8 @@ export interface FileRoutesByTo {
   '/organization/settings/models': typeof appLayoutOrganizationSettingsModelsIndexRoute
   '/api/hr/recruitment/positions/$positionId/applications/bulk-upload': typeof ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRoute
   '/api/hr/recruitment/positions/$positionId/applications/clear': typeof ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRoute
+  '/hr/recruitment/candidates/$candidateId': typeof appLayoutHrRecruitmentCandidatesCandidateIdIndexRoute
+  '/hr/recruitment/candidates/$candidateId/applications/$applicationId': typeof appLayoutHrRecruitmentCandidatesCandidateIdApplicationsApplicationIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -604,6 +624,8 @@ export interface FileRoutesById {
   '/(app)/_layout/organization/settings/models/': typeof appLayoutOrganizationSettingsModelsIndexRoute
   '/api/hr/recruitment/positions/$positionId/applications/bulk-upload': typeof ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRoute
   '/api/hr/recruitment/positions/$positionId/applications/clear': typeof ApiHrRecruitmentPositionsPositionIdApplicationsClearRouteRoute
+  '/(app)/_layout/hr/recruitment/candidates/$candidateId/': typeof appLayoutHrRecruitmentCandidatesCandidateIdIndexRoute
+  '/(app)/_layout/hr/recruitment/candidates/$candidateId/applications/$applicationId': typeof appLayoutHrRecruitmentCandidatesCandidateIdApplicationsApplicationIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -670,6 +692,8 @@ export interface FileRouteTypes {
     | '/organization/settings/models/'
     | '/api/hr/recruitment/positions/$positionId/applications/bulk-upload'
     | '/api/hr/recruitment/positions/$positionId/applications/clear'
+    | '/hr/recruitment/candidates/$candidateId/'
+    | '/hr/recruitment/candidates/$candidateId/applications/$applicationId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
@@ -723,6 +747,8 @@ export interface FileRouteTypes {
     | '/organization/settings/models'
     | '/api/hr/recruitment/positions/$positionId/applications/bulk-upload'
     | '/api/hr/recruitment/positions/$positionId/applications/clear'
+    | '/hr/recruitment/candidates/$candidateId'
+    | '/hr/recruitment/candidates/$candidateId/applications/$applicationId'
   id:
     | '__root__'
     | '/auth'
@@ -788,6 +814,8 @@ export interface FileRouteTypes {
     | '/(app)/_layout/organization/settings/models/'
     | '/api/hr/recruitment/positions/$positionId/applications/bulk-upload'
     | '/api/hr/recruitment/positions/$positionId/applications/clear'
+    | '/(app)/_layout/hr/recruitment/candidates/$candidateId/'
+    | '/(app)/_layout/hr/recruitment/candidates/$candidateId/applications/$applicationId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1243,6 +1271,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appLayoutOrganizationSettingsModelsProviderIdRouteRouteImport
       parentRoute: typeof appLayoutOrganizationSettingsModelsRouteRoute
     }
+    '/(app)/_layout/hr/recruitment/candidates/$candidateId/': {
+      id: '/(app)/_layout/hr/recruitment/candidates/$candidateId/'
+      path: '/candidates/$candidateId'
+      fullPath: '/hr/recruitment/candidates/$candidateId/'
+      preLoaderRoute: typeof appLayoutHrRecruitmentCandidatesCandidateIdIndexRouteImport
+      parentRoute: typeof appLayoutHrRecruitmentRouteRoute
+    }
     '/api/hr/recruitment/positions/$positionId/applications/clear': {
       id: '/api/hr/recruitment/positions/$positionId/applications/clear'
       path: '/api/hr/recruitment/positions/$positionId/applications/clear'
@@ -1256,6 +1291,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/hr/recruitment/positions/$positionId/applications/bulk-upload'
       preLoaderRoute: typeof ApiHrRecruitmentPositionsPositionIdApplicationsBulkUploadRouteRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/(app)/_layout/hr/recruitment/candidates/$candidateId/applications/$applicationId': {
+      id: '/(app)/_layout/hr/recruitment/candidates/$candidateId/applications/$applicationId'
+      path: '/candidates/$candidateId/applications/$applicationId'
+      fullPath: '/hr/recruitment/candidates/$candidateId/applications/$applicationId'
+      preLoaderRoute: typeof appLayoutHrRecruitmentCandidatesCandidateIdApplicationsApplicationIdRouteImport
+      parentRoute: typeof appLayoutHrRecruitmentRouteRoute
     }
   }
 }
@@ -1321,6 +1363,8 @@ interface appLayoutHrRecruitmentRouteRouteChildren {
   appLayoutHrRecruitmentIndexRoute: typeof appLayoutHrRecruitmentIndexRoute
   appLayoutHrRecruitmentPositionsPositionIdRoute: typeof appLayoutHrRecruitmentPositionsPositionIdRoute
   appLayoutHrRecruitmentPositionsIndexRoute: typeof appLayoutHrRecruitmentPositionsIndexRoute
+  appLayoutHrRecruitmentCandidatesCandidateIdIndexRoute: typeof appLayoutHrRecruitmentCandidatesCandidateIdIndexRoute
+  appLayoutHrRecruitmentCandidatesCandidateIdApplicationsApplicationIdRoute: typeof appLayoutHrRecruitmentCandidatesCandidateIdApplicationsApplicationIdRoute
 }
 
 const appLayoutHrRecruitmentRouteRouteChildren: appLayoutHrRecruitmentRouteRouteChildren =
@@ -1330,6 +1374,10 @@ const appLayoutHrRecruitmentRouteRouteChildren: appLayoutHrRecruitmentRouteRoute
       appLayoutHrRecruitmentPositionsPositionIdRoute,
     appLayoutHrRecruitmentPositionsIndexRoute:
       appLayoutHrRecruitmentPositionsIndexRoute,
+    appLayoutHrRecruitmentCandidatesCandidateIdIndexRoute:
+      appLayoutHrRecruitmentCandidatesCandidateIdIndexRoute,
+    appLayoutHrRecruitmentCandidatesCandidateIdApplicationsApplicationIdRoute:
+      appLayoutHrRecruitmentCandidatesCandidateIdApplicationsApplicationIdRoute,
   }
 
 const appLayoutHrRecruitmentRouteRouteWithChildren =

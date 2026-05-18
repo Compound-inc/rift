@@ -1,0 +1,4 @@
+team_id = "COM"
+workspace = "ucompound"
+vcs = "git"
+issue_sort = "manual"

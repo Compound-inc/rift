@@ -12,10 +12,12 @@ import Users from 'lucide-react/dist/esm/icons/users'
 import type { ComponentType, SVGProps } from 'react'
 import {
   useHrApplicationsForPosition,
+  useHrPosition,
   useHrPositions,
 } from '@/lib/frontend/hr/recruitment'
 import type {
   HrApplicationView,
+  HrPositionArchiveFilter,
   HrPositionView,
 } from '@/lib/frontend/hr/recruitment'
 import type {
@@ -39,6 +41,7 @@ export type HrPosition = {
   readonly arrangement: HrPositionWorkArrangement
   readonly employmentType: HrPositionEmploymentType
   readonly status: HrPositionStatus
+  readonly archivedAt: number | null
   readonly applicants: number
   readonly newThisWeek: number
   readonly openedAt: string
@@ -49,6 +52,8 @@ export type HrPosition = {
 }
 
 export type { HrPositionStatus }
+
+export type HrPositionFilterValue = HrPositionStatus | 'all' | 'archived'
 
 export type HrPositionStatCard = {
   readonly id: string
@@ -132,6 +137,7 @@ function buildHrPosition(input: {
     arrangement: input.position.arrangement,
     employmentType: input.position.employmentType,
     status: input.position.status,
+    archivedAt: input.position.archivedAt,
     applicants,
     newThisWeek,
     openedAt: formatOpenedAt(input.position.createdAt, input.position.status),
@@ -145,8 +151,12 @@ function buildHrPosition(input: {
   }
 }
 
-export function useHrPositionsViewModel(): HrPositionsViewModel {
-  const { positions: rawPositions, loading } = useHrPositions()
+export function useHrPositionsViewModel(input?: {
+  readonly archiveFilter?: HrPositionArchiveFilter
+}): HrPositionsViewModel {
+  const { positions: rawPositions, loading } = useHrPositions({
+    archiveFilter: input?.archiveFilter,
+  })
   const compositePositions = useMemo(() => rawPositions, [rawPositions])
 
   const positions = useMemo<readonly HrPosition[]>(
@@ -158,12 +168,21 @@ export function useHrPositionsViewModel(): HrPositionsViewModel {
   )
 
   const stats = useMemo<readonly HrPositionStatCard[]>(() => {
-    const openCount = positions.filter((p) => p.status === 'open').length
-    const filledThisQuarter = positions.filter(
+    // Archived Positions are retained for historical Application context, but
+    // dashboard cards should describe active dashboard work only. Archive is a
+    // visibility flag (`archivedAt`), not a lifecycle status.
+    const dashboardPositions = positions.filter((p) => p.archivedAt === null)
+    const openCount = dashboardPositions.filter(
+      (p) => p.status === 'open',
+    ).length
+    const filledThisQuarter = dashboardPositions.filter(
       (p) => p.status === 'filled',
     ).length
-    const newApplicants = positions.reduce((sum, p) => sum + p.newThisWeek, 0)
-    const openPositions = positions.filter((p) => p.status === 'open')
+    const newApplicants = dashboardPositions.reduce(
+      (sum, p) => sum + p.newThisWeek,
+      0,
+    )
+    const openPositions = dashboardPositions.filter((p) => p.status === 'open')
     const avgDaysOpen =
       openPositions.length === 0
         ? 0
@@ -212,15 +231,15 @@ export function useHrPositionDetailViewModel(positionId: string | null): {
   readonly applications: readonly HrApplicationView[]
   readonly loading: boolean
 } {
-  const { positions, loading: positionsLoading } = useHrPositions()
+  // Position detail is reachable from Candidate/Application history, so use
+  // the by-id lookup instead of the dashboard list query. The by-id query does
+  // not apply archive filtering, keeping old Positions available as context.
+  const { position: matched, loading: positionLoading } =
+    useHrPosition(positionId)
   const { applications, loading: applicationsLoading } =
     useHrApplicationsForPosition({
       positionId: positionId ?? '__missing__',
     })
-  const matched = useMemo(
-    () => positions.find((entry) => entry.id === positionId) ?? null,
-    [positions, positionId],
-  )
   const composed = useMemo(() => {
     if (!matched) return null
     return buildHrPosition({ position: matched, applications })
@@ -228,7 +247,7 @@ export function useHrPositionDetailViewModel(positionId: string | null): {
   return {
     position: composed,
     applications,
-    loading: positionsLoading || applicationsLoading,
+    loading: positionLoading || applicationsLoading,
   }
 }
 
@@ -271,14 +290,6 @@ export function resolvePositionStatusPresentation(status: HrPositionStatus): {
         chipClassName:
           'border-border-light bg-surface-overlay text-foreground-secondary',
       }
-    case 'archived':
-      return {
-        label: 'Archived',
-        icon: PauseCircle,
-        className: 'text-foreground-tertiary',
-        chipClassName:
-          'border-border-light bg-surface-overlay text-foreground-tertiary',
-      }
   }
 }
 
@@ -306,7 +317,7 @@ export function getArrangementLabel(
 }
 
 export const POSITION_STATUS_FILTERS: ReadonlyArray<{
-  readonly value: HrPositionStatus | 'all'
+  readonly value: HrPositionFilterValue
   readonly label: string
 }> = [
   { value: 'all', label: 'All' },

@@ -36,7 +36,7 @@ export const ORG_PRODUCT_ADDON_CATALOG = {
       recruitment: {
         label: 'Recruitment',
         description:
-          'Candidate pipeline, job postings, bulk CV ingest, AI affinity scoring, and assessment workflows.',
+          'Candidate pipeline, job postings, bulk CV intake, AI affinity scoring, and assessment workflows.',
         orgConfigurableSettingKeys: [
           'recruitment.aiRerankEnabled',
           'recruitment.aiRerankTopK',

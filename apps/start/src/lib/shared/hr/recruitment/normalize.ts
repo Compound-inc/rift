@@ -10,6 +10,7 @@ import type {
 const MAX_TITLE_LENGTH = 200
 const MAX_DESCRIPTION_LENGTH = 8000
 const MAX_TEXT_FIELD_LENGTH = 500
+const MAX_RATIONALE_LENGTH = 4000
 const MAX_NOTES_LENGTH = 4000
 const MAX_TAGS = 32
 const MAX_TAG_LENGTH = 64
@@ -32,6 +33,13 @@ export function normalizePositionDescription(value: string): string {
 export function normalizeTextField(value: string | null | undefined): string {
   if (!value) return ''
   return clampString(value.trim(), MAX_TEXT_FIELD_LENGTH)
+}
+
+export function normalizeAffinityRationale(
+  value: string | null | undefined,
+): string {
+  if (!value) return ''
+  return clampString(value.trim(), MAX_RATIONALE_LENGTH)
 }
 
 export function normalizeNotes(
@@ -78,7 +86,6 @@ export function normalizePositionStatus(
     case 'open':
     case 'paused':
     case 'filled':
-    case 'archived':
       return value
     default:
       return 'draft'
@@ -123,6 +130,10 @@ export function normalizeEvaluationKind(
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const CONTROL_CHARACTER_RE = new RegExp(
+  `[${String.fromCharCode(0)}-${String.fromCharCode(31)}${String.fromCharCode(127)}-${String.fromCharCode(159)}]`,
+  'g',
+)
 
 export function normalizeEmail(
   value: string | null | undefined,
@@ -136,6 +147,6 @@ export function normalizeEmail(
 }
 
 export function sanitizeCvForEmbedding(text: string): string {
-  const stripped = text.replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ')
+  const stripped = text.replace(CONTROL_CHARACTER_RE, ' ')
   return stripped.replace(/\s+/g, ' ').trim()
 }

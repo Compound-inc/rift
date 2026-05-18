@@ -801,9 +801,6 @@ CREATE TABLE IF NOT EXISTS hr_position (
   hiring_manager TEXT NOT NULL DEFAULT '',
   compensation TEXT NOT NULL DEFAULT '',
   tags JSONB NOT NULL DEFAULT '[]'::jsonb,
-  -- Catalog ids (e.g. `screening-technical-v1`) the workflow will dispatch.
-  -- Stored as JSON to allow per-position ordering and easy expansion.
-  recommended_evaluation_kinds JSONB NOT NULL DEFAULT '[]'::jsonb,
   -- Cached embedding of the position description. The pipeline keeps it
   -- around so future stage-1 cosine-similarity prefilters do not have
   -- to re-embed the JD for every CV upload. Refreshed when the
@@ -819,7 +816,7 @@ CREATE TABLE IF NOT EXISTS hr_position (
   updated_at BIGINT NOT NULL,
   created_by TEXT NOT NULL,
   CONSTRAINT hr_position_status_check CHECK (
-    status IN ('draft', 'open', 'paused', 'filled', 'archived')
+    status IN ('draft', 'open', 'paused', 'filled')
   ),
   CONSTRAINT hr_position_arrangement_check CHECK (
     arrangement IN ('remote', 'hybrid', 'onsite')
@@ -833,8 +830,36 @@ CREATE INDEX IF NOT EXISTS hr_position_org
   ON hr_position (organization_id);
 CREATE INDEX IF NOT EXISTS hr_position_org_status_updated
   ON hr_position (organization_id, status, updated_at DESC);
-CREATE INDEX IF NOT EXISTS hr_position_org_archived_at
-  ON hr_position (organization_id, archived_at);
+CREATE INDEX IF NOT EXISTS hr_position_org_active_updated
+  ON hr_position (organization_id, updated_at DESC)
+  WHERE archived_at IS NULL;
+CREATE INDEX IF NOT EXISTS hr_position_org_archived_updated
+  ON hr_position (organization_id, updated_at DESC)
+  WHERE archived_at IS NOT NULL;
+
+DO $$
+DECLARE
+  has_archived_rows BOOLEAN;
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'hr_position' AND column_name = 'status'
+  ) THEN
+    SELECT EXISTS (SELECT 1 FROM hr_position WHERE status = 'archived')
+      INTO has_archived_rows;
+    IF has_archived_rows THEN
+      UPDATE hr_position SET status = 'paused' WHERE status = 'archived';
+    END IF;
+  END IF;
+
+  ALTER TABLE hr_position
+    DROP CONSTRAINT IF EXISTS hr_position_status_check;
+  ALTER TABLE hr_position
+    ADD CONSTRAINT hr_position_status_check
+    CHECK (status IN ('draft', 'open', 'paused', 'filled'));
+END
+$$;
 
 -- ---------------------------------------------------------------------------
 -- Candidates (org-isolated profiles deduped by normalized email)
@@ -914,6 +939,7 @@ CREATE TABLE IF NOT EXISTS hr_application (
   affinity_model TEXT,
   cv_attachment_id TEXT,
   cv_text TEXT,
+  source TEXT NOT NULL DEFAULT 'Manual',
   -- Snapshot of the CV embedding at the moment of application creation.
   -- Frozen with the application so re-extracting the candidate row
   -- later (newer CV) never rewrites historical scoring inputs.
@@ -948,9 +974,23 @@ CREATE TABLE IF NOT EXISTS hr_application (
       'rejected',
       'hired'
     )
+  ),
+  CONSTRAINT hr_application_source_check CHECK (
+    source IN ('Manual', 'LinkedIn', 'Referral', 'Indeed', 'Careers page', 'Agency')
   )
 );
 
+ALTER TABLE hr_application
+ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'Manual';
+DO $$
+BEGIN
+  ALTER TABLE hr_application
+  ADD CONSTRAINT hr_application_source_check
+  CHECK (source IN ('Manual', 'LinkedIn', 'Referral', 'Indeed', 'Careers page', 'Agency'));
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END
+$$;
 CREATE UNIQUE INDEX IF NOT EXISTS hr_application_position_candidate
   ON hr_application (position_id, candidate_id);
 CREATE INDEX IF NOT EXISTS hr_application_org_position_score

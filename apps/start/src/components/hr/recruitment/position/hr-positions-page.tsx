@@ -10,24 +10,27 @@ import { HrCreatePositionDialog } from './hr-create-position-dialog'
 import { HrPositionRow } from './hr-position-row'
 import {
   POSITION_STATUS_FILTERS,
-  
-  
-  useHrPositionsViewModel
+  useHrPositionsViewModel,
 } from './hr-positions.logic'
-import type {HrPosition, HrPositionStatus} from './hr-positions.logic';
+import type { HrPosition, HrPositionFilterValue } from './hr-positions.logic'
 
 export function HrPositionsPage() {
-  const { stats, positions } = useHrPositionsViewModel()
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<HrPositionStatus | 'all'>(
-    'all',
-  )
+  const [statusFilter, setStatusFilter] = useState<HrPositionFilterValue>('all')
+  const { stats, positions } = useHrPositionsViewModel({
+    archiveFilter: statusFilter === 'archived' ? 'archived' : 'active',
+  })
 
   const filteredPositions = useMemo<readonly HrPosition[]>(() => {
     const query = search.trim().toLowerCase()
     return positions.filter((position) => {
+      // Archive is an orthogonal visibility flag, so the Archived tab is based
+      // on `archivedAt` while the other tabs filter by lifecycle status.
       const matchesStatus =
-        statusFilter === 'all' || position.status === statusFilter
+        statusFilter === 'all' ||
+        (statusFilter === 'archived'
+          ? position.archivedAt !== null
+          : position.status === statusFilter)
       if (!matchesStatus) return false
       if (query.length === 0) return true
       return (

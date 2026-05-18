@@ -30,11 +30,25 @@ Run from repo root unless noted.
 
 ## Comments in code
 
-- You need to add comprehensive documentation for the code you write, so future devs and underestend the code with ease
+- You need to add well formatted documentation for the code you write, so future devs and underestend the code with ease
 - DO NOT abuse comments and a way to "respond" to user question or request, they need to be real informatives
-- DO NOT spam comments for irelevant code 
+- DO NOT spam comments for irelevant code, only comment on code that needs explanation
 - For complex logic or parts of a service, you can explain the implementation so future devs know why that code is the way it is
 
 ### Non-obvious caveats
 
 - **`@rocicorp/zero-sqlite3` native binary**: After `bun install`, the `zero-cache-dev` process needs the native `better_sqlite3.node` binary. Run `npm run install` from the package directory to download the prebuilt binary via `prebuild-install`. With Bun, the package may live under `node_modules/.bun/@rocicorp+zero-sqlite3@<version>/node_modules/@rocicorp/zero-sqlite3` — use that path if `node_modules/@rocicorp/zero-sqlite3` does not exist. Without this step, `zero-cache` will crash with "Could not locate the bindings file."
+
+## Agent skills
+
+### Issue tracker
+
+Linear (workspace `ucompound`, default team `COM`) via the `linear` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five canonical roles, default names. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context. See `docs/agents/domain.md`.

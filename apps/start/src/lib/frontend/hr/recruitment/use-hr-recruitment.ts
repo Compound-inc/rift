@@ -3,9 +3,11 @@
 import { useMemo } from 'react'
 import { useQuery } from '@rocicorp/zero/react'
 import { queries } from '@/integrations/zero'
+import { isHrApplicationSource } from '@/lib/shared/hr/recruitment'
 import type {
+  HrApplicationSource,
   HrApplicationStage,
-  HrEvaluationKind,
+  HrArchiveFilter,
   HrPositionEmploymentType,
   HrPositionStatus,
   HrPositionWorkArrangement,
@@ -23,7 +25,6 @@ export type HrPositionView = {
   readonly hiringManager: string
   readonly compensation: string
   readonly tags: readonly string[]
-  readonly recommendedEvaluationKinds: readonly HrEvaluationKind[]
   readonly archivedAt: number | null
   readonly createdAt: number
   readonly updatedAt: number
@@ -36,11 +37,24 @@ export type HrApplicationView = {
   readonly stage: HrApplicationStage
   readonly affinityScore: number | null
   readonly affinityRationale: string | null
+  readonly affinitySignals: Record<
+    string,
+    string | number | boolean | null
+  > | null
   readonly affinityModel: string | null
   readonly cvAttachmentId: string | null
+  readonly cvText: string | null
+  readonly source: HrApplicationSource
+  readonly aiProfileSnapshot: Record<
+    string,
+    string | number | boolean | null
+  > | null
+  readonly aiSignals: Record<string, string | number | boolean | null> | null
   readonly lastTransitionAt: number | null
   readonly rejectionReason: string | null
+  readonly hiredAt: number | null
   readonly archivedAt: number | null
+  readonly createdAt: number
   readonly updatedAt: number
 }
 
@@ -87,9 +101,6 @@ function asPosition(row: Record<string, unknown>): HrPositionView {
     hiringManager: String(row.hiringManager ?? ''),
     compensation: String(row.compensation ?? ''),
     tags: Array.isArray(row.tags) ? (row.tags as readonly string[]) : [],
-    recommendedEvaluationKinds: Array.isArray(row.recommendedEvaluationKinds)
-      ? (row.recommendedEvaluationKinds as readonly HrEvaluationKind[])
-      : [],
     archivedAt: typeof row.archivedAt === 'number' ? row.archivedAt : null,
     createdAt: typeof row.createdAt === 'number' ? row.createdAt : 0,
     updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : 0,
@@ -106,17 +117,47 @@ function asApplication(row: Record<string, unknown>): HrApplicationView {
       typeof row.affinityScore === 'number' ? row.affinityScore : null,
     affinityRationale:
       typeof row.affinityRationale === 'string' ? row.affinityRationale : null,
+    affinitySignals: asLooseRecord(row.affinitySignals),
     affinityModel:
       typeof row.affinityModel === 'string' ? row.affinityModel : null,
     cvAttachmentId:
       typeof row.cvAttachmentId === 'string' ? row.cvAttachmentId : null,
+    cvText: typeof row.cvText === 'string' ? row.cvText : null,
+    source:
+      typeof row.source === 'string' && isHrApplicationSource(row.source)
+        ? row.source
+        : 'Manual',
+    aiProfileSnapshot: asLooseRecord(row.aiProfileSnapshot),
+    aiSignals: asLooseRecord(row.aiSignals),
     lastTransitionAt:
       typeof row.lastTransitionAt === 'number' ? row.lastTransitionAt : null,
     rejectionReason:
       typeof row.rejectionReason === 'string' ? row.rejectionReason : null,
+    hiredAt: typeof row.hiredAt === 'number' ? row.hiredAt : null,
     archivedAt: typeof row.archivedAt === 'number' ? row.archivedAt : null,
+    createdAt: typeof row.createdAt === 'number' ? row.createdAt : 0,
     updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : 0,
   }
+}
+
+function asLooseRecord(
+  value: unknown,
+): Record<string, string | number | boolean | null> | null {
+  if (value === null || value === undefined) return null
+  if (typeof value !== 'object') return null
+  const out: Record<string, string | number | boolean | null> = {}
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (raw === null) {
+      out[key] = null
+    } else if (
+      typeof raw === 'string' ||
+      typeof raw === 'number' ||
+      typeof raw === 'boolean'
+    ) {
+      out[key] = raw
+    }
+  }
+  return out
 }
 
 function asCandidate(row: Record<string, unknown>): HrCandidateView {
@@ -145,9 +186,13 @@ function asCandidate(row: Record<string, unknown>): HrCandidateView {
   }
 }
 
-export function useHrPositions(input?: { readonly includeArchived?: boolean }) {
+export type HrPositionArchiveFilter = HrArchiveFilter
+
+export function useHrPositions(input?: {
+  readonly archiveFilter?: HrPositionArchiveFilter
+}) {
   const [rows, result] = useQuery(
-    queries.hrPositions.list({ includeArchived: input?.includeArchived }),
+    queries.hrPositions.list({ archiveFilter: input?.archiveFilter }),
   )
   const positions = useMemo(
     () => (rows ?? []).map((row) => asPosition(row as Record<string, unknown>)),
@@ -173,6 +218,22 @@ export function useHrPosition(positionId: string | null | undefined) {
   }
 }
 
+export function useHrPositionsByIds(input: {
+  readonly positionIds: readonly string[]
+}) {
+  const [rows, result] = useQuery(
+    queries.hrPositions.byIds({ positionIds: input.positionIds.slice() }),
+  )
+  const positions = useMemo(
+    () => (rows ?? []).map((row) => asPosition(row as Record<string, unknown>)),
+    [rows],
+  )
+  return {
+    positions,
+    loading: input.positionIds.length > 0 && result.type !== 'complete',
+  }
+}
+
 export function useHrApplicationsForPosition(input: {
   readonly positionId: string
   readonly includeArchived?: boolean
@@ -194,6 +255,42 @@ export function useHrApplicationsForPosition(input: {
   }
 }
 
+export function useHrApplicationsForCandidate(input: {
+  readonly candidateId: string | null | undefined
+}) {
+  const [rows, result] = useQuery(
+    queries.hrApplications.byCandidate({
+      candidateId: input.candidateId ?? '__missing__',
+      includeArchived: true,
+    }),
+  )
+  const applications = useMemo(
+    () =>
+      (rows ?? []).map((row) => asApplication(row as Record<string, unknown>)),
+    [rows],
+  )
+  return {
+    applications,
+    loading: !!input.candidateId && result.type !== 'complete',
+  }
+}
+
+export function useHrApplication(applicationId: string | null | undefined) {
+  const [row, result] = useQuery(
+    queries.hrApplications.byId({
+      applicationId: applicationId ?? '__missing__',
+    }),
+  )
+  const application = useMemo(() => {
+    if (!row) return null
+    return asApplication(row as Record<string, unknown>)
+  }, [row])
+  return {
+    application,
+    loading: !!applicationId && result.type !== 'complete',
+  }
+}
+
 export function useHrCandidates(input?: {
   readonly includeArchived?: boolean
 }) {
@@ -208,6 +305,22 @@ export function useHrCandidates(input?: {
   return {
     candidates,
     loading: result.type !== 'complete',
+  }
+}
+
+export function useHrCandidate(candidateId: string | null | undefined) {
+  const [row, result] = useQuery(
+    queries.hrCandidates.byId({
+      candidateId: candidateId ?? '__missing__',
+    }),
+  )
+  const candidate = useMemo(() => {
+    if (!row) return null
+    return asCandidate(row as Record<string, unknown>)
+  }, [row])
+  return {
+    candidate,
+    loading: !!candidateId && result.type !== 'complete',
   }
 }
 
@@ -255,6 +368,152 @@ export function useHrEvaluationDispatchesForApplication(input: {
   )
   return {
     dispatches,
+    loading: result.type !== 'complete',
+  }
+}
+
+export type HrEvaluationResponseView = {
+  readonly id: string
+  readonly applicationId: string
+  readonly dispatchId: string
+  readonly score: number | null
+  readonly scoredBy: 'auto' | 'manual' | 'pending'
+  readonly passed: boolean | null
+  readonly submittedAt: number
+}
+
+function asEvaluationResponse(
+  row: Record<string, unknown>,
+): HrEvaluationResponseView {
+  const scoredBy = (() => {
+    const value = row.scoredBy
+    if (value === 'auto' || value === 'manual' || value === 'pending') {
+      return value
+    }
+    return 'pending' as const
+  })()
+  return {
+    id: String(row.id ?? ''),
+    applicationId: String(row.applicationId ?? ''),
+    dispatchId: String(row.dispatchId ?? ''),
+    score: typeof row.score === 'number' ? row.score : null,
+    scoredBy,
+    passed: typeof row.passed === 'boolean' ? row.passed : null,
+    submittedAt: typeof row.submittedAt === 'number' ? row.submittedAt : 0,
+  }
+}
+
+export function useHrEvaluationResponsesForApplication(input: {
+  readonly applicationId: string
+}) {
+  const [rows, result] = useQuery(
+    queries.hrEvaluationResponses.byApplication({
+      applicationId: input.applicationId,
+    }),
+  )
+  const responses = useMemo(
+    () =>
+      (rows ?? []).map((row) =>
+        asEvaluationResponse(row as Record<string, unknown>),
+      ),
+    [rows],
+  )
+  return {
+    responses,
+    loading: result.type !== 'complete',
+  }
+}
+
+export type HrBackgroundCheckView = {
+  readonly id: string
+  readonly applicationId: string
+  readonly candidateId: string
+  readonly provider: string
+  readonly status:
+    | 'pending'
+    | 'in_progress'
+    | 'completed'
+    | 'failed'
+    | 'cancelled'
+  readonly passed: boolean | null
+  readonly creditScore: number | null
+  readonly legalFlags: ReadonlyArray<{
+    readonly code: string
+    readonly severity: string
+    readonly message: string
+  }>
+  readonly requestedAt: number
+  readonly completedAt: number | null
+}
+
+function asBackgroundCheck(
+  row: Record<string, unknown>,
+): HrBackgroundCheckView {
+  const status = (() => {
+    const value = row.status
+    if (
+      value === 'pending' ||
+      value === 'in_progress' ||
+      value === 'completed' ||
+      value === 'failed' ||
+      value === 'cancelled'
+    ) {
+      return value
+    }
+    return 'pending' as const
+  })()
+  const legalFlagsRaw = Array.isArray(row.legalFlags) ? row.legalFlags : []
+  const legalFlags = legalFlagsRaw.flatMap((flag) => {
+    if (!flag || typeof flag !== 'object') return []
+    const candidate = flag as {
+      code?: unknown
+      severity?: unknown
+      message?: unknown
+    }
+    return [
+      {
+        code: typeof candidate.code === 'string' ? candidate.code : '',
+        severity:
+          typeof candidate.severity === 'string' ? candidate.severity : '',
+        message: typeof candidate.message === 'string' ? candidate.message : '',
+      },
+    ]
+  })
+  return {
+    id: String(row.id ?? ''),
+    applicationId: String(row.applicationId ?? ''),
+    candidateId: String(row.candidateId ?? ''),
+    provider: String(row.provider ?? ''),
+    status,
+    passed: typeof row.passed === 'boolean' ? row.passed : null,
+    creditScore: typeof row.creditScore === 'number' ? row.creditScore : null,
+    legalFlags,
+    requestedAt: typeof row.requestedAt === 'number' ? row.requestedAt : 0,
+    completedAt: typeof row.completedAt === 'number' ? row.completedAt : null,
+  }
+}
+
+export function useHrBackgroundCheckForApplication(input: {
+  readonly applicationId: string
+}) {
+  const [rows, result] = useQuery(
+    queries.hrBackgroundChecks.byApplication({
+      applicationId: input.applicationId,
+    }),
+  )
+  const checks = useMemo(
+    () =>
+      (rows ?? []).map((row) =>
+        asBackgroundCheck(row as Record<string, unknown>),
+      ),
+    [rows],
+  )
+  // Latest first by `requestedAt`. The detail UI only ever renders one
+  // (rerunning a check is out of scope for v1), so [0] is the canonical row.
+  const latest = checks[0] ?? null
+  return {
+    checks,
+    latest,
     loading: result.type !== 'complete',
   }
 }

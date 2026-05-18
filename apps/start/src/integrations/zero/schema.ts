@@ -10,6 +10,7 @@ import {
 } from '@rocicorp/zero'
 import type { ChatErrorCode } from '@/lib/shared/chat-contracts/error-codes'
 import type { ChatErrorI18nKey } from '@/lib/shared/chat-contracts/error-i18n'
+import type { HrApplicationSource } from '@/lib/shared/hr/recruitment'
 
 // ---------------------------------------------------------------------------
 // Table definitions
@@ -381,14 +382,11 @@ const hrPosition = table('hrPosition')
     employmentType: enumeration<
       'full_time' | 'part_time' | 'contract' | 'internship'
     >().from('employment_type'),
-    status: enumeration<'draft' | 'open' | 'paused' | 'filled' | 'archived'>(),
+    status: enumeration<'draft' | 'open' | 'paused' | 'filled'>(),
     description: string(),
     hiringManager: string().from('hiring_manager'),
     compensation: string(),
     tags: json<readonly string[]>(),
-    recommendedEvaluationKinds: json<readonly string[]>().from(
-      'recommended_evaluation_kinds',
-    ),
     descriptionEmbedding: json<readonly number[]>()
       .from('description_embedding')
       .optional(),
@@ -475,6 +473,7 @@ const hrApplication = table('hrApplication')
     affinityModel: string().from('affinity_model').optional(),
     cvAttachmentId: string().from('cv_attachment_id').optional(),
     cvText: string().from('cv_text').optional(),
+    source: enumeration<HrApplicationSource>(),
     cvEmbedding: json<readonly number[]>().from('cv_embedding').optional(),
     cvEmbeddingModel: string().from('cv_embedding_model').optional(),
     aiProfileSnapshot: json<Record<string, string | number | boolean | null>>()

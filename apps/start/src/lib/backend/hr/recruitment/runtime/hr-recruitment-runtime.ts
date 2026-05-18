@@ -7,7 +7,6 @@ import { MarkdownConversionService } from '@/lib/backend/file/services/markdown-
 import { HrApplicationService } from '../services/application.service'
 import { HrCandidateService } from '../services/candidate.service'
 import { HrCvAiExtractorService } from '../services/cv-ai-extractor.service'
-import { HrCvIngestService } from '../services/cv-ingest.service'
 import { HrEvaluationDispatcherService } from '../services/evaluation-dispatcher.service'
 import { HrPositionService } from '../services/position.service'
 
@@ -18,7 +17,6 @@ const layer = Layer.mergeAll(
   HrPositionService.layer,
   HrCandidateService.layer,
   HrApplicationService.layer,
-  HrCvIngestService.layer,
   HrCvAiExtractorService.layer,
   HrEvaluationDispatcherService.layer,
   MarkdownConversionService.layer,

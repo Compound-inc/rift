@@ -1,7 +1,6 @@
 import { PgClient } from '@effect/sql-pg'
 import { Effect, Layer, ServiceMap } from 'effect'
 import {
-  getRecommendedEvaluationKinds,
   normalizeArrangement,
   normalizeEmploymentType,
   normalizePositionDescription,
@@ -11,7 +10,7 @@ import {
   normalizeTextField,
 } from '@/lib/shared/hr/recruitment'
 import type {
-  HrEvaluationKind,
+  HrArchiveFilter,
   HrPositionEmploymentType,
   HrPositionStatus,
   HrPositionWorkArrangement,
@@ -65,7 +64,7 @@ export type UpdatePositionInput = {
 export type ListPositionsInput = {
   readonly organizationId: string
   readonly requestId: string
-  readonly includeArchived?: boolean
+  readonly archiveFilter?: HrArchiveFilter
   readonly statuses?: readonly HrPositionStatus[]
 }
 
@@ -142,18 +141,6 @@ function toCrossOrg(input: {
     resource: input.resource,
     resourceId: input.resourceId,
     actualOrganizationId: input.actualOrganizationId,
-  })
-}
-
-function buildRecommendedEvaluationKinds(input: {
-  readonly title: string
-  readonly department: string
-  readonly tags: readonly string[]
-}): readonly HrEvaluationKind[] {
-  return getRecommendedEvaluationKinds({
-    title: input.title,
-    department: input.department,
-    tags: input.tags,
   })
 }
 
@@ -244,12 +231,6 @@ export class HrPositionService extends ServiceMap.Service<
           const arrangement = normalizeArrangement(input.arrangement)
           const employmentType = normalizeEmploymentType(input.employmentType)
           const status = normalizePositionStatus(input.status)
-          const recommendedEvaluationKinds = buildRecommendedEvaluationKinds({
-            title,
-            department,
-            tags,
-          })
-
           const id = crypto.randomUUID()
           const now = Date.now()
 
@@ -257,7 +238,7 @@ export class HrPositionService extends ServiceMap.Service<
             insert into hr_position (
               id, organization_id, title, department, location,
               arrangement, employment_type, status, description,
-              hiring_manager, compensation, tags, recommended_evaluation_kinds,
+              hiring_manager, compensation, tags,
               archived_at, archived_by,
               created_at, updated_at, created_by
             )
@@ -265,7 +246,7 @@ export class HrPositionService extends ServiceMap.Service<
               ${id}, ${input.organizationId}, ${title}, ${department}, ${location},
               ${arrangement}, ${employmentType}, ${status}, ${description},
               ${hiringManager}, ${compensation},
-              ${jsonValue(client, tags)}, ${jsonValue(client, recommendedEvaluationKinds)},
+              ${jsonValue(client, tags)},
               null, null,
               ${now}, ${now}, ${input.userId}
             )
@@ -358,11 +339,6 @@ export class HrPositionService extends ServiceMap.Service<
             input.status !== undefined
               ? normalizePositionStatus(input.status)
               : existing.status
-          const recommendedEvaluationKinds = buildRecommendedEvaluationKinds({
-            title,
-            department,
-            tags,
-          })
           const now = Date.now()
 
           const rows = yield* client<PositionRawRow>`
@@ -378,7 +354,6 @@ export class HrPositionService extends ServiceMap.Service<
               hiring_manager = ${hiringManager},
               compensation = ${compensation},
               tags = ${jsonValue(client, tags)},
-              recommended_evaluation_kinds = ${jsonValue(client, recommendedEvaluationKinds)},
               updated_at = ${now}
             where id = ${input.positionId}
               and organization_id = ${input.organizationId}
@@ -421,14 +396,12 @@ export class HrPositionService extends ServiceMap.Service<
           const now = Date.now()
           const archivedAt = input.archive ? now : null
           const archivedBy = input.archive ? input.userId : null
-          const status = input.archive ? 'archived' : 'paused'
 
           const rows = yield* client<PositionRawRow>`
             update hr_position
             set
               archived_at = ${archivedAt},
               archived_by = ${archivedBy},
-              status = ${status},
               updated_at = ${now}
             where id = ${input.positionId}
               and organization_id = ${input.organizationId}
@@ -463,18 +436,21 @@ export class HrPositionService extends ServiceMap.Service<
         'HrPositionService.list',
       )((input) =>
         Effect.gen(function* () {
-          const includeArchived = input.includeArchived === true
+          const archiveFilter = input.archiveFilter ?? 'active'
           const statusFilter = (input.statuses ?? []).filter(
             (status): status is HrPositionStatus =>
               status === 'draft' ||
               status === 'open' ||
               status === 'paused' ||
-              status === 'filled' ||
-              status === 'archived',
+              status === 'filled',
           )
 
           const archivedClause = client.literal(
-            includeArchived ? 'TRUE' : 'archived_at is null',
+            archiveFilter === 'all'
+              ? 'TRUE'
+              : archiveFilter === 'archived'
+                ? 'archived_at is not null'
+                : 'archived_at is null',
           )
 
           const rows =
@@ -529,7 +505,7 @@ export class HrPositionService extends ServiceMap.Service<
 
   /**
    * In-memory implementation for deterministic tests. Mirrors the real
-   * service exactly: org isolation, archive flow, recommended test kinds.
+   * service exactly: org isolation and archive flow.
    */
   static readonly layerMemory = Layer.sync(this, () => {
     const rows = new Map<string, HrPositionRow>()
@@ -598,11 +574,6 @@ export class HrPositionService extends ServiceMap.Service<
             hiringManager: normalizeTextField(input.hiringManager),
             compensation: normalizeTextField(input.compensation),
             tags,
-            recommendedEvaluationKinds: buildRecommendedEvaluationKinds({
-              title,
-              department,
-              tags,
-            }),
             descriptionEmbedding: null,
             descriptionEmbeddingModel: null,
             descriptionEmbeddingDimensions: null,
@@ -680,11 +651,6 @@ export class HrPositionService extends ServiceMap.Service<
                 ? normalizeTextField(input.compensation)
                 : existing.compensation,
             tags,
-            recommendedEvaluationKinds: buildRecommendedEvaluationKinds({
-              title,
-              department,
-              tags,
-            }),
             updatedAt: Date.now(),
           }
           rows.set(existing.id, next)
@@ -703,7 +669,6 @@ export class HrPositionService extends ServiceMap.Service<
             ...existing,
             archivedAt: input.archive ? now : null,
             archivedBy: input.archive ? input.userId : null,
-            status: input.archive ? 'archived' : 'paused',
             updatedAt: now,
           }
           rows.set(existing.id, next)
@@ -714,9 +679,12 @@ export class HrPositionService extends ServiceMap.Service<
         Effect.succeed(
           Array.from(rows.values())
             .filter((row) => row.organizationId === input.organizationId)
-            .filter((row) =>
-              input.includeArchived ? true : row.archivedAt === null,
-            )
+            .filter((row) => {
+              const archiveFilter = input.archiveFilter ?? 'active'
+              if (archiveFilter === 'all') return true
+              if (archiveFilter === 'archived') return row.archivedAt !== null
+              return row.archivedAt === null
+            })
             .filter((row) =>
               input.statuses && input.statuses.length > 0
                 ? input.statuses.includes(row.status)

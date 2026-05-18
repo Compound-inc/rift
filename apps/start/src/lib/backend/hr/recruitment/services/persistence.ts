@@ -8,12 +8,12 @@ import type {
   HrPositionRow,
 } from '../domain/types'
 import {
+  isHrApplicationSource,
   isHrApplicationStage,
-  isHrEvaluationKind,
 } from '@/lib/shared/hr/recruitment'
 import type {
+  HrApplicationSource,
   HrApplicationStage,
-  HrEvaluationKind,
   HrPositionEmploymentType,
   HrPositionStatus,
   HrPositionWorkArrangement,
@@ -112,10 +112,6 @@ function toAliasArray(
   return result
 }
 
-function toEvaluationKindArray(value: unknown): readonly HrEvaluationKind[] {
-  return toStringArray(value).filter(isHrEvaluationKind)
-}
-
 function toEmbeddingArray(value: unknown): readonly number[] | null {
   if (Array.isArray(value)) {
     const numbers = value
@@ -138,8 +134,7 @@ function normalizeStatus(value: unknown): HrPositionStatus {
     value === 'draft' ||
     value === 'open' ||
     value === 'paused' ||
-    value === 'filled' ||
-    value === 'archived'
+    value === 'filled'
   ) {
     return value
   }
@@ -172,6 +167,13 @@ function normalizeStage(value: unknown): HrApplicationStage {
   return 'uploaded'
 }
 
+function normalizeApplicationSourceValue(value: unknown): HrApplicationSource {
+  if (typeof value === 'string' && isHrApplicationSource(value)) {
+    return value
+  }
+  return 'Manual'
+}
+
 export function toHrPositionRow(row: RawRow): HrPositionRow {
   return {
     id: String(row.id),
@@ -186,9 +188,6 @@ export function toHrPositionRow(row: RawRow): HrPositionRow {
     hiringManager: String(row.hiring_manager ?? ''),
     compensation: String(row.compensation ?? ''),
     tags: toStringArray(row.tags),
-    recommendedEvaluationKinds: toEvaluationKindArray(
-      row.recommended_evaluation_kinds,
-    ),
     descriptionEmbedding: toEmbeddingArray(row.description_embedding),
     descriptionEmbeddingModel: toStringOrNull(row.description_embedding_model),
     descriptionEmbeddingDimensions: toNumberOrNull(
@@ -254,6 +253,7 @@ export function toHrApplicationRow(row: RawRow): HrApplicationRow {
     affinityModel: toStringOrNull(row.affinity_model),
     cvAttachmentId: toStringOrNull(row.cv_attachment_id),
     cvText: toStringOrNull(row.cv_text),
+    source: normalizeApplicationSourceValue(row.source),
     cvEmbedding: toEmbeddingArray(row.cv_embedding),
     cvEmbeddingModel: toStringOrNull(row.cv_embedding_model),
     workflowRunId: toStringOrNull(row.workflow_run_id),

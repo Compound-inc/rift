@@ -1,6 +1,6 @@
 import type {
+  HrApplicationSource,
   HrApplicationStage,
-  HrEvaluationKind,
   HrPositionEmploymentType,
   HrPositionStatus,
   HrPositionWorkArrangement,
@@ -20,7 +20,6 @@ export type HrPositionRow = {
   readonly compensation: string
   readonly tags: readonly string[]
 
-  readonly recommendedEvaluationKinds: readonly HrEvaluationKind[]
   readonly descriptionEmbedding: readonly number[] | null
   readonly descriptionEmbeddingModel: string | null
   readonly descriptionEmbeddingDimensions: number | null
@@ -80,6 +79,7 @@ export type HrApplicationRow = {
   readonly affinityModel: string | null
   readonly cvAttachmentId: string | null
   readonly cvText: string | null
+  readonly source: HrApplicationSource
   /**
    * Snapshot of the CV embedding captured at application creation /
    * affinity scoring time. Frozen with the application so a later

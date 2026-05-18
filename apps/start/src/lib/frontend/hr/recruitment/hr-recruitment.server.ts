@@ -9,12 +9,14 @@
 import { getRequestHeaders } from '@tanstack/react-start/server'
 import { Effect } from 'effect'
 import {
+  HrApplicationService,
   HrPositionService,
   HrRecruitmentRuntime,
 } from '@/lib/backend/hr/recruitment'
 import { PermissionService } from '@/lib/backend/permissions/services/permission.service'
 import { PermissionsRuntime } from '@/lib/backend/permissions/runtime/permissions-runtime'
 import { requireOrgAuth } from '@/lib/backend/server-effect/http/server-auth'
+import { uploadService } from '@/lib/backend/upload/upload.service'
 import {
   PermissionDeniedError,
   PermissionResolveError,
@@ -129,6 +131,63 @@ export async function archivePositionAction(input: {
         positionId: input.positionId,
         archive: input.archive,
       })
+    }),
+  )
+}
+
+export type ResolveApplicationCvUrlAction = {
+  readonly applicationId: string
+}
+
+export type ResolveApplicationCvUrlResult = {
+  readonly url: string | null
+  readonly contentType: 'application/pdf' | 'unknown'
+}
+
+/**
+ * Resolves a browser-accessible URL for the CV stored against an
+ * Application, scoped to the caller's org. Returns `{ url: null }` when
+ * the Application has no CV on file. The URL respects the storage
+ * provider's mode: a signed proxy URL for S3-compatible deployments and
+ * a direct public URL for R2's public bucket setup.
+ *
+ * The CV viewer fetches the URL once
+ * per Application detail page and embeds it in an `<iframe>`.
+ */
+export async function resolveApplicationCvUrlAction(
+  input: ResolveApplicationCvUrlAction,
+): Promise<ResolveApplicationCvUrlResult> {
+  const auth = await requireRecruitmentAccess()
+  return HrRecruitmentRuntime.run(
+    Effect.gen(function* () {
+      const applicationService = yield* HrApplicationService
+      const application = yield* applicationService
+        .findById({
+          organizationId: auth.organizationId,
+          applicationId: input.applicationId,
+          requestId: crypto.randomUUID(),
+        })
+        .pipe(
+          // Treat "missing application" and cross-org access as "no CV"
+          // for the caller. The recruiter cannot reach this code path
+          // for an application they don't own, so the latter mostly
+          // protects the runtime against URL tampering.
+          Effect.catchTag('HrApplicationNotFoundError', () =>
+            Effect.succeed(null),
+          ),
+          Effect.catchTag('HrCrossOrgAccessError', () => Effect.succeed(null)),
+        )
+      const cvKey = application?.cvAttachmentId ?? null
+      if (!cvKey) {
+        return { url: null, contentType: 'unknown' as const }
+      }
+      const url = uploadService.buildAccessibleObjectUrl({ key: cvKey })
+      const contentType: 'application/pdf' | 'unknown' = cvKey
+        .toLowerCase()
+        .endsWith('.pdf')
+        ? 'application/pdf'
+        : 'unknown'
+      return { url, contentType }
     }),
   )
 }

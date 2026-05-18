@@ -11,7 +11,7 @@ import type {
   EvaluationSubmissionPayload,
   FinalizeApplicationOutcome,
 } from '@/lib/shared/hr/recruitment'
-import { pickDefaultEvaluationForPosition } from '@/lib/shared/hr/recruitment'
+import { getDefaultEvaluationCatalogId } from '@/lib/shared/hr/recruitment'
 import {
   HrApplicationService,
   HrCandidateService,
@@ -104,11 +104,13 @@ async function runStep<TValue, TError, TServices>(input: {
   throw new Error(`[${input.stepName}] ${tag}: ${message}`)
 }
 
-/** Marks the application as `scoring` if it isn't already terminal. */
-export async function ingestCvStep(input: StepInput): Promise<void> {
+/** Marks the Application as `scoring` if it isn't already terminal. */
+export async function markApplicationScoringStep(
+  input: StepInput,
+): Promise<void> {
   'use step'
   await runStep({
-    stepName: 'ingestCv',
+    stepName: 'markApplicationScoring',
     request: input,
     fatalErrorTags: ['HrApplicationNotFoundError', 'HrCrossOrgAccessError'],
     program: Effect.gen(function* () {
@@ -199,7 +201,6 @@ export async function computeAffinityStep(
           title: position.title,
           description: position.description,
           tags: [...position.tags],
-          recommendedEvaluationKinds: [...position.recommendedEvaluationKinds],
         },
       })
 
@@ -295,10 +296,9 @@ function aiSnapshotForApplication(analysis: {
 }
 
 /**
- * Picks the evaluation catalog id for the dispatch. Today this maps
- * the position's first recommended kind to a catalog entry; when the
- * per-position selection UI lands the workflow reads the chosen id
- * from a position-scoped mapping instead.
+ * Picks the evaluation catalog id for the dispatch. Recruitment uses
+ * one fixed built-in evaluation catalog; position metadata no longer
+ * changes the dispatched test.
  */
 export async function resolveDefaultEvaluationStep(
   input: StepInput,
@@ -307,19 +307,8 @@ export async function resolveDefaultEvaluationStep(
   return await runStep({
     stepName: 'resolveDefaultEvaluation',
     request: input,
-    fatalErrorTags: ['HrPositionNotFoundError', 'HrCrossOrgAccessError'],
-    program: Effect.gen(function* () {
-      const positionService = yield* HrPositionService
-      const position = yield* positionService.findById({
-        organizationId: input.organizationId,
-        positionId: input.positionId,
-        requestId: input.requestId,
-      })
-      return {
-        evaluationCatalogId: pickDefaultEvaluationForPosition({
-          recommendedKinds: position.recommendedEvaluationKinds,
-        }),
-      }
+    program: Effect.succeed({
+      evaluationCatalogId: getDefaultEvaluationCatalogId(),
     }),
   })
 }

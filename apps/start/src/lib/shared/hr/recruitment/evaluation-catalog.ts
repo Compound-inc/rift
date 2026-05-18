@@ -325,14 +325,8 @@ export const HR_EVALUATION_CATALOG: Readonly<
   },
 }
 
-export const HR_EVALUATION_CATALOG_BY_KIND: Readonly<
-  Partial<Record<HrEvaluationKind, HrEvaluationCatalogId>>
-> = {
-  technical: 'screening-technical-v1',
-  honesty: 'screening-honesty-v1',
-  behavioral: 'screening-behavioral-v1',
-  language: 'screening-language-en-v1',
-}
+export const DEFAULT_HR_EVALUATION_CATALOG_ID: HrEvaluationCatalogId =
+  'screening-behavioral-v1'
 
 export function getEvaluationCatalogEntry(
   id: string,
@@ -341,63 +335,13 @@ export function getEvaluationCatalogEntry(
 }
 
 /**
- * Picks the catalog id for a position. Used by the workflow's
- * `resolveDefaultEvaluationStep`. When the per-position selection UI
- * lands the workflow will read the chosen id from a position-scoped
- * mapping instead of relying on this fallback.
+ * Returns the single built-in evaluation used by the recruitment
+ * workflow. Position metadata no longer influences test selection;
+ * every candidate receives the same fixed catalog entry until a real
+ * template-selection feature is introduced.
  */
-export function pickDefaultEvaluationForPosition(input: {
-  readonly recommendedKinds: readonly HrEvaluationKind[]
-}): HrEvaluationCatalogId {
-  for (const kind of input.recommendedKinds) {
-    const id = HR_EVALUATION_CATALOG_BY_KIND[kind]
-    if (id) return id
-  }
-  return 'screening-behavioral-v1'
-}
-
-/**
- * Heuristic that maps position metadata to suggested evaluation
- * kinds. Drives the position row's `recommended_evaluation_kinds`
- * JSON column so the create-position dialog can pre-select sensible
- * defaults without an AI call.
- */
-const KIND_TAG_HINTS: Readonly<Record<HrEvaluationKind, readonly string[]>> = {
-  technical: ['engineer', 'engineering', 'developer', 'data', 'platform'],
-  honesty: ['finance', 'banking', 'bank', 'money', 'compliance'],
-  background: ['finance', 'banking', 'security', 'driver', 'legal'],
-  language: ['support', 'sales', 'success', 'partnerships', 'community'],
-  behavioral: ['manager', 'lead', 'director', 'people', 'operations'],
-}
-
-export function getRecommendedEvaluationKinds(input: {
-  readonly tags: readonly string[]
-  readonly title?: string
-  readonly department?: string
-}): readonly HrEvaluationKind[] {
-  const haystack = [
-    ...input.tags.map((tag) => tag.trim().toLowerCase()),
-    input.title?.toLowerCase() ?? '',
-    input.department?.toLowerCase() ?? '',
-  ]
-  const matches: { kind: HrEvaluationKind; weight: number }[] = []
-  for (const [kind, hints] of Object.entries(KIND_TAG_HINTS) as readonly [
-    HrEvaluationKind,
-    readonly string[],
-  ][]) {
-    let weight = 0
-    for (const tag of hints) {
-      const needle = tag.toLowerCase()
-      for (const candidate of haystack) {
-        if (candidate.length > 0 && candidate.includes(needle)) {
-          weight += 1
-        }
-      }
-    }
-    if (weight > 0) matches.push({ kind, weight })
-  }
-  matches.sort((a, b) => b.weight - a.weight)
-  return matches.map((entry) => entry.kind)
+export function getDefaultEvaluationCatalogId(): HrEvaluationCatalogId {
+  return DEFAULT_HR_EVALUATION_CATALOG_ID
 }
 
 /**

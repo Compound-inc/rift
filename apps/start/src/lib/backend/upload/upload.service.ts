@@ -159,6 +159,19 @@ function buildContentDisposition(fileName: string): string {
   return `inline; filename="${safeName}"`
 }
 
+/**
+ * Pins a `Content-Type` for served objects based on the file extension. The
+ * proxy serves user-uploaded content from the app's own origin (when
+ * `publicUrlMode === 'proxy_query'`); leaving the response without an
+ * explicit `Content-Type` lets the browser sniff the body, which means a
+ * file named `*.pdf` whose body is HTML could execute scripts on the app
+ * origin. Combined with `X-Content-Type-Options: nosniff`, this guarantees
+ * the browser renders the file as the type we declared at upload time.
+ */
+function resolveResponseContentType(key: string): string {
+  return hasPdfExtension(key) ? 'application/pdf' : 'application/octet-stream'
+}
+
 export class UploadService {
   /**
    * Fetches an object from the configured S3-compatible backend and returns it
@@ -167,14 +180,32 @@ export class UploadService {
   readObjectByKey(params: { key: string }): Response {
     const config = getUploadStorageConfig()
     const objectFile = getUploadClient().file(params.key)
+    const contentType = resolveResponseContentType(params.key)
 
     return new Response(objectFile, {
       status: 200,
       headers: {
         'Cache-Control': 'private, max-age=300',
+        'Content-Type': contentType,
+        // Prevent the browser from MIME-sniffing the response body. Without
+        // this, a file uploaded as `.pdf` whose body is HTML could execute
+        // scripts on the proxy's origin.
+        'X-Content-Type-Options': 'nosniff',
         'x-rift-storage-provider': config.provider,
       },
     })
+  }
+
+  /**
+   * Returns a URL that the browser can fetch directly for the object at
+   * `key`.
+   */
+  buildAccessibleObjectUrl(params: { key: string }): string {
+    const config = getUploadStorageConfig()
+    if (config.publicUrlMode === 'proxy_query') {
+      return buildProxyFileUrl(params.key, config.publicBaseUrl)
+    }
+    return buildPublicFileUrl(params.key, config.publicBaseUrl)
   }
 
   async upload(params: {

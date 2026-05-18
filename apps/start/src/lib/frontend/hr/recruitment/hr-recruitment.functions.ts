@@ -23,6 +23,10 @@ const archivePositionInput = z.object({
   archive: z.boolean(),
 })
 
+const resolveApplicationCvUrlInput = z.object({
+  applicationId: z.string().trim().min(1),
+})
+
 export const createPosition = createServerFn({ method: 'POST' })
   .inputValidator((input: unknown) => createPositionInput.parse(input))
   .handler(async ({ data }) => {
@@ -35,4 +39,18 @@ export const archivePosition = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const { archivePositionAction } = await import('./hr-recruitment.server')
     return archivePositionAction(data)
+  })
+
+/**
+ * Returns a browser-accessible URL for the CV attached to the given
+ * Application, or `null` when no CV is on file. Used by the Application
+ * detail CV viewer so the iframe can src= a signed URL.
+ */
+export const resolveApplicationCvUrl = createServerFn({ method: 'POST' })
+  .inputValidator((input: unknown) => resolveApplicationCvUrlInput.parse(input))
+  .handler(async ({ data }) => {
+    const { resolveApplicationCvUrlAction } = await import(
+      './hr-recruitment.server'
+    )
+    return resolveApplicationCvUrlAction(data)
   })

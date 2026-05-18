@@ -2,12 +2,9 @@
  * Shared HR recruitment domain types.
  */
 
-export type HrPositionStatus =
-  | 'draft'
-  | 'open'
-  | 'paused'
-  | 'filled'
-  | 'archived'
+export type HrPositionStatus = 'draft' | 'open' | 'paused' | 'filled'
+
+export type HrArchiveFilter = 'active' | 'archived' | 'all'
 
 export type HrPositionEmploymentType =
   | 'full_time'
@@ -23,8 +20,8 @@ export type HrPositionWorkArrangement = 'remote' | 'hybrid' | 'onsite'
  * step. Both the UI funnel and the workflow steps key off this enum, so
  * never rename a value without updating both ends.
  *
- * - uploaded               → CV stored, awaiting ingest
- * - scoring                → CV ingested, affinity scoring in progress
+ * - uploaded               → CV stored, workflow not yet scoring
+ * - scoring                → AI profile extraction and affinity scoring in progress
  * - awaiting_test          → tests dispatched, waiting on candidate
  * - evaluating             → tests submitted, awaiting eval (manual or auto)
  * - awaiting_verification  → background check addon stage (gated by entitlement)
@@ -58,6 +55,23 @@ export const HR_TERMINAL_APPLICATION_STAGES = new Set<HrApplicationStage>([
   'rejected',
   'hired',
 ])
+
+export type HrApplicationSource =
+  | 'Manual'
+  | 'LinkedIn'
+  | 'Referral'
+  | 'Indeed'
+  | 'Careers page'
+  | 'Agency'
+
+export const HR_APPLICATION_SOURCES: readonly HrApplicationSource[] = [
+  'Manual',
+  'LinkedIn',
+  'Referral',
+  'Indeed',
+  'Careers page',
+  'Agency',
+] as const
 
 /**
  * Evaluation kinds. Custom org-defined evaluations land in a future
@@ -107,6 +121,12 @@ export function isHrApplicationStage(
   value: string,
 ): value is HrApplicationStage {
   return (HR_APPLICATION_STAGES as readonly string[]).includes(value)
+}
+
+export function isHrApplicationSource(
+  value: string,
+): value is HrApplicationSource {
+  return (HR_APPLICATION_SOURCES as readonly string[]).includes(value)
 }
 
 export function isHrEvaluationKind(value: string): value is HrEvaluationKind {

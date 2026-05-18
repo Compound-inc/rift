@@ -4,17 +4,17 @@ import { start } from 'workflow/api'
 import {
   HrApplicationService,
   HrCandidateService,
-  HrCvIngestService,
   HrPositionService,
   HrRecruitmentRuntime,
+  extractFirstCvEmail,
 } from '@/lib/backend/hr/recruitment'
 import { MarkdownConversionService } from '@/lib/backend/file/services/markdown-conversion.service'
 import { readDirectTextFileContent } from '@/lib/backend/file/services/plain-text-file'
 import { PermissionService } from '@/lib/backend/permissions/services/permission.service'
 import { PermissionsRuntime } from '@/lib/backend/permissions/runtime/permissions-runtime'
 import { requireOrgAuth } from '@/lib/backend/server-effect/http/server-auth'
-import { uploadService } from '@/lib/backend/upload/upload.service'
 import { candidatePipelineWorkflow } from '@/lib/backend/hr/recruitment/workflows/candidate-pipeline'
+import { uploadService } from '@/lib/backend/upload/upload.service'
 import {
   addHrWideEventBreadcrumb,
   createHrRecruitmentWideEvent,
@@ -34,10 +34,10 @@ const ROUTE_NAME =
 /**
  * Bulk CV upload route.
  *
- * Multipart upload + ingest + workflow start. CV text is sourced
- * directly for plain-text files, via the markdown worker for binary
- * formats (PDF, DOCX); markdown-worker failures fall back to filename
- * so the workflow can still progress.
+ * Multipart upload + Candidate/Application creation + workflow start. CV text
+ * is sourced directly for plain-text files, via the markdown worker for binary
+ * formats (PDF, DOCX). CV intake only extracts the first syntactically valid
+ * email for dedup/placeholders; AI scoring owns the rich Candidate persona.
  *
  * The route owns the Workflow SDK boundary (`start(...)`) so Effect
  * services never see the workflow runtime directly
@@ -158,18 +158,17 @@ export const Route = createFileRoute(
             detail: { hasBackgroundCheckAddon },
           })
 
-          let ingested: {
+          let createdApplications: {
             applicationId: string
             candidateId: string
             positionId: string
           }[] = []
 
           try {
-            ingested = await HrRecruitmentRuntime.run(
+            createdApplications = await HrRecruitmentRuntime.run(
               Effect.gen(function* () {
                 const candidateService = yield* HrCandidateService
                 const applicationService = yield* HrApplicationService
-                const cvIngest = yield* HrCvIngestService
                 const positionService = yield* HrPositionService
                 const markdownConversion = yield* MarkdownConversionService
 
@@ -248,22 +247,14 @@ export const Route = createFileRoute(
                     }
                   }
 
-                  const contactInputText =
-                    cvText.trim().length > 0 ? cvText : file.name
-
-                  const contact = yield* cvIngest.extractContact({
-                    organizationId: auth.organizationId,
-                    requestId: `${REQUEST_ID_PREFIX}.extract.${crypto.randomUUID()}`,
-                    fileName: file.name,
-                    cvText: contactInputText,
-                  })
+                  const email = extractFirstCvEmail({ cvText })
 
                   const candidate = yield* candidateService.upsertByEmail({
                     organizationId: auth.organizationId,
                     requestId: `${REQUEST_ID_PREFIX}.candidate.${crypto.randomUUID()}`,
-                    email: contact.email,
-                    displayName: contact.displayName,
-                    phone: contact.phone,
+                    email,
+                    displayName: email ? null : 'Unknown candidate',
+                    phone: null,
                     cvAttachmentId: uploaded.key,
                     cvText,
                   })
@@ -275,15 +266,19 @@ export const Route = createFileRoute(
                     positionId: position.id,
                     cvAttachmentId: uploaded.key,
                     cvText,
+                    source: 'Manual',
                   })
 
-                  console.info('[hr.recruitment][bulk-upload] ingested cv', {
-                    requestId,
-                    applicationId: application.id,
-                    fileName: file.name,
-                    cvSource,
-                    cvLength: cvText.length,
-                  })
+                  console.info(
+                    '[hr.recruitment][bulk-upload] created application from cv',
+                    {
+                      requestId,
+                      applicationId: application.id,
+                      fileName: file.name,
+                      cvSource,
+                      cvLength: cvText.length,
+                    },
+                  )
 
                   results.push({
                     applicationId: application.id,
@@ -295,15 +290,15 @@ export const Route = createFileRoute(
               }),
             )
             addHrWideEventBreadcrumb(wideEvent, {
-              name: 'ingest.completed',
-              detail: { applications: ingested.length },
+              name: 'cv-intake.completed',
+              detail: { applications: createdApplications.length },
             })
           } catch (cause) {
             return await respondWithError({
               status: 500,
               wideEvent,
               cause,
-              fallback: 'Failed to ingest CV uploads',
+              fallback: 'Failed to create applications from CV uploads',
             })
           }
 
@@ -312,7 +307,7 @@ export const Route = createFileRoute(
           // (position_id, candidate_id) constraint) start a fresh run
           // with fresh hook tokens, never colliding with a previous run.
           await Promise.allSettled(
-            ingested.map(async (entry) => {
+            createdApplications.map(async (entry) => {
               try {
                 const runIdempotencyKey = `${entry.applicationId}:${requestId}`
                 const run = await start(candidatePipelineWorkflow, [
@@ -365,7 +360,9 @@ export const Route = createFileRoute(
 
           return Response.json(
             {
-              applicationIds: ingested.map((entry) => entry.applicationId),
+              applicationIds: createdApplications.map(
+                (entry) => entry.applicationId,
+              ),
               requestId,
             },
             { status: 200 },

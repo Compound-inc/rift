@@ -27,12 +27,8 @@ export type {
   HrCvAiAnalysis,
   HrCvAiExtractorServiceShape,
 } from './services/cv-ai-extractor.service'
-export { HrCvIngestService } from './services/cv-ingest.service'
-export type {
-  CvContact,
-  ExtractContactInput,
-  HrCvIngestServiceShape,
-} from './services/cv-ingest.service'
+export { extractFirstCvEmail } from './services/cv-email-extraction'
+export type { ExtractFirstCvEmailInput } from './services/cv-email-extraction'
 export { HrEvaluationDispatcherService } from './services/evaluation-dispatcher.service'
 export type {
   DispatchEvaluationInput,

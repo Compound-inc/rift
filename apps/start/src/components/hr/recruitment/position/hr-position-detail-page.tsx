@@ -1,6 +1,7 @@
 'use client'
 
-import { Link } from '@tanstack/react-router'
+import { useCallback, useRef, useState } from 'react'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { Button } from '@rift/ui/button'
 import {
   Table,
@@ -25,18 +26,69 @@ import {
   resolvePositionStatusPresentation,
 } from './hr-positions.logic'
 import type { HrPosition } from './hr-positions.logic'
-import {
-  resolveCandidateStagePresentation,
-  useHrPositionApplications,
-} from './hr-position-candidates.logic'
-import { HrBulkCvUploader } from './hr-bulk-cv-uploader'
+import { useHrPositionApplications } from './hr-position-detail.logic'
 import { HrCleanCvsButton } from './hr-clean-cvs-button'
-import { HrEvaluationLink } from './hr-evaluation-link'
+import { resolveApplicationStagePresentation } from '../application'
+import { toast } from 'sonner'
 
 export function HrPositionDetailPage({ position }: { position: HrPosition }) {
   const status = resolvePositionStatusPresentation(position.status)
   const StatusIcon = status.icon
   const { candidates } = useHrPositionApplications(position.id)
+  const navigate = useNavigate()
+  const [submitting, setSubmitting] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFiles = useCallback(
+    async (fileList: FileList | null) => {
+      if (!fileList || fileList.length === 0) return
+      setSubmitting(true)
+      try {
+        const formData = new FormData()
+        for (const file of Array.from(fileList)) {
+          formData.append('files', file)
+        }
+        const response = await fetch(
+          `/api/hr/recruitment/positions/${encodeURIComponent(position.id)}/applications/bulk-upload`,
+          {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin',
+          },
+        )
+        const payload = (await response.json().catch(() => null)) as {
+          applicationIds?: string[]
+          error?: string
+          requestId?: string
+          errorTag?: string
+          detail?: { cause?: string }
+        } | null
+        if (!response.ok) {
+          const head =
+            payload?.error ?? `Upload failed with status ${response.status}`
+          const tail = [
+            payload?.errorTag ? `tag=${payload.errorTag}` : null,
+            payload?.detail?.cause ? `cause=${payload.detail.cause}` : null,
+            payload?.requestId ? `requestId=${payload.requestId}` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')
+          throw new Error(tail ? `${head} (${tail})` : head)
+        }
+        const count = payload?.applicationIds?.length ?? 0
+        toast.success(
+          `Queued ${count} CV${count === 1 ? '' : 's'} for scoring.`,
+        )
+      } catch (cause) {
+        toast.error(
+          cause instanceof Error ? cause.message : 'Failed to upload CVs.',
+        )
+      } finally {
+        setSubmitting(false)
+      }
+    },
+    [position.id],
+  )
 
   return (
     <ContentPage>
@@ -80,10 +132,24 @@ export function HrPositionDetailPage({ position }: { position: HrPosition }) {
               <Button variant="ghost" className="border border-border-base">
                 Edit position
               </Button>
-              <Button>
+              <Button
+                disabled={submitting}
+                onClick={() => fileInputRef.current?.click()}
+              >
                 <UserPlus aria-hidden />
-                Add candidate
+                {submitting ? 'Uploading…' : 'Add candidate'}
               </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.txt,.md,.doc,.docx"
+                className="sr-only"
+                onChange={(event) => {
+                  void handleFiles(event.target.files)
+                  event.target.value = ''
+                }}
+              />
             </div>
           </div>
         </div>
@@ -139,22 +205,6 @@ export function HrPositionDetailPage({ position }: { position: HrPosition }) {
         </section>
 
         <section
-          aria-label="Bulk upload"
-          className="rounded-xl border border-border-base bg-surface-overlay p-4"
-        >
-          <header className="mb-3">
-            <h2 className="text-sm font-medium text-foreground-strong">
-              Bulk CV upload
-            </h2>
-            <p className="text-xs text-foreground-tertiary">
-              Drop multiple resumes at once. We extract emails, dedupe
-              candidates, and start the pipeline workflow per CV.
-            </p>
-          </header>
-          <HrBulkCvUploader positionId={position.id} />
-        </section>
-
-        <section
           aria-label="Candidates"
           className="flex flex-col overflow-hidden rounded-xl border border-border-base bg-surface-raised shadow-[0_1px_0_0_rgb(0_0_0_/_0.02)]"
         >
@@ -203,32 +253,53 @@ export function HrPositionDetailPage({ position }: { position: HrPosition }) {
               </TableHeader>
               <TableBody>
                 {candidates.map((candidate) => {
-                  const stage = resolveCandidateStagePresentation(
+                  const stage = resolveApplicationStagePresentation(
                     candidate.stage,
                   )
                   const StageIcon = stage.icon
                   return (
                     <TableRow
                       key={candidate.applicationId}
-                      className="border-border-light"
+                      className="cursor-pointer border-border-light hover:bg-surface-inverse/5"
+                      onClick={() =>
+                        navigate({
+                          to: '/hr/recruitment/candidates/$candidateId/applications/$applicationId',
+                          params: {
+                            candidateId: candidate.id,
+                            applicationId: candidate.applicationId,
+                          },
+                        })
+                      }
                     >
-                      <TableCell className="px-4 py-3">
-                        <div className="flex flex-col">
-                          <span className="font-medium text-foreground-strong">
-                            {candidate.name}
-                          </span>
-                          <span className="line-clamp-2 text-xs text-foreground-tertiary">
-                            {candidate.headline}
-                          </span>
-                          {candidate.location ? (
-                            <span className="text-xs text-foreground-tertiary">
-                              {candidate.location}
-                            </span>
-                          ) : null}
+                      <TableCell className="p-0">
+                        <div className="flex flex-col px-4 py-3">
+                          {candidate.profilePending ? (
+                            <CandidateIdentitySkeleton
+                              placeholder={
+                                candidate.name === 'Unknown candidate'
+                                  ? null
+                                  : candidate.name
+                              }
+                            />
+                          ) : (
+                            <>
+                              <span className="font-medium text-foreground-strong">
+                                {candidate.name}
+                              </span>
+                              <span className="line-clamp-2 text-xs text-foreground-tertiary">
+                                {candidate.headline}
+                              </span>
+                              {candidate.location ? (
+                                <span className="text-xs text-foreground-tertiary">
+                                  {candidate.location}
+                                </span>
+                              ) : null}
+                            </>
+                          )}
                         </div>
                       </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <div className="flex flex-col gap-1">
+                      <TableCell className="p-0">
+                        <div className="flex flex-col gap-1 px-4 py-3">
                           <span
                             className={cn(
                               'inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium',
@@ -238,24 +309,27 @@ export function HrPositionDetailPage({ position }: { position: HrPosition }) {
                             <StageIcon aria-hidden className="size-3" />
                             {stage.label}
                           </span>
-                          <HrEvaluationLink
-                            applicationId={candidate.applicationId}
-                          />
                         </div>
                       </TableCell>
-                      <TableCell className="px-4 py-3 text-foreground-primary">
-                        {candidate.source}
+                      <TableCell className="p-0">
+                        <div className="block px-4 py-3 text-foreground-primary">
+                          {candidate.source}
+                        </div>
                       </TableCell>
                       <TableCell
                         title={candidate.affinityRationale ?? undefined}
-                        className="px-4 py-3 text-right tabular-nums text-foreground-primary"
+                        className="p-0"
                       >
-                        {candidate.affinityScore === null
-                          ? '—'
-                          : `${candidate.affinityScore}/100`}
+                        <div className="block px-4 py-3 text-right tabular-nums text-foreground-primary">
+                          {candidate.affinityScore === null
+                            ? '—'
+                            : `${candidate.affinityScore}/100`}
+                        </div>
                       </TableCell>
-                      <TableCell className="px-4 py-3 text-right tabular-nums text-foreground-primary">
-                        {candidate.appliedAt}
+                      <TableCell className="p-0">
+                        <div className="block px-4 py-3 text-right tabular-nums text-foreground-primary">
+                          {candidate.appliedAt}
+                        </div>
                       </TableCell>
                     </TableRow>
                   )
@@ -292,6 +366,28 @@ function SummaryCard({
       <span className="text-sm font-medium text-foreground-strong">
         {value}
       </span>
+    </div>
+  )
+}
+
+function CandidateIdentitySkeleton({
+  placeholder,
+}: {
+  readonly placeholder: string | null
+}) {
+  return (
+    <div
+      aria-label="Extracting candidate profile"
+      className="flex min-h-9 flex-col gap-1.5"
+    >
+      {placeholder ? (
+        <span className="font-medium text-foreground-strong">
+          {placeholder}
+        </span>
+      ) : (
+        <span className="h-4 w-36 animate-pulse rounded-full bg-surface-inverse/10" />
+      )}
+      <span className="h-3 w-52 animate-pulse rounded-full bg-surface-inverse/10" />
     </div>
   )
 }
