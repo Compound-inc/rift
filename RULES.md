@@ -4,7 +4,7 @@ These rules are enforced automatically by [Tripwire](https://tripwire.sh). Contr
 
 ## What we check
 
-_No rules are currently enabled._
+- **Account age** — accounts younger than 30 days are blocked.
 
 ---
 
