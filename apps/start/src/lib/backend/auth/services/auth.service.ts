@@ -73,6 +73,8 @@ async function markWorkspaceSubscriptionCanceled(input: {
 
 const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim()
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim()
+const githubClientId = process.env.GITHUB_CLIENT_ID?.trim()
+const githubClientSecret = process.env.GITHUB_CLIENT_SECRET?.trim()
 
 function requireEnv(name: string): string {
   const value = process.env[name]?.trim()
@@ -474,13 +476,26 @@ export const auth = betterAuth({
     requireEmailVerification: !isSelfHosted,
     revokeSessionsOnPasswordReset: true,
   },
-  ...(!isSelfHosted && googleClientId && googleClientSecret
+  ...(!isSelfHosted &&
+  (googleClientId || googleClientSecret || githubClientId || githubClientSecret)
     ? {
         socialProviders: {
-          google: {
-            clientId: googleClientId,
-            clientSecret: googleClientSecret,
-          },
+          ...(googleClientId && googleClientSecret
+            ? {
+                google: {
+                  clientId: googleClientId,
+                  clientSecret: googleClientSecret,
+                },
+              }
+            : {}),
+          ...(githubClientId && githubClientSecret
+            ? {
+                github: {
+                  clientId: githubClientId,
+                  clientSecret: githubClientSecret,
+                },
+              }
+            : {}),
         },
       }
     : {}),

@@ -169,7 +169,7 @@ function SidebarUsageMeterView(input: {
         <div className="relative flex size-11 items-center justify-center">
           <svg
             viewBox="0 0 56 56"
-            className="-rotate-90 overflow-visible"
+            className="size-11 -rotate-90 overflow-visible"
             aria-hidden="true"
           >
             <UsageRing

@@ -29,7 +29,9 @@ cp apps/start/.env.example apps/start/.env.local
 bun run dev
 ```
 
-The app will be available at `http://localhost:3000`.
+The app will be available at `https://rift.localhost`.
+
+On first run, [portless](https://portless.sh) will set up a local CA and bind port 443. This requires a one-time sudo prompt. If you'd rather do it ahead of time, run `bunx portless trust` from `apps/start/` before `bun run dev`.
 
 ## Detailed Setup
 
@@ -114,11 +116,11 @@ bun run dev
 
 This starts:
 
-- The TanStack Start dev server on port 3000
-- Zero cache on port 4848
+- The TanStack Start dev server, exposed via portless at `https://rift.localhost` (Vite itself listens on a random port in 4000–4999 picked by portless)
+- Zero cache, exposed via portless at `https://zero.rift.localhost` (also on a random portless-assigned port; the script forwards portless's `PORT` to `ZERO_PORT`)
 - Turbo task runner with TUI
 
-Access the app at: `http://localhost:3000`
+Access the app at: `https://rift.localhost`
 
 ### Available Scripts
 
@@ -166,11 +168,15 @@ npm run install
 
 ### Port already in use
 
-- Port 3000: Used by the TanStack Start dev server
-- Port 4848: Used by Zero cache
+- Port 443: Used by the portless HTTPS proxy (fronts the dev server at `https://rift.localhost` and Zero cache at `https://zero.rift.localhost`)
 - Port 5432: Used by PostgreSQL
+- Ports 4000–4999: portless picks two at random for the underlying Vite dev server and Zero cache
 
-If these are taken, you can modify ports in the respective config files.
+If these are taken, you can modify ports in the respective config files. To bypass portless temporarily, run `bun --bun vite dev --port 3000` directly inside `apps/start/` and `zero-cache-dev` (which defaults to port 4848) in a second terminal — set `VITE_ZERO_CACHE_URL=http://localhost:4848` in `.env.local` while doing so.
+
+### portless TLS trust prompt
+
+On first run, portless generates a local CA and asks for sudo to install it and bind port 443. If your browser still shows a TLS warning for `https://rift.localhost`, run `bunx portless trust` from `apps/start/` to re-trust the CA.
 
 ### Database connection errors
 
