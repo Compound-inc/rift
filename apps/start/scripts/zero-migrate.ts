@@ -11,7 +11,12 @@
  * 2. Acquires a Postgres advisory lock so only one runner migrates at a time.
  * 3. Runs Better Auth migrations first so auth-owned tables exist.
  * 4. Creates a migration ledger table if needed.
- * 5. Bootstraps `zero/migrations/schema.sql` on fresh databases when needed.
+ * 5. Applies `zero/migrations/schema.sql` (the baseline) through the same
+ *    ledger. It is idempotent (`IF NOT EXISTS` everywhere), so re-running it
+ *    is safe; the ledger ensures it is recorded exactly once. Editing
+ *    `schema.sql` after it has been recorded will trip the checksum guard
+ *    and fail the deploy on purpose — new tables must go in a new
+ *    timestamped migration file, never by editing the baseline in place.
  * 6. Applies timestamped `zero/migrations/*.sql` files in lexical order.
  * 7. Records filename + checksum, and fails if an already-applied file changed.
  *
@@ -177,31 +182,24 @@ async function main(): Promise<void> {
     console.log(`Found ${files.length} migration files.`)
 
     /**
-     * Fresh Railway/Postgres environments do not have any Zero tables yet, and
-     * the first timestamped migration may depend on them. We bootstrap the
-     * baseline schema once before replaying incremental migrations.
+     * Always run the baseline schema before timestamped migrations.
+     *
+     * The previous implementation only applied `schema.sql` when the
+     * `threads` table was missing, on the assumption that `schema.sql`
+     * represented a frozen baseline. In practice, new tables kept being
+     * added directly to `schema.sql` after environments had already been
+     * bootstrapped, so those environments silently fell behind and later
+     * `ALTER TABLE` migrations exploded against tables that did not exist.
+     *
+     * Running it every time is safe because every statement in `schema.sql`
+     * uses `IF NOT EXISTS`, and the migration ledger guarantees the file is
+     * recorded exactly once. The checksum guard in `applyMigration` then
+     * forces any future change to `schema.sql` to be made via a new
+     * timestamped migration file rather than an in-place edit.
      */
-    const threadsTable = await client.query<{ exists: boolean }>(
-      `
-        SELECT EXISTS (
-          SELECT 1
-          FROM information_schema.tables
-          WHERE table_schema = 'public'
-            AND table_name = 'threads'
-        ) AS exists
-      `,
-    )
-
     const schemaPath = join(migrationsDir, BASELINE_SCHEMA_FILE)
     const schemaSql = await readFile(schemaPath, 'utf-8')
-    const shouldBootstrapSchema = !threadsTable.rows[0]?.exists
-
-    if (shouldBootstrapSchema) {
-      console.log(
-        'Zero baseline tables not found. Applying schema.sql before incremental migrations.',
-      )
-      await applyMigration(client, BASELINE_SCHEMA_FILE, schemaSql)
-    }
+    await applyMigration(client, BASELINE_SCHEMA_FILE, schemaSql)
 
     if (files.length === 0) {
       console.log('No timestamped migration files found.')
