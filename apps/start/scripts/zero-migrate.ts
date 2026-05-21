@@ -11,14 +11,17 @@
  * 2. Acquires a Postgres advisory lock so only one runner migrates at a time.
  * 3. Runs Better Auth migrations first so auth-owned tables exist.
  * 4. Creates a migration ledger table if needed.
- * 5. Applies `zero/migrations/schema.sql` (the baseline) through the same
- *    ledger. It is idempotent (`IF NOT EXISTS` everywhere), so re-running it
- *    is safe; the ledger ensures it is recorded exactly once. Editing
- *    `schema.sql` after it has been recorded will trip the checksum guard
- *    and fail the deploy on purpose — new tables must go in a new
- *    timestamped migration file, never by editing the baseline in place.
+ * 5. Applies `zero/migrations/schema.sql` (the live baseline) on every run.
+ *    `schema.sql` is intentionally idempotent (`IF NOT EXISTS` everywhere)
+ *    and is treated as the always-current source of truth: editing it is
+ *    fine, and the changes get picked up on the next deploy. The ledger
+ *    records the latest applied checksum for visibility but does not enforce
+ *    a match — unlike timestamped migrations.
  * 6. Applies timestamped `zero/migrations/*.sql` files in lexical order.
- * 7. Records filename + checksum, and fails if an already-applied file changed.
+ *    These are forward-only: once a timestamped migration has been applied,
+ *    editing the file will fail the next deploy with a checksum mismatch.
+ *    Use new timestamped files for non-idempotent transformations such as
+ *    drops, renames, type changes, or data backfills.
  *
  * Run from apps/start:
  *   bun run scripts/zero-migrate.ts
@@ -64,11 +67,16 @@ function checksum(input: string): string {
 }
 
 /**
- * Applies a migration file exactly once using the shared migration ledger.
+ * Applies a timestamped migration file exactly once using the migration
+ * ledger.
  *
- * Keeping the write path centralized ensures the baseline schema and the
- * timestamped forward-only migrations use the same checksum validation and
- * transaction semantics.
+ * Timestamped migrations are forward-only: once a file has been applied, its
+ * contents must not change. The checksum guard turns any in-place edit into
+ * a hard deploy-time error so the team is forced to add a new timestamped
+ * file rather than silently mutating history.
+ *
+ * Note: this guard intentionally does NOT apply to `schema.sql`, which is
+ * handled by `applyBaseline` and is meant to be re-applied on every deploy.
  */
 async function applyMigration(
   client: PoolClient,
@@ -104,6 +112,46 @@ async function applyMigration(
     await client.query(
       `INSERT INTO ${MIGRATION_TABLE} (filename, checksum)
        VALUES ($1, $2)`,
+      [filename, fileChecksum],
+    )
+    await client.query('COMMIT')
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  }
+}
+
+/**
+ * Applies the live baseline `schema.sql` on every deploy.
+ *
+ * Unlike `applyMigration`, this path is intentionally not guarded by a
+ * checksum match. `schema.sql` is the team's source of truth for the
+ * declarative shape of the database: every statement uses `IF NOT EXISTS`,
+ * so re-running it is safe, and any newly added tables flow to staging and
+ * production automatically on the next deploy.
+ *
+ * The ledger row is still upserted so the most recent applied checksum is
+ * visible for debugging, but it is never compared against the file on disk.
+ * Operations that cannot be expressed idempotently in `schema.sql` (drops,
+ * renames, type changes, data backfills) must go in a timestamped migration
+ * file instead, where the strict checksum guard applies.
+ */
+async function applyBaseline(
+  client: PoolClient,
+  filename: string,
+  sql: string,
+): Promise<void> {
+  const fileChecksum = checksum(sql)
+
+  console.log(`- apply ${filename} (baseline, idempotent)`)
+  await client.query('BEGIN')
+  try {
+    await client.query(sql)
+    await client.query(
+      `INSERT INTO ${MIGRATION_TABLE} (filename, checksum)
+       VALUES ($1, $2)
+       ON CONFLICT (filename)
+       DO UPDATE SET checksum = EXCLUDED.checksum, applied_at = NOW()`,
       [filename, fileChecksum],
     )
     await client.query('COMMIT')
@@ -182,24 +230,22 @@ async function main(): Promise<void> {
     console.log(`Found ${files.length} migration files.`)
 
     /**
-     * Always run the baseline schema before timestamped migrations.
+     * Always run the live baseline before timestamped migrations.
      *
-     * The previous implementation only applied `schema.sql` when the
-     * `threads` table was missing, on the assumption that `schema.sql`
-     * represented a frozen baseline. In practice, new tables kept being
-     * added directly to `schema.sql` after environments had already been
-     * bootstrapped, so those environments silently fell behind and later
-     * `ALTER TABLE` migrations exploded against tables that did not exist.
+     * `schema.sql` is the declarative source of truth for the database's
+     * shape and is fully idempotent. Re-applying it on every deploy ensures
+     * any newly added tables reach staging/production even when those
+     * environments were originally bootstrapped against an older snapshot.
+     * The earlier "only bootstrap when `threads` is missing" optimization
+     * silently skipped this work and led to `ALTER TABLE` migrations
+     * exploding against tables that did not exist in older databases.
      *
-     * Running it every time is safe because every statement in `schema.sql`
-     * uses `IF NOT EXISTS`, and the migration ledger guarantees the file is
-     * recorded exactly once. The checksum guard in `applyMigration` then
-     * forces any future change to `schema.sql` to be made via a new
-     * timestamped migration file rather than an in-place edit.
+     * `applyBaseline` deliberately skips the timestamped-migration checksum
+     * guard for this file; see its docstring for the rationale.
      */
     const schemaPath = join(migrationsDir, BASELINE_SCHEMA_FILE)
     const schemaSql = await readFile(schemaPath, 'utf-8')
-    await applyMigration(client, BASELINE_SCHEMA_FILE, schemaSql)
+    await applyBaseline(client, BASELINE_SCHEMA_FILE, schemaSql)
 
     if (files.length === 0) {
       console.log('No timestamped migration files found.')
