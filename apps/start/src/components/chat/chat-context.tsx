@@ -565,9 +565,16 @@ function areBranchSelectionsEqual(
 export function ChatProvider({
   children,
   threadId,
+  projectId,
 }: {
   children: ReactNode
   threadId?: string
+  /**
+   * Project hint for the welcome-screen bootstrap path. When the user types
+   * their first message from `/chat?projectId=<id>`, the new thread is
+   * created already attached to this project (Q1 / unified bootstrap).
+   */
+  projectId?: string
 }) {
   const navigate = useNavigate()
   const z = useZero()
@@ -576,6 +583,7 @@ export function ChatProvider({
   // Mutable refs avoid stale values inside async callbacks owned by the transport hook.
   const threadIdRef = useRef<string | undefined>(threadId)
   const previousThreadIdRef = useRef<string | undefined>(threadId)
+  const bootstrapProjectIdRef = useRef<string | undefined>(projectId)
   const lastAppliedBranchVersionRef = useRef<number | undefined>(undefined)
   const allowShrinkOnNextBranchVersionRef = useRef(false)
   const resumeAttemptedThreadIdRef = useRef<string | undefined>(undefined)
@@ -954,6 +962,7 @@ export function ChatProvider({
     mode: effectiveSelectedContextWindowMode,
   })
   selectedModelIdRef.current = selectedModelId
+  bootstrapProjectIdRef.current = projectId
   selectedReasoningEffortRef.current = selectedReasoningEffort
   selectedContextWindowModeRef.current = effectiveSelectedContextWindowMode
   selectedModeIdRef.current = effectiveModeId
@@ -1577,6 +1586,7 @@ export function ChatProvider({
                   modeId: draftModeId,
                   contextWindowMode: selectedContextWindowModeRef.current,
                   disabledToolKeys: [...draftDisabledToolKeys],
+                  projectId: bootstrapProjectIdRef.current,
                 }),
               )
               await write.client

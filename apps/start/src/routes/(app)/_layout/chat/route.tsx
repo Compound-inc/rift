@@ -1,9 +1,20 @@
-import { Outlet, createFileRoute, useLocation } from '@tanstack/react-router'
+import {
+  Outlet,
+  createFileRoute,
+  useLocation,
+  useSearch,
+} from '@tanstack/react-router'
+import { z } from 'zod'
 import { ChatProvider } from '@/components/chat'
 import { ChatPageShell } from '@/components/chat/chat-page-shell'
 
+const chatSearchSchema = z.object({
+  projectId: z.string().trim().min(1).optional(),
+})
+
 export const Route = createFileRoute('/(app)/_layout/chat')({
   component: ChatLayout,
+  validateSearch: chatSearchSchema,
 })
 
 /**
@@ -14,6 +25,9 @@ const RESERVED_FIRST_SEGMENTS = new Set(['projects'])
 
 function ChatLayout() {
   const { pathname } = useLocation()
+  const { projectId: searchProjectId } = useSearch({
+    from: '/(app)/_layout/chat',
+  })
 
   const normalized = pathname.replace(/\/+$/, '')
   const trailing = normalized.startsWith('/chat/')
@@ -30,8 +44,10 @@ function ChatLayout() {
   // prevents the chat thread + composer from double-rendering behind it.
   const isProjectRoute = firstSegment === 'projects'
 
+  const projectId = threadId ? undefined : searchProjectId
+
   return (
-    <ChatProvider threadId={threadId}>
+    <ChatProvider threadId={threadId} projectId={projectId}>
       {isProjectRoute ? null : <ChatPageShell />}
       <Outlet />
     </ChatProvider>

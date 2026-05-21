@@ -56,8 +56,9 @@ _Avoid_: Knowledge base (in user-facing copy when ambiguous).
   unconditionally (ADR-0003).
 - RAG retrieval for a Thread inside a Project unions per-message,
   per-thread, project, and org-knowledge sources (ADR-0002).
-- Project deletion is a soft delete; FKs from Threads and attachments are
-  preserved (ADR-0001).
+- Project deletion is a soft delete with a Windows-folder cascade: the
+  project, its Threads, and its Project Files are hidden together. FKs
+  are preserved on the soft-deleted side (ADR-0001).
 
 ## Example dialogue
 
@@ -71,10 +72,11 @@ _Avoid_: Knowledge base (in user-facing copy when ambiguous).
 >
 > **Dev:** "And if I delete the **Project** the Thread is in?"
 >
-> **Domain expert:** "Soft delete. The Thread keeps its `project_id`,
-> but every project query filters out soft-deleted projects, so the
-> Thread renders as if it were unprojected. The Project's **Project
-> Files** stop contributing to retrieval for the same reason."
+> **Domain expert:** "Soft delete with a Windows-folder cascade. The
+> project disappears, and so do its threads and attached files — they
+> all become invisible together. Database rows survive intact (the FK is
+> preserved), so a future restore feature can bring everything back, but
+> the user can no longer see the threads anywhere in the UI."
 
 ## Flagged ambiguities
 

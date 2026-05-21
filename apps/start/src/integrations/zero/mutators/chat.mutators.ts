@@ -35,7 +35,6 @@ const createThreadArgs = z.object({
    * place threads into projects it should not see.
    */
   projectId: z.string().trim().min(1).optional(),
-  bootstrapStatus: z.enum(['pending', 'completed']).optional(),
 })
 
 const renameThreadArgs = z.object({
@@ -362,7 +361,6 @@ export const chatMutatorDefinitions = {
             organizationId: ctx.organizationId,
             disabledToolKeys,
             projectId: resolvedProjectId,
-            bootstrapStatus: args.bootstrapStatus,
           }),
         )
       } catch (error) {

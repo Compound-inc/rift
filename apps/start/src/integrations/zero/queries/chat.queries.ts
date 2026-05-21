@@ -31,23 +31,13 @@ const threadHistoryPageArgs = z.object({
  */
 export const chatQueryDefinitions = {
   threads: {
-    /**
-     * Cursor-based history page used by the virtualized sidebar.
-     */
     historyPage: defineQuery(threadHistoryPageArgs, ({ args, ctx }) => {
       const orderDirection = args.dir === 'forward' ? 'desc' : 'asc'
       const organizationId = args.organizationId?.trim()
       let q = zql.thread
         .where('userId', ctx.userID)
         .where('visibility', 'visible')
-        .where(({ or, cmp, exists }) =>
-          or(
-            cmp('projectId', 'IS', null),
-            exists('project', (project) =>
-              project.where('deletedAt', 'IS NOT', null),
-            ),
-          ),
-        )
+        .where('projectId', 'IS', null)
         .orderBy('pinned', orderDirection)
         .orderBy('updatedAt', orderDirection)
         .orderBy('threadId', orderDirection)
@@ -68,6 +58,14 @@ export const chatQueryDefinitions = {
       let q = zql.thread
         .where('threadId', args.threadId)
         .where('userId', ctx.userID)
+        .where(({ or, cmp, exists }) =>
+          or(
+            cmp('projectId', 'IS', null),
+            exists('project', (project) =>
+              project.where('deletedAt', 'IS', null),
+            ),
+          ),
+        )
       if (organizationId) {
         q = q.where('ownerOrgId', organizationId)
       }

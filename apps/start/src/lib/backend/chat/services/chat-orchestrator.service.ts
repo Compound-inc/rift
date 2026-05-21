@@ -330,13 +330,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             )
           }
 
-          /**
-           * Fire-and-forget title generation. Runs on every user message;
-           * `autoGenerateTitle` exits early unless the thread is still on
-           * the default title and the user has not renamed it manually —
-           * so the LLM call only happens once per thread.
-           */
-          if (command.message) {
+          if (createIfMissing && command.message) {
             const userMessage = getUserMessageText(command.message)
             if (userMessage) {
               yield* runDetachedObserved({

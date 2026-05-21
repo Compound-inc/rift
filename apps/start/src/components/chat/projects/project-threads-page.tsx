@@ -3,7 +3,7 @@
 'use client'
 
 import { Link, useNavigate } from '@tanstack/react-router'
-import { useQuery, useZero } from '@rocicorp/zero/react'
+import { useQuery } from '@rocicorp/zero/react'
 import Plus from 'lucide-react/dist/esm/icons/plus'
 import Settings from 'lucide-react/dist/esm/icons/settings'
 import MessageCircle from 'lucide-react/dist/esm/icons/message-circle'
@@ -13,20 +13,14 @@ import {
   ContextMenuContent,
   ContextMenuTrigger,
 } from '@rift/ui/context-menu'
-import { mutators, queries } from '@/integrations/zero'
-import { useCallback, useEffect, useState } from 'react'
-import { toast } from 'sonner'
-import { useChatComposer } from '../chat-context'
+import { queries } from '@/integrations/zero'
+import { useCallback, useEffect } from 'react'
 import { ThreadMoveToProjectSubmenu } from '../chat-sidebar-move-to-project'
 import { m } from '@/paraglide/messages.js'
 
 export function ProjectThreadsPage({ projectId }: { projectId: string }) {
   const navigate = useNavigate()
-  const z = useZero()
-  const composer = useChatComposer()
-  const [project, projectResult] = useQuery(
-    queries.projects.byId({ projectId }),
-  )
+  const [project, projectResult] = useQuery(queries.projects.byId({ projectId }))
   const [threadsRows] = useQuery(
     queries.projects.threadsPage({
       projectId,
@@ -36,7 +30,6 @@ export function ProjectThreadsPage({ projectId }: { projectId: string }) {
       inclusive: true,
     }),
   )
-  const [creatingThread, setCreatingThread] = useState(false)
 
   // Redirect home if the project no longer exists or has been soft-deleted in
   // another tab. The query is reactive so this also fires post-mount.
@@ -46,31 +39,14 @@ export function ProjectThreadsPage({ projectId }: { projectId: string }) {
     }
   }, [navigate, project, projectResult.type])
 
-  const handleNewChat = useCallback(async () => {
-    if (!project || creatingThread) return
-    setCreatingThread(true)
-    const newThreadId = crypto.randomUUID()
-    const createdAt = Date.now()
-    try {
-      await z.mutate(
-        mutators.threads.create({
-          threadId: newThreadId,
-          createdAt,
-          modelId: composer.selectedModelId,
-          modeId: composer.selectedModeId,
-          contextWindowMode: composer.selectedContextWindowMode,
-          disabledToolKeys: [...composer.disabledToolKeys],
-          projectId,
-          bootstrapStatus: 'completed',
-        }),
-      ).client
-      navigate({ to: '/chat/$threadId', params: { threadId: newThreadId } })
-    } catch (error) {
-      console.error('Failed to create project thread:', error)
-      toast.error(m.chat_project_new_chat_failed())
-      setCreatingThread(false)
-    }
-  }, [composer, creatingThread, navigate, project, projectId, z])
+  // Route to the chat welcome state with this project as a hint. The thread
+  // is created (with `projectId`) when the first message is sent, matching
+  // the regular `/chat` bootstrap path — so title generation, resume-stream
+  // behaviour, and `ownerOrgId` are all unified with the loose-thread flow.
+  const handleNewChat = useCallback(() => {
+    if (!project) return
+    navigate({ to: '/chat', search: { projectId } })
+  }, [navigate, project, projectId])
 
   if (!project) {
     return (
@@ -104,10 +80,7 @@ export function ProjectThreadsPage({ projectId }: { projectId: string }) {
               {m.chat_project_settings_link()}
             </Link>
           </Button>
-          <Button
-            onClick={() => void handleNewChat()}
-            disabled={creatingThread}
-          >
+          <Button onClick={handleNewChat}>
             <Plus className="size-4" aria-hidden />
             {m.chat_project_new_chat()}
           </Button>

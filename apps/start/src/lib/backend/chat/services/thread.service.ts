@@ -1,15 +1,16 @@
 import { Effect, Layer, ServiceMap } from 'effect'
 import { generateText } from 'ai'
-import {
-  DEFAULT_CONTEXT_WINDOW_MODE,
-} from '@/lib/shared/ai-catalog'
+import { DEFAULT_CONTEXT_WINDOW_MODE } from '@/lib/shared/ai-catalog'
 import type {
   AiContextWindowMode,
   AiReasoningEffort,
 } from '@/lib/shared/ai-catalog/types'
-import { isChatModeId  } from '@/lib/shared/chat-modes'
-import type {ChatModeId} from '@/lib/shared/chat-modes';
-import { buildBootstrapThreadRecord, DEFAULT_THREAD_TITLE } from '@/lib/shared/chat'
+import { isChatModeId } from '@/lib/shared/chat-modes'
+import type { ChatModeId } from '@/lib/shared/chat-modes'
+import {
+  buildBootstrapThreadRecord,
+  DEFAULT_THREAD_TITLE,
+} from '@/lib/shared/chat'
 import {
   MessagePersistenceError,
   ThreadForbiddenError,
@@ -96,7 +97,10 @@ export type ThreadServiceShape = {
     readonly threadId: string
     readonly modeId?: ChatModeId
     readonly requestId: string
-  }) => Effect.Effect<void, ThreadNotFoundError | ThreadForbiddenError | MessagePersistenceError>
+  }) => Effect.Effect<
+    void,
+    ThreadNotFoundError | ThreadForbiddenError | MessagePersistenceError
+  >
   readonly setThreadDisabledToolKeys: (input: {
     readonly userId: string
     readonly threadId: string
@@ -328,6 +332,30 @@ export class ThreadService extends ServiceMap.Service<
               )
             }
 
+            const threadProjectId = thread.projectId
+            if (threadProjectId) {
+              const projectRow = yield* Effect.tryPromise({
+                try: () =>
+                  db.run(zql.project.where('id', threadProjectId).one()),
+                catch: (error) =>
+                  new MessagePersistenceError({
+                    message: 'Failed to validate project access',
+                    requestId,
+                    threadId,
+                    cause: String(error),
+                  }),
+              })
+              if (!projectRow || projectRow.deletedAt) {
+                return yield* Effect.fail(
+                  new ThreadNotFoundError({
+                    message: 'Thread not found',
+                    requestId,
+                    threadId,
+                  }),
+                )
+              }
+            }
+
             return {
               dbId: thread.id,
               threadId: thread.threadId,
@@ -342,8 +370,9 @@ export class ThreadService extends ServiceMap.Service<
                 thread.contextWindowMode === 'max'
                   ? 'max'
                   : DEFAULT_CONTEXT_WINDOW_MODE,
-              disabledToolKeys:
-                Array.isArray(thread.disabledToolKeys) ? thread.disabledToolKeys : [],
+              disabledToolKeys: Array.isArray(thread.disabledToolKeys)
+                ? thread.disabledToolKeys
+                : [],
               generationStatus: thread.generationStatus,
               branchVersion: thread.branchVersion,
               projectId: thread.projectId ?? undefined,
@@ -504,8 +533,7 @@ User message: ${trimmedMessage}`,
           Effect.gen(function* () {
             const db = yield* loadDb({ requestId, threadId: projectId })
             const project = yield* Effect.tryPromise({
-              try: () =>
-                db.run(zql.project.where('id', projectId).one()),
+              try: () => db.run(zql.project.where('id', projectId).one()),
               catch: (error) =>
                 new MessagePersistenceError({
                   message: 'Failed to load project instruction',
@@ -945,7 +973,9 @@ User message: ${trimmedMessage}`,
             }),
           )
         }
-        thread.disabledToolKeys = [...new Set(disabledToolKeys)] as readonly string[]
+        thread.disabledToolKeys = [
+          ...new Set(disabledToolKeys),
+        ] as readonly string[]
         thread.updatedAt = Date.now()
         return thread.disabledToolKeys ?? []
       }),

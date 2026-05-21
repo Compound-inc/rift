@@ -144,6 +144,13 @@ export class ChatSearchService extends ServiceMap.Service<
                 t.user_id = i.user_id
                 and t.visibility = 'visible'
                 and (
+                  t.project_id is null
+                  or exists (
+                    select 1 from projects p
+                    where p.id = t.project_id and p.deleted_at is null
+                  )
+                )
+                and (
                   (i.organization_id is null and t.owner_org_id is null)
                   or t.owner_org_id = i.organization_id
                 )
@@ -200,6 +207,13 @@ export class ChatSearchService extends ServiceMap.Service<
                 and m.role = any(${[...CHAT_SEARCHABLE_MESSAGE_ROLES]}::text[])
                 and t.user_id = i.user_id
                 and t.visibility = 'visible'
+                and (
+                  t.project_id is null
+                  or exists (
+                    select 1 from projects p
+                    where p.id = t.project_id and p.deleted_at is null
+                  )
+                )
                 and (
                   (i.organization_id is null and t.owner_org_id is null)
                   or t.owner_org_id = i.organization_id
