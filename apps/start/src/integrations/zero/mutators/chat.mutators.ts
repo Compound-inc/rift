@@ -1,23 +1,17 @@
-import {
-  defineMutator,
-} from '@rocicorp/zero'
+import { defineMutator } from '@rocicorp/zero'
 import { z } from 'zod'
 import type { AiContextWindowMode } from '@/lib/shared/ai-catalog'
 import { sanitizeThreadDisabledToolKeys } from '@/lib/shared/chat/tool-policy'
 import { isChatModeId, resolveEffectiveChatMode } from '@/lib/shared/chat-modes'
 import {
   DEFAULT_ORG_TOOL_POLICY,
-  EMPTY_ORG_PROVIDER_KEY_STATUS
-  
+  EMPTY_ORG_PROVIDER_KEY_STATUS,
 } from '@/lib/shared/model-policy/types'
-import type {OrgAiPolicy} from '@/lib/shared/model-policy/types';
+import type { OrgAiPolicy } from '@/lib/shared/model-policy/types'
 import { buildBootstrapThreadRecord } from '@/lib/shared/chat'
 import { zql } from '../zql'
-import {
-  ROOT_BRANCH_PARENT_KEY
-  
-} from '@/lib/shared/chat-branching/branch-resolver'
-import type {BranchSelection} from '@/lib/shared/chat-branching/branch-resolver';
+import { ROOT_BRANCH_PARENT_KEY } from '@/lib/shared/chat-branching/branch-resolver'
+import type { BranchSelection } from '@/lib/shared/chat-branching/branch-resolver'
 import { isOrgMember, requireOrgContext } from '../org-access'
 
 /**
@@ -41,6 +35,7 @@ const createThreadArgs = z.object({
    * place threads into projects it should not see.
    */
   projectId: z.string().trim().min(1).optional(),
+  bootstrapStatus: z.enum(['pending', 'completed']).optional(),
 })
 
 const renameThreadArgs = z.object({
@@ -123,8 +118,7 @@ function buildOrgToolPolicy(input: {
   } | null
 }): OrgAiPolicy | undefined {
   const organizationId =
-    input.organizationId?.trim() ??
-    input.policyRow?.organizationId?.trim()
+    input.organizationId?.trim() ?? input.policyRow?.organizationId?.trim()
   if (!organizationId) return undefined
 
   return {
@@ -224,16 +218,14 @@ async function loadValidatedBranchThread(input: {
 }) {
   const thread = (await input.tx.run(
     zql.thread.where('threadId', input.threadId).one(),
-  )) as
-    | {
-        id: string
-        userId: string
-        ownerOrgId?: string | null
-        branchVersion: number
-        generationStatus: 'idle' | 'pending' | 'generation' | 'failed'
-        activeChildByParent?: Record<string, string> | null
-      }
-    | null
+  )) as {
+    id: string
+    userId: string
+    ownerOrgId?: string | null
+    branchVersion: number
+    generationStatus: 'idle' | 'pending' | 'generation' | 'failed'
+    activeChildByParent?: Record<string, string> | null
+  } | null
   if (!thread || thread.userId !== input.ctx.userID) {
     return null
   }
@@ -344,12 +336,16 @@ export const chatMutatorDefinitions = {
         const project = await tx.run(
           zql.project.where('id', args.projectId).one(),
         )
-        if (
-          !project ||
-          project.userId !== ctx.userID ||
-          project.deletedAt
-        ) {
+        if (!project || project.userId !== ctx.userID || project.deletedAt) {
           throw new Error('thread_create_project_not_owned_or_missing')
+        }
+        // Refuse to bootstrap a thread whose org context disagrees with the
+        // target project's org — leaving them mismatched would create a
+        // thread that is invisible from one side or the other.
+        const threadOrgId = ctx.organizationId?.trim() || undefined
+        const projectOrgId = project.organizationId?.trim() || undefined
+        if (threadOrgId !== projectOrgId) {
+          throw new Error('thread_create_project_org_mismatch')
         }
         resolvedProjectId = project.id
       }
@@ -366,6 +362,7 @@ export const chatMutatorDefinitions = {
             organizationId: ctx.organizationId,
             disabledToolKeys,
             projectId: resolvedProjectId,
+            bootstrapStatus: args.bootstrapStatus,
           }),
         )
       } catch (error) {
@@ -388,7 +385,9 @@ export const chatMutatorDefinitions = {
     }),
 
     rename: defineMutator(renameThreadArgs, async ({ tx, args, ctx }) => {
-      const thread = await tx.run(zql.thread.where('threadId', args.threadId).one())
+      const thread = await tx.run(
+        zql.thread.where('threadId', args.threadId).one(),
+      )
       if (!thread || thread.userId !== ctx.userID) {
         return
       }
@@ -410,7 +409,9 @@ export const chatMutatorDefinitions = {
     }),
 
     archive: defineMutator(archiveThreadArgs, async ({ tx, args, ctx }) => {
-      const thread = await tx.run(zql.thread.where('threadId', args.threadId).one())
+      const thread = await tx.run(
+        zql.thread.where('threadId', args.threadId).one(),
+      )
       if (!thread || thread.userId !== ctx.userID) {
         return
       }
@@ -448,7 +449,9 @@ export const chatMutatorDefinitions = {
 
     /** Permanently delete thread and all its messages. */
     delete: defineMutator(deleteThreadArgs, async ({ tx, args, ctx }) => {
-      const thread = await tx.run(zql.thread.where('threadId', args.threadId).one())
+      const thread = await tx.run(
+        zql.thread.where('threadId', args.threadId).one(),
+      )
       if (!thread || thread.userId !== ctx.userID) {
         return
       }
@@ -462,7 +465,9 @@ export const chatMutatorDefinitions = {
       }
 
       const messages = await tx.run(
-        zql.message.where('threadId', args.threadId).where('userId', ctx.userID),
+        zql.message
+          .where('threadId', args.threadId)
+          .where('userId', ctx.userID),
       )
       for (const message of messages) {
         await tx.mutate.message.delete({ id: message.id })
@@ -580,7 +585,9 @@ export const chatMutatorDefinitions = {
       },
     ),
     setMode: defineMutator(setThreadModeArgs, async ({ tx, args, ctx }) => {
-      const thread = await tx.run(zql.thread.where('threadId', args.threadId).one())
+      const thread = await tx.run(
+        zql.thread.where('threadId', args.threadId).one(),
+      )
       if (!thread || thread.userId !== ctx.userID) {
         return
       }
@@ -609,7 +616,9 @@ export const chatMutatorDefinitions = {
     setContextWindowMode: defineMutator(
       setThreadContextWindowModeArgs,
       async ({ tx, args, ctx }) => {
-        const thread = await tx.run(zql.thread.where('threadId', args.threadId).one())
+        const thread = await tx.run(
+          zql.thread.where('threadId', args.threadId).one(),
+        )
         if (!thread || thread.userId !== ctx.userID) {
           return
         }
@@ -638,15 +647,6 @@ export const chatMutatorDefinitions = {
       },
     ),
 
-    /**
-     * Move a thread into / out of / between Projects. The move is metadata
-     * only — past turns are not re-embedded or re-evaluated; the new Project's
-     * context applies to *future* turns only (see Q4 in the grilling notes).
-     *
-     * Authorization: caller must own the thread, and (if `projectId` is not
-     * null) caller must own the target Project. Org-shared visibility does
-     * not grant move-into rights in v1 to keep the model simple.
-     */
     setProject: defineMutator(
       setThreadProjectArgs,
       async ({ tx, args, ctx }) => {
@@ -682,6 +682,11 @@ export const chatMutatorDefinitions = {
           ) {
             throw new Error('thread_set_project_not_owned_or_missing')
           }
+          const threadOrgId = thread.ownerOrgId?.trim() || undefined
+          const projectOrgId = targetProject.organizationId?.trim() || undefined
+          if (threadOrgId !== projectOrgId) {
+            throw new Error('thread_set_project_org_mismatch')
+          }
         }
 
         await tx.mutate.thread.update({
@@ -700,7 +705,9 @@ export const chatMutatorDefinitions = {
     setDisabledToolKeys: defineMutator(
       setThreadDisabledToolKeysArgs,
       async ({ tx, args, ctx }) => {
-        const thread = await tx.run(zql.thread.where('threadId', args.threadId).one())
+        const thread = await tx.run(
+          zql.thread.where('threadId', args.threadId).one(),
+        )
         if (!thread || thread.userId !== ctx.userID) {
           return
         }
@@ -724,7 +731,8 @@ export const chatMutatorDefinitions = {
         })
         const mode = resolveEffectiveChatMode({
           orgEnforcedModeId: orgPolicy?.enforcedModeId,
-          threadModeId: typeof thread.modeId === 'string' ? thread.modeId : undefined,
+          threadModeId:
+            typeof thread.modeId === 'string' ? thread.modeId : undefined,
         })
         const nextDisabledToolKeys = sanitizeThreadDisabledToolKeys({
           modelId: thread.model,

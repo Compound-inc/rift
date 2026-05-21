@@ -8,6 +8,7 @@ import { useSideNav } from '@/components/layout/main-nav'
 import { usePageSidebarVisibility } from '@/components/layout/page-sidebar-visibility-context'
 import { m } from '@/paraglide/messages.js'
 import { ChatInput } from './chat-input'
+import { ChatProjectChip } from './chat-project-chip'
 import { ChatThread } from './chat-thread'
 
 /**
@@ -69,6 +70,7 @@ export function ChatPageShell() {
               )}
             </Button>
           </div>
+          <ChatProjectChip />
         </div>
       </div>
 

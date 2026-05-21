@@ -1,18 +1,14 @@
-// Project settings page (info, instruction, files, delete) \u2014 single sectioned
-// page per Q9 (Option B). Files section is a placeholder until Phase 6 wires
-// up the project-scoped file upload + RAG pipeline.
+// Project settings page (info / instruction / files / delete) in one
+// sectioned page (Q9, Option B).
 'use client'
 
-import {
-  useCallback,
-  useEffect,
-  useState,
-} from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useZero } from '@rocicorp/zero/react'
 import ArrowLeft from 'lucide-react/dist/esm/icons/arrow-left'
 import Trash2 from 'lucide-react/dist/esm/icons/trash-2'
 import { Button } from '@rift/ui/button'
+import { FormDialog } from '@rift/ui/dialog'
 import { Input } from '@rift/ui/input'
 import { Textarea } from '@rift/ui/textarea'
 import { toast } from 'sonner'
@@ -33,12 +29,11 @@ export function ProjectSettingsPage({ projectId }: { projectId: string }) {
   const [nameDraft, setNameDraft] = useState('')
   const [descriptionDraft, setDescriptionDraft] = useState('')
   const [instructionDraft, setInstructionDraft] = useState('')
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false)
 
-  /**
-   * Sync drafts from the live row whenever it changes. The drafts are local
-   * state so typing feels instant; the debounced effects below push changes
-   * back through Zero mutators.
-   */
+  // Drafts are local state so typing feels instant; the debounced effects
+  // below push changes back through Zero mutators.
   useEffect(() => {
     if (!project) return
     setNameDraft(project.name)
@@ -46,19 +41,14 @@ export function ProjectSettingsPage({ projectId }: { projectId: string }) {
     setInstructionDraft(project.customInstruction ?? '')
   }, [project])
 
-  /**
-   * Redirect home if the Project no longer exists (e.g. owner deleted it).
-   */
   useEffect(() => {
     if (projectResult.type === 'complete' && !project) {
       void navigate({ to: '/chat' })
     }
   }, [navigate, project, projectResult.type])
 
-  /**
-   * Debounced name save. We avoid calling the mutator on every keystroke to
-   * keep the live updatedAt timestamp from churning the sidebar order.
-   */
+  // Debounce name commits so the live `updatedAt` does not churn the sidebar
+  // order on every keystroke.
   useEffect(() => {
     if (!project) return
     const trimmed = nameDraft.trim()
@@ -112,24 +102,19 @@ export function ProjectSettingsPage({ projectId }: { projectId: string }) {
   }, [instructionDraft, project, projectId, z])
 
   const handleDelete = useCallback(async () => {
-    /**
-     * Soft-delete (ADR-0001). Confirmation is intentionally simple in v1; the
-     * threads attached to this Project keep their `project_id` and start
-     * rendering as loose threads in the chat sidebar.
-     */
-    const confirmed = window.confirm(
-      m.chat_project_delete_confirm({ name: project?.name ?? '' }),
-    )
-    if (!confirmed) return
+    setDeleteSubmitting(true)
     try {
       await z.mutate(mutators.projects.delete({ projectId })).client
       toast.success(m.chat_project_deleted())
+      setDeleteDialogOpen(false)
       navigate({ to: '/chat' })
     } catch (error) {
       console.error('Failed to delete project:', error)
       toast.error(m.chat_project_delete_failed())
+    } finally {
+      setDeleteSubmitting(false)
     }
-  }, [navigate, project?.name, projectId, z])
+  }, [navigate, projectId, z])
 
   if (!project) {
     return (
@@ -238,12 +223,28 @@ export function ProjectSettingsPage({ projectId }: { projectId: string }) {
           <p className="text-xs text-foreground-secondary">
             {m.chat_project_delete_helper()}
           </p>
-          <Button variant="danger" onClick={() => void handleDelete()}>
+          <Button
+            variant="danger"
+            onClick={() => setDeleteDialogOpen(true)}
+          >
             <Trash2 className="size-4" aria-hidden />
             {m.chat_project_delete_button()}
           </Button>
         </div>
       </section>
+
+      <FormDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title={m.chat_project_delete_dialog_title()}
+        description={m.chat_project_delete_confirm({ name: project.name })}
+        buttonText={m.chat_project_delete_button()}
+        buttonVariant="danger"
+        secondaryButtonText={m.common_cancel()}
+        onSecondaryClick={() => setDeleteDialogOpen(false)}
+        buttonDisabled={deleteSubmitting}
+        handleSubmit={handleDelete}
+      />
     </div>
   )
 }

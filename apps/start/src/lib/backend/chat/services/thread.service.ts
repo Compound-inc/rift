@@ -62,6 +62,7 @@ export type ThreadServiceShape = {
         | 'completed'
         | 'failed'
       readonly branchVersion: number
+      readonly projectId?: string
     },
     ThreadNotFoundError | ThreadForbiddenError | MessagePersistenceError
   >
@@ -76,6 +77,20 @@ export type ThreadServiceShape = {
     readonly threadId: string
     readonly requestId: string
   }) => Effect.Effect<void, MessagePersistenceError>
+  /**
+   * Loads the Project's `custom_instruction` for a Thread that belongs to
+   * a Project. Returns `{ instruction: undefined }` when the project is
+   * missing, soft-deleted, or not owned by `userId` so the caller can
+   * gracefully fall back to no project context.
+   */
+  readonly loadProjectInstruction: (input: {
+    readonly userId: string
+    readonly projectId: string
+    readonly requestId: string
+  }) => Effect.Effect<
+    { readonly instruction?: string },
+    MessagePersistenceError
+  >
   readonly setThreadMode: (input: {
     readonly userId: string
     readonly threadId: string
@@ -331,6 +346,7 @@ export class ThreadService extends ServiceMap.Service<
                 Array.isArray(thread.disabledToolKeys) ? thread.disabledToolKeys : [],
               generationStatus: thread.generationStatus,
               branchVersion: thread.branchVersion,
+              projectId: thread.projectId ?? undefined,
             }
           }),
       )
@@ -470,6 +486,49 @@ User message: ${trimmedMessage}`,
                   cause: String(error),
                 }),
             })
+          }),
+      )
+
+      const loadProjectInstruction = Effect.fn(
+        'ThreadService.loadProjectInstruction',
+      )(
+        ({
+          userId,
+          projectId,
+          requestId,
+        }: {
+          readonly userId: string
+          readonly projectId: string
+          readonly requestId: string
+        }) =>
+          Effect.gen(function* () {
+            const db = yield* loadDb({ requestId, threadId: projectId })
+            const project = yield* Effect.tryPromise({
+              try: () =>
+                db.run(zql.project.where('id', projectId).one()),
+              catch: (error) =>
+                new MessagePersistenceError({
+                  message: 'Failed to load project instruction',
+                  requestId,
+                  threadId: projectId,
+                  cause: String(error),
+                }),
+            })
+
+            // A missing, soft-deleted, or foreign-owned project falls back
+            // to no instruction; the orchestrator should still be able to
+            // generate a response without one.
+            if (!project || project.userId !== userId || project.deletedAt) {
+              return { instruction: undefined }
+            }
+
+            const trimmed = project.customInstruction?.trim()
+            return {
+              instruction:
+                typeof trimmed === 'string' && trimmed.length > 0
+                  ? trimmed
+                  : undefined,
+            }
           }),
       )
 
@@ -697,6 +756,7 @@ User message: ${trimmedMessage}`,
         assertThreadAccess,
         autoGenerateTitle,
         markThreadGenerationFailed,
+        loadProjectInstruction,
         setThreadMode,
         setThreadDisabledToolKeys,
         setThreadContextWindowMode,
@@ -821,6 +881,7 @@ User message: ${trimmedMessage}`,
           disabledToolKeys: thread.disabledToolKeys ?? [],
           generationStatus: 'completed' as const,
           branchVersion: 1,
+          projectId: undefined,
         }
       },
     ),
@@ -830,6 +891,9 @@ User message: ${trimmedMessage}`,
     markThreadGenerationFailed: Effect.fn(
       'ThreadService.markThreadGenerationFailedMemory',
     )(() => Effect.void),
+    loadProjectInstruction: Effect.fn(
+      'ThreadService.loadProjectInstructionMemory',
+    )(() => Effect.succeed({ instruction: undefined })),
     setThreadMode: Effect.fn('ThreadService.setThreadModeMemory')(
       ({ userId, threadId, modeId, requestId }) =>
         Effect.gen(function* () {

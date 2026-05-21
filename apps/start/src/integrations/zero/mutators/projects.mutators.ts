@@ -2,40 +2,20 @@ import { defineMutator } from '@rocicorp/zero'
 import { z } from 'zod'
 import { zql } from '../zql'
 
-/**
- * Project mutators.
- *
- * Authorization model:
- * - Create: only an authenticated, non-anonymous user can create a Project.
- *   The new Project is owned by `ctx.userID`. If the caller has an active
- *   org context, `organizationId` is recorded; otherwise the Project is a
- *   user-only Project.
- * - Mutate / soft-delete: only the owner can change a Project. Org members
- *   reading an org-shared Project cannot mutate it in v1; this matches the
- *   "Project context is unconditional" stance of ADR-0003 and keeps the
- *   permission model boring. Loosen later if real users need it.
- *
- * Soft-delete (ADR-0001): `delete` sets `deleted_at = Date.now()` and never
- * removes rows. Reads must filter `deletedAt IS NULL`.
- */
-
 const PROJECT_NAME_MAX = 80
 const PROJECT_DESCRIPTION_MAX = 500
 const PROJECT_INSTRUCTION_MAX = 8000
+const PROJECT_ICON_MAX = 64
+const PROJECT_COLOR_MAX = 32
 
 const createProjectArgs = z.object({
-  /**
-   * Client-generated project id (matches the threads.create pattern). The
-   * mutator rejects creates that collide with an existing id owned by a
-   * different user, but tolerates idempotent retries from the same owner.
-   */
   projectId: z.string().trim().min(1),
   name: z.string().trim().min(1).max(PROJECT_NAME_MAX),
   description: z.string().trim().max(PROJECT_DESCRIPTION_MAX).optional(),
   customInstruction: z.string().max(PROJECT_INSTRUCTION_MAX).optional(),
   visibility: z.enum(['private', 'org']).optional(),
-  icon: z.string().trim().max(64).optional(),
-  color: z.string().trim().max(32).optional(),
+  icon: z.string().trim().max(PROJECT_ICON_MAX).optional(),
+  color: z.string().trim().max(PROJECT_COLOR_MAX).optional(),
   createdAt: z.number().int().nonnegative(),
 })
 
@@ -60,14 +40,14 @@ const setVisibilityArgs = projectIdArgs.extend({
 })
 
 const setIconArgs = projectIdArgs.extend({
-  icon: z.string().trim().max(64).nullable(),
+  icon: z.string().trim().max(PROJECT_ICON_MAX).nullable(),
 })
 
 const setColorArgs = projectIdArgs.extend({
-  color: z.string().trim().max(32).nullable(),
+  color: z.string().trim().max(PROJECT_COLOR_MAX).nullable(),
 })
 
-/** Loads the project iff it exists and the caller owns it. Returns null otherwise. */
+/** Loads the project iff it exists, the caller owns it, and it is not soft-deleted. */
 async function loadOwnedProject(input: {
   readonly tx: any
   readonly userID: string
@@ -82,6 +62,13 @@ async function loadOwnedProject(input: {
   return project
 }
 
+/**
+ * Project mutators.
+ *
+ * Authorization: only the owner (`userId === ctx.userID`) can mutate or
+ * soft-delete a project; org members reading an org-shared project cannot
+ * mutate it in v1
+ */
 export const projectMutatorDefinitions = {
   projects: {
     create: defineMutator(createProjectArgs, async ({ tx, args, ctx }) => {
@@ -101,12 +88,11 @@ export const projectMutatorDefinitions = {
         return
       }
 
-      const visibility = args.visibility ?? 'private'
-      // org-shared visibility requires an active org context; without one we
-      // silently downgrade to private rather than throwing — keeps the client
-      // free of ordering bugs around org switches.
+      // Org-shared visibility silently downgrades to private when the caller
+      // has no active org context, rather than throwing — avoids brittle
+      // failures around org-switch ordering on the client.
       const orgId = ctx.organizationId?.trim()
-      const effectiveVisibility = visibility === 'org' && orgId ? 'org' : 'private'
+      const visibility = args.visibility === 'org' && orgId ? 'org' : 'private'
 
       await tx.mutate.project.insert({
         id: args.projectId,
@@ -115,10 +101,9 @@ export const projectMutatorDefinitions = {
         name: args.name,
         description: args.description ?? undefined,
         customInstruction: args.customInstruction ?? undefined,
-        visibility: effectiveVisibility,
+        visibility,
         icon: args.icon ?? undefined,
         color: args.color ?? undefined,
-        deletedAt: undefined,
         createdAt: args.createdAt,
         updatedAt: args.createdAt,
       })
@@ -130,9 +115,7 @@ export const projectMutatorDefinitions = {
         userID: ctx.userID,
         projectId: args.projectId,
       })
-      if (!project || project.name === args.name) {
-        return
-      }
+      if (!project || project.name === args.name) return
       await tx.mutate.project.update({
         id: project.id,
         name: args.name,
@@ -148,13 +131,8 @@ export const projectMutatorDefinitions = {
           userID: ctx.userID,
           projectId: args.projectId,
         })
-        if (!project) {
-          return
-        }
         const next = args.description ?? undefined
-        if ((project.description ?? undefined) === next) {
-          return
-        }
+        if (!project || (project.description ?? undefined) === next) return
         await tx.mutate.project.update({
           id: project.id,
           description: next,
@@ -171,11 +149,8 @@ export const projectMutatorDefinitions = {
           userID: ctx.userID,
           projectId: args.projectId,
         })
-        if (!project) {
-          return
-        }
         const next = args.customInstruction ?? undefined
-        if ((project.customInstruction ?? undefined) === next) {
+        if (!project || (project.customInstruction ?? undefined) === next) {
           return
         }
         await tx.mutate.project.update({
@@ -194,16 +169,11 @@ export const projectMutatorDefinitions = {
           userID: ctx.userID,
           projectId: args.projectId,
         })
-        if (!project) {
-          return
-        }
-        // Cannot promote to org-shared without an active org context.
+        if (!project) return
         if (args.visibility === 'org' && !ctx.organizationId?.trim()) {
           throw new Error('project_visibility_requires_org_context')
         }
-        if (project.visibility === args.visibility) {
-          return
-        }
+        if (project.visibility === args.visibility) return
         await tx.mutate.project.update({
           id: project.id,
           visibility: args.visibility,
@@ -218,13 +188,8 @@ export const projectMutatorDefinitions = {
         userID: ctx.userID,
         projectId: args.projectId,
       })
-      if (!project) {
-        return
-      }
       const next = args.icon ?? undefined
-      if ((project.icon ?? undefined) === next) {
-        return
-      }
+      if (!project || (project.icon ?? undefined) === next) return
       await tx.mutate.project.update({
         id: project.id,
         icon: next,
@@ -238,13 +203,8 @@ export const projectMutatorDefinitions = {
         userID: ctx.userID,
         projectId: args.projectId,
       })
-      if (!project) {
-        return
-      }
       const next = args.color ?? undefined
-      if ((project.color ?? undefined) === next) {
-        return
-      }
+      if (!project || (project.color ?? undefined) === next) return
       await tx.mutate.project.update({
         id: project.id,
         color: next,
@@ -253,9 +213,9 @@ export const projectMutatorDefinitions = {
     }),
 
     /**
-     * Soft-delete (ADR-0001). Sets `deleted_at` and stops here — Threads and
-     * attachments retain their `project_id` and become invisible to UI via
-     * the `deletedAt IS NULL` filter applied on every read path.
+     * Soft-delete. Sets `deleted_at`; threads and attachments keep
+     * their `project_id` and become invisible to UI via the `deletedAt IS
+     * NULL` filter applied on every read path.
      */
     delete: defineMutator(projectIdArgs, async ({ tx, args, ctx }) => {
       const project = await loadOwnedProject({
@@ -263,9 +223,7 @@ export const projectMutatorDefinitions = {
         userID: ctx.userID,
         projectId: args.projectId,
       })
-      if (!project) {
-        return
-      }
+      if (!project) return
       const now = Date.now()
       await tx.mutate.project.update({
         id: project.id,

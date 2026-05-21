@@ -7,9 +7,8 @@ export const Route = createFileRoute('/(app)/_layout/chat')({
 })
 
 /**
- * Reserved first-path-segments under `/chat/` that are not thread IDs. Today
- * only `projects` is reserved. When a path begins with `/chat/<reserved>/...`
- * we leave `threadId` undefined and let child routes render the page.
+ * First-path-segments under `/chat/` that are not thread IDs. Today only
+ * `projects` is reserved.
  */
 const RESERVED_FIRST_SEGMENTS = new Set(['projects'])
 
@@ -22,21 +21,13 @@ function ChatLayout() {
     : ''
   const firstSegment = trailing.length > 0 ? trailing.split('/')[0] : ''
 
-  /**
-   * `firstSegment` is `''` for `/chat` itself (welcome screen),
-   * `'<threadId>'` for `/chat/:threadId`, or a reserved string for routed
-   * sub-pages like `/chat/projects/:projectId`.
-   */
   const threadId =
     firstSegment.length > 0 && !RESERVED_FIRST_SEGMENTS.has(firstSegment)
       ? firstSegment
       : undefined
 
-  /**
-   * Project pages render their own content; suppressing `ChatPageShell` here
-   * prevents the chat thread + composer from double-rendering behind the
-   * project route's own UI.
-   */
+  // Project pages render their own content; suppressing ChatPageShell here
+  // prevents the chat thread + composer from double-rendering behind it.
   const isProjectRoute = firstSegment === 'projects'
 
   return (

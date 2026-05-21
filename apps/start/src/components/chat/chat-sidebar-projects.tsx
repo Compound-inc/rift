@@ -1,8 +1,8 @@
-// Sidebar section listing the user's Projects, sitting between the static
+// Sidebar section listing the user's Projects. Sits between the static
 // "New chat / Search" actions and the date-grouped thread history.
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery, useZero } from '@rocicorp/zero/react'
 import Folder from 'lucide-react/dist/esm/icons/folder'
@@ -15,26 +15,15 @@ import { m } from '@/paraglide/messages.js'
 
 export const PROJECTS_HREF_BASE = '/chat/projects'
 
-/**
- * Resolves the icon component for a Project row. Project rows use a generic
- * folder glyph in v1; the schema reserves `icon` and `color` columns for a
- * future iteration where users can customise the visual.
- */
-function ProjectIcon(props: React.ComponentProps<typeof Folder>) {
-  return <Folder {...props} />
-}
-
-/**
- * Renders the "Projects" section in the chat sidebar. Subscribes directly to
- * `queries.projects.list`; the result set is small so we render flat without
- * virtualization.
- */
 export function ChatSidebarProjects({ pathname }: { pathname: string }) {
   const z = useZero()
   const navigate = useNavigate()
   const [projects] = useQuery(queries.projects.list({}))
+  const [creating, setCreating] = useState(false)
 
   const handleCreateProject = useCallback(async () => {
+    if (creating) return
+    setCreating(true)
     const projectId = crypto.randomUUID()
     const createdAt = Date.now()
     try {
@@ -52,8 +41,10 @@ export function ChatSidebarProjects({ pathname }: { pathname: string }) {
     } catch (error) {
       console.error('Failed to create project:', error)
       toast.error(m.chat_sidebar_project_create_failed())
+    } finally {
+      setCreating(false)
     }
-  }, [navigate, z])
+  }, [creating, navigate, z])
 
   const newProjectItem: NavItemType = {
     name: m.chat_sidebar_project_create(),
@@ -72,7 +63,7 @@ export function ChatSidebarProjects({ pathname }: { pathname: string }) {
         const item: NavItemType = {
           name: project.name,
           href: `${PROJECTS_HREF_BASE}/${project.id}`,
-          icon: ProjectIcon,
+          icon: Folder,
         }
         return (
           <SidebarNavItem key={project.id} item={item} pathname={pathname} />

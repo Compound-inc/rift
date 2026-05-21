@@ -1,11 +1,10 @@
+import type { ExpressionBuilder } from '@rocicorp/zero'
 import { defineQuery } from '@rocicorp/zero'
 import { z } from 'zod'
+import type { Schema } from '../schema'
 import { zql } from '../zql'
 
-/**
- * Cursor for the project page's virtualized thread list. Mirrors the chat
- * sidebar's history cursor so we can reuse the same Zero virtualizer plumbing.
- */
+/** Cursor for the project page's virtualized thread list. */
 export const projectThreadsCursor = z.object({
   pinned: z.boolean(),
   updatedAt: z.number(),
@@ -29,18 +28,16 @@ const projectAttachmentsArgs = z.object({
 })
 
 /**
- * Builds the visibility predicate for the `project` table:
+ * Visibility predicate for the `project` table:
  * - the caller owns the project, OR
  * - the project is `visibility = 'org'` and the caller is a member of the
- *   matching organization (and the caller has an active org context).
- *
- * Returned as an `ExpressionFactory` so it composes with `.where(...)`.
+ *   matching organization (and has an active org context).
  */
 function projectVisibleToCaller(input: {
   readonly userID: string
   readonly organizationId?: string
 }) {
-  return (eb: Parameters<Parameters<typeof zql.project.where>[0] & object>[0]) => {
+  return (eb: ExpressionBuilder<'project', Schema>) => {
     const { or, and, cmp, exists } = eb
     return or(
       cmp('userId', input.userID),
@@ -60,52 +57,33 @@ function projectVisibleToCaller(input: {
 }
 
 /**
- * Project queries.
- *
- * Visibility rules (CONTEXT.md, Q3):
- * - A user always sees Projects they own (`userId === ctx.userID`).
- * - A user additionally sees Projects with `visibility === 'org'` whose
- *   `organizationId` matches their active org context AND in which they are
- *   an organization member.
- *
- * Soft-delete rule (ADR-0001): every read filters `deletedAt IS NULL`.
+ * Project queries. Visibility rules and soft-delete behaviour are applied on
+ * every read path.
  */
 export const projectQueryDefinitions = {
   projects: {
-    /**
-     * Projects visible to the current user, ordered by recency. The sidebar
-     * binds to this query directly; the result set is expected to be small
-     * (single-digit to low-double-digit per user) so we do not paginate.
-     */
     list: defineQuery(z.object({}).optional(), ({ ctx }) => {
       const orgId = ctx.organizationId?.trim()
       return zql.project
-        .where(projectVisibleToCaller({ userID: ctx.userID, organizationId: orgId }))
+        .where(
+          projectVisibleToCaller({ userID: ctx.userID, organizationId: orgId }),
+        )
         .where('deletedAt', 'IS', null)
         .orderBy('updatedAt', 'desc')
         .orderBy('id', 'desc')
     }),
 
-    /**
-     * Single project by id, with the same visibility rules as `list`.
-     * Returned `.one()` so the consumer can render a not-found state.
-     */
     byId: defineQuery(projectByIdArgs, ({ args, ctx }) => {
       const orgId = ctx.organizationId?.trim()
       return zql.project
         .where('id', args.projectId)
-        .where(projectVisibleToCaller({ userID: ctx.userID, organizationId: orgId }))
+        .where(
+          projectVisibleToCaller({ userID: ctx.userID, organizationId: orgId }),
+        )
         .where('deletedAt', 'IS', null)
         .one()
     }),
 
-    /**
-     * Cursor-based threads list for the project page. Mirrors
-     * `threads.historyPage` shape so we can reuse the virtualizer.
-     *
-     * The Project's own visibility is enforced via the `project` exists
-     * subquery, which also re-applies the soft-delete filter.
-     */
     threadsPage: defineQuery(projectThreadsPageArgs, ({ args, ctx }) => {
       const orderDirection = args.dir === 'forward' ? 'desc' : 'asc'
       const orgId = ctx.organizationId?.trim()
@@ -136,11 +114,6 @@ export const projectQueryDefinitions = {
       return q
     }),
 
-    /**
-     * Project files (RAG corpus). Used by the Settings page Files section.
-     * Visibility is inherited from the parent Project via the `project` exists
-     * subquery, which also re-applies the soft-delete filter.
-     */
     attachments: defineQuery(projectAttachmentsArgs, ({ args, ctx }) => {
       const orgId = ctx.organizationId?.trim()
       return zql.attachment

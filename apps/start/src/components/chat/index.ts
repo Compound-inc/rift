@@ -2,6 +2,7 @@ export {
   ChatProvider,
   useChat,
   useChatActions,
+  useChatComposer,
   useChatMessages,
 } from './chat-context'
 export { ChatMessage } from './chat-message'

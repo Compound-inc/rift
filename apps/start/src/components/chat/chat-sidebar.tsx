@@ -38,6 +38,7 @@ import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 import { useOrgBillingSummary } from '@/lib/frontend/billing/use-org-billing'
 import { m } from '@/paraglide/messages.js'
 import { openChatSearchCommand } from './chat-search-command'
+import { ThreadMoveToProjectSubmenu } from './chat-sidebar-move-to-project'
 import { ChatSidebarProjects } from './chat-sidebar-projects'
 import { resolveChatSidebarDateGroup } from './chat-sidebar-date-groups'
 import type { ChatSidebarDateGroupKey } from './chat-sidebar-date-groups'
@@ -83,6 +84,7 @@ type ThreadItemRow = {
   readonly pinned: boolean
   readonly updatedAt: number
   readonly generationStatus?: ThreadHistoryRow['generationStatus']
+  readonly projectId?: string | null
 }
 
 type ThreadHistoryListContext = {
@@ -284,6 +286,10 @@ function buildThreadItem({
             {thread.pinned ? <PinOff /> : <Pin />}
             {thread.pinned ? m.chat_sidebar_unpin() : m.chat_sidebar_pin()}
           </ContextMenuItem>
+          <ThreadMoveToProjectSubmenu
+            threadId={thread.threadId}
+            currentProjectId={thread.projectId ?? null}
+          />
           <ContextMenuSeparator />
           <ContextMenuItem
             variant="destructive"

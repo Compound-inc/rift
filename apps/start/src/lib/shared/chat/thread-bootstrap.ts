@@ -12,7 +12,7 @@ export type BootstrapThreadRecord = {
   readonly createdAt: number
   readonly updatedAt: number
   readonly lastMessageAt: number
-  readonly generationStatus: 'pending'
+  readonly generationStatus: 'pending' | 'completed'
   readonly visibility: 'visible'
   readonly userSetTitle: false
   readonly userId: string
@@ -39,6 +39,15 @@ type BootstrapThreadInput = {
   readonly organizationId?: string
   readonly disabledToolKeys?: readonly string[]
   readonly projectId?: string
+  /**
+   * Bootstrap status. Defaults to `'pending'` for the first-message-creates-
+   * the-thread flow (a generation is about to start). Pass `'completed'`
+   * when pre-creating a thread that has no generation pending yet (e.g. the
+   * project page's "new chat in project" button), otherwise the chat
+   * client will try to resume a non-existent stream before the server has
+   * observed the new row.
+   */
+  readonly bootstrapStatus?: 'pending' | 'completed'
 }
 
 /**
@@ -68,7 +77,7 @@ export function buildBootstrapThreadRecord(
     createdAt: input.createdAt,
     updatedAt: input.createdAt,
     lastMessageAt: input.createdAt,
-    generationStatus: 'pending',
+    generationStatus: input.bootstrapStatus ?? 'pending',
     visibility: 'visible',
     userSetTitle: false,
     userId: input.userId,

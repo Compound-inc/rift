@@ -342,11 +342,7 @@ const attachment = table('attachment')
   })
   .primaryKey('id')
 
-/**
- * Project (chat-projects feature). A user-owned container that groups Threads
- * and applies a shared custom instruction + Project files (via RAG) to every
- * Thread inside it. See CONTEXT.md and ADR-0001/0002/0003.
- */
+/** Project (chat-projects feature). See CONTEXT.md. */
 const project = table('project')
   .from('projects')
   .columns({
@@ -481,10 +477,9 @@ const messageRelationships = relationships(message, ({ one }) => ({
 }))
 
 /**
- * Project relationships expose threads, attachments, and the owning user/org
- * so callers can `.related('threads')` etc. Read paths must additionally
- * filter `project.deletedAt` IS NULL — Zero relationships do not enforce
- * the soft-delete predicate.
+ * Project relationships. Read paths must additionally filter
+ * `project.deletedAt IS NULL` — Zero relationships do not enforce the
+ * soft-delete predicate.
  */
 const projectRelationships = relationships(project, ({ one, many }) => ({
   user: one({
