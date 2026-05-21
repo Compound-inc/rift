@@ -14,6 +14,8 @@ import { cn } from '@rift/utils'
 import { Popover, PopoverContent, PopoverTrigger } from '@rift/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@rift/ui/tooltip'
 import { getCatalogModel, getProviderIcon } from '@/lib/shared/ai-catalog'
+import { getModelCostTier } from '@/lib/shared/ai-catalog/cost-tier'
+import type { AiModelCostTier } from '@/lib/shared/ai-catalog/cost-tier'
 import type { AiModelCatalogEntry } from '@/lib/shared/ai-catalog/types'
 import type { CatalogProviderId } from '@/lib/shared/ai-catalog/provider-tools'
 import type {PaidWorkspacePlanId} from '@/lib/shared/access-control';
@@ -48,6 +50,53 @@ const CAPABILITY_ORDER: Array<keyof typeof CAPABILITY_ICONS> = [
   'supportsImageInput',
   'supportsPdfInput',
 ]
+
+/**
+ * Visual recipe per cost tier. The indicator renders three slots that are
+ * either filled with a colored "$" or a muted dot, plus an optional trailing
+ * "+" so the most expensive tier reads as "off the scale". Colors progress
+ * from muted gray (cheapest) through emerald/amber/orange to red, giving both
+ * a length and a hue gradient.
+ */
+const COST_TIER_VISUALS: Record<
+  AiModelCostTier,
+  {
+    /** Number of "$" glyphs to render in the three-slot indicator. */
+    readonly dollarCount: 0 | 1 | 2 | 3
+    /** Tailwind classes applied to the colored "$" glyphs only. */
+    readonly colorClass: string
+    /** When true, render a trailing "+" after the three slots. */
+    readonly overflow: boolean
+  }
+> = {
+  very_low: {
+    dollarCount: 0,
+    colorClass: '',
+    overflow: false,
+  },
+  low: {
+    dollarCount: 1,
+    colorClass: 'text-emerald-700/85 dark:text-emerald-400/80',
+    overflow: false,
+  },
+  medium: {
+    dollarCount: 2,
+    colorClass: 'text-amber-600/85 dark:text-amber-400/80',
+    overflow: false,
+  },
+  high: {
+    dollarCount: 3,
+    colorClass: 'text-orange-600/85 dark:text-orange-400/80',
+    overflow: false,
+  },
+  very_high: {
+    dollarCount: 3,
+    colorClass: 'text-red-600/85 dark:text-red-400',
+    overflow: true,
+  },
+}
+
+const COST_TIER_SLOT_COUNT = 3
 
 export type SelectableModelOption = {
   readonly id: string
@@ -85,10 +134,21 @@ export function ModelSelectorPanel({
     supportsImageInput: m.chat_model_capability_images(),
     supportsPdfInput: m.chat_model_capability_pdf(),
   }
+  const costTierLabels: Record<AiModelCostTier, string> = {
+    very_low: m.chat_model_cost_very_low(),
+    low: m.chat_model_cost_low(),
+    medium: m.chat_model_cost_medium(),
+    high: m.chat_model_cost_high(),
+    very_high: m.chat_model_cost_very_high(),
+  }
 
   const selectedCatalog = React.useMemo(
     () => (value ? getCatalogModel(value) : undefined),
     [value],
+  )
+  const selectedCostTier = React.useMemo(
+    () => (selectedCatalog ? getModelCostTier(selectedCatalog) : undefined),
+    [selectedCatalog],
   )
 
   React.useEffect(() => {
@@ -171,6 +231,24 @@ export function ModelSelectorPanel({
             })()
           : null}
         <span className="truncate font-normal">{triggerLabel}</span>
+        {selectedCostTier ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <span
+                  className="inline-flex shrink-0 items-center justify-center rounded outline-none"
+                  aria-label={costTierLabels[selectedCostTier]}
+                  data-cost-tier={selectedCostTier}
+                >
+                  <CostTierIndicator tier={selectedCostTier} />
+                </span>
+              }
+            />
+            <TooltipContent side="top" sideOffset={8}>
+              <p className="text-xs">{costTierLabels[selectedCostTier]}</p>
+            </TooltipContent>
+          </Tooltip>
+        ) : null}
         <ChevronDown
           className="pointer-events-none absolute ltr:right-2 rtl:left-2 top-1/2 size-4 -translate-y-1/2 text-foreground-secondary shrink-0"
           aria-hidden
@@ -291,6 +369,7 @@ export function ModelSelectorPanel({
                         minimumPlanId={opt.minimumPlanId}
                         onSelect={handleSelect}
                         capabilityLabels={capabilityLabels}
+                        costTierLabels={costTierLabels}
                         style={{
                           contentVisibility: 'auto',
                           containIntrinsicSize: '0 60px',
@@ -316,6 +395,7 @@ interface ModelRowProps {
   minimumPlanId?: PaidWorkspacePlanId
   onSelect: (id: string) => void
   capabilityLabels: Record<keyof typeof CAPABILITY_ICONS, string>
+  costTierLabels: Record<AiModelCostTier, string>
   style?: React.CSSProperties
 }
 
@@ -327,11 +407,14 @@ const ModelRow = React.memo(function ModelRow({
   minimumPlanId,
   onSelect,
   capabilityLabels,
+  costTierLabels,
   style,
 }: ModelRowProps) {
   const capabilities = CAPABILITY_ORDER.filter(
     (key) => model.capabilities[key as keyof typeof model.capabilities],
   )
+  const costTier = getModelCostTier(model)
+  const costTierLabel = costTier ? costTierLabels[costTier] : null
 
   const buttonContent = (
     <button
@@ -369,7 +452,27 @@ const ModelRow = React.memo(function ModelRow({
             ) : null
           })()}
           <div className="min-w-0">
-            <div className="truncate">{displayName}</div>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="truncate">{displayName}</span>
+              {costTier && costTierLabel ? (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <span
+                        className="inline-flex shrink-0 items-center justify-center rounded outline-none"
+                        aria-label={costTierLabel}
+                        data-cost-tier={costTier}
+                      >
+                        <CostTierIndicator tier={costTier} />
+                      </span>
+                    }
+                  />
+                  <TooltipContent side="top" sideOffset={8}>
+                    <p className="text-xs">{costTierLabel}</p>
+                  </TooltipContent>
+                </Tooltip>
+              ) : null}
+            </div>
             <div
               className={cn(
                 'text-xs line-clamp-1 mt-0.5',
@@ -430,6 +533,35 @@ const ModelRow = React.memo(function ModelRow({
 
   return buttonContent
 })
+
+/**
+ * Renders the three-slot "$$$" cost indicator for a single tier. Filled slots
+ * use the tier's color class; remaining slots fall back to a muted middle dot.
+ * The trailing "+" appears only for the highest tier so users see at a glance
+ * that costs run beyond the rest of the catalog.
+ */
+function CostTierIndicator({ tier }: { tier: AiModelCostTier }) {
+  const visual = COST_TIER_VISUALS[tier]
+  const slots = Array.from({ length: COST_TIER_SLOT_COUNT }, (_, index) =>
+    index < visual.dollarCount ? '$' : '·',
+  )
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-flex items-center gap-0 font-mono text-xs font-semibold tabular-nums tracking-tight text-foreground-secondary/70"
+    >
+      {slots.map((glyph, index) => (
+        <span
+          key={index}
+          className={glyph === '$' ? visual.colorClass : undefined}
+        >
+          {glyph}
+        </span>
+      ))}
+      {visual.overflow ? <span>+</span> : null}
+    </span>
+  )
+}
 
 interface ProviderButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   isActive: boolean

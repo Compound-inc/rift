@@ -116,8 +116,53 @@ function DashedLineVertical({ className }: { className?: string }) {
 /**
  * Frame with dashed borders around the pricing card grid. Renders top, left,
  * right, and bottom SVG lines with responsive positioning.
+ *
+ * `frameClassName` opts into a uniform-inset layout where all four borders are
+ * positioned relative to a single rectangle whose offsets you control. This
+ * is what callers wrapping a smaller card (e.g. the standalone enterprise
+ * card on the billing page) want — they pass something like
+ * `inset-4 sm:inset-6 lg:inset-8` to tighten the frame.
+ *
+ * When `frameClassName` is omitted we keep the legacy responsive layout used
+ * by the pricing-comparison table, which has hand-tuned `max-lg:` overrides
+ * for that specific full-width grid context.
  */
-export function DashedBorderFrame({ children }: { children: React.ReactNode }) {
+export function DashedBorderFrame({
+  children,
+  frameClassName,
+}: {
+  children: React.ReactNode
+  frameClassName?: string
+}) {
+  if (frameClassName) {
+    return (
+      <>
+        <div
+          className={`pointer-events-none absolute ${frameClassName}`}
+          aria-hidden="true"
+        >
+          {/* Top border */}
+          <div className="absolute inset-x-0 top-0 flex w-full items-center justify-center">
+            <DashedLineHorizontal className="inline-block h-auto w-full will-change-transform" />
+          </div>
+          {/* Left border */}
+          <div className="absolute inset-y-0 left-0 flex h-full items-center justify-center">
+            <DashedLineVertical className="inline-block h-full max-w-full will-change-transform" />
+          </div>
+          {/* Right border */}
+          <div className="absolute inset-y-0 right-0 flex h-full items-center justify-center">
+            <DashedLineVertical className="inline-block h-full max-w-full will-change-transform" />
+          </div>
+          {/* Bottom border */}
+          <div className="absolute inset-x-0 bottom-0 flex w-full items-center justify-center">
+            <DashedLineHorizontal className="inline-block h-auto w-full will-change-transform" />
+          </div>
+        </div>
+        {children}
+      </>
+    )
+  }
+
   return (
     <>
       {/* Top border */}

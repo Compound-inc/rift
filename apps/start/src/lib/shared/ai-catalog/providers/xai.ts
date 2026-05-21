@@ -17,6 +17,46 @@ function xaiDefaultProviderOptions(): Record<string, unknown> {
 
 export const XAI_MODELS: readonly AiModelCatalogEntry<'xai'>[] = [
   {
+    id: 'xai/grok-4.3',
+    providerId: 'xai',
+    providers: ['gateway'],
+    name: 'Grok 4.3',
+    description:
+      'Grok 4.3 matches the scale of Grok 4.20 with an improved architecture and a December 2025 knowledge cutoff.',
+    contextWindow: 1000000,
+    zeroDataRetention: false,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: true,
+      supportsPdfInput: false,
+    },
+    providerToolIds: ['web_search', 'x_search', 'code_execution'],
+    reasoningEfforts: [],
+    defaultProviderOptions: xaiDefaultProviderOptions(),
+    defaultMaxOutputTokens: 128000,
+    pricing: {
+      inputPerToken: '0.00000125',
+      outputPerToken: '0.0000025',
+      inputCacheReadPerToken: '0.0000002',
+      webSearchPerRequest: '5',
+      inputTiers: [
+        { cost: '0.00000125', min: 0, max: 200001 },
+        { cost: '0.0000025', min: 200001 },
+      ],
+      outputTiers: [
+        { cost: '0.0000025', min: 0, max: 200001 },
+        { cost: '0.000005', min: 200001 },
+      ],
+      inputCacheReadTiers: [
+        { cost: '0.0000002', min: 0, max: 200001 },
+        { cost: '0.0000004', min: 200001 },
+      ],
+    },
+  },
+  {
     id: 'xai/grok-4.1-fast-reasoning',
     providerId: 'xai',
     providers: ['gateway'],

@@ -20,6 +20,56 @@ function alibabaReasoningOptions(
 
 export const ALIBABA_MODELS: readonly AiModelCatalogEntry<'alibaba'>[] = [
   {
+    id: 'alibaba/qwen-3.6-max-preview',
+    providerId: 'alibaba',
+    providers: ['gateway'],
+    name: 'Qwen 3.6 Max Preview',
+    description:
+      'Compared with Qwen3-Max and Qwen3.6-Plus, this model features enhanced vibe coding abilities, more efficient coding agent execution, and significantly improved front-end development. Long-tail knowledge retention has also been upgraded.',
+    contextWindow: 240000,
+    zeroDataRetention: false,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: true,
+      supportsPdfInput: false,
+    },
+    providerToolIds: [],
+    reasoningEfforts: ['low', 'medium', 'high'],
+    defaultReasoningEffort: 'medium',
+    providerOptionsByReasoning: {
+      low: alibabaReasoningOptions(2048),
+      medium: alibabaReasoningOptions(8192),
+      high: alibabaReasoningOptions(16384),
+    },
+    defaultProviderOptions: alibabaReasoningOptions(8192),
+    defaultMaxOutputTokens: 64000,
+    pricing: {
+      inputPerToken: '0.0000013',
+      outputPerToken: '0.0000078',
+      inputCacheReadPerToken: '0.00000026',
+      inputCacheWritePerToken: '0.000001625',
+      inputTiers: [
+        { cost: '0.0000013', min: 0, max: 128001 },
+        { cost: '0.000002', min: 128000 },
+      ],
+      outputTiers: [
+        { cost: '0.0000078', min: 0, max: 128001 },
+        { cost: '0.000012', min: 128000 },
+      ],
+      inputCacheReadTiers: [
+        { cost: '0.00000026', min: 0, max: 128001 },
+        { cost: '0.0000002', min: 128000 },
+      ],
+      inputCacheWriteTiers: [
+        { cost: '0.000001625', min: 0, max: 128001 },
+        { cost: '0.0000025', min: 128000 },
+      ],
+    },
+  },
+  {
     id: 'alibaba/qwen3.6-plus',
     providerId: 'alibaba',
     providers: ['gateway'],

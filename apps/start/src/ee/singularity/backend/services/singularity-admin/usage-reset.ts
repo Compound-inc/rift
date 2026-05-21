@@ -1,4 +1,5 @@
 import { Effect } from 'effect'
+import { PgClient } from '@effect/sql-pg'
 import {
   syncOrganizationUsageQuotaStateEffect,
 } from '@/lib/backend/billing/services/workspace-usage/policy-store'
@@ -377,7 +378,7 @@ export const resetOrganizationUsageEffect = Effect.fn(
         organizationId: input.organizationId,
         client,
         now,
-      })
+      }).pipe(Effect.provideService(PgClient.PgClient, client))
       yield* writeZeroUsageSummaries(client, {
         organizationId: input.organizationId,
         cycleStartAt: now,
