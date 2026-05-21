@@ -23,4 +23,4 @@ Each backend domain should follow this structure when applicable:
 - Backend code must not import from `lib/frontend/**`.
 - Cross-layer shared logic belongs in `lib/shared/**`.
 
-This keeps execution boundaries explicit.
+This keeps execution boundaries explicit
