@@ -33,6 +33,9 @@ const ZAI_PROVIDER_TOOL_REGISTRY: ProviderToolRegistry<'zai'> = {
 const XIAOMI_PROVIDER_TOOL_REGISTRY: ProviderToolRegistry<'xiaomi'> = {
   byId: {},
 }
+const OPENROUTER_PROVIDER_TOOL_REGISTRY: ProviderToolRegistry<'openrouter'> = {
+  byId: {},
+}
 
 type ProviderToolRegistries = {
   [P in CatalogProviderId]: ProviderToolRegistry<P>
@@ -48,6 +51,7 @@ const PROVIDER_TOOL_REGISTRIES: ProviderToolRegistries = {
   mistral: MISTRAL_PROVIDER_TOOL_REGISTRY,
   minimax: MINIMAX_PROVIDER_TOOL_REGISTRY,
   moonshotai: MOONSHOTAI_PROVIDER_TOOL_REGISTRY,
+  openrouter: OPENROUTER_PROVIDER_TOOL_REGISTRY,
   xai: XAI_PROVIDER_TOOL_REGISTRY,
   xiaomi: XIAOMI_PROVIDER_TOOL_REGISTRY,
   zai: ZAI_PROVIDER_TOOL_REGISTRY,

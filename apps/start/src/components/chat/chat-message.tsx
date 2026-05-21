@@ -4,6 +4,7 @@ import type { UIMessage } from 'ai'
 import { useDirection } from '@rift/ui/direction'
 import type { ChatMessageMetadata } from '@/lib/shared/chat-contracts/message-metadata'
 import type { ChatAttachment } from '@/lib/shared/chat-contracts/attachments'
+import { getCatalogModel } from '@/lib/shared/ai-catalog'
 import { AttachmentPreviewPill } from './attachment-preview-pill'
 import {
   AssistantMessageParts,
@@ -107,9 +108,12 @@ export function ChatMessage({
       typeof attachment.name === 'string' &&
       typeof attachment.contentType === 'string',
   )
-  const modelName = !isUser && typeof metadata?.model === 'string'
-    ? metadata.model
-    : null
+  const modelName = useMemo<string | null>(() => {
+    if (isUser) return null
+    const rawModelId = metadata?.model
+    if (typeof rawModelId !== 'string') return null
+    return getCatalogModel(rawModelId)?.name ?? rawModelId
+  }, [isUser, metadata?.model])
 
   useEffect(() => {
     if (isEditing || isSavingEdit) return

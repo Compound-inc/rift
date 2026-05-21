@@ -7,8 +7,9 @@ import type {
 } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createOpenAI } from '@ai-sdk/openai'
+import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { Effect, Layer, ServiceMap } from 'effect'
-import { getCatalogModelProviderRoute } from '@/lib/shared/ai-catalog'
+import { getCatalogModel, getCatalogModelProviderRoute } from '@/lib/shared/ai-catalog'
 import {
   toReadableErrorCause,
   toReadableErrorMessage,
@@ -27,16 +28,68 @@ type ProviderApiKeyOverride = {
   readonly apiKey: string
 }
 
-/**
- * Resolves the model object passed to AI SDK. By default we use gateway model
- * IDs as plain strings. When org BYOK override is active we switch to a
- * provider instance bound to the organization API key to prevent fallback.
- */
+export type OpenRouterRequestOptions = {
+  readonly enforceZdr?: boolean
+  readonly allowedModels?: readonly string[]
+}
+
+function readOpenRouterApiKey(): string {
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim()
+  if (!apiKey) {
+    throw new Error(
+      'OPENROUTER_API_KEY is not configured. Set it in the server environment to use the OpenRouter Auto Router.',
+    )
+  }
+  return apiKey
+}
+
+function createOpenRouterRuntimeModel(input: {
+  readonly modelId: string
+  readonly options?: OpenRouterRequestOptions
+}) {
+  const openrouter = createOpenRouter({ apiKey: readOpenRouterApiKey() })
+  const isAutoRouter = input.modelId === 'openrouter/auto'
+
+  return openrouter.chat(input.modelId, {
+    // Surfaces token + cost details on every response. Required by the
+    // generation-metrics extractor and the workspace usage settlement path.
+    usage: { include: true },
+    // ZDR is enforced via OpenRouter's provider preferences. The flag is
+    // strictly additive: passing `false` would not disable a globally
+    // enforced ZDR setting, so we omit the field unless requested.
+    ...(input.options?.enforceZdr ? { provider: { zdr: true } } : {}),
+    // Auto-router-specific plugin: when callers want to constrain the pool
+    // of selectable downstream models, we forward the list as wildcards via
+    // the `auto-router` plugin. Without it, OpenRouter uses its default
+    // curated set.
+    ...(isAutoRouter && input.options?.allowedModels?.length
+      ? {
+          plugins: [
+            {
+              id: 'auto-router' as const,
+              allowed_models: [...input.options.allowedModels],
+            },
+          ],
+        }
+      : {}),
+  })
+}
+
 function resolveRuntimeModel(input: {
   readonly modelId: string
   readonly providerApiKeyOverride?: ProviderApiKeyOverride
+  readonly openrouterOptions?: OpenRouterRequestOptions
 }) {
-  const { modelId, providerApiKeyOverride } = input
+  const { modelId, providerApiKeyOverride, openrouterOptions } = input
+
+  const catalogModel = getCatalogModel(modelId)
+  if (catalogModel?.providerId === 'openrouter') {
+    return createOpenRouterRuntimeModel({
+      modelId,
+      options: openrouterOptions,
+    })
+  }
+
   if (!providerApiKeyOverride) return modelId
   const providerRoute = getCatalogModelProviderRoute({
     modelId,
@@ -85,6 +138,11 @@ export type ModelGatewayServiceShape = {
     readonly messages: UIMessage[]
     readonly model: string
     readonly providerApiKeyOverride?: ProviderApiKeyOverride
+    /**
+     * OpenRouter-specific request options. Forwarded to the OpenRouter SDK
+     * for `openrouter/*` models and ignored for everything else.
+     */
+    readonly openrouterOptions?: OpenRouterRequestOptions
     readonly systemPrompt?: string
     readonly requestId: string
     readonly tools: ToolSet
@@ -115,6 +173,7 @@ export class ModelGatewayService extends ServiceMap.Service<
         messages,
         model,
         providerApiKeyOverride,
+        openrouterOptions,
         systemPrompt,
         requestId,
         tools,
@@ -127,6 +186,7 @@ export class ModelGatewayService extends ServiceMap.Service<
         readonly messages: UIMessage[]
         readonly model: string
         readonly providerApiKeyOverride?: ProviderApiKeyOverride
+        readonly openrouterOptions?: OpenRouterRequestOptions
         readonly systemPrompt?: string
         readonly requestId: string
         readonly tools: ToolSet
@@ -150,6 +210,7 @@ export class ModelGatewayService extends ServiceMap.Service<
             const runtimeModel = resolveRuntimeModel({
               modelId: model,
               providerApiKeyOverride,
+              openrouterOptions,
             })
 
             return streamText({

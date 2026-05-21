@@ -47,6 +47,10 @@ const XIAOMI_PROVIDER_TOOLS =
   [] as const satisfies readonly ProviderToolDefinition[]
 type XiaomiProviderToolId = (typeof XIAOMI_PROVIDER_TOOLS)[number]['id']
 
+const OPENROUTER_PROVIDER_TOOLS =
+  [] as const satisfies readonly ProviderToolDefinition[]
+type OpenRouterProviderToolId = (typeof OPENROUTER_PROVIDER_TOOLS)[number]['id']
+
 export const PROVIDER_TOOLS = {
   openai: OPENAI_PROVIDER_TOOLS,
   google: GOOGLE_PROVIDER_TOOLS,
@@ -56,6 +60,7 @@ export const PROVIDER_TOOLS = {
   mistral: MISTRAL_PROVIDER_TOOLS,
   minimax: MINIMAX_PROVIDER_TOOLS,
   moonshotai: MOONSHOTAI_PROVIDER_TOOLS,
+  openrouter: OPENROUTER_PROVIDER_TOOLS,
   xai: XAI_PROVIDER_TOOLS,
   xiaomi: XIAOMI_PROVIDER_TOOLS,
   zai: ZAI_PROVIDER_TOOLS,
@@ -71,6 +76,7 @@ export type CatalogProviderId =
   | 'mistral'
   | 'minimax'
   | 'moonshotai'
+  | 'openrouter'
   | 'xai'
   | 'xiaomi'
   | 'zai'
@@ -85,6 +91,7 @@ export type ProviderToolIdByProvider = {
   readonly mistral: MistralProviderToolId
   readonly minimax: MinimaxProviderToolId
   readonly moonshotai: MoonshotaiProviderToolId
+  readonly openrouter: OpenRouterProviderToolId
   readonly xai: XaiProviderToolId
   readonly xiaomi: XiaomiProviderToolId
   readonly zai: ZaiProviderToolId
@@ -149,6 +156,10 @@ export function getProviderToolDefinition<
   }
 
   if (providerId === 'meta') {
+    return undefined
+  }
+
+  if (providerId === 'openrouter') {
     return undefined
   }
 

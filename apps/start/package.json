@@ -39,6 +39,7 @@
     "@elysiajs/eden": "^1.4.8",
     "@json-render/core": "^0.11.0",
     "@json-render/react": "^0.11.0",
+    "@openrouter/ai-sdk-provider": "^2.9.0",
     "@rift/chat-scroll": "workspace:*",
     "@rift/tailwind-config": "workspace:*",
     "@rift/ui": "workspace:*",

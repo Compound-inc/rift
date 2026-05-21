@@ -22,6 +22,12 @@ import type {PaidWorkspacePlanId} from '@/lib/shared/access-control';
 import { getLocalizedFeatureAccessGateMessage } from '@/lib/frontend/access-control'
 import { m } from '@/paraglide/messages.js'
 
+const HIDDEN_SIDEBAR_PROVIDERS: ReadonlySet<CatalogProviderId> = new Set([
+  'openrouter',
+])
+
+const PINNED_MODEL_IDS: ReadonlyArray<string> = ['openrouter/auto']
+
 /** Display names for providers in the sidebar filter. */
 const PROVIDER_NAMES: Record<string, string> = {
   openai: 'OpenAI',
@@ -156,7 +162,12 @@ export function ModelSelectorPanel({
       setQuery('')
     } else {
       const catalog = value ? getCatalogModel(value) : undefined
-      setSelectedProvider(catalog?.providerId ?? 'all')
+      const candidateProvider = catalog?.providerId
+      const initialProvider =
+        candidateProvider && !HIDDEN_SIDEBAR_PROVIDERS.has(candidateProvider)
+          ? candidateProvider
+          : 'all'
+      setSelectedProvider(initialProvider)
     }
   }, [open, value])
 
@@ -168,21 +179,43 @@ export function ModelSelectorPanel({
         : options.filter(
             (o) => getCatalogModel(o.id)?.providerId === selectedProvider,
           )
-    if (!normalized) return byProvider
-    return byProvider.filter((opt) => {
-      const catalog = getCatalogModel(opt.id)
-      const searchText = [opt.name, catalog?.description ?? '']
-        .join(' ')
-        .toLowerCase()
-      return searchText.includes(normalized)
-    })
+    const matched = !normalized
+      ? byProvider
+      : byProvider.filter((opt) => {
+          const catalog = getCatalogModel(opt.id)
+          const searchText = [opt.name, catalog?.description ?? '']
+            .join(' ')
+            .toLowerCase()
+          return searchText.includes(normalized)
+        })
+    if (selectedProvider !== 'all') return matched
+
+    const pinnedIndex = new Map(
+      PINNED_MODEL_IDS.map((id, index) => [id, index] as const),
+    )
+    const pinned: SelectableModelOption[] = []
+    const rest: SelectableModelOption[] = []
+    for (const opt of matched) {
+      if (pinnedIndex.has(opt.id)) {
+        pinned.push(opt)
+      } else {
+        rest.push(opt)
+      }
+    }
+    pinned.sort(
+      (a, b) =>
+        (pinnedIndex.get(a.id) ?? 0) - (pinnedIndex.get(b.id) ?? 0),
+    )
+    return [...pinned, ...rest]
   }, [options, query, selectedProvider])
 
   const providersInOptions = React.useMemo(() => {
     const set = new Set<CatalogProviderId>()
     for (const opt of options) {
       const catalog = getCatalogModel(opt.id)
-      if (catalog) set.add(catalog.providerId)
+      if (catalog && !HIDDEN_SIDEBAR_PROVIDERS.has(catalog.providerId)) {
+        set.add(catalog.providerId)
+      }
     }
     return Array.from(set)
   }, [options])

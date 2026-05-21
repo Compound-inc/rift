@@ -89,4 +89,125 @@ describe('buildPersistedGenerationAnalytics', () => {
     expect(analytics.providerMetadata).toBeUndefined()
     expect(analytics.generationMetadata).toBeUndefined()
   })
+
+  it('extracts cost and tokens from OpenRouter usage accounting metadata', () => {
+    const analytics = buildPersistedGenerationAnalytics({
+      usedByok: false,
+      // OpenRouter does not always populate the AI SDK structured usage
+      // shape; we rely on `providerMetadata.openrouter.usage` instead.
+      usage: {
+        inputTokens: undefined,
+        inputTokenDetails: {
+          noCacheTokens: undefined,
+          cacheReadTokens: undefined,
+          cacheWriteTokens: undefined,
+        },
+        outputTokens: undefined,
+        outputTokenDetails: {
+          textTokens: undefined,
+          reasoningTokens: undefined,
+        },
+        totalTokens: undefined,
+      },
+      providerMetadata: {
+        openrouter: {
+          provider: 'anthropic',
+          usage: {
+            promptTokens: 1500,
+            promptTokensDetails: {
+              cachedTokens: 400,
+            },
+            completionTokens: 250,
+            completionTokensDetails: {
+              reasoningTokens: 80,
+            },
+            totalTokens: 1750,
+            cost: 0.00345,
+          },
+        },
+      },
+    })
+
+    expect(analytics.publicCost).toBe(
+      canExposeUserCost ? 0.00345 : undefined,
+    )
+    expect(analytics.aiCost).toBe(
+      canExposeUserCost ? undefined : 0.00345,
+    )
+    expect(analytics.usedByok).toBe(false)
+    expect(analytics.inputTokens).toBe(1500)
+    expect(analytics.outputTokens).toBe(250)
+    expect(analytics.totalTokens).toBe(1750)
+    expect(analytics.cacheReadTokens).toBe(400)
+    // 1500 prompt - 400 cached = 1100 fresh input tokens.
+    expect(analytics.noCacheTokens).toBe(1100)
+    expect(analytics.reasoningTokens).toBe(80)
+    // 250 completion - 80 reasoning = 170 text-only tokens.
+    expect(analytics.textTokens).toBe(170)
+  })
+
+  it('prefers BYOK upstream cost when OpenRouter reports both', () => {
+    const analytics = buildPersistedGenerationAnalytics({
+      usedByok: true,
+      usage: {
+        inputTokens: 100,
+        inputTokenDetails: {
+          noCacheTokens: 100,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+        },
+        outputTokens: 40,
+        outputTokenDetails: {
+          textTokens: 40,
+          reasoningTokens: 0,
+        },
+        totalTokens: 140,
+      },
+      providerMetadata: {
+        openrouter: {
+          provider: 'openai',
+          usage: {
+            promptTokens: 100,
+            completionTokens: 40,
+            totalTokens: 140,
+            cost: 0.0008,
+            costDetails: {
+              upstreamInferenceCost: 0.00065,
+            },
+          },
+        },
+      },
+    })
+
+    // BYOK cost is always exposed via publicCost.
+    expect(analytics.publicCost).toBe(0.00065)
+    expect(analytics.aiCost).toBeUndefined()
+  })
+
+  it('prefers AI Gateway cost over OpenRouter cost when both are present', () => {
+    const analytics = buildPersistedGenerationAnalytics({
+      usedByok: true,
+      usage: {
+        inputTokens: 10,
+        inputTokenDetails: {
+          noCacheTokens: 10,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+        },
+        outputTokens: 5,
+        outputTokenDetails: {
+          textTokens: 5,
+          reasoningTokens: 0,
+        },
+        totalTokens: 15,
+      },
+      providerMetadata: {
+        gateway: { cost: '0.001' },
+        openrouter: { usage: { cost: 0.999 } },
+      },
+    })
+
+    // Gateway is the authoritative transport when both are reported.
+    expect(analytics.publicCost).toBe(0.001)
+  })
 })
