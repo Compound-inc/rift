@@ -110,6 +110,26 @@ function withGatewayComplianceProviderOptions(input: {
 }
 
 /**
+ * Resolves OpenRouter-specific request options for a single chat turn.
+ * Returns `undefined` for non-OpenRouter routes so callers can ignore the
+ * result without branching. ZDR enforcement is dynamic: when the org has
+ * `require_zdr` enabled we forward `provider.zdr: true` to OpenRouter, which
+ * restricts routing to ZDR endpoints regardless of the upstream model picked
+ * by the auto-router.
+ */
+function resolveOpenRouterRequestOptions(input: {
+  readonly modelId: string
+  readonly orgPolicy?: OrgAiPolicy
+}): { readonly enforceZdr: boolean } | undefined {
+  const catalogModel = getCatalogModel(input.modelId)
+  if (catalogModel?.providerId !== 'openrouter') return undefined
+
+  return {
+    enforceZdr: Boolean(input.orgPolicy?.complianceFlags.require_zdr),
+  }
+}
+
+/**
  * High-level chat orchestration boundary.
  * Coordinates cross-cutting concerns (authz, throttling, model policy, persistence,
  * stream lifecycle) so route handlers stay thin.
@@ -866,6 +886,10 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             messages,
             model: modelResolution.modelId,
             providerApiKeyOverride: modelResolution.providerApiKeyOverride,
+            openrouterOptions: resolveOpenRouterRequestOptions({
+              modelId: modelResolution.modelId,
+              orgPolicy,
+            }),
             systemPrompt: effectiveMode?.definition.systemPrompt,
             requestId,
             tools: toolRegistry.tools,

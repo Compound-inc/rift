@@ -7,6 +7,7 @@ import { MISTRAL_MODELS } from './providers/mistral'
 import { MINIMAX_MODELS } from './providers/minimax'
 import { MOONSHOTAI_MODELS } from './providers/moonshotai'
 import { OPENAI_MODELS } from './providers/openai'
+import { OPENROUTER_MODELS } from './providers/openrouter'
 import { XAI_MODELS } from './providers/xai'
 import { XIAOMI_MODELS } from './providers/xiaomi'
 import { ZAI_MODELS } from './providers/zai'
@@ -69,6 +70,7 @@ export const AI_CATALOG: readonly AiModelCatalogEntry[] = [
   ...MISTRAL_MODELS,
   ...MINIMAX_MODELS,
   ...MOONSHOTAI_MODELS,
+  ...OPENROUTER_MODELS,
   ...XAI_MODELS,
   ...XIAOMI_MODELS,
   ...ZAI_MODELS,
