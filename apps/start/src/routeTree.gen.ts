@@ -55,6 +55,8 @@ import { Route as appLayoutOrganizationSettingsByokRouteRouteImport } from './ro
 import { Route as appLayoutOrganizationSettingsBillingRouteRouteImport } from './routes/(app)/_layout/organization/settings/billing/route'
 import { Route as appLayoutOrganizationSettingsAnalyticsRouteRouteImport } from './routes/(app)/_layout/organization/settings/analytics/route'
 import { Route as appLayoutOrganizationSettingsModelsIndexRouteImport } from './routes/(app)/_layout/organization/settings/models/index'
+import { Route as appLayoutChatProjectsProjectIdIndexRouteImport } from './routes/(app)/_layout/chat/projects/$projectId/index'
+import { Route as appLayoutChatProjectsProjectIdSettingsRouteImport } from './routes/(app)/_layout/chat/projects/$projectId/settings'
 import { Route as appLayoutOrganizationSettingsModelsProviderIdRouteRouteImport } from './routes/(app)/_layout/organization/settings/models/$providerId/route'
 
 const SetupRouteRoute = SetupRouteRouteImport.update({
@@ -306,6 +308,18 @@ const appLayoutOrganizationSettingsModelsIndexRoute =
     path: '/',
     getParentRoute: () => appLayoutOrganizationSettingsModelsRouteRoute,
   } as any)
+const appLayoutChatProjectsProjectIdIndexRoute =
+  appLayoutChatProjectsProjectIdIndexRouteImport.update({
+    id: '/projects/$projectId/',
+    path: '/projects/$projectId/',
+    getParentRoute: () => appLayoutChatRouteRoute,
+  } as any)
+const appLayoutChatProjectsProjectIdSettingsRoute =
+  appLayoutChatProjectsProjectIdSettingsRouteImport.update({
+    id: '/projects/$projectId/settings',
+    path: '/projects/$projectId/settings',
+    getParentRoute: () => appLayoutChatRouteRoute,
+  } as any)
 const appLayoutOrganizationSettingsModelsProviderIdRouteRoute =
   appLayoutOrganizationSettingsModelsProviderIdRouteRouteImport.update({
     id: '/$providerId',
@@ -359,6 +373,8 @@ export interface FileRoutesByFullPath {
   '/singularity/orgs/$organizationId': typeof eeSingularityLayoutOrgsOrganizationIdRoute
   '/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
   '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
+  '/chat/projects/$projectId/settings': typeof appLayoutChatProjectsProjectIdSettingsRoute
+  '/chat/projects/$projectId/': typeof appLayoutChatProjectsProjectIdIndexRoute
   '/organization/settings/models/': typeof appLayoutOrganizationSettingsModelsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -402,6 +418,8 @@ export interface FileRoutesByTo {
   '/singularity/orgs/$organizationId': typeof eeSingularityLayoutOrgsOrganizationIdRoute
   '/organization/settings': typeof appLayoutOrganizationSettingsIndexRoute
   '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
+  '/chat/projects/$projectId/settings': typeof appLayoutChatProjectsProjectIdSettingsRoute
+  '/chat/projects/$projectId': typeof appLayoutChatProjectsProjectIdIndexRoute
   '/organization/settings/models': typeof appLayoutOrganizationSettingsModelsIndexRoute
 }
 export interface FileRoutesById {
@@ -452,6 +470,8 @@ export interface FileRoutesById {
   '/(ee)/singularity/_layout/orgs/$organizationId': typeof eeSingularityLayoutOrgsOrganizationIdRoute
   '/(app)/_layout/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
   '/(app)/_layout/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
+  '/(app)/_layout/chat/projects/$projectId/settings': typeof appLayoutChatProjectsProjectIdSettingsRoute
+  '/(app)/_layout/chat/projects/$projectId/': typeof appLayoutChatProjectsProjectIdIndexRoute
   '/(app)/_layout/organization/settings/models/': typeof appLayoutOrganizationSettingsModelsIndexRoute
 }
 export interface FileRouteTypes {
@@ -502,6 +522,8 @@ export interface FileRouteTypes {
     | '/singularity/orgs/$organizationId'
     | '/organization/settings/'
     | '/organization/settings/models/$providerId'
+    | '/chat/projects/$projectId/settings'
+    | '/chat/projects/$projectId/'
     | '/organization/settings/models/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -545,6 +567,8 @@ export interface FileRouteTypes {
     | '/singularity/orgs/$organizationId'
     | '/organization/settings'
     | '/organization/settings/models/$providerId'
+    | '/chat/projects/$projectId/settings'
+    | '/chat/projects/$projectId'
     | '/organization/settings/models'
   id:
     | '__root__'
@@ -594,6 +618,8 @@ export interface FileRouteTypes {
     | '/(ee)/singularity/_layout/orgs/$organizationId'
     | '/(app)/_layout/organization/settings/'
     | '/(app)/_layout/organization/settings/models/$providerId'
+    | '/(app)/_layout/chat/projects/$projectId/settings'
+    | '/(app)/_layout/chat/projects/$projectId/'
     | '/(app)/_layout/organization/settings/models/'
   fileRoutesById: FileRoutesById
 }
@@ -943,6 +969,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appLayoutOrganizationSettingsModelsIndexRouteImport
       parentRoute: typeof appLayoutOrganizationSettingsModelsRouteRoute
     }
+    '/(app)/_layout/chat/projects/$projectId/': {
+      id: '/(app)/_layout/chat/projects/$projectId/'
+      path: '/projects/$projectId'
+      fullPath: '/chat/projects/$projectId/'
+      preLoaderRoute: typeof appLayoutChatProjectsProjectIdIndexRouteImport
+      parentRoute: typeof appLayoutChatRouteRoute
+    }
+    '/(app)/_layout/chat/projects/$projectId/settings': {
+      id: '/(app)/_layout/chat/projects/$projectId/settings'
+      path: '/projects/$projectId/settings'
+      fullPath: '/chat/projects/$projectId/settings'
+      preLoaderRoute: typeof appLayoutChatProjectsProjectIdSettingsRouteImport
+      parentRoute: typeof appLayoutChatRouteRoute
+    }
     '/(app)/_layout/organization/settings/models/$providerId': {
       id: '/(app)/_layout/organization/settings/models/$providerId'
       path: '/$providerId'
@@ -972,11 +1012,17 @@ const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
 interface appLayoutChatRouteRouteChildren {
   appLayoutChatThreadIdRouteRoute: typeof appLayoutChatThreadIdRouteRoute
   appLayoutChatIndexRoute: typeof appLayoutChatIndexRoute
+  appLayoutChatProjectsProjectIdSettingsRoute: typeof appLayoutChatProjectsProjectIdSettingsRoute
+  appLayoutChatProjectsProjectIdIndexRoute: typeof appLayoutChatProjectsProjectIdIndexRoute
 }
 
 const appLayoutChatRouteRouteChildren: appLayoutChatRouteRouteChildren = {
   appLayoutChatThreadIdRouteRoute: appLayoutChatThreadIdRouteRoute,
   appLayoutChatIndexRoute: appLayoutChatIndexRoute,
+  appLayoutChatProjectsProjectIdSettingsRoute:
+    appLayoutChatProjectsProjectIdSettingsRoute,
+  appLayoutChatProjectsProjectIdIndexRoute:
+    appLayoutChatProjectsProjectIdIndexRoute,
 }
 
 const appLayoutChatRouteRouteWithChildren =
@@ -1137,13 +1183,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

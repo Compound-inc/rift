@@ -34,6 +34,13 @@ const createThreadArgs = z.object({
   modeId: z.string().optional(),
   contextWindowMode: z.enum(['standard', 'max']).optional(),
   disabledToolKeys: z.array(z.string()),
+  /**
+   * Optional Project to attach the new thread to. The mutator validates that
+   * the caller owns the project (and that it has not been soft-deleted) —
+   * unknown / foreign / deleted ids are rejected so a stale client cannot
+   * place threads into projects it should not see.
+   */
+  projectId: z.string().trim().min(1).optional(),
 })
 
 const renameThreadArgs = z.object({
@@ -85,6 +92,16 @@ const setThreadDisabledToolKeysArgs = z.object({
 const setThreadContextWindowModeArgs = z.object({
   threadId: z.string(),
   contextWindowMode: z.enum(['standard', 'max']),
+})
+
+const setThreadProjectArgs = z.object({
+  threadId: z.string(),
+  /**
+   * Target project, or `null` to detach the thread (move-to-loose).
+   * The mutator validates that the caller owns the target project — moving
+   * a thread into a project the caller does not own is rejected.
+   */
+  projectId: z.string().nullable(),
 })
 
 /**
@@ -320,6 +337,23 @@ export const chatMutatorDefinitions = {
         disabledToolKeys: args.disabledToolKeys,
       })
 
+      // Validate Project ownership before bootstrapping. We accept the
+      // mutator without `projectId` to keep the loose-thread path unchanged.
+      let resolvedProjectId: string | undefined
+      if (args.projectId) {
+        const project = await tx.run(
+          zql.project.where('id', args.projectId).one(),
+        )
+        if (
+          !project ||
+          project.userId !== ctx.userID ||
+          project.deletedAt
+        ) {
+          throw new Error('thread_create_project_not_owned_or_missing')
+        }
+        resolvedProjectId = project.id
+      }
+
       try {
         await tx.mutate.thread.insert(
           buildBootstrapThreadRecord({
@@ -331,6 +365,7 @@ export const chatMutatorDefinitions = {
             contextWindowMode: args.contextWindowMode,
             organizationId: ctx.organizationId,
             disabledToolKeys,
+            projectId: resolvedProjectId,
           }),
         )
       } catch (error) {
@@ -598,6 +633,60 @@ export const chatMutatorDefinitions = {
         await tx.mutate.thread.update({
           id: thread.id,
           contextWindowMode: nextContextWindowMode,
+          updatedAt: Date.now(),
+        })
+      },
+    ),
+
+    /**
+     * Move a thread into / out of / between Projects. The move is metadata
+     * only — past turns are not re-embedded or re-evaluated; the new Project's
+     * context applies to *future* turns only (see Q4 in the grilling notes).
+     *
+     * Authorization: caller must own the thread, and (if `projectId` is not
+     * null) caller must own the target Project. Org-shared visibility does
+     * not grant move-into rights in v1 to keep the model simple.
+     */
+    setProject: defineMutator(
+      setThreadProjectArgs,
+      async ({ tx, args, ctx }) => {
+        const thread = await tx.run(
+          zql.thread.where('threadId', args.threadId).one(),
+        )
+        if (!thread || thread.userId !== ctx.userID) {
+          return
+        }
+        if (
+          !isThreadVisibleInContext({
+            threadOwnerOrgId: thread.ownerOrgId,
+            contextOrganizationId: ctx.organizationId,
+          })
+        ) {
+          return
+        }
+
+        const currentProjectId = thread.projectId ?? null
+        const nextProjectId = args.projectId
+        if (currentProjectId === nextProjectId) {
+          return
+        }
+
+        if (nextProjectId) {
+          const targetProject = await tx.run(
+            zql.project.where('id', nextProjectId).one(),
+          )
+          if (
+            !targetProject ||
+            targetProject.userId !== ctx.userID ||
+            targetProject.deletedAt
+          ) {
+            throw new Error('thread_set_project_not_owned_or_missing')
+          }
+        }
+
+        await tx.mutate.thread.update({
+          id: thread.id,
+          projectId: nextProjectId ?? undefined,
           updatedAt: Date.now(),
         })
       },

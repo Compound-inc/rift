@@ -38,6 +38,7 @@ import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 import { useOrgBillingSummary } from '@/lib/frontend/billing/use-org-billing'
 import { m } from '@/paraglide/messages.js'
 import { openChatSearchCommand } from './chat-search-command'
+import { ChatSidebarProjects } from './chat-sidebar-projects'
 import { resolveChatSidebarDateGroup } from './chat-sidebar-date-groups'
 import type { ChatSidebarDateGroupKey } from './chat-sidebar-date-groups'
 import {
@@ -833,6 +834,11 @@ export function ChatSidebarContent({ pathname }: { pathname: string }) {
           sections={staticSections}
           pathname={pathname}
         />
+        {shouldRenderHistory ? (
+          <div className="mt-6">
+            <ChatSidebarProjects pathname={pathname} />
+          </div>
+        ) : null}
         <div className="mt-8 flex min-h-0 flex-1 flex-col">
           {shouldRenderHistory ? (
             <ChatSidebarHistory

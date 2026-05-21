@@ -226,6 +226,7 @@ const thread = table('thread')
     ownerOrgId: string().from('owner_org_id').optional(),
     customInstructionId: string().from('custom_instruction_id').optional(),
     modeId: string().from('mode_id').optional(),
+    projectId: string().from('project_id').optional(),
     disabledToolKeys: json<readonly string[]>()
       .from('disabled_tool_keys')
       .optional(),
@@ -326,7 +327,8 @@ const attachment = table('attachment')
     embeddingStatus: string().from('embedding_status').optional(),
     ownerOrgId: string().from('owner_org_id').optional(),
     workspaceId: string().from('workspace_id').optional(),
-    accessScope: enumeration<'user' | 'workspace' | 'org'>()
+    projectId: string().from('project_id').optional(),
+    accessScope: enumeration<'user' | 'workspace' | 'project' | 'org'>()
       .from('access_scope')
       .optional(),
     orgKnowledgeKind: string().from('org_knowledge_kind').optional(),
@@ -335,6 +337,29 @@ const attachment = table('attachment')
     vectorIndexedAt: number().from('vector_indexed_at').optional(),
     vectorError: string().from('vector_error').optional(),
     status: enumeration<'deleted' | 'uploaded'>().optional(),
+    createdAt: number().from('created_at'),
+    updatedAt: number().from('updated_at'),
+  })
+  .primaryKey('id')
+
+/**
+ * Project (chat-projects feature). A user-owned container that groups Threads
+ * and applies a shared custom instruction + Project files (via RAG) to every
+ * Thread inside it. See CONTEXT.md and ADR-0001/0002/0003.
+ */
+const project = table('project')
+  .from('projects')
+  .columns({
+    id: string(),
+    userId: string().from('user_id'),
+    organizationId: string().from('organization_id').optional(),
+    name: string(),
+    description: string().optional(),
+    customInstruction: string().from('custom_instruction').optional(),
+    visibility: enumeration<'private' | 'org'>(),
+    icon: string().optional(),
+    color: string().optional(),
+    deletedAt: number().from('deleted_at').optional(),
     createdAt: number().from('created_at'),
     updatedAt: number().from('updated_at'),
   })
@@ -419,6 +444,11 @@ const attachmentRelationships = relationships(attachment, ({ one }) => ({
     destField: ['id'],
     destSchema: organization,
   }),
+  project: one({
+    sourceField: ['projectId'],
+    destField: ['id'],
+    destSchema: project,
+  }),
 }))
 
 const orgSubscriptionRelationships = relationships(orgSubscription, ({ one }) => ({
@@ -450,6 +480,43 @@ const messageRelationships = relationships(message, ({ one }) => ({
   }),
 }))
 
+/**
+ * Project relationships expose threads, attachments, and the owning user/org
+ * so callers can `.related('threads')` etc. Read paths must additionally
+ * filter `project.deletedAt` IS NULL — Zero relationships do not enforce
+ * the soft-delete predicate.
+ */
+const projectRelationships = relationships(project, ({ one, many }) => ({
+  user: one({
+    sourceField: ['userId'],
+    destField: ['id'],
+    destSchema: user,
+  }),
+  organization: one({
+    sourceField: ['organizationId'],
+    destField: ['id'],
+    destSchema: organization,
+  }),
+  threads: many({
+    sourceField: ['id'],
+    destSchema: thread,
+    destField: ['projectId'],
+  }),
+  attachments: many({
+    sourceField: ['id'],
+    destSchema: attachment,
+    destField: ['projectId'],
+  }),
+}))
+
+const threadProjectRelationship = relationships(thread, ({ one }) => ({
+  project: one({
+    sourceField: ['projectId'],
+    destField: ['id'],
+    destSchema: project,
+  }),
+}))
+
 // ---------------------------------------------------------------------------
 // Schema export and default types
 // ---------------------------------------------------------------------------
@@ -469,6 +536,7 @@ export const schema = createSchema({
     thread,
     message,
     attachment,
+    project,
   ],
   relationships: [
     organizationRelationships,
@@ -478,6 +546,8 @@ export const schema = createSchema({
     orgSubscriptionRelationships,
     orgUserUsageSummaryRelationships,
     messageRelationships,
+    projectRelationships,
+    threadProjectRelationship,
   ],
 })
 

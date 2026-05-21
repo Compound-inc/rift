@@ -34,6 +34,11 @@ export const chatQueryDefinitions = {
     /**
      * Cursor-based history page used by the virtualized sidebar. This keeps the
      * client subscribed to only the currently needed thread window.
+     *
+     * Per Q6 (sidebar UX, Option A), this list shows **loose Threads only** —
+     * Threads that belong to a Project are reachable from the Project's own
+     * page. Threads whose Project has been soft-deleted (ADR-0001) appear here
+     * because they're effectively unprojected from the user's perspective.
      */
     historyPage: defineQuery(threadHistoryPageArgs, ({ args, ctx }) => {
       const orderDirection = args.dir === 'forward' ? 'desc' : 'asc'
@@ -41,6 +46,14 @@ export const chatQueryDefinitions = {
       let q = zql.thread
         .where('userId', ctx.userID)
         .where('visibility', 'visible')
+        .where(({ or, cmp, exists }) =>
+          or(
+            cmp('projectId', 'IS', null),
+            exists('project', (project) =>
+              project.where('deletedAt', 'IS NOT', null),
+            ),
+          ),
+        )
         .orderBy('pinned', orderDirection)
         .orderBy('updatedAt', orderDirection)
         .orderBy('threadId', orderDirection)
