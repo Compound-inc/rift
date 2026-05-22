@@ -11,7 +11,7 @@ export const SINGULARITY_ORG_ID =
   (typeof process !== 'undefined'
     ? process.env.SINGULARITY_ORG_ID
     : undefined) ??
-  '1kxfDFb6TqemyYSQSu9cRpwhmU19rxrL'
+  'hni8Y0wUYPy3PrC2D0Fngi8BFKR4PvpF'
 
 export function isSingularityOrganizationId(
   organizationId: string | null | undefined,
