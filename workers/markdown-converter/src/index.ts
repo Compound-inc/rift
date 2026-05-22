@@ -116,10 +116,6 @@ export default {
       tokens: result.tokens ?? 0,
       durationMs: Date.now() - startedAt,
     })
-    // Dump the full markdown on its own line so it's easy to read/copy from
-    // `wrangler tail` or the dashboard. Note: very large documents may be
-    // truncated by Workers Logs (per-line size limits).
-    console.log('convert: markdown output\n' + result.data)
 
     return jsonResponse({
       name: result.name,

@@ -171,6 +171,16 @@ export class MarkdownConversionService extends ServiceMap.Service<
               ? workerPayload.tokens
               : 0
 
+          // Dump the converted markdown to the server terminal so we can
+          // eyeball worker output without round-tripping to wrangler tail.
+          // Always-on by request — if this gets noisy, gate on an env flag.
+          yield* Effect.log('Markdown conversion succeeded', {
+            requestId,
+            fileName,
+            tokenCount,
+            markdown,
+          })
+
           return {
             markdown,
             tokenCount,
