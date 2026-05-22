@@ -22,7 +22,7 @@ export function ChatPageShell() {
     useSideNav()
   const { isChatPageSidebarCollapsed, setIsChatPageSidebarCollapsed } =
     usePageSidebarVisibility()
-  const { activeProjectId, activeThreadId, messages } = useChatMessages()
+  const { isProjectLandingState } = useChatMessages()
 
   const toggleSidebar = () => {
     if (isMobile) {
