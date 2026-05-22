@@ -1,15 +1,16 @@
 import { Effect, Layer, ServiceMap } from 'effect'
 import { generateText } from 'ai'
-import {
-  DEFAULT_CONTEXT_WINDOW_MODE,
-} from '@/lib/shared/ai-catalog'
+import { DEFAULT_CONTEXT_WINDOW_MODE } from '@/lib/shared/ai-catalog'
 import type {
   AiContextWindowMode,
   AiReasoningEffort,
 } from '@/lib/shared/ai-catalog/types'
-import { isChatModeId  } from '@/lib/shared/chat-modes'
-import type {ChatModeId} from '@/lib/shared/chat-modes';
-import { buildBootstrapThreadRecord, DEFAULT_THREAD_TITLE } from '@/lib/shared/chat'
+import { isChatModeId } from '@/lib/shared/chat-modes'
+import type { ChatModeId } from '@/lib/shared/chat-modes'
+import {
+  buildBootstrapThreadRecord,
+  DEFAULT_THREAD_TITLE,
+} from '@/lib/shared/chat'
 import {
   MessagePersistenceError,
   ThreadForbiddenError,
@@ -45,6 +46,7 @@ export type ThreadServiceShape = {
     readonly requestedModeId?: string
     readonly requestedContextWindowMode?: AiContextWindowMode
     readonly requestedDisabledToolKeys?: readonly string[]
+    readonly requestedProjectId?: string
     readonly organizationId?: string
   }) => Effect.Effect<
     {
@@ -62,6 +64,7 @@ export type ThreadServiceShape = {
         | 'completed'
         | 'failed'
       readonly branchVersion: number
+      readonly projectId?: string
     },
     ThreadNotFoundError | ThreadForbiddenError | MessagePersistenceError
   >
@@ -76,12 +79,29 @@ export type ThreadServiceShape = {
     readonly threadId: string
     readonly requestId: string
   }) => Effect.Effect<void, MessagePersistenceError>
+  /**
+   * Loads the Project's `custom_instruction` for a Thread that belongs to
+   * a Project. Returns `{ instruction: undefined }` when the project is
+   * missing, soft-deleted, or not owned by `userId` so the caller can
+   * gracefully fall back to no project context.
+   */
+  readonly loadProjectInstruction: (input: {
+    readonly userId: string
+    readonly projectId: string
+    readonly requestId: string
+  }) => Effect.Effect<
+    { readonly instruction?: string },
+    MessagePersistenceError
+  >
   readonly setThreadMode: (input: {
     readonly userId: string
     readonly threadId: string
     readonly modeId?: ChatModeId
     readonly requestId: string
-  }) => Effect.Effect<void, ThreadNotFoundError | ThreadForbiddenError | MessagePersistenceError>
+  }) => Effect.Effect<
+    void,
+    ThreadNotFoundError | ThreadForbiddenError | MessagePersistenceError
+  >
   readonly setThreadDisabledToolKeys: (input: {
     readonly userId: string
     readonly threadId: string
@@ -201,6 +221,7 @@ export class ThreadService extends ServiceMap.Service<
           requestedModeId,
           requestedContextWindowMode,
           requestedDisabledToolKeys,
+          requestedProjectId,
           organizationId,
         }: {
           readonly userId: string
@@ -211,6 +232,7 @@ export class ThreadService extends ServiceMap.Service<
           readonly requestedModeId?: string
           readonly requestedContextWindowMode?: AiContextWindowMode
           readonly requestedDisabledToolKeys?: readonly string[]
+          readonly requestedProjectId?: string
           readonly organizationId?: string
         }) =>
           Effect.gen(function* () {
@@ -244,6 +266,48 @@ export class ThreadService extends ServiceMap.Service<
                     requestedModeId && isChatModeId(requestedModeId)
                       ? requestedModeId
                       : undefined
+                  const normalizedRequestedProjectId =
+                    requestedProjectId?.trim() || undefined
+                  let resolvedProjectId: string | undefined
+
+                  if (normalizedRequestedProjectId) {
+                    // The server fallback can win the first-send race before
+                    // the optimistic Zero mutator reaches upstream. Validate
+                    // the project here so that fallback creates the same
+                    // project-scoped thread instead of a loose thread.
+                    const project = await db.run(
+                      zql.project
+                        .where('id', normalizedRequestedProjectId)
+                        .one(),
+                    )
+                    if (
+                      !project ||
+                      project.userId !== userId ||
+                      project.deletedAt
+                    ) {
+                      throw new ThreadForbiddenError({
+                        message: 'Project is not available for thread creation',
+                        requestId,
+                        threadId,
+                        userId,
+                      })
+                    }
+
+                    const threadOrgId = organizationId?.trim() || undefined
+                    const projectOrgId =
+                      project.organizationId?.trim() || undefined
+                    if (threadOrgId !== projectOrgId) {
+                      throw new ThreadForbiddenError({
+                        message:
+                          'Project is not available in the active organization',
+                        requestId,
+                        threadId,
+                        userId,
+                      })
+                    }
+
+                    resolvedProjectId = project.id
+                  }
 
                   try {
                     const bootstrapThread = buildBootstrapThreadRecord({
@@ -255,6 +319,7 @@ export class ThreadService extends ServiceMap.Service<
                       contextWindowMode: requestedContextWindowMode,
                       organizationId,
                       disabledToolKeys: requestedDisabledToolKeys ?? [],
+                      projectId: resolvedProjectId,
                     })
                     await db.transaction(async (tx) => {
                       // Uses deterministic IDs so first-message bootstrap can be retried safely.
@@ -276,6 +341,9 @@ export class ThreadService extends ServiceMap.Service<
               },
               catch: (error) => {
                 if (error instanceof ThreadNotFoundError) {
+                  return error
+                }
+                if (error instanceof ThreadForbiddenError) {
                   return error
                 }
                 return new MessagePersistenceError({
@@ -313,6 +381,30 @@ export class ThreadService extends ServiceMap.Service<
               )
             }
 
+            const threadProjectId = thread.projectId
+            if (threadProjectId) {
+              const projectRow = yield* Effect.tryPromise({
+                try: () =>
+                  db.run(zql.project.where('id', threadProjectId).one()),
+                catch: (error) =>
+                  new MessagePersistenceError({
+                    message: 'Failed to validate project access',
+                    requestId,
+                    threadId,
+                    cause: String(error),
+                  }),
+              })
+              if (!projectRow || projectRow.deletedAt) {
+                return yield* Effect.fail(
+                  new ThreadNotFoundError({
+                    message: 'Thread not found',
+                    requestId,
+                    threadId,
+                  }),
+                )
+              }
+            }
+
             return {
               dbId: thread.id,
               threadId: thread.threadId,
@@ -327,10 +419,12 @@ export class ThreadService extends ServiceMap.Service<
                 thread.contextWindowMode === 'max'
                   ? 'max'
                   : DEFAULT_CONTEXT_WINDOW_MODE,
-              disabledToolKeys:
-                Array.isArray(thread.disabledToolKeys) ? thread.disabledToolKeys : [],
+              disabledToolKeys: Array.isArray(thread.disabledToolKeys)
+                ? thread.disabledToolKeys
+                : [],
               generationStatus: thread.generationStatus,
               branchVersion: thread.branchVersion,
+              projectId: thread.projectId ?? undefined,
             }
           }),
       )
@@ -470,6 +564,48 @@ User message: ${trimmedMessage}`,
                   cause: String(error),
                 }),
             })
+          }),
+      )
+
+      const loadProjectInstruction = Effect.fn(
+        'ThreadService.loadProjectInstruction',
+      )(
+        ({
+          userId,
+          projectId,
+          requestId,
+        }: {
+          readonly userId: string
+          readonly projectId: string
+          readonly requestId: string
+        }) =>
+          Effect.gen(function* () {
+            const db = yield* loadDb({ requestId, threadId: projectId })
+            const project = yield* Effect.tryPromise({
+              try: () => db.run(zql.project.where('id', projectId).one()),
+              catch: (error) =>
+                new MessagePersistenceError({
+                  message: 'Failed to load project instruction',
+                  requestId,
+                  threadId: projectId,
+                  cause: String(error),
+                }),
+            })
+
+            // A missing, soft-deleted, or foreign-owned project falls back
+            // to no instruction; the orchestrator should still be able to
+            // generate a response without one.
+            if (!project || project.userId !== userId || project.deletedAt) {
+              return { instruction: undefined }
+            }
+
+            const trimmed = project.customInstruction?.trim()
+            return {
+              instruction:
+                typeof trimmed === 'string' && trimmed.length > 0
+                  ? trimmed
+                  : undefined,
+            }
           }),
       )
 
@@ -697,6 +833,7 @@ User message: ${trimmedMessage}`,
         assertThreadAccess,
         autoGenerateTitle,
         markThreadGenerationFailed,
+        loadProjectInstruction,
         setThreadMode,
         setThreadDisabledToolKeys,
         setThreadContextWindowMode,
@@ -747,6 +884,7 @@ User message: ${trimmedMessage}`,
         requestedModeId,
         requestedContextWindowMode,
         requestedDisabledToolKeys,
+        requestedProjectId,
         organizationId: _organizationId,
       }: {
         readonly userId: string
@@ -757,6 +895,7 @@ User message: ${trimmedMessage}`,
         readonly requestedModeId?: string
         readonly requestedContextWindowMode?: AiContextWindowMode
         readonly requestedDisabledToolKeys?: readonly string[]
+        readonly requestedProjectId?: string
         readonly organizationId?: string
       }) {
         let thread = getMemoryState().threads.get(threadId)
@@ -784,6 +923,7 @@ User message: ${trimmedMessage}`,
             contextWindowMode:
               requestedContextWindowMode ?? DEFAULT_CONTEXT_WINDOW_MODE,
             disabledToolKeys: [...new Set(requestedDisabledToolKeys ?? [])],
+            projectId: requestedProjectId?.trim() || undefined,
           }
           if (!created.modelId) {
             return yield* Effect.fail(
@@ -821,6 +961,7 @@ User message: ${trimmedMessage}`,
           disabledToolKeys: thread.disabledToolKeys ?? [],
           generationStatus: 'completed' as const,
           branchVersion: 1,
+          projectId: thread.projectId,
         }
       },
     ),
@@ -830,6 +971,9 @@ User message: ${trimmedMessage}`,
     markThreadGenerationFailed: Effect.fn(
       'ThreadService.markThreadGenerationFailedMemory',
     )(() => Effect.void),
+    loadProjectInstruction: Effect.fn(
+      'ThreadService.loadProjectInstructionMemory',
+    )(() => Effect.succeed({ instruction: undefined })),
     setThreadMode: Effect.fn('ThreadService.setThreadModeMemory')(
       ({ userId, threadId, modeId, requestId }) =>
         Effect.gen(function* () {
@@ -881,7 +1025,9 @@ User message: ${trimmedMessage}`,
             }),
           )
         }
-        thread.disabledToolKeys = [...new Set(disabledToolKeys)] as readonly string[]
+        thread.disabledToolKeys = [
+          ...new Set(disabledToolKeys),
+        ] as readonly string[]
         thread.updatedAt = Date.now()
         return thread.disabledToolKeys ?? []
       }),

@@ -68,6 +68,18 @@ const ORG_KNOWLEDGE_ALLOWED_MIME_TYPES = new Set([
 
 const ORG_KNOWLEDGE_ALLOWED_EXTENSIONS = new Set(['pdf', 'md', 'markdown'])
 
+const PROJECT_SOURCES_ALLOWED_MIME_TYPES = new Set([
+  ...ORG_KNOWLEDGE_ALLOWED_MIME_TYPES,
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.oasis.opendocument.text',
+])
+
+const PROJECT_SOURCES_ALLOWED_EXTENSIONS = new Set([
+  ...ORG_KNOWLEDGE_ALLOWED_EXTENSIONS,
+  'docx',
+  'odt',
+])
+
 const AVATAR_ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
   'image/png',
@@ -117,6 +129,23 @@ export const ORG_KNOWLEDGE_UPLOAD_POLICY: UploadValidationPolicy = {
   ].join(','),
   allowedMimeTypes: ORG_KNOWLEDGE_ALLOWED_MIME_TYPES,
   allowedExtensions: ORG_KNOWLEDGE_ALLOWED_EXTENSIONS,
+  maxSizeBytes: ORG_KNOWLEDGE_MAX_UPLOAD_SIZE_BYTES,
+}
+
+export const PROJECT_SOURCES_UPLOAD_POLICY: UploadValidationPolicy = {
+  acceptedFileTypes: [
+    '.pdf',
+    '.md',
+    '.markdown',
+    '.docx',
+    '.odt',
+    'application/pdf',
+    'text/markdown',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.oasis.opendocument.text',
+  ].join(','),
+  allowedMimeTypes: PROJECT_SOURCES_ALLOWED_MIME_TYPES,
+  allowedExtensions: PROJECT_SOURCES_ALLOWED_EXTENSIONS,
   maxSizeBytes: ORG_KNOWLEDGE_MAX_UPLOAD_SIZE_BYTES,
 }
 

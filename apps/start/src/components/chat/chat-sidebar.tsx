@@ -38,6 +38,10 @@ import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 import { useOrgBillingSummary } from '@/lib/frontend/billing/use-org-billing'
 import { m } from '@/paraglide/messages.js'
 import { openChatSearchCommand } from './chat-search-command'
+import { ThreadMoveToProjectSubmenu } from './chat-sidebar-move-to-project'
+import { ChatProjectScopedSidebarContent } from './chat-sidebar-project-scope'
+import { ChatSidebarProjects } from './chat-sidebar-projects'
+import { useChatSidebarProjectScope } from './use-chat-sidebar-project-scope'
 import { resolveChatSidebarDateGroup } from './chat-sidebar-date-groups'
 import type { ChatSidebarDateGroupKey } from './chat-sidebar-date-groups'
 import {
@@ -82,6 +86,7 @@ type ThreadItemRow = {
   readonly pinned: boolean
   readonly updatedAt: number
   readonly generationStatus?: ThreadHistoryRow['generationStatus']
+  readonly projectId?: string | null
 }
 
 type ThreadHistoryListContext = {
@@ -283,6 +288,10 @@ function buildThreadItem({
             {thread.pinned ? <PinOff /> : <Pin />}
             {thread.pinned ? m.chat_sidebar_unpin() : m.chat_sidebar_pin()}
           </ContextMenuItem>
+          <ThreadMoveToProjectSubmenu
+            threadId={thread.threadId}
+            currentProjectId={thread.projectId ?? null}
+          />
           <ContextMenuSeparator />
           <ContextMenuItem
             variant="destructive"
@@ -810,6 +819,7 @@ function ChatSidebarHistory({
 }
 
 export function ChatSidebarContent({ pathname }: { pathname: string }) {
+  const projectId = useChatSidebarProjectScope(pathname)
   const { activeOrganizationId, isAnonymous, loading, user } = useAppAuth()
   const { entitlement, loading: billingLoading } = useOrgBillingSummary()
   const normalizedOrganizationId = activeOrganizationId?.trim() || undefined
@@ -825,6 +835,39 @@ export function ChatSidebarContent({ pathname }: { pathname: string }) {
       planId: entitlement?.planId,
     })
 
+  /**
+   * When the user enters a project (`/chat/projects/<id>/...`), the
+   * sidebar swaps to a project-scoped variant: a back row, the project's
+   * identity, sub-page links, and a project-scoped thread list.
+   *
+   * The bottom panel (login / upgrade CTA) intentionally stays the same in
+   * both modes — it's a billing affordance, not a navigation one.
+   */
+  if (projectId) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <ChatProjectScopedSidebarContent
+            projectId={projectId}
+            pathname={pathname}
+          />
+        </div>
+        {shouldShowBottomPanel ? (
+          <div className="flex-shrink-0 bg-surface-overlay px-3 py-3">
+            {shouldShowLoginButton ? (
+              <Button asChild size="default" className="w-full">
+                <Link to="/auth/sign-in" preload="intent">
+                  {m.auth_login_sign_in()}
+                </Link>
+              </Button>
+            ) : null}
+            {shouldShowUpgradeCta ? <ChatSidebarUpgradeCta /> : null}
+          </div>
+        ) : null}
+      </div>
+    )
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -833,6 +876,11 @@ export function ChatSidebarContent({ pathname }: { pathname: string }) {
           sections={staticSections}
           pathname={pathname}
         />
+        {shouldRenderHistory ? (
+          <div className="mt-6">
+            <ChatSidebarProjects pathname={pathname} />
+          </div>
+        ) : null}
         <div className="mt-8 flex min-h-0 flex-1 flex-col">
           {shouldRenderHistory ? (
             <ChatSidebarHistory

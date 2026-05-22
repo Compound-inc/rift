@@ -26,6 +26,7 @@ export type BootstrapThreadRecord = {
   readonly branchVersion: 1
   readonly ownerOrgId?: string
   readonly disabledToolKeys: readonly string[]
+  readonly projectId?: string
 }
 
 type BootstrapThreadInput = {
@@ -37,6 +38,7 @@ type BootstrapThreadInput = {
   readonly contextWindowMode?: AiContextWindowMode | null
   readonly organizationId?: string
   readonly disabledToolKeys?: readonly string[]
+  readonly projectId?: string
 }
 
 /**
@@ -81,5 +83,6 @@ export function buildBootstrapThreadRecord(
     branchVersion: 1,
     ownerOrgId: organizationId,
     disabledToolKeys,
+    projectId: input.projectId?.trim() || undefined,
   }
 }

@@ -47,6 +47,7 @@ export const ChatStreamRequest = Schema.Struct({
   message: Schema.optional(IncomingUserMessage),
   attachments: Schema.optional(Schema.Array(IncomingAttachmentInput)),
   createIfMissing: Schema.optional(Schema.Boolean),
+  projectId: Schema.optional(Schema.String),
   modelId: Schema.optional(Schema.String),
   modeId: Schema.optional(Schema.String),
   reasoningEffort: Schema.optional(Schema.String),

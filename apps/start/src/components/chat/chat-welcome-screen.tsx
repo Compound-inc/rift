@@ -461,7 +461,7 @@ function StudentIcon({ className, ...props }: IconProps) {
   )
 }
 
-function DoddleLine({ className, ...props }: IconProps) {
+export function DoddleLine({ className, ...props }: IconProps) {
   return (
     <svg
       width="200"

@@ -34,17 +34,13 @@ import { buildChatApiErrorEnvelope } from '../http/error-response'
 import { canUseReasoningControls } from '@/utils/app-feature-flags'
 import type { OrgAiPolicy } from '@/lib/shared/model-policy/types'
 import { isChatModeId, resolveEffectiveChatMode } from '@/lib/shared/chat-modes'
-import type {ResolvedChatAccessPolicy} from '@/lib/backend/access-control';
+import type { ResolvedChatAccessPolicy } from '@/lib/backend/access-control'
 import {
   runDetachedObserved,
   runDetachedUnsafe,
 } from '@/lib/backend/server-effect/runtime/detached'
-import {
-  WorkspaceUsageQuotaService,
-} from '@/lib/backend/billing/services/workspace-usage-quota.service'
-import {
-  WorkspaceUsageSettlementService,
-} from '@/lib/backend/billing/services/workspace-usage-settlement.service'
+import { WorkspaceUsageQuotaService } from '@/lib/backend/billing/services/workspace-usage-quota.service'
+import { WorkspaceUsageSettlementService } from '@/lib/backend/billing/services/workspace-usage-settlement.service'
 import { WorkspaceUsageQuotaExceededError } from '@/lib/backend/billing/domain/errors'
 import { MessageStoreService } from './message-store.service'
 import { ModelGatewayService } from './model-gateway.service'
@@ -110,26 +106,6 @@ function withGatewayComplianceProviderOptions(input: {
 }
 
 /**
- * Resolves OpenRouter-specific request options for a single chat turn.
- * Returns `undefined` for non-OpenRouter routes so callers can ignore the
- * result without branching. ZDR enforcement is dynamic: when the org has
- * `require_zdr` enabled we forward `provider.zdr: true` to OpenRouter, which
- * restricts routing to ZDR endpoints regardless of the upstream model picked
- * by the auto-router.
- */
-function resolveOpenRouterRequestOptions(input: {
-  readonly modelId: string
-  readonly orgPolicy?: OrgAiPolicy
-}): { readonly enforceZdr: boolean } | undefined {
-  const catalogModel = getCatalogModel(input.modelId)
-  if (catalogModel?.providerId !== 'openrouter') return undefined
-
-  return {
-    enforceZdr: Boolean(input.orgPolicy?.complianceFlags.require_zdr),
-  }
-}
-
-/**
  * High-level chat orchestration boundary.
  * Coordinates cross-cutting concerns (authz, throttling, model policy, persistence,
  * stream lifecycle) so route handlers stay thin.
@@ -161,6 +137,7 @@ export type ChatOrchestratorServiceShape = {
     readonly contextWindowMode?: AiContextWindowMode
     readonly disabledToolKeys?: readonly string[]
     readonly createIfMissing?: boolean
+    readonly projectId?: string
     readonly route: string
     readonly wideEvent?: ChatRequestWideEvent
   }) => Effect.Effect<Response, ChatDomainError>
@@ -216,6 +193,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
         contextWindowMode,
         disabledToolKeys,
         createIfMissing,
+        projectId,
         route,
         wideEvent,
       }) => {
@@ -227,7 +205,8 @@ export class ChatOrchestratorService extends ServiceMap.Service<
           readonly estimatedNanoUsd?: number
         } = { bypassed: true }
         const releaseQuotaReservation = (reasonCode: string) => {
-          if (quotaReservation.bypassed || quotaReservationReleased) return Effect.void
+          if (quotaReservation.bypassed || quotaReservationReleased)
+            return Effect.void
           quotaReservationReleased = true
           return usageQuota.releaseReservation({ requestId, reasonCode })
         }
@@ -241,6 +220,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               thread: {
                 threadId,
                 createIfMissing,
+                projectId,
                 expectedBranchVersion,
                 targetMessageId: messageId,
               },
@@ -305,6 +285,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             requestedModeId: modeId,
             requestedContextWindowMode: contextWindowMode,
             requestedDisabledToolKeys: bootstrapDisabledToolKeys,
+            requestedProjectId: projectId,
             organizationId,
           })
 
@@ -313,6 +294,24 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             requestModeId: modeId,
             threadModeId: threadAccess.modeId,
           })
+
+          /**
+           * If the Thread belongs to a Project, concatenate the Project's
+           * `custom_instruction` after the mode's system prompt so it can
+           * extend (not be overridden by) the mode's tone/role guidance.
+           */
+          const projectInstruction = threadAccess.projectId
+            ? yield* threads.loadProjectInstruction({
+                userId,
+                projectId: threadAccess.projectId,
+                requestId,
+              })
+            : { instruction: undefined as string | undefined }
+          const baseSystemPrompt = effectiveMode?.definition.systemPrompt
+          const assembledSystemPrompt =
+            baseSystemPrompt && projectInstruction.instruction
+              ? `${baseSystemPrompt}\n\n${projectInstruction.instruction}`
+              : (projectInstruction.instruction ?? baseSystemPrompt)
 
           if (
             attachments &&
@@ -335,7 +334,6 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             )
           }
 
-          // Fire-and-forget title generation after the first message bootstrap path.
           if (createIfMissing && command.message) {
             const userMessage = getUserMessageText(command.message)
             if (userMessage) {
@@ -401,7 +399,9 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                 resolvedModelId: modelResolution.modelId,
                 modelSource: modelResolution.source,
                 reasoningEffort: modelResolution.reasoningEffort,
-                providerOverride: Boolean(modelResolution.providerApiKeyOverride),
+                providerOverride: Boolean(
+                  modelResolution.providerApiKeyOverride,
+                ),
               },
               policy: {
                 zeroDataRetentionRequired: Boolean(
@@ -447,7 +447,8 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             (sanitizedDisabledToolKeys.length !==
               threadAccess.disabledToolKeys.length ||
               sanitizedDisabledToolKeys.some(
-                (toolKey, index) => threadAccess.disabledToolKeys[index] !== toolKey,
+                (toolKey, index) =>
+                  threadAccess.disabledToolKeys[index] !== toolKey,
               ))
           if (shouldPersistDisabledToolKeys) {
             yield* threads.setThreadDisabledToolKeys({
@@ -469,12 +470,11 @@ export class ChatOrchestratorService extends ServiceMap.Service<
           const resolvedCatalogModel = getResolvedCatalogModel(
             modelResolution.modelId,
           )
-          const contextWindowResolution = resolveModelContextWindow(
-            resolvedCatalogModel,
-          )
+          const contextWindowResolution =
+            resolveModelContextWindow(resolvedCatalogModel)
           const effectiveContextWindowMode = contextWindowMode
             ? contextWindowMode
-            : threadAccess.contextWindowMode ?? DEFAULT_CONTEXT_WINDOW_MODE
+            : (threadAccess.contextWindowMode ?? DEFAULT_CONTEXT_WINDOW_MODE)
           const activeContextWindow = resolveContextWindowForMode({
             model: resolvedCatalogModel,
             mode: effectiveContextWindowMode,
@@ -658,39 +658,41 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             assistantParentMessageId = command.message!.id
           }
 
-          quotaReservation = yield* usageQuota.reserveChatQuota({
-            organizationId,
-            userId,
-            requestId,
-            modelId: modelResolution.modelId,
-            messages,
-            bypassQuota: Boolean(modelResolution.providerApiKeyOverride),
-          }).pipe(
-            Effect.mapError((error) =>
-              error instanceof WorkspaceUsageQuotaExceededError
-                ? new QuotaExceededError({
-                    message: error.message,
-                    requestId,
-                    userId,
-                    retryAfterMs: error.retryAfterMs,
-                    reasonCode: error.reasonCode,
-                  })
-                : new MessagePersistenceError({
-                    message: 'Failed to reserve workspace chat quota',
-                    requestId,
-                    threadId,
-                    cause:
-                      typeof error === 'object'
-                      && error !== null
-                      && 'cause' in error
-                      && typeof (error as { cause?: unknown }).cause === 'string'
-                        ? (error as { cause: string }).cause
-                        : error instanceof Error
-                          ? error.message
-                          : String(error),
-                  }),
-            ),
-          )
+          quotaReservation = yield* usageQuota
+            .reserveChatQuota({
+              organizationId,
+              userId,
+              requestId,
+              modelId: modelResolution.modelId,
+              messages,
+              bypassQuota: Boolean(modelResolution.providerApiKeyOverride),
+            })
+            .pipe(
+              Effect.mapError((error) =>
+                error instanceof WorkspaceUsageQuotaExceededError
+                  ? new QuotaExceededError({
+                      message: error.message,
+                      requestId,
+                      userId,
+                      retryAfterMs: error.retryAfterMs,
+                      reasonCode: error.reasonCode,
+                    })
+                  : new MessagePersistenceError({
+                      message: 'Failed to reserve workspace chat quota',
+                      requestId,
+                      threadId,
+                      cause:
+                        typeof error === 'object' &&
+                        error !== null &&
+                        'cause' in error &&
+                        typeof (error as { cause?: unknown }).cause === 'string'
+                          ? (error as { cause: string }).cause
+                          : error instanceof Error
+                            ? error.message
+                            : String(error),
+                    }),
+              ),
+            )
           if (wideEvent) {
             setWideEventContext(wideEvent, {
               usage: {
@@ -816,8 +818,8 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                   assistantMessageId,
                   modelId: modelResolution.modelId,
                   actualCostUsd:
-                    input.generationAnalytics?.aiCost
-                    ?? input.generationAnalytics?.publicCost,
+                    input.generationAnalytics?.aiCost ??
+                    input.generationAnalytics?.publicCost,
                   estimatedCostNanoUsd: quotaReservation.estimatedNanoUsd,
                   usedByok: input.generationAnalytics?.usedByok ?? false,
                 })
@@ -886,11 +888,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             messages,
             model: modelResolution.modelId,
             providerApiKeyOverride: modelResolution.providerApiKeyOverride,
-            openrouterOptions: resolveOpenRouterRequestOptions({
-              modelId: modelResolution.modelId,
-              orgPolicy,
-            }),
-            systemPrompt: effectiveMode?.definition.systemPrompt,
+            systemPrompt: assembledSystemPrompt,
             requestId,
             tools: toolRegistry.tools,
             activeTools: toolRegistry.activeTools,
@@ -983,7 +981,8 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                     threadId,
                     model: modelResolution.modelId,
                     errorTag: 'Interrupted',
-                    message: 'Detached resumable stream persistence interrupted',
+                    message:
+                      'Detached resumable stream persistence interrupted',
                     latencyMs: Date.now() - startedAt,
                     cause: `phase=${persistPhase}`,
                   }),
@@ -1012,12 +1011,11 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                   message: readableMessage,
                   errorCode: chatErrorCodeFromTag(getErrorTag(error)),
                   i18nKey: classification.i18nKey,
-                  cause:
-                    error instanceof Error
-                      ? error.message
-                      : undefined,
+                  cause: error instanceof Error ? error.message : undefined,
                 })
-                void Effect.runPromise(drainWideEvent(wideEvent)).catch(() => undefined)
+                void Effect.runPromise(drainWideEvent(wideEvent)).catch(
+                  () => undefined,
+                )
               }
               void finalizeAssistant({
                 ok: false,
@@ -1095,7 +1093,8 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                           reasons: [...entry.reasons],
                         })),
                       orgProviderNativeToolsEnabled:
-                        orgPolicy?.toolPolicy.providerNativeToolsEnabled ?? true,
+                        orgPolicy?.toolPolicy.providerNativeToolsEnabled ??
+                        true,
                       threadDisabledToolKeys: sanitizedDisabledToolKeys,
                     },
                   }),
@@ -1108,8 +1107,8 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                     totalTokens: persistedGeneration?.totalTokens,
                     outputTokens: persistedGeneration?.outputTokens,
                     actualCostUsd:
-                      persistedGeneration?.aiCost
-                      ?? persistedGeneration?.publicCost,
+                      persistedGeneration?.aiCost ??
+                      persistedGeneration?.publicCost,
                     usedByok: persistedGeneration?.usedByok,
                   },
                   stream: { aborted: isAborted, activePhase: 'finished' },
@@ -1131,21 +1130,23 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                     i18nKey: classification.i18nKey,
                   })
                 }
-                await Effect.runPromise(drainWideEvent(wideEvent)).catch(() => undefined)
+                await Effect.runPromise(drainWideEvent(wideEvent)).catch(
+                  () => undefined,
+                )
               }
 
-                await finalizeAssistant({
-                  ok,
-                  providerMetadata: persistedGeneration?.providerMetadata,
-                  generationAnalytics: persistedGeneration,
-                  errorMessage: isAborted
+              await finalizeAssistant({
+                ok,
+                providerMetadata: persistedGeneration?.providerMetadata,
+                generationAnalytics: persistedGeneration,
+                errorMessage: isAborted
                   ? GENERIC_ASSISTANT_FAILURE_MESSAGE
                   : ok
                     ? undefined
                     : GENERIC_ASSISTANT_FAILURE_MESSAGE,
-                  errorCode: ok ? undefined : ChatErrorCode.Unknown,
-                  errorI18nKey: ok ? undefined : ChatErrorI18nKey.Unknown,
-                })
+                errorCode: ok ? undefined : ChatErrorCode.Unknown,
+                errorI18nKey: ok ? undefined : ChatErrorI18nKey.Unknown,
+              })
               cleanupActiveStream()
             },
           })

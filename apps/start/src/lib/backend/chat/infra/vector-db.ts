@@ -3,11 +3,12 @@ import { isEmbeddingFeatureEnabled } from '@/utils/app-feature-flags'
 type VectorChunkInsert = {
   readonly id: string
   readonly attachmentId: string
-  readonly scopeType?: 'attachment' | 'org_knowledge'
+  readonly scopeType?: 'attachment' | 'project_source' | 'org_knowledge'
   readonly userId: string
   readonly ownerOrgId?: string
+  readonly projectId?: string
   readonly workspaceId?: string
-  readonly accessScope?: 'user' | 'workspace' | 'org'
+  readonly accessScope?: 'user' | 'workspace' | 'project' | 'org'
   readonly accessGroupIds?: readonly string[]
   readonly chunkIndex: number
   readonly content: string
@@ -38,7 +39,7 @@ type QdrantSearchHit = {
 }
 
 const DEFAULT_QDRANT_COLLECTION = 'attachment_chunks_v1'
-const DEFAULT_QDRANT_TIMEOUT_MS = 5_000
+const DEFAULT_QDRANT_TIMEOUT_MS = 30_000
 const DEFAULT_QDRANT_BATCH_SIZE = 128
 let ensureReadyPromise: Promise<void> | null = null
 
@@ -166,6 +167,7 @@ async function ensureCollection(vectorSize: number): Promise<void> {
       createPayloadIndex(collection, 'userId', 'keyword'),
       createPayloadIndex(collection, 'threadId', 'keyword'),
       createPayloadIndex(collection, 'ownerOrgId', 'keyword'),
+      createPayloadIndex(collection, 'projectId', 'keyword'),
       createPayloadIndex(collection, 'workspaceId', 'keyword'),
       createPayloadIndex(collection, 'accessScope', 'keyword'),
       createPayloadIndex(collection, 'accessGroupIds', 'keyword'),
@@ -189,6 +191,7 @@ function toPoints(
         attachmentId: chunk.attachmentId,
         userId: chunk.userId,
         ownerOrgId: chunk.ownerOrgId,
+        projectId: chunk.projectId,
         workspaceId: chunk.workspaceId,
         accessScope: chunk.accessScope ?? 'user',
         accessGroupIds: [...(chunk.accessGroupIds ?? [])],
@@ -238,8 +241,9 @@ export async function insertAttachmentVectors(input: {
 
 export async function deleteAttachmentVectors(input: {
   readonly attachmentIds: readonly string[]
-  readonly scopeType: 'attachment' | 'org_knowledge'
+  readonly scopeType: 'attachment' | 'project_source' | 'org_knowledge'
   readonly ownerOrgId?: string
+  readonly projectId?: string
   readonly userId?: string
 }): Promise<void> {
   if (!isQdrantEnabled() || input.attachmentIds.length === 0) return
@@ -251,6 +255,9 @@ export async function deleteAttachmentVectors(input: {
 
   if (input.ownerOrgId) {
     must.push({ key: 'ownerOrgId', match: { value: input.ownerOrgId } })
+  }
+  if (input.projectId) {
+    must.push({ key: 'projectId', match: { value: input.projectId } })
   }
   if (input.userId) {
     must.push({ key: 'userId', match: { value: input.userId } })
@@ -442,6 +449,65 @@ export async function searchOrgKnowledgeVectors(input: {
         must: [
           { key: 'scopeType', match: { value: 'org_knowledge' } },
           { key: 'ownerOrgId', match: { value: input.organizationId } },
+          { key: 'attachmentId', match: { any: [...input.attachmentIds] } },
+        ],
+      },
+    },
+  )
+
+  return hits
+    .map((hit) => {
+      const payload = hit.payload ?? {}
+      const attachmentId = payload.attachmentId
+      const content = payload.content
+      const chunkIndex = payload.chunkIndex
+      if (
+        typeof attachmentId !== 'string' ||
+        typeof content !== 'string' ||
+        typeof chunkIndex !== 'number'
+      ) {
+        return null
+      }
+      return {
+        id: String(hit.id),
+        attachmentId,
+        chunkIndex,
+        content,
+        score: Number.isFinite(hit.score) ? hit.score : 0,
+      }
+    })
+    .filter((row): row is VectorChunkSearchResult => !!row)
+}
+
+export async function searchProjectSourceVectors(input: {
+  readonly projectId: string
+  readonly attachmentIds: readonly string[]
+  readonly queryEmbedding: readonly number[]
+  readonly limit: number
+}): Promise<readonly VectorChunkSearchResult[]> {
+  if (
+    !isQdrantEnabled() ||
+    input.attachmentIds.length === 0 ||
+    input.limit <= 0 ||
+    input.queryEmbedding.length === 0
+  ) {
+    return []
+  }
+
+  await ensureCollection(input.queryEmbedding.length)
+  const collection = getQdrantCollectionName()
+  const hits = await qdrantRequest<readonly QdrantSearchHit[]>(
+    'POST',
+    `/collections/${collection}/points/search`,
+    {
+      vector: [...input.queryEmbedding],
+      limit: input.limit,
+      with_payload: true,
+      with_vector: false,
+      filter: {
+        must: [
+          { key: 'scopeType', match: { value: 'project_source' } },
+          { key: 'projectId', match: { value: input.projectId } },
           { key: 'attachmentId', match: { any: [...input.attachmentIds] } },
         ],
       },

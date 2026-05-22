@@ -19,7 +19,11 @@ import type { IncomingUserMessage } from '@/lib/backend/chat/domain/schemas'
 import { getMemoryState } from '@/lib/backend/chat/infra/memory/state'
 import { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
 import { AttachmentRecordService } from './attachment-record.service'
-import { AttachmentRagService, OrgKnowledgeRagService } from './rag'
+import {
+  AttachmentRagService,
+  OrgKnowledgeRagService,
+  ProjectSourceRagService,
+} from './rag'
 import { toUserMessage } from './message-store/helpers'
 import { makeAppendUserMessageOperation } from './message-store/operations/append-user-message'
 import { makeFinalizeAssistantMessageOperation } from './message-store/operations/finalize-assistant-message'
@@ -129,6 +133,7 @@ export class MessageStoreService extends ServiceMap.Service<
       const attachmentRecord = yield* AttachmentRecordService
       const attachmentRag = yield* AttachmentRagService
       const orgKnowledgeRag = yield* OrgKnowledgeRagService
+      const projectSourceRag = yield* ProjectSourceRagService
       const orgKnowledgeRepository = yield* OrgKnowledgeRepositoryService
       const sql = yield* PgClient.PgClient
       const zeroDatabase = yield* ZeroDatabaseService
@@ -139,6 +144,7 @@ export class MessageStoreService extends ServiceMap.Service<
           attachmentRecord,
           attachmentRag,
           orgKnowledgeRag,
+          projectSourceRag,
           orgKnowledgeRepository,
         }),
         appendUserMessage: makeAppendUserMessageOperation({

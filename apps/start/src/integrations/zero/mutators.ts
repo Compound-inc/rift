@@ -2,6 +2,7 @@ import { defineMutatorsWithType } from '@rocicorp/zero'
 import type { Schema } from './schema'
 import { chatMutatorDefinitions } from './mutators/chat.mutators'
 import { orgPolicyMutatorDefinitions } from './mutators/org-policy.mutators'
+import { projectMutatorDefinitions } from './mutators/projects.mutators'
 
 /**
  * Workspace-wide Zero mutators composed from feature-scoped modules.
@@ -10,4 +11,5 @@ import { orgPolicyMutatorDefinitions } from './mutators/org-policy.mutators'
 export const mutators = defineMutatorsWithType<Schema>()({
   ...chatMutatorDefinitions,
   ...orgPolicyMutatorDefinitions,
+  ...projectMutatorDefinitions,
 })

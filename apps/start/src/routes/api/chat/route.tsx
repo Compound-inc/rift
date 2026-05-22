@@ -174,6 +174,7 @@ export const Route = createFileRoute('/api/chat')({
             thread: {
               threadId: body.threadId,
               createIfMissing: body.createIfMissing,
+              projectId: body.projectId,
               expectedBranchVersion: body.expectedBranchVersion,
               targetMessageId: body.messageId,
             },
@@ -236,6 +237,7 @@ export const Route = createFileRoute('/api/chat')({
             contextWindowMode: body.contextWindowMode,
             disabledToolKeys: body.disabledToolKeys,
             createIfMissing: body.createIfMissing,
+            projectId: body.projectId,
             route: '/api/chat',
             wideEvent,
           })

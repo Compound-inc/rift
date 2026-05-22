@@ -197,6 +197,29 @@ describe('chat-backend scaffold', () => {
     ])
   })
 
+  it('keeps create-if-missing threads attached to the requested project', async () => {
+    const threadId = 'thread-bootstrap-project'
+
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const threads = yield* ThreadService
+        return yield* threads.assertThreadAccess({
+          userId: 'user-project-bootstrap',
+          threadId,
+          requestId: 'req-project-bootstrap',
+          createIfMissing: true,
+          requestedModelId: 'openai/gpt-5-mini',
+          requestedProjectId: 'project-bootstrap',
+        })
+      }).pipe(Effect.provide(TestChatLayer)),
+    )
+
+    expect(result.projectId).toBe('project-bootstrap')
+    expect(getMemoryState().threads.get(threadId)?.projectId).toBe(
+      'project-bootstrap',
+    )
+  })
+
   it('streams and persists assistant message on finish', async () => {
     const result = await Effect.runPromise(
       Effect.gen(function* () {
@@ -256,6 +279,7 @@ describe('chat-backend scaffold', () => {
           requestId: 'req-bootstrap-tools',
           route: '/api/chat',
           createIfMissing: true,
+          projectId: 'project-bootstrap-tools',
           expectedBranchVersion: 1,
           modelId: 'openai/gpt-5-mini',
           disabledToolKeys: ['openai.code_interpreter'],
@@ -274,6 +298,9 @@ describe('chat-backend scaffold', () => {
     expect(getMemoryState().threads.get(threadId)?.disabledToolKeys).toEqual([
       'openai.code_interpreter',
     ])
+    expect(getMemoryState().threads.get(threadId)?.projectId).toBe(
+      'project-bootstrap-tools',
+    )
     expect(getMemoryState().threads.get(threadId)?.modeId).toBeUndefined()
   })
 

@@ -54,7 +54,11 @@ import { Route as appLayoutOrganizationSettingsCompliancePolicyRouteRouteImport 
 import { Route as appLayoutOrganizationSettingsByokRouteRouteImport } from './routes/(app)/_layout/organization/settings/byok/route'
 import { Route as appLayoutOrganizationSettingsBillingRouteRouteImport } from './routes/(app)/_layout/organization/settings/billing/route'
 import { Route as appLayoutOrganizationSettingsAnalyticsRouteRouteImport } from './routes/(app)/_layout/organization/settings/analytics/route'
+import { Route as appLayoutChatProjectsProjectIdRouteRouteImport } from './routes/(app)/_layout/chat/projects/$projectId/route'
 import { Route as appLayoutOrganizationSettingsModelsIndexRouteImport } from './routes/(app)/_layout/organization/settings/models/index'
+import { Route as appLayoutChatProjectsProjectIdIndexRouteImport } from './routes/(app)/_layout/chat/projects/$projectId/index'
+import { Route as appLayoutChatProjectsProjectIdSourcesRouteImport } from './routes/(app)/_layout/chat/projects/$projectId/sources'
+import { Route as appLayoutChatProjectsProjectIdSettingsRouteImport } from './routes/(app)/_layout/chat/projects/$projectId/settings'
 import { Route as appLayoutOrganizationSettingsModelsProviderIdRouteRouteImport } from './routes/(app)/_layout/organization/settings/models/$providerId/route'
 
 const SetupRouteRoute = SetupRouteRouteImport.update({
@@ -300,11 +304,35 @@ const appLayoutOrganizationSettingsAnalyticsRouteRoute =
     path: '/analytics',
     getParentRoute: () => appLayoutOrganizationSettingsRouteRoute,
   } as any)
+const appLayoutChatProjectsProjectIdRouteRoute =
+  appLayoutChatProjectsProjectIdRouteRouteImport.update({
+    id: '/projects/$projectId',
+    path: '/projects/$projectId',
+    getParentRoute: () => appLayoutChatRouteRoute,
+  } as any)
 const appLayoutOrganizationSettingsModelsIndexRoute =
   appLayoutOrganizationSettingsModelsIndexRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => appLayoutOrganizationSettingsModelsRouteRoute,
+  } as any)
+const appLayoutChatProjectsProjectIdIndexRoute =
+  appLayoutChatProjectsProjectIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => appLayoutChatProjectsProjectIdRouteRoute,
+  } as any)
+const appLayoutChatProjectsProjectIdSourcesRoute =
+  appLayoutChatProjectsProjectIdSourcesRouteImport.update({
+    id: '/sources',
+    path: '/sources',
+    getParentRoute: () => appLayoutChatProjectsProjectIdRouteRoute,
+  } as any)
+const appLayoutChatProjectsProjectIdSettingsRoute =
+  appLayoutChatProjectsProjectIdSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => appLayoutChatProjectsProjectIdRouteRoute,
   } as any)
 const appLayoutOrganizationSettingsModelsProviderIdRouteRoute =
   appLayoutOrganizationSettingsModelsProviderIdRouteRouteImport.update({
@@ -346,6 +374,7 @@ export interface FileRoutesByFullPath {
   '/chat/': typeof appLayoutChatIndexRoute
   '/settings/': typeof appLayoutSettingsIndexRoute
   '/singularity/': typeof eeSingularityLayoutIndexRoute
+  '/chat/projects/$projectId': typeof appLayoutChatProjectsProjectIdRouteRouteWithChildren
   '/organization/settings/analytics': typeof appLayoutOrganizationSettingsAnalyticsRouteRoute
   '/organization/settings/billing': typeof appLayoutOrganizationSettingsBillingRouteRoute
   '/organization/settings/byok': typeof appLayoutOrganizationSettingsByokRouteRoute
@@ -359,6 +388,9 @@ export interface FileRoutesByFullPath {
   '/singularity/orgs/$organizationId': typeof eeSingularityLayoutOrgsOrganizationIdRoute
   '/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
   '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
+  '/chat/projects/$projectId/settings': typeof appLayoutChatProjectsProjectIdSettingsRoute
+  '/chat/projects/$projectId/sources': typeof appLayoutChatProjectsProjectIdSourcesRoute
+  '/chat/projects/$projectId/': typeof appLayoutChatProjectsProjectIdIndexRoute
   '/organization/settings/models/': typeof appLayoutOrganizationSettingsModelsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -402,6 +434,9 @@ export interface FileRoutesByTo {
   '/singularity/orgs/$organizationId': typeof eeSingularityLayoutOrgsOrganizationIdRoute
   '/organization/settings': typeof appLayoutOrganizationSettingsIndexRoute
   '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
+  '/chat/projects/$projectId/settings': typeof appLayoutChatProjectsProjectIdSettingsRoute
+  '/chat/projects/$projectId/sources': typeof appLayoutChatProjectsProjectIdSourcesRoute
+  '/chat/projects/$projectId': typeof appLayoutChatProjectsProjectIdIndexRoute
   '/organization/settings/models': typeof appLayoutOrganizationSettingsModelsIndexRoute
 }
 export interface FileRoutesById {
@@ -439,6 +474,7 @@ export interface FileRoutesById {
   '/(app)/_layout/chat/': typeof appLayoutChatIndexRoute
   '/(app)/_layout/settings/': typeof appLayoutSettingsIndexRoute
   '/(ee)/singularity/_layout/': typeof eeSingularityLayoutIndexRoute
+  '/(app)/_layout/chat/projects/$projectId': typeof appLayoutChatProjectsProjectIdRouteRouteWithChildren
   '/(app)/_layout/organization/settings/analytics': typeof appLayoutOrganizationSettingsAnalyticsRouteRoute
   '/(app)/_layout/organization/settings/billing': typeof appLayoutOrganizationSettingsBillingRouteRoute
   '/(app)/_layout/organization/settings/byok': typeof appLayoutOrganizationSettingsByokRouteRoute
@@ -452,6 +488,9 @@ export interface FileRoutesById {
   '/(ee)/singularity/_layout/orgs/$organizationId': typeof eeSingularityLayoutOrgsOrganizationIdRoute
   '/(app)/_layout/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
   '/(app)/_layout/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
+  '/(app)/_layout/chat/projects/$projectId/settings': typeof appLayoutChatProjectsProjectIdSettingsRoute
+  '/(app)/_layout/chat/projects/$projectId/sources': typeof appLayoutChatProjectsProjectIdSourcesRoute
+  '/(app)/_layout/chat/projects/$projectId/': typeof appLayoutChatProjectsProjectIdIndexRoute
   '/(app)/_layout/organization/settings/models/': typeof appLayoutOrganizationSettingsModelsIndexRoute
 }
 export interface FileRouteTypes {
@@ -489,6 +528,7 @@ export interface FileRouteTypes {
     | '/chat/'
     | '/settings/'
     | '/singularity/'
+    | '/chat/projects/$projectId'
     | '/organization/settings/analytics'
     | '/organization/settings/billing'
     | '/organization/settings/byok'
@@ -502,6 +542,9 @@ export interface FileRouteTypes {
     | '/singularity/orgs/$organizationId'
     | '/organization/settings/'
     | '/organization/settings/models/$providerId'
+    | '/chat/projects/$projectId/settings'
+    | '/chat/projects/$projectId/sources'
+    | '/chat/projects/$projectId/'
     | '/organization/settings/models/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -545,6 +588,9 @@ export interface FileRouteTypes {
     | '/singularity/orgs/$organizationId'
     | '/organization/settings'
     | '/organization/settings/models/$providerId'
+    | '/chat/projects/$projectId/settings'
+    | '/chat/projects/$projectId/sources'
+    | '/chat/projects/$projectId'
     | '/organization/settings/models'
   id:
     | '__root__'
@@ -581,6 +627,7 @@ export interface FileRouteTypes {
     | '/(app)/_layout/chat/'
     | '/(app)/_layout/settings/'
     | '/(ee)/singularity/_layout/'
+    | '/(app)/_layout/chat/projects/$projectId'
     | '/(app)/_layout/organization/settings/analytics'
     | '/(app)/_layout/organization/settings/billing'
     | '/(app)/_layout/organization/settings/byok'
@@ -594,6 +641,9 @@ export interface FileRouteTypes {
     | '/(ee)/singularity/_layout/orgs/$organizationId'
     | '/(app)/_layout/organization/settings/'
     | '/(app)/_layout/organization/settings/models/$providerId'
+    | '/(app)/_layout/chat/projects/$projectId/settings'
+    | '/(app)/_layout/chat/projects/$projectId/sources'
+    | '/(app)/_layout/chat/projects/$projectId/'
     | '/(app)/_layout/organization/settings/models/'
   fileRoutesById: FileRoutesById
 }
@@ -936,12 +986,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appLayoutOrganizationSettingsAnalyticsRouteRouteImport
       parentRoute: typeof appLayoutOrganizationSettingsRouteRoute
     }
+    '/(app)/_layout/chat/projects/$projectId': {
+      id: '/(app)/_layout/chat/projects/$projectId'
+      path: '/projects/$projectId'
+      fullPath: '/chat/projects/$projectId'
+      preLoaderRoute: typeof appLayoutChatProjectsProjectIdRouteRouteImport
+      parentRoute: typeof appLayoutChatRouteRoute
+    }
     '/(app)/_layout/organization/settings/models/': {
       id: '/(app)/_layout/organization/settings/models/'
       path: '/'
       fullPath: '/organization/settings/models/'
       preLoaderRoute: typeof appLayoutOrganizationSettingsModelsIndexRouteImport
       parentRoute: typeof appLayoutOrganizationSettingsModelsRouteRoute
+    }
+    '/(app)/_layout/chat/projects/$projectId/': {
+      id: '/(app)/_layout/chat/projects/$projectId/'
+      path: '/'
+      fullPath: '/chat/projects/$projectId/'
+      preLoaderRoute: typeof appLayoutChatProjectsProjectIdIndexRouteImport
+      parentRoute: typeof appLayoutChatProjectsProjectIdRouteRoute
+    }
+    '/(app)/_layout/chat/projects/$projectId/sources': {
+      id: '/(app)/_layout/chat/projects/$projectId/sources'
+      path: '/sources'
+      fullPath: '/chat/projects/$projectId/sources'
+      preLoaderRoute: typeof appLayoutChatProjectsProjectIdSourcesRouteImport
+      parentRoute: typeof appLayoutChatProjectsProjectIdRouteRoute
+    }
+    '/(app)/_layout/chat/projects/$projectId/settings': {
+      id: '/(app)/_layout/chat/projects/$projectId/settings'
+      path: '/settings'
+      fullPath: '/chat/projects/$projectId/settings'
+      preLoaderRoute: typeof appLayoutChatProjectsProjectIdSettingsRouteImport
+      parentRoute: typeof appLayoutChatProjectsProjectIdRouteRoute
     }
     '/(app)/_layout/organization/settings/models/$providerId': {
       id: '/(app)/_layout/organization/settings/models/$providerId'
@@ -969,14 +1047,38 @@ const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
   AuthRouteRouteChildren,
 )
 
+interface appLayoutChatProjectsProjectIdRouteRouteChildren {
+  appLayoutChatProjectsProjectIdSettingsRoute: typeof appLayoutChatProjectsProjectIdSettingsRoute
+  appLayoutChatProjectsProjectIdSourcesRoute: typeof appLayoutChatProjectsProjectIdSourcesRoute
+  appLayoutChatProjectsProjectIdIndexRoute: typeof appLayoutChatProjectsProjectIdIndexRoute
+}
+
+const appLayoutChatProjectsProjectIdRouteRouteChildren: appLayoutChatProjectsProjectIdRouteRouteChildren =
+  {
+    appLayoutChatProjectsProjectIdSettingsRoute:
+      appLayoutChatProjectsProjectIdSettingsRoute,
+    appLayoutChatProjectsProjectIdSourcesRoute:
+      appLayoutChatProjectsProjectIdSourcesRoute,
+    appLayoutChatProjectsProjectIdIndexRoute:
+      appLayoutChatProjectsProjectIdIndexRoute,
+  }
+
+const appLayoutChatProjectsProjectIdRouteRouteWithChildren =
+  appLayoutChatProjectsProjectIdRouteRoute._addFileChildren(
+    appLayoutChatProjectsProjectIdRouteRouteChildren,
+  )
+
 interface appLayoutChatRouteRouteChildren {
   appLayoutChatThreadIdRouteRoute: typeof appLayoutChatThreadIdRouteRoute
   appLayoutChatIndexRoute: typeof appLayoutChatIndexRoute
+  appLayoutChatProjectsProjectIdRouteRoute: typeof appLayoutChatProjectsProjectIdRouteRouteWithChildren
 }
 
 const appLayoutChatRouteRouteChildren: appLayoutChatRouteRouteChildren = {
   appLayoutChatThreadIdRouteRoute: appLayoutChatThreadIdRouteRoute,
   appLayoutChatIndexRoute: appLayoutChatIndexRoute,
+  appLayoutChatProjectsProjectIdRouteRoute:
+    appLayoutChatProjectsProjectIdRouteRouteWithChildren,
 }
 
 const appLayoutChatRouteRouteWithChildren =

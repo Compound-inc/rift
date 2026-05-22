@@ -44,6 +44,9 @@ describe('makeLoadThreadMessagesOperation', () => {
       orgKnowledgeRag: {
         searchOrgKnowledge: () => Effect.succeed([]),
       } as never,
+      projectSourceRag: {
+        searchProjectSources: () => Effect.succeed([]),
+      } as never,
       orgKnowledgeRepository: {
         listActiveAttachmentIds,
       } as never,
@@ -219,6 +222,9 @@ describe('makeLoadThreadMessagesOperation', () => {
       orgKnowledgeRag: {
         searchOrgKnowledge: () => Effect.succeed([]),
       } as never,
+      projectSourceRag: {
+        searchProjectSources: () => Effect.succeed([]),
+      } as never,
       orgKnowledgeRepository: {
         listActiveAttachmentIds: () => Effect.succeed([]),
       } as never,
@@ -326,6 +332,9 @@ describe('makeLoadThreadMessagesOperation', () => {
       orgKnowledgeRag: {
         searchOrgKnowledge: () => Effect.succeed([]),
       } as never,
+      projectSourceRag: {
+        searchProjectSources: () => Effect.succeed([]),
+      } as never,
       orgKnowledgeRepository: {
         listActiveAttachmentIds: () => Effect.succeed([]),
       } as never,
@@ -374,6 +383,101 @@ describe('makeLoadThreadMessagesOperation', () => {
     })
   })
 
+  it('injects project source fallback context into project thread prompts', async () => {
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          messageId: 'user-1',
+          role: 'user',
+          parentMessageId: null,
+          branchIndex: 0,
+          created_at: Date.now(),
+          content: 'What should the launch brief mention?',
+          userId: 'user-1',
+          attachmentsIds: [],
+        },
+      ])
+      .mockResolvedValueOnce({
+        projectId: 'project-1',
+        activeChildByParent: {},
+      })
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: 'project-source-1',
+          projectId: 'project-1',
+          userId: 'user-1',
+          fileName: 'launch.pdf',
+          mimeType: 'application/pdf',
+          fileSize: 10,
+          status: 'uploaded',
+          embeddingStatus: 'indexed',
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ])
+
+    const loadThreadMessages = makeLoadThreadMessagesOperation({
+      zeroDatabase: {
+        getOrFail: Effect.succeed({
+          run,
+        } as never),
+        withDatabase: (withDatabaseRun: (db: { run: typeof run }) => unknown) =>
+          withDatabaseRun({
+            run,
+          } as never),
+      } as never,
+      attachmentRecord: {
+        listAttachmentContentRowsByThread: () => Effect.succeed([]),
+        listAttachmentContentRowsByIdsForProject: () =>
+          Effect.succeed([
+            {
+              id: 'project-source-1',
+              fileName: 'launch.pdf',
+              mimeType: 'application/pdf',
+              fileContent: 'Project launch plan requires SOC 2 language.',
+            },
+          ]),
+      } as never,
+      attachmentRag: {
+        searchThreadAttachments: () => Effect.succeed([]),
+        searchUserAttachments: () => Effect.succeed([]),
+      } as never,
+      orgKnowledgeRag: {
+        searchOrgKnowledge: () => Effect.succeed([]),
+      } as never,
+      projectSourceRag: {
+        searchProjectSources: () => Effect.succeed([]),
+      } as never,
+      orgKnowledgeRepository: {
+        listActiveAttachmentIds: () => Effect.succeed([]),
+      } as never,
+    })
+
+    const messages = await Effect.runPromise(
+      loadThreadMessages({
+        threadId: 'thread-1',
+        model: 'openai/gpt-5-mini',
+        userId: 'user-1',
+        requestId: 'req-project-source',
+      }),
+    )
+
+    const latestText = messages.at(-1)?.parts
+      .filter(
+        (part): part is { type: 'text'; text: string } =>
+          part.type === 'text' && typeof (part as { text?: unknown }).text === 'string',
+      )
+      .map((part) => part.text)
+      .join('\n')
+
+    expect(latestText).toContain('System-provided project context')
+    expect(latestText).toContain('launch.pdf')
+    expect(latestText).toContain('Project launch plan requires SOC 2 language.')
+    expect(latestText).toContain('What should the launch brief mention?')
+  })
+
   it('includes pending native attachments as AI SDK file parts', async () => {
     const run = vi
       .fn()
@@ -417,6 +521,9 @@ describe('makeLoadThreadMessagesOperation', () => {
       orgKnowledgeRag: {
         searchOrgKnowledge: () => Effect.succeed([]),
       } as never,
+      projectSourceRag: {
+        searchProjectSources: () => Effect.succeed([]),
+      } as never,
       orgKnowledgeRepository: {
         listActiveAttachmentIds: () => Effect.succeed([]),
       } as never,
@@ -442,6 +549,110 @@ describe('makeLoadThreadMessagesOperation', () => {
       mediaType: 'image/png',
       filename: 'diagram.png',
       url: 'https://example.com/diagram.png',
+    })
+  })
+
+  it('routes pending PDF attachments through RAG fallback even when the model supports PDFs natively', async () => {
+    // Even though `openai/gpt-5-mini` advertises `supportsPdfInput: true`,
+    // we deliberately route PDFs through the RAG / markdown fallback path
+    // because retrieving relevant excerpts is significantly more token
+    // efficient than uploading the full document on every turn.
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: 'att-pdf',
+          messageId: null,
+          threadId: null,
+          userId: 'user-1',
+          fileKey: 'whitepaper.pdf',
+          attachmentUrl: 'https://example.com/whitepaper.pdf',
+          fileName: 'whitepaper.pdf',
+          mimeType: 'application/pdf',
+          fileSize: 10,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ])
+
+    const loadThreadMessages = makeLoadThreadMessagesOperation({
+      zeroDatabase: {
+        getOrFail: Effect.succeed({
+          run,
+        } as never),
+        withDatabase: (withDatabaseRun: (db: { run: typeof run }) => unknown) =>
+          withDatabaseRun({
+            run,
+          } as never),
+      } as never,
+      attachmentRecord: {
+        listAttachmentContentRowsByThread: () => Effect.succeed([]),
+        listAttachmentContentRowsByIdsForUser: () =>
+          Effect.succeed([
+            {
+              id: 'att-pdf',
+              fileName: 'whitepaper.pdf',
+              mimeType: 'application/pdf',
+              fileContent: 'Whitepaper section about retrieval pipelines.',
+            },
+          ]),
+      } as never,
+      attachmentRag: {
+        searchThreadAttachments: () => Effect.succeed([]),
+        searchUserAttachments: () => Effect.succeed([]),
+      } as never,
+      orgKnowledgeRag: {
+        searchOrgKnowledge: () => Effect.succeed([]),
+      } as never,
+      projectSourceRag: {
+        searchProjectSources: () => Effect.succeed([]),
+      } as never,
+      orgKnowledgeRepository: {
+        listActiveAttachmentIds: () => Effect.succeed([]),
+      } as never,
+    })
+
+    const messages = await Effect.runPromise(
+      loadThreadMessages({
+        threadId: 'thread-1',
+        model: 'openai/gpt-5-mini',
+        userId: 'user-1',
+        pendingUserMessage: {
+          id: 'user-pdf',
+          role: 'user',
+          parts: [{ type: 'text', text: 'Summarize the whitepaper' }],
+        },
+        pendingAttachments: [{ id: 'att-pdf' }],
+        requestId: 'req-pending-pdf',
+      }),
+    )
+
+    const pendingMessage = messages.at(-1)
+    const pendingText = pendingMessage?.parts
+      .filter(
+        (part): part is { type: 'text'; text: string } =>
+          part.type === 'text' && typeof (part as { text?: unknown }).text === 'string',
+      )
+      .map((part) => part.text)
+      .join('\n')
+    const fileParts = pendingMessage?.parts.filter((part) => part.type === 'file')
+
+    // No native file part for the PDF — it must be routed through the
+    // markdown fallback context instead.
+    expect(fileParts).toEqual([])
+    expect(pendingText).toContain('Summarize the whitepaper')
+    expect(pendingText).toContain('Whitepaper section about retrieval pipelines.')
+    expect(pendingMessage?.metadata).toMatchObject({
+      attachments: [
+        {
+          id: 'att-pdf',
+          name: 'whitepaper.pdf',
+          contentType: 'application/pdf',
+        },
+      ],
     })
   })
 })

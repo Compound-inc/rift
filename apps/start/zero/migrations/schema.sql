@@ -696,3 +696,35 @@ CREATE INDEX IF NOT EXISTS attachments_message_id ON attachments (message_id);
 CREATE INDEX IF NOT EXISTS attachments_user_id ON attachments (user_id);
 CREATE INDEX IF NOT EXISTS attachments_org_knowledge_lookup
   ON attachments (owner_org_id, org_knowledge_kind, org_knowledge_active, status, updated_at DESC);
+
+-- ----------------------------------------------------------------------------
+-- projects (Projects feature). See ADR-0001/0002/0003 and CONTEXT.md.
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS projects (
+  id                  TEXT PRIMARY KEY,
+  user_id             TEXT NOT NULL,
+  organization_id     TEXT,
+  name                TEXT NOT NULL,
+  description         TEXT,
+  custom_instruction  TEXT,
+  visibility          TEXT NOT NULL DEFAULT 'private',
+  icon                TEXT,
+  color               TEXT,
+  deleted_at          BIGINT,
+  created_at          BIGINT NOT NULL,
+  updated_at          BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS projects_user_visible
+  ON projects (user_id, updated_at DESC)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS projects_org_visible
+  ON projects (organization_id, updated_at DESC)
+  WHERE deleted_at IS NULL AND visibility = 'org';
+
+ALTER TABLE threads
+ADD COLUMN IF NOT EXISTS project_id TEXT;
+CREATE INDEX IF NOT EXISTS threads_project_id ON threads (project_id);
+
+ALTER TABLE attachments
+ADD COLUMN IF NOT EXISTS project_id TEXT;
+CREATE INDEX IF NOT EXISTS attachments_project_id ON attachments (project_id);

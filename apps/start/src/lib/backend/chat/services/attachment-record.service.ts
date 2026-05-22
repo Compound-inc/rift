@@ -4,11 +4,14 @@ import type {
   AttachmentContentRow,
   AttachmentPersistenceRow,
   OrgKnowledgeAttachmentRecord,
+  ProjectSourceAttachmentRecord,
 } from '@/lib/backend/chat/infra/attachment-records'
 import {
+  getProjectSourceAttachmentRecordEffect,
   getOrgKnowledgeAttachmentRecordEffect,
   insertAttachmentRecordEffect,
   listAttachmentContentRowsByIdsForUserEffect,
+  listAttachmentContentRowsByIdsForProjectEffect,
   listAttachmentContentRowsByThreadEffect,
 } from '@/lib/backend/chat/infra/attachment-records'
 
@@ -23,10 +26,18 @@ export type AttachmentRecordServiceShape = {
     readonly userId: string
     readonly attachmentIds: readonly string[]
   }) => Effect.Effect<readonly AttachmentContentRow[], unknown>
+  readonly listAttachmentContentRowsByIdsForProject: (input: {
+    readonly projectId: string
+    readonly attachmentIds: readonly string[]
+  }) => Effect.Effect<readonly AttachmentContentRow[], unknown>
   readonly getOrgKnowledgeAttachmentRecord: (input: {
     readonly organizationId: string
     readonly attachmentId: string
   }) => Effect.Effect<OrgKnowledgeAttachmentRecord | null, unknown>
+  readonly getProjectSourceAttachmentRecord: (input: {
+    readonly projectId: string
+    readonly attachmentId: string
+  }) => Effect.Effect<ProjectSourceAttachmentRecord | null, unknown>
 }
 
 /**
@@ -63,7 +74,15 @@ export class AttachmentRecordService extends ServiceMap.Service<
           readonly userId: string
           readonly attachmentIds: readonly string[]
         }) =>
-          provideUpstream(listAttachmentContentRowsByIdsForUserEffect(input)),
+            provideUpstream(listAttachmentContentRowsByIdsForUserEffect(input)),
+        ),
+        listAttachmentContentRowsByIdsForProject: Effect.fn(
+          'AttachmentRecordService.listAttachmentContentRowsByIdsForProject',
+        )((input: {
+          readonly projectId: string
+          readonly attachmentIds: readonly string[]
+        }) =>
+          provideUpstream(listAttachmentContentRowsByIdsForProjectEffect(input)),
         ),
         getOrgKnowledgeAttachmentRecord: Effect.fn(
           'AttachmentRecordService.getOrgKnowledgeAttachmentRecord',
@@ -73,6 +92,15 @@ export class AttachmentRecordService extends ServiceMap.Service<
         }) =>
           provideUpstream(
             getOrgKnowledgeAttachmentRecordEffect(organizationId, attachmentId),
+          )),
+        getProjectSourceAttachmentRecord: Effect.fn(
+          'AttachmentRecordService.getProjectSourceAttachmentRecord',
+        )(({ projectId, attachmentId }: {
+          readonly projectId: string
+          readonly attachmentId: string
+        }) =>
+          provideUpstream(
+            getProjectSourceAttachmentRecordEffect(projectId, attachmentId),
           )),
       }
     }),

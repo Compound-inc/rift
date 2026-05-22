@@ -70,6 +70,7 @@ export type ChatRequestWideEvent = {
   thread: {
     threadId?: string
     createIfMissing?: boolean
+    projectId?: string
     expectedBranchVersion?: number
     actualBranchVersion?: number
     targetMessageId?: string
