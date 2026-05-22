@@ -11,40 +11,34 @@
 'use client'
 
 import { useCallback, useEffect } from 'react'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import type { QueryResultType } from '@rocicorp/zero'
 import { useQuery, useZero } from '@rocicorp/zero/react'
 import { Button } from '@rift/ui/button'
 import {
   ContextMenu,
   ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@rift/ui/context-menu'
 import { directionClass, useDirection } from '@rift/ui/direction'
-import { cn, copyToClipboard } from '@rift/utils'
-import { SidebarGroupTooltip } from '@rift/ui/tooltip'
-import { Spinner } from '@rift/ui/spinner'
-import AlertTriangle from 'lucide-react/dist/esm/icons/alert-triangle'
+import { cn } from '@rift/utils'
 import ArrowLeft from 'lucide-react/dist/esm/icons/arrow-left'
-import Copy from 'lucide-react/dist/esm/icons/copy'
 import FileText from 'lucide-react/dist/esm/icons/file-text'
 import Link2 from 'lucide-react/dist/esm/icons/link-2'
-import Pin from 'lucide-react/dist/esm/icons/pin'
-import PinOff from 'lucide-react/dist/esm/icons/pin-off'
 import Settings from 'lucide-react/dist/esm/icons/settings'
-import Trash2 from 'lucide-react/dist/esm/icons/trash-2'
-import { toast } from 'sonner'
 
-import { mutators, queries } from '@/integrations/zero'
+import { queries } from '@/integrations/zero'
 import { CACHE_CHAT_NAV } from '@/integrations/zero/query-cache-policy'
 import { SidebarNavItem } from '@/components/layout/sidebar/sidebar-nav-item'
 import type { NavItemType } from '@/components/layout/sidebar/app-sidebar-nav.config'
 import { m } from '@/paraglide/messages.js'
 
-import { ThreadMoveToProjectSubmenu } from './chat-sidebar-move-to-project'
 import { syncThreadGenerationStatuses } from './thread-status-store'
+import {
+  ThreadRowContextMenuItems,
+  getThreadRowTrailingElement,
+  useThreadRowActions,
+} from './thread-row-shared'
 
 const PROJECT_THREADS_PAGE_SIZE = 50
 
@@ -275,8 +269,14 @@ function ChatProjectThreadRow({
   pathname: string
 }) {
   const z = useZero()
-  const navigate = useNavigate()
   const activeThreadId = getActiveThreadIdFromPathname(pathname)
+
+  // Shared row actions; the project-scoped sidebar redirects post-delete
+  // to the project landing page rather than the global chat root.
+  const rowActions = useThreadRowActions({
+    redirectTargetOnDelete: `/chat/projects/${projectId}`,
+    activeThreadId,
+  })
 
   const preloadThreadMessages = useCallback(
     (threadId: string) => {
@@ -285,87 +285,11 @@ function ChatProjectThreadRow({
     [z],
   )
 
-  const handleCopyThreadLink = useCallback(async (threadId: string) => {
-    const origin = window.location.origin
-    await copyToClipboard(`${origin}/chat/${threadId}`)
-  }, [])
-
-  const handleSetThreadPinned = useCallback(
-    async (threadId: string, pinned: boolean) => {
-      try {
-        await z.mutate(mutators.threads.setPinned({ threadId, pinned })).client
-      } catch (error) {
-        console.error('Failed to update thread pin state:', error)
-        toast.error(m.chat_sidebar_thread_pin_failed())
-      }
-    },
-    [z],
-  )
-
-  const handleDeleteThread = useCallback(
-    async (threadId: string) => {
-      try {
-        const write = z.mutate(mutators.threads.delete({ threadId }))
-        await write.client
-        toast.success(m.chat_sidebar_thread_deleted())
-        if (activeThreadId === threadId) {
-          navigate({ to: `/chat/projects/${projectId}` })
-        }
-        const serverRes = await write.server
-        if (serverRes.type === 'error') {
-          toast.error(m.chat_sidebar_thread_delete_failed())
-        }
-      } catch (error) {
-        console.error('Failed to delete thread:', error)
-        toast.error(m.chat_sidebar_thread_delete_failed())
-      }
-    },
-    [activeThreadId, navigate, projectId, z],
-  )
-
   const title = thread.title || m.chat_sidebar_thread_untitled()
-  const status = thread.generationStatus
-  const showSpinner =
-    status === 'pending' || status === 'generation' || status === undefined
-  const showError = status === 'failed'
   const item: NavItemType = {
     name: title,
     href: `/chat/${thread.threadId}`,
-    trailing: showSpinner ? (
-      <SidebarGroupTooltip
-        name={
-          status === 'pending'
-            ? m.chat_sidebar_status_pending()
-            : m.chat_sidebar_status_generating()
-        }
-        description={
-          status === 'pending'
-            ? m.chat_sidebar_status_pending_description()
-            : m.chat_sidebar_status_generating_description()
-        }
-      >
-        <span className="inline-flex shrink-0">
-          <Spinner
-            className="size-4 animate-spin text-foreground-secondary"
-            aria-hidden
-          />
-        </span>
-      </SidebarGroupTooltip>
-    ) : showError ? (
-      <SidebarGroupTooltip
-        name={m.chat_sidebar_status_error()}
-        description={m.chat_sidebar_status_error_description()}
-      >
-        <span className="inline-flex shrink-0">
-          <AlertTriangle className="size-4 text-foreground-error" aria-hidden />
-        </span>
-      </SidebarGroupTooltip>
-    ) : thread.pinned ? (
-      <Pin
-        className="size-3.5 shrink-0 text-foreground-tertiary"
-        aria-label={m.chat_sidebar_group_pinned()}
-      />
-    ) : undefined,
+    trailing: getThreadRowTrailingElement(thread),
   }
 
   return (
@@ -379,36 +303,11 @@ function ChatProjectThreadRow({
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem
-          onClick={() => {
-            void handleCopyThreadLink(thread.threadId)
-          }}
-        >
-          <Copy />
-          {m.chat_sidebar_copy_link()}
-        </ContextMenuItem>
-        <ContextMenuItem
-          onClick={() => {
-            void handleSetThreadPinned(thread.threadId, !thread.pinned)
-          }}
-        >
-          {thread.pinned ? <PinOff /> : <Pin />}
-          {thread.pinned ? m.chat_sidebar_unpin() : m.chat_sidebar_pin()}
-        </ContextMenuItem>
-        <ThreadMoveToProjectSubmenu
-          threadId={thread.threadId}
+        <ThreadRowContextMenuItems
+          thread={thread}
           currentProjectId={projectId}
+          actions={rowActions}
         />
-        <ContextMenuSeparator />
-        <ContextMenuItem
-          variant="destructive"
-          onClick={() => {
-            void handleDeleteThread(thread.threadId)
-          }}
-        >
-          <Trash2 />
-          {m.chat_sidebar_delete()}
-        </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
   )

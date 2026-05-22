@@ -105,7 +105,7 @@ function ProjectSourceRowActions({
             variant="ghost"
             size="iconSmall"
             className="size-8 rounded-md"
-            aria-label={m.org_knowledge_actions_aria({ name: item.fileName })}
+            aria-label={m.chat_project_sources_actions_aria({ name: item.fileName })}
             disabled={pending}
           >
             <MoreVertical className="size-4" aria-hidden />
@@ -114,13 +114,13 @@ function ProjectSourceRowActions({
       />
       <DropdownMenuContent align="end" sideOffset={6} className="min-w-40">
         <DropdownMenuItem onClick={() => void onRetryIndex(item.id)}>
-          {m.org_knowledge_action_retry_index()}
+          {m.chat_project_sources_action_retry_index()}
         </DropdownMenuItem>
         <DropdownMenuItem
           variant="destructive"
           onClick={() => void onRemove(item.id)}
         >
-          {m.org_knowledge_action_delete()}
+          {m.chat_project_sources_action_delete()}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

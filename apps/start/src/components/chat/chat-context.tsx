@@ -220,6 +220,22 @@ type ChatMessagesContextValue = {
    * project welcome screen and chat header chip.
    */
   activeProjectId?: string
+  /**
+   * `true` exactly when the user is on a project's empty landing
+   * screen: inside a project (no active thread) with no messages
+   * yet. Both the sticky chrome (decorative backdrop) and the thread
+   * body (project-specific welcome hero) consult this flag so they
+   * can't disagree on what counts as "project landing state".
+   */
+  isProjectLandingState: boolean
+  /**
+   * Broader "the chat area should show a welcome hero" flag: no
+   * active thread and no messages, regardless of whether a project
+   * is in scope. The thread body uses this as the outer guard for
+   * its welcome branch, then picks the project-specific or generic
+   * welcome variant from `isProjectLandingState`.
+   */
+  isWelcomeState: boolean
   hasHydratedActiveThread: boolean
   branchSelectorsByAnchorMessageId: Record<string, BranchSelectorState>
   latestAssistantUsage?: LanguageModelUsage
@@ -2258,17 +2274,24 @@ export function ChatProvider({
   )
 
   const messagesValue = useMemo<ChatMessagesContextValue>(
-    () => ({
-      messages,
-      status,
-      activeThreadId,
-      activeProjectId: projectId,
-      hasHydratedActiveThread,
-      branchSelectorsByAnchorMessageId,
-      latestAssistantUsage,
-      branchCost,
-      showBranchCost,
-    }),
+    () => {
+      const isWelcomeState =
+        activeThreadId == null && messages.length === 0
+      const isProjectLandingState = isWelcomeState && projectId != null
+      return {
+        messages,
+        status,
+        activeThreadId,
+        activeProjectId: projectId,
+        isProjectLandingState,
+        isWelcomeState,
+        hasHydratedActiveThread,
+        branchSelectorsByAnchorMessageId,
+        latestAssistantUsage,
+        branchCost,
+        showBranchCost,
+      }
+    },
     [
       messages,
       status,

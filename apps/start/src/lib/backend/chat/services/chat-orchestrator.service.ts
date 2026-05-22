@@ -60,6 +60,10 @@ import {
   emitBranchVersionConflictTelemetry,
   emitInvalidEditTargetTelemetry,
 } from './chat-orchestrator/failure-telemetry'
+import {
+  resolveOpenRouterRequestOptions,
+  withGatewayComplianceProviderOptions,
+} from './chat-orchestrator/zdr-policy'
 import { normalizeStreamCommand } from './chat-orchestrator/command'
 import { buildPersistedGenerationAnalytics } from '../domain/generation-metrics'
 import { nanoUsdToUsd } from '@/lib/backend/billing/services/workspace-usage/shared'
@@ -78,51 +82,6 @@ function getResolvedCatalogModel(modelId: string) {
   }
 
   return catalogModel
-}
-
-function withGatewayComplianceProviderOptions(input: {
-  readonly providerOptions?: Record<string, unknown>
-  readonly orgPolicy?: OrgAiPolicy
-  readonly hasProviderKeyOverride?: boolean
-}): Record<string, unknown> | undefined {
-  const gatewayOptions =
-    input.providerOptions?.gateway &&
-    typeof input.providerOptions.gateway === 'object' &&
-    !Array.isArray(input.providerOptions.gateway)
-      ? (input.providerOptions.gateway as Record<string, unknown>)
-      : undefined
-
-  const requireZdr = Boolean(input.orgPolicy?.complianceFlags.require_zdr)
-  const applyZdr = requireZdr && !input.hasProviderKeyOverride
-
-  return {
-    ...(input.providerOptions ?? {}),
-    gateway: {
-      ...(gatewayOptions ?? {}),
-      caching: 'auto',
-      ...(applyZdr ? { zeroDataRetention: true } : {}),
-    },
-  }
-}
-
-/**
- * Resolves OpenRouter-specific request options for a single chat turn.
- * Returns `undefined` for non-OpenRouter routes so callers can ignore the
- * result without branching. ZDR enforcement is dynamic: when the org has
- * `require_zdr` enabled we forward `provider.zdr: true` to OpenRouter, which
- * restricts routing to ZDR endpoints regardless of the upstream model picked
- * by the auto-router.
- */
-function resolveOpenRouterRequestOptions(input: {
-  readonly modelId: string
-  readonly orgPolicy?: OrgAiPolicy
-}): { readonly enforceZdr: boolean } | undefined {
-  const catalogModel = getCatalogModel(input.modelId)
-  if (catalogModel?.providerId !== 'openrouter') return undefined
-
-  return {
-    enforceZdr: Boolean(input.orgPolicy?.complianceFlags.require_zdr),
-  }
 }
 
 /**
