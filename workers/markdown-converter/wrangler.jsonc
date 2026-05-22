@@ -6,4 +6,11 @@
   "ai": {
     "binding": "AI",
   },
+  // Enable Workers Logs so runtime logs and uncaught exceptions are captured
+  // in the Cloudflare dashboard. `head_sampling_rate: 1` keeps 100% of
+  // invocations — safe here because this worker is low-traffic.
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+  },
 }

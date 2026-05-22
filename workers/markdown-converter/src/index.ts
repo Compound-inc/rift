@@ -23,6 +23,16 @@ function getBearerToken(headerValue: string | null): string | null {
   return match?.[1]?.trim() ?? null
 }
 
+// Extract just the host from a URL for safe logging. The full `fileUrl` may
+// be a presigned URL whose query string is a credential, so we never log it.
+function safeHost(rawUrl: string): string {
+  try {
+    return new URL(rawUrl).host
+  } catch {
+    return '<invalid-url>'
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
@@ -32,6 +42,7 @@ export default {
 
     const providedToken = getBearerToken(request.headers.get('authorization'))
     if (!providedToken || providedToken !== env.INTERNAL_TOKEN) {
+      console.warn('convert: unauthorized request')
       return jsonResponse({ error: 'Unauthorized' }, 401)
     }
 
@@ -49,20 +60,66 @@ export default {
       return jsonResponse({ error: 'fileUrl is required' }, 400)
     }
 
-    const sourceResponse = await fetch(fileUrl)
+    const startedAt = Date.now()
+    console.log('convert: start', { fileName, host: safeHost(fileUrl) })
+
+    let sourceResponse: Response
+    try {
+      sourceResponse = await fetch(fileUrl)
+    } catch (err) {
+      console.error('convert: source fetch threw', {
+        fileName,
+        host: safeHost(fileUrl),
+        error: err instanceof Error ? err.message : String(err),
+      })
+      return jsonResponse({ error: 'Failed to fetch source file' }, 502)
+    }
+
     if (!sourceResponse.ok) {
+      console.warn('convert: source fetch non-ok', {
+        fileName,
+        host: safeHost(fileUrl),
+        status: sourceResponse.status,
+      })
       return jsonResponse({ error: 'Failed to fetch source file' }, 400)
     }
 
     const blob = await sourceResponse.blob()
-    const result = await env.AI.toMarkdown({
-      name: fileName,
-      blob,
-    })
+
+    let result: Awaited<ReturnType<Ai['toMarkdown']>>
+    try {
+      result = await env.AI.toMarkdown({
+        name: fileName,
+        blob,
+      })
+    } catch (err) {
+      console.error('convert: AI.toMarkdown threw', {
+        fileName,
+        size: blob.size,
+        error: err instanceof Error ? err.message : String(err),
+      })
+      return jsonResponse({ error: 'Conversion failed' }, 500)
+    }
 
     if (result.format === 'error') {
+      console.error('convert: AI.toMarkdown returned error', {
+        fileName,
+        size: blob.size,
+        error: result.error,
+      })
       return jsonResponse({ error: result.error }, 422)
     }
+
+    console.log('convert: ok', {
+      fileName,
+      mimeType: result.mimeType,
+      tokens: result.tokens ?? 0,
+      durationMs: Date.now() - startedAt,
+    })
+    // Dump the full markdown on its own line so it's easy to read/copy from
+    // `wrangler tail` or the dashboard. Note: very large documents may be
+    // truncated by Workers Logs (per-line size limits).
+    console.log('convert: markdown output\n' + result.data)
 
     return jsonResponse({
       name: result.name,
