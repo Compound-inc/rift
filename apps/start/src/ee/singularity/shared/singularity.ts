@@ -1,4 +1,4 @@
-export const SINGULARITY_ORG_ID = 'jMjvN2WIXT042NFOSpErVoUySnPCZSAm'
+export const SINGULARITY_ORG_ID = 'b14vYXg3qGsOCXb5nedwWhcdZo3WhWKx'
 
 export function isSingularityOrganizationId(
   organizationId: string | null | undefined,
