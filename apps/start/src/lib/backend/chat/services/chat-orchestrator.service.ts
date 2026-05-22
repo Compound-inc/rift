@@ -278,20 +278,14 @@ export class ChatOrchestratorService extends ServiceMap.Service<
            * If the Thread belongs to a Project, concatenate the Project's
            * `custom_instruction` after the mode's system prompt so it can
            * extend (not be overridden by) the mode's tone/role guidance.
+           * The instruction is resolved as part of `assertThreadAccess` so
+           * we don't pay a second project query per turn.
            */
-          const projectInstruction = threadAccess.projectId
-            ? yield* threads.loadProjectInstruction({
-                userId,
-                projectId: threadAccess.projectId,
-                threadId,
-                requestId,
-              })
-            : { instruction: undefined as string | undefined }
           const baseSystemPrompt = effectiveMode?.definition.systemPrompt
           const assembledSystemPrompt =
-            baseSystemPrompt && projectInstruction.instruction
-              ? `${baseSystemPrompt}\n\n${projectInstruction.instruction}`
-              : (projectInstruction.instruction ?? baseSystemPrompt)
+            baseSystemPrompt && threadAccess.projectInstruction
+              ? `${baseSystemPrompt}\n\n${threadAccess.projectInstruction}`
+              : (threadAccess.projectInstruction ?? baseSystemPrompt)
 
           if (
             attachments &&
