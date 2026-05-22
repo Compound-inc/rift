@@ -11,6 +11,7 @@ import {
   buildBootstrapThreadRecord,
   DEFAULT_THREAD_TITLE,
 } from '@/lib/shared/chat'
+import { checkProjectAccess } from '@/lib/shared/projects/access'
 import {
   MessagePersistenceError,
   ThreadForbiddenError,
@@ -83,11 +84,14 @@ export type ThreadServiceShape = {
    * Loads the Project's `custom_instruction` for a Thread that belongs to
    * a Project. Returns `{ instruction: undefined }` when the project is
    * missing, soft-deleted, or not owned by `userId` so the caller can
-   * gracefully fall back to no project context.
+   * gracefully fall back to no project context. The owning thread's id is
+   * passed along so observability errors are attributed to the thread
+   * that triggered the project lookup.
    */
   readonly loadProjectInstruction: (input: {
     readonly userId: string
     readonly projectId: string
+    readonly threadId: string
     readonly requestId: string
   }) => Effect.Effect<
     { readonly instruction?: string },
@@ -280,33 +284,26 @@ export class ThreadService extends ServiceMap.Service<
                         .where('id', normalizedRequestedProjectId)
                         .one(),
                     )
-                    if (
-                      !project ||
-                      project.userId !== userId ||
-                      project.deletedAt
-                    ) {
-                      throw new ThreadForbiddenError({
-                        message: 'Project is not available for thread creation',
-                        requestId,
-                        threadId,
-                        userId,
-                      })
-                    }
-
-                    const threadOrgId = organizationId?.trim() || undefined
-                    const projectOrgId =
-                      project.organizationId?.trim() || undefined
-                    if (threadOrgId !== projectOrgId) {
+                    const access = checkProjectAccess(project, {
+                      userId,
+                      orgContext: {
+                        enforce: true,
+                        organizationId,
+                      },
+                    })
+                    if (access.kind !== 'ok') {
                       throw new ThreadForbiddenError({
                         message:
-                          'Project is not available in the active organization',
+                          access.kind === 'org-mismatch'
+                            ? 'Project is not available in the active organization'
+                            : 'Project is not available for thread creation',
                         requestId,
                         threadId,
                         userId,
                       })
                     }
 
-                    resolvedProjectId = project.id
+                    resolvedProjectId = access.project.id
                   }
 
                   try {
@@ -381,11 +378,18 @@ export class ThreadService extends ServiceMap.Service<
               )
             }
 
-            const threadProjectId = thread.projectId
-            if (threadProjectId) {
+            // Soft-deleted or missing parent projects make the thread
+            // unprojected from the orchestrator's point of view, matching
+            // ADR-0001's "hidden from UI but data preserved" stance: the
+            // thread itself remains accessible to its owner so a future
+            // restore can bring everything back. The project context just
+            // stops applying for new turns.
+            const persistedProjectId = thread.projectId ?? undefined
+            let effectiveProjectId = persistedProjectId
+            if (persistedProjectId) {
               const projectRow = yield* Effect.tryPromise({
                 try: () =>
-                  db.run(zql.project.where('id', threadProjectId).one()),
+                  db.run(zql.project.where('id', persistedProjectId).one()),
                 catch: (error) =>
                   new MessagePersistenceError({
                     message: 'Failed to validate project access',
@@ -394,14 +398,12 @@ export class ThreadService extends ServiceMap.Service<
                     cause: String(error),
                   }),
               })
-              if (!projectRow || projectRow.deletedAt) {
-                return yield* Effect.fail(
-                  new ThreadNotFoundError({
-                    message: 'Thread not found',
-                    requestId,
-                    threadId,
-                  }),
-                )
+              const access = checkProjectAccess(projectRow, {
+                userId,
+                orgContext: { enforce: false },
+              })
+              if (access.kind !== 'ok') {
+                effectiveProjectId = undefined
               }
             }
 
@@ -424,7 +426,7 @@ export class ThreadService extends ServiceMap.Service<
                 : [],
               generationStatus: thread.generationStatus,
               branchVersion: thread.branchVersion,
-              projectId: thread.projectId ?? undefined,
+              projectId: effectiveProjectId,
             }
           }),
       )
@@ -573,21 +575,23 @@ User message: ${trimmedMessage}`,
         ({
           userId,
           projectId,
+          threadId,
           requestId,
         }: {
           readonly userId: string
           readonly projectId: string
+          readonly threadId: string
           readonly requestId: string
         }) =>
           Effect.gen(function* () {
-            const db = yield* loadDb({ requestId, threadId: projectId })
+            const db = yield* loadDb({ requestId, threadId })
             const project = yield* Effect.tryPromise({
               try: () => db.run(zql.project.where('id', projectId).one()),
               catch: (error) =>
                 new MessagePersistenceError({
                   message: 'Failed to load project instruction',
                   requestId,
-                  threadId: projectId,
+                  threadId,
                   cause: String(error),
                 }),
             })
@@ -595,11 +599,15 @@ User message: ${trimmedMessage}`,
             // A missing, soft-deleted, or foreign-owned project falls back
             // to no instruction; the orchestrator should still be able to
             // generate a response without one.
-            if (!project || project.userId !== userId || project.deletedAt) {
+            const access = checkProjectAccess(project, {
+              userId,
+              orgContext: { enforce: false },
+            })
+            if (access.kind !== 'ok') {
               return { instruction: undefined }
             }
 
-            const trimmed = project.customInstruction?.trim()
+            const trimmed = access.project.customInstruction?.trim()
             return {
               instruction:
                 typeof trimmed === 'string' && trimmed.length > 0

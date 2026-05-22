@@ -324,6 +324,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             ? yield* threads.loadProjectInstruction({
                 userId,
                 projectId: threadAccess.projectId,
+                threadId,
                 requestId,
               })
             : { instruction: undefined as string | undefined }

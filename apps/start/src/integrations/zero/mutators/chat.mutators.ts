@@ -4,6 +4,10 @@ import type { AiContextWindowMode } from '@/lib/shared/ai-catalog'
 import { sanitizeThreadDisabledToolKeys } from '@/lib/shared/chat/tool-policy'
 import { isChatModeId, resolveEffectiveChatMode } from '@/lib/shared/chat-modes'
 import {
+  PROJECT_ACCESS_FAILURE_CODE,
+  checkProjectAccess,
+} from '@/lib/shared/projects/access'
+import {
   DEFAULT_ORG_TOOL_POLICY,
   EMPTY_ORG_PROVIDER_KEY_STATUS,
 } from '@/lib/shared/model-policy/types'
@@ -330,23 +334,27 @@ export const chatMutatorDefinitions = {
 
       // Validate Project ownership before bootstrapping. We accept the
       // mutator without `projectId` to keep the loose-thread path unchanged.
+      // The org-context check is enforced because mismatched thread/project
+      // orgs would create a thread that is invisible from one side or the
+      // other.
       let resolvedProjectId: string | undefined
       if (args.projectId) {
         const project = await tx.run(
           zql.project.where('id', args.projectId).one(),
         )
-        if (!project || project.userId !== ctx.userID || project.deletedAt) {
-          throw new Error('thread_create_project_not_owned_or_missing')
+        const access = checkProjectAccess(project, {
+          userId: ctx.userID,
+          orgContext: {
+            enforce: true,
+            organizationId: ctx.organizationId,
+          },
+        })
+        if (access.kind !== 'ok') {
+          throw new Error(
+            `thread_create_${PROJECT_ACCESS_FAILURE_CODE[access.kind]}`,
+          )
         }
-        // Refuse to bootstrap a thread whose org context disagrees with the
-        // target project's org — leaving them mismatched would create a
-        // thread that is invisible from one side or the other.
-        const threadOrgId = ctx.organizationId?.trim() || undefined
-        const projectOrgId = project.organizationId?.trim() || undefined
-        if (threadOrgId !== projectOrgId) {
-          throw new Error('thread_create_project_org_mismatch')
-        }
-        resolvedProjectId = project.id
+        resolvedProjectId = access.project.id
       }
 
       try {
@@ -673,17 +681,20 @@ export const chatMutatorDefinitions = {
           const targetProject = await tx.run(
             zql.project.where('id', nextProjectId).one(),
           )
-          if (
-            !targetProject ||
-            targetProject.userId !== ctx.userID ||
-            targetProject.deletedAt
-          ) {
-            throw new Error('thread_set_project_not_owned_or_missing')
-          }
-          const threadOrgId = thread.ownerOrgId?.trim() || undefined
-          const projectOrgId = targetProject.organizationId?.trim() || undefined
-          if (threadOrgId !== projectOrgId) {
-            throw new Error('thread_set_project_org_mismatch')
+          // Enforce org match against the THREAD's owner org, not the
+          // caller's active org: moving a thread between orgs is not a
+          // supported operation, and the thread row is the authority.
+          const access = checkProjectAccess(targetProject, {
+            userId: ctx.userID,
+            orgContext: {
+              enforce: true,
+              organizationId: thread.ownerOrgId ?? undefined,
+            },
+          })
+          if (access.kind !== 'ok') {
+            throw new Error(
+              `thread_set_${PROJECT_ACCESS_FAILURE_CODE[access.kind]}`,
+            )
           }
         }
 
