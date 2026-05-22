@@ -103,7 +103,7 @@ export const Route = createFileRoute('/api/chat')({
 
         try {
           const response = await ChatRuntime.run(program)
-          if (wideEvent.outcome && !wideEvent._drained) {
+          if (wideEvent.outcome && !wideEvent._drained && wideEvent.outcome.level !== 'info') {
             await Effect.runPromise(drainWideEvent(wideEvent)).catch(() => undefined)
           }
           return response
@@ -246,7 +246,7 @@ export const Route = createFileRoute('/api/chat')({
 
         try {
           const response = await ChatRuntime.run(program)
-          if (wideEvent.outcome && !wideEvent._drained) {
+          if (wideEvent.outcome && !wideEvent._drained && wideEvent.outcome.level !== 'info') {
             await Effect.runPromise(drainWideEvent(wideEvent)).catch(() => undefined)
           }
           return response
