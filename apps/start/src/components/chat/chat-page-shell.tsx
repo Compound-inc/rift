@@ -7,6 +7,7 @@ import { useMediaQuery } from '@rift/ui/hooks/useMediaQuery'
 import { useSideNav } from '@/components/layout/main-nav'
 import { usePageSidebarVisibility } from '@/components/layout/page-sidebar-visibility-context'
 import { m } from '@/paraglide/messages.js'
+import { useChatMessages } from './chat-context'
 import { ChatInput } from './chat-input'
 import { ChatProjectChip } from './chat-project-chip'
 import { ChatThread } from './chat-thread'
@@ -21,6 +22,7 @@ export function ChatPageShell() {
     useSideNav()
   const { isChatPageSidebarCollapsed, setIsChatPageSidebarCollapsed } =
     usePageSidebarVisibility()
+  const { activeProjectId, activeThreadId, messages } = useChatMessages()
 
   const toggleSidebar = () => {
     if (isMobile) {
@@ -50,8 +52,19 @@ export function ChatPageShell() {
     },
   )
 
+  /**
+   * Decorative doodles backdrop is reserved for the project landing page \u2014
+   * the in-project welcome + composer state. It would compete with thread
+   * messages on `/chat/$threadId` and isn't called for on the empty global
+   * `/chat` welcome. The condition matches the welcome-screen guard in
+   * `ChatThread` so the backdrop appears in lockstep with the project hero.
+   */
+  const showProjectLandingBackdrop =
+    activeProjectId != null && activeThreadId == null && messages.length === 0
+
   return (
     <div className="relative flex min-h-full flex-1 flex-col overflow-visible">
+      {showProjectLandingBackdrop ? <ChatProjectLandingBackdrop /> : null}
       <div className="pointer-events-none sticky top-0 z-30 h-0 overflow-visible px-2 pt-2 md:px-4 md:pt-3">
         <div className="flex w-full items-center justify-start gap-2">
           <div className="pointer-events-auto">
@@ -88,6 +101,41 @@ export function ChatPageShell() {
           <ChatInput />
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Decorative doodles spread across the top of the project landing page,
+ * fading to fully transparent before reaching the composer. Rendered at
+ * `z-0` so the welcome hero, composer, and any sticky chrome stack over it.
+ *
+ * The SVG asset ships with hardcoded `fill="black"` paths; rather than
+ * rewriting the asset, the dark-mode pass uses `invert` on the rendered
+ * image so the doodles read as light strokes on dark surfaces. The
+ * `mask-image` linear gradient is what produces the "fades down to 0"
+ * effect: anything outside the gradient's reach is clipped, regardless of
+ * the underlying image opacity.
+ */
+function ChatProjectLandingBackdrop() {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[70vh] overflow-hidden"
+      style={{
+        maskImage:
+          'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.7) 40%, rgba(0,0,0,0) 100%)',
+        WebkitMaskImage:
+          'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.7) 40%, rgba(0,0,0,0) 100%)',
+      }}
+    >
+      <img
+        src="/doodles.svg"
+        alt=""
+        aria-hidden
+        className="size-full max-w-none object-cover object-top opacity-[0.06] dark:opacity-[0.08] dark:invert"
+        draggable={false}
+      />
     </div>
   )
 }

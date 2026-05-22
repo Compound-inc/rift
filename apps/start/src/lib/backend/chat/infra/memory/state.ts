@@ -12,6 +12,7 @@ type ThreadRecord = {
   modeId?: ChatModeId
   disabledToolKeys?: readonly string[]
   contextWindowMode?: AiContextWindowMode
+  projectId?: string
 }
 
 type RateLimitBucket = {

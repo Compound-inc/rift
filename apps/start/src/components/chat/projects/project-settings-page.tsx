@@ -1,237 +1,200 @@
-// Project settings page (info / instruction / files / delete) in one
-// sectioned page (Q9, Option B).
+// Project Parameters page (`/chat/projects/$projectId/settings`).
+//
+// Mirrors the user account and org-general settings pattern: each
+// editable field gets its own `Form` section with built-in input and an
+// explicit Save button. Per-section error and success messages render
+// inline via the Form footer instead of toasts. The custom-instruction
+// textarea uses `contentSlot` + `forceActions` because the shared Form
+// component does not expose a built-in textarea.
+//
+// All write paths go through Zero mutators so changes surface to other
+// tabs and routes immediately. The destructive Delete action keeps its
+// confirmation dialog; the Save button on the danger card simply opens
+// it instead of deleting on click.
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate } from '@tanstack/react-router'
-import { useQuery, useZero } from '@rocicorp/zero/react'
-import ArrowLeft from 'lucide-react/dist/esm/icons/arrow-left'
-import Trash2 from 'lucide-react/dist/esm/icons/trash-2'
-import { Button } from '@rift/ui/button'
 import { FormDialog } from '@rift/ui/dialog'
-import { Input } from '@rift/ui/input'
+import { Form } from '@rift/ui/form'
 import { Textarea } from '@rift/ui/textarea'
-import { toast } from 'sonner'
-import { mutators, queries } from '@/integrations/zero'
+
+import { ContentPage } from '@/components/layout'
 import { m } from '@/paraglide/messages.js'
 
-const NAME_DEBOUNCE_MS = 400
-const TEXT_DEBOUNCE_MS = 600
+import { useProjectSettingsPageLogic } from './project-settings-page.logic'
 
 export function ProjectSettingsPage({ projectId }: { projectId: string }) {
-  const z = useZero()
-  const navigate = useNavigate()
-  const [project, projectResult] = useQuery(
-    queries.projects.byId({ projectId }),
-  )
-  const [files] = useQuery(queries.projects.attachments({ projectId }))
+  const {
+    project,
+    canEdit,
+    name,
+    description,
+    instruction,
+    nameMessage,
+    descriptionMessage,
+    instructionMessage,
+    deleteDialogOpen,
+    deleteSubmitting,
+    deleteMessage,
+    setNameInput,
+    setDescriptionInput,
+    setInstructionInput,
+    setDeleteDialogOpen,
+    submitName,
+    submitDescription,
+    submitInstruction,
+    submitDelete,
+    limits,
+  } = useProjectSettingsPageLogic({ projectId })
 
-  const [nameDraft, setNameDraft] = useState('')
-  const [descriptionDraft, setDescriptionDraft] = useState('')
-  const [instructionDraft, setInstructionDraft] = useState('')
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [deleteSubmitting, setDeleteSubmitting] = useState(false)
+  if (!project) return null
 
-  // Drafts are local state so typing feels instant; the debounced effects
-  // below push changes back through Zero mutators.
-  useEffect(() => {
-    if (!project) return
-    setNameDraft(project.name)
-    setDescriptionDraft(project.description ?? '')
-    setInstructionDraft(project.customInstruction ?? '')
-  }, [project])
+  // The Form component renders `success` styling when the message string
+  // is the success constant for that section, otherwise treats it as an
+  // error. This mirrors the account page convention exactly.
+  const nameSuccess =
+    nameMessage === m.chat_project_name_saved() ? nameMessage : undefined
+  const descriptionSuccess =
+    descriptionMessage === m.chat_project_description_saved()
+      ? descriptionMessage
+      : undefined
+  const instructionSuccess =
+    instructionMessage === m.chat_project_instruction_saved()
+      ? instructionMessage
+      : undefined
 
-  useEffect(() => {
-    if (projectResult.type === 'complete' && !project) {
-      void navigate({ to: '/chat' })
-    }
-  }, [navigate, project, projectResult.type])
-
-  // Debounce name commits so the live `updatedAt` does not churn the sidebar
-  // order on every keystroke.
-  useEffect(() => {
-    if (!project) return
-    const trimmed = nameDraft.trim()
-    if (!trimmed || trimmed === project.name) return
-    const handle = window.setTimeout(() => {
-      void z
-        .mutate(mutators.projects.rename({ projectId, name: trimmed }))
-        .client.catch((error) => {
-          console.error('Failed to rename project:', error)
-        })
-    }, NAME_DEBOUNCE_MS)
-    return () => window.clearTimeout(handle)
-  }, [nameDraft, project, projectId, z])
-
-  useEffect(() => {
-    if (!project) return
-    const next = descriptionDraft.trim() || null
-    if ((project.description ?? null) === next) return
-    const handle = window.setTimeout(() => {
-      void z
-        .mutate(
-          mutators.projects.setDescription({
-            projectId,
-            description: next,
-          }),
-        )
-        .client.catch((error) => {
-          console.error('Failed to update project description:', error)
-        })
-    }, TEXT_DEBOUNCE_MS)
-    return () => window.clearTimeout(handle)
-  }, [descriptionDraft, project, projectId, z])
-
-  useEffect(() => {
-    if (!project) return
-    const next = instructionDraft || null
-    if ((project.customInstruction ?? null) === next) return
-    const handle = window.setTimeout(() => {
-      void z
-        .mutate(
-          mutators.projects.setCustomInstruction({
-            projectId,
-            customInstruction: next,
-          }),
-        )
-        .client.catch((error) => {
-          console.error('Failed to update project instruction:', error)
-        })
-    }, TEXT_DEBOUNCE_MS)
-    return () => window.clearTimeout(handle)
-  }, [instructionDraft, project, projectId, z])
-
-  const handleDelete = useCallback(async () => {
-    setDeleteSubmitting(true)
-    try {
-      await z.mutate(mutators.projects.delete({ projectId })).client
-      toast.success(m.chat_project_deleted())
-      setDeleteDialogOpen(false)
-      navigate({ to: '/chat' })
-    } catch (error) {
-      console.error('Failed to delete project:', error)
-      toast.error(m.chat_project_delete_failed())
-    } finally {
-      setDeleteSubmitting(false)
-    }
-  }, [navigate, projectId, z])
-
-  if (!project) {
-    return (
-      <div className="flex min-h-full items-center justify-center text-foreground-secondary">
-        {m.chat_project_loading()}
-      </div>
-    )
-  }
+  const trimmedName = name.trim()
+  const nameUnchanged = trimmedName === project.name
+  const descriptionUnchanged =
+    (description.trim() || null) === (project.description ?? null)
+  const instructionUnchanged =
+    (instruction.length > 0 ? instruction : null) ===
+    (project.customInstruction ?? null)
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 p-6">
-      <header className="flex items-center gap-3">
-        <Button asChild variant="ghost" size="iconSmall">
-          <Link
-            to="/chat/projects/$projectId"
-            params={{ projectId }}
-            preload="intent"
-            aria-label={m.chat_project_back_to_project_aria()}
-          >
-            <ArrowLeft className="size-4" aria-hidden />
-          </Link>
-        </Button>
-        <h1 className="text-2xl font-semibold text-foreground-strong">
-          {m.chat_project_settings_title()}
-        </h1>
-      </header>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-foreground-secondary">
-          {m.chat_project_section_info()}
-        </h2>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-foreground-secondary">
-            {m.chat_project_field_name()}
-          </span>
-          <Input
-            value={nameDraft}
-            onChange={(e) => setNameDraft(e.target.value)}
-            maxLength={80}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-foreground-secondary">
-            {m.chat_project_field_description()}
-          </span>
-          <Input
-            value={descriptionDraft}
-            onChange={(e) => setDescriptionDraft(e.target.value)}
-            maxLength={500}
-            placeholder={m.chat_project_field_description_placeholder()}
-          />
-        </label>
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-foreground-secondary">
-          {m.chat_project_section_instruction()}
-        </h2>
-        <p className="text-xs text-foreground-secondary">
-          {m.chat_project_section_instruction_description()}
-        </p>
-        <Textarea
-          value={instructionDraft}
-          onChange={(e) => setInstructionDraft(e.target.value)}
-          rows={8}
-          maxLength={8000}
-          placeholder={m.chat_project_field_instruction_placeholder()}
-        />
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-foreground-secondary">
-          {m.chat_project_section_files()}
-        </h2>
-        <p className="text-xs text-foreground-secondary">
-          {m.chat_project_section_files_description()}
-        </p>
-        {files.length === 0 ? (
-          <div className="rounded-md border border-dashed border-border p-6 text-center text-sm text-foreground-secondary">
-            {m.chat_project_files_empty_phase4()}
-          </div>
-        ) : (
-          <ul className="flex flex-col gap-1">
-            {files.map((file) => (
-              <li
-                key={file.id}
-                className="flex items-center justify-between rounded-md border border-border p-3"
-              >
-                <span className="min-w-0 flex-1 truncate text-sm">
-                  {file.fileName}
-                </span>
-                <span className="text-xs text-foreground-secondary">
-                  {file.embeddingStatus ?? '\u2014'}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="flex flex-col gap-3 border-t border-border pt-6">
-        <h2 className="text-sm font-medium text-foreground-secondary">
-          {m.chat_project_section_danger()}
-        </h2>
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-foreground-secondary">
-            {m.chat_project_delete_helper()}
+    <ContentPage
+      title={m.chat_project_parameters_title()}
+      description={m.chat_project_parameters_description()}
+    >
+      <Form
+        title={m.chat_project_section_name_title()}
+        description={m.chat_project_section_name_description()}
+        inputAttrs={{
+          name: 'projectName',
+          type: 'text',
+          placeholder: m.chat_project_field_name(),
+          maxLength: limits.name,
+          disabled: !canEdit,
+        }}
+        value={name}
+        onValueChange={setNameInput}
+        error={
+          nameMessage != null && nameMessage !== m.chat_project_name_saved()
+            ? nameMessage
+            : undefined
+        }
+        success={nameSuccess}
+        helpText={
+          <p className="text-sm text-foreground-tertiary">
+            {m.chat_project_name_help()}
           </p>
-          <Button
-            variant="danger"
-            onClick={() => setDeleteDialogOpen(true)}
-          >
-            <Trash2 className="size-4" aria-hidden />
-            {m.chat_project_delete_button()}
-          </Button>
-        </div>
-      </section>
+        }
+        buttonText={m.common_save()}
+        buttonDisabled={!canEdit || trimmedName.length === 0 || nameUnchanged}
+        handleSubmit={submitName}
+      />
+
+      <Form
+        title={m.chat_project_section_description_title()}
+        description={m.chat_project_section_description_description()}
+        inputAttrs={{
+          name: 'projectDescription',
+          type: 'text',
+          placeholder: m.chat_project_field_description_placeholder(),
+          maxLength: limits.description,
+          disabled: !canEdit,
+        }}
+        value={description}
+        onValueChange={setDescriptionInput}
+        error={
+          descriptionMessage != null &&
+          descriptionMessage !== m.chat_project_description_saved()
+            ? descriptionMessage
+            : undefined
+        }
+        success={descriptionSuccess}
+        helpText={
+          <p className="text-sm text-foreground-tertiary">
+            {m.chat_project_description_help()}
+          </p>
+        }
+        buttonText={m.common_save()}
+        buttonDisabled={!canEdit || descriptionUnchanged}
+        handleSubmit={submitDescription}
+      />
+
+      {/*
+       * The instruction textarea cannot use Form's built-in input, so it
+       * lives in `contentSlot` and turns on `forceActions` to surface the
+       * Save button row that the other sections get for free.
+       */}
+      <Form
+        title={m.chat_project_section_instruction()}
+        description={m.chat_project_section_instruction_description()}
+        forceActions
+        contentSlot={
+          <div className="flex flex-col gap-1.5">
+            <Textarea
+              id="project-instruction"
+              value={instruction}
+              onChange={(event) => setInstructionInput(event.target.value)}
+              rows={8}
+              maxLength={limits.instruction}
+              placeholder={m.chat_project_field_instruction_placeholder()}
+              className="min-h-32"
+              disabled={!canEdit}
+            />
+            <p
+              className="self-end text-xs tabular-nums text-foreground-tertiary"
+              aria-live="polite"
+            >
+              {instruction.length} / {limits.instruction}
+            </p>
+          </div>
+        }
+        error={
+          instructionMessage != null &&
+          instructionMessage !== m.chat_project_instruction_saved()
+            ? instructionMessage
+            : undefined
+        }
+        success={instructionSuccess}
+        helpText={
+          <p className="text-sm text-foreground-tertiary">
+            {m.chat_project_instruction_help()}
+          </p>
+        }
+        buttonText={m.common_save()}
+        buttonDisabled={!canEdit || instructionUnchanged}
+        handleSubmit={submitInstruction}
+      />
+
+      {/*
+       * Danger zone. `forceActions` surfaces the destructive button in the
+       * same footer layout the rest of the page uses. The submit handler
+       * only opens the confirmation dialog; the actual mutation runs from
+       * the dialog's onSubmit so a stray Enter cannot delete a project.
+       */}
+      <Form
+        title={m.chat_project_section_danger()}
+        description={m.chat_project_delete_helper()}
+        error={deleteMessage ?? undefined}
+        helpText=""
+        forceActions
+        buttonText={m.chat_project_delete_button()}
+        buttonVariant="danger"
+        buttonDisabled={!canEdit}
+        handleSubmit={async () => setDeleteDialogOpen(true)}
+      />
 
       <FormDialog
         open={deleteDialogOpen}
@@ -243,8 +206,8 @@ export function ProjectSettingsPage({ projectId }: { projectId: string }) {
         secondaryButtonText={m.common_cancel()}
         onSecondaryClick={() => setDeleteDialogOpen(false)}
         buttonDisabled={deleteSubmitting}
-        handleSubmit={handleDelete}
+        handleSubmit={submitDelete}
       />
-    </div>
+    </ContentPage>
   )
 }

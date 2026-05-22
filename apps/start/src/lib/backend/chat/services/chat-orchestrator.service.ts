@@ -137,6 +137,7 @@ export type ChatOrchestratorServiceShape = {
     readonly contextWindowMode?: AiContextWindowMode
     readonly disabledToolKeys?: readonly string[]
     readonly createIfMissing?: boolean
+    readonly projectId?: string
     readonly route: string
     readonly wideEvent?: ChatRequestWideEvent
   }) => Effect.Effect<Response, ChatDomainError>
@@ -192,6 +193,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
         contextWindowMode,
         disabledToolKeys,
         createIfMissing,
+        projectId,
         route,
         wideEvent,
       }) => {
@@ -218,6 +220,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               thread: {
                 threadId,
                 createIfMissing,
+                projectId,
                 expectedBranchVersion,
                 targetMessageId: messageId,
               },
@@ -282,6 +285,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             requestedModeId: modeId,
             requestedContextWindowMode: contextWindowMode,
             requestedDisabledToolKeys: bootstrapDisabledToolKeys,
+            requestedProjectId: projectId,
             organizationId,
           })
 

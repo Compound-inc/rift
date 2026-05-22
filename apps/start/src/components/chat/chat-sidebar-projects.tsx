@@ -5,7 +5,6 @@
 import { useCallback, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery, useZero } from '@rocicorp/zero/react'
-import Folder from 'lucide-react/dist/esm/icons/folder'
 import Plus from 'lucide-react/dist/esm/icons/plus'
 import { toast } from 'sonner'
 import { mutators, queries } from '@/integrations/zero'
@@ -63,7 +62,6 @@ export function ChatSidebarProjects({ pathname }: { pathname: string }) {
         const item: NavItemType = {
           name: project.name,
           href: `${PROJECTS_HREF_BASE}/${project.id}`,
-          icon: Folder,
         }
         return (
           <SidebarNavItem key={project.id} item={item} pathname={pathname} />

@@ -46,6 +46,7 @@ export type ThreadServiceShape = {
     readonly requestedModeId?: string
     readonly requestedContextWindowMode?: AiContextWindowMode
     readonly requestedDisabledToolKeys?: readonly string[]
+    readonly requestedProjectId?: string
     readonly organizationId?: string
   }) => Effect.Effect<
     {
@@ -220,6 +221,7 @@ export class ThreadService extends ServiceMap.Service<
           requestedModeId,
           requestedContextWindowMode,
           requestedDisabledToolKeys,
+          requestedProjectId,
           organizationId,
         }: {
           readonly userId: string
@@ -230,6 +232,7 @@ export class ThreadService extends ServiceMap.Service<
           readonly requestedModeId?: string
           readonly requestedContextWindowMode?: AiContextWindowMode
           readonly requestedDisabledToolKeys?: readonly string[]
+          readonly requestedProjectId?: string
           readonly organizationId?: string
         }) =>
           Effect.gen(function* () {
@@ -263,6 +266,48 @@ export class ThreadService extends ServiceMap.Service<
                     requestedModeId && isChatModeId(requestedModeId)
                       ? requestedModeId
                       : undefined
+                  const normalizedRequestedProjectId =
+                    requestedProjectId?.trim() || undefined
+                  let resolvedProjectId: string | undefined
+
+                  if (normalizedRequestedProjectId) {
+                    // The server fallback can win the first-send race before
+                    // the optimistic Zero mutator reaches upstream. Validate
+                    // the project here so that fallback creates the same
+                    // project-scoped thread instead of a loose thread.
+                    const project = await db.run(
+                      zql.project
+                        .where('id', normalizedRequestedProjectId)
+                        .one(),
+                    )
+                    if (
+                      !project ||
+                      project.userId !== userId ||
+                      project.deletedAt
+                    ) {
+                      throw new ThreadForbiddenError({
+                        message: 'Project is not available for thread creation',
+                        requestId,
+                        threadId,
+                        userId,
+                      })
+                    }
+
+                    const threadOrgId = organizationId?.trim() || undefined
+                    const projectOrgId =
+                      project.organizationId?.trim() || undefined
+                    if (threadOrgId !== projectOrgId) {
+                      throw new ThreadForbiddenError({
+                        message:
+                          'Project is not available in the active organization',
+                        requestId,
+                        threadId,
+                        userId,
+                      })
+                    }
+
+                    resolvedProjectId = project.id
+                  }
 
                   try {
                     const bootstrapThread = buildBootstrapThreadRecord({
@@ -274,6 +319,7 @@ export class ThreadService extends ServiceMap.Service<
                       contextWindowMode: requestedContextWindowMode,
                       organizationId,
                       disabledToolKeys: requestedDisabledToolKeys ?? [],
+                      projectId: resolvedProjectId,
                     })
                     await db.transaction(async (tx) => {
                       // Uses deterministic IDs so first-message bootstrap can be retried safely.
@@ -295,6 +341,9 @@ export class ThreadService extends ServiceMap.Service<
               },
               catch: (error) => {
                 if (error instanceof ThreadNotFoundError) {
+                  return error
+                }
+                if (error instanceof ThreadForbiddenError) {
                   return error
                 }
                 return new MessagePersistenceError({
@@ -835,6 +884,7 @@ User message: ${trimmedMessage}`,
         requestedModeId,
         requestedContextWindowMode,
         requestedDisabledToolKeys,
+        requestedProjectId,
         organizationId: _organizationId,
       }: {
         readonly userId: string
@@ -845,6 +895,7 @@ User message: ${trimmedMessage}`,
         readonly requestedModeId?: string
         readonly requestedContextWindowMode?: AiContextWindowMode
         readonly requestedDisabledToolKeys?: readonly string[]
+        readonly requestedProjectId?: string
         readonly organizationId?: string
       }) {
         let thread = getMemoryState().threads.get(threadId)
@@ -872,6 +923,7 @@ User message: ${trimmedMessage}`,
             contextWindowMode:
               requestedContextWindowMode ?? DEFAULT_CONTEXT_WINDOW_MODE,
             disabledToolKeys: [...new Set(requestedDisabledToolKeys ?? [])],
+            projectId: requestedProjectId?.trim() || undefined,
           }
           if (!created.modelId) {
             return yield* Effect.fail(
@@ -909,7 +961,7 @@ User message: ${trimmedMessage}`,
           disabledToolKeys: thread.disabledToolKeys ?? [],
           generationStatus: 'completed' as const,
           branchVersion: 1,
-          projectId: undefined,
+          projectId: thread.projectId,
         }
       },
     ),

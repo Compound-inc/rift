@@ -18,7 +18,11 @@ import { MessageStoreService } from '../services/message-store.service'
 import { ModelGatewayService } from '../services/model-gateway.service'
 import { ModelPolicyService } from '../services/model-policy.service'
 import { RateLimitService } from '../services/rate-limit.service'
-import { AttachmentRagService, OrgKnowledgeRagService } from '../services/rag'
+import {
+  AttachmentRagService,
+  OrgKnowledgeRagService,
+  ProjectSourceRagService,
+} from '../services/rag'
 import { StreamResumeService } from '../services/stream-resume.service'
 import { ThreadService } from '../services/thread.service'
 import { ToolRegistryService } from '../services/tool-registry.service'
@@ -60,6 +64,7 @@ const dependencyLayer = Layer.mergeAll(
   Layer.provideMerge(ZeroDatabaseService.layer),
   Layer.provideMerge(AttachmentRagService.layer),
   Layer.provideMerge(OrgKnowledgeRagService.layer),
+  Layer.provideMerge(ProjectSourceRagService.layer),
 )
 
 const layer = ChatOrchestratorService.layer.pipe(

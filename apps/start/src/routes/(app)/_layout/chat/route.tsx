@@ -33,22 +33,37 @@ function ChatLayout() {
   const trailing = normalized.startsWith('/chat/')
     ? normalized.slice('/chat/'.length)
     : ''
-  const firstSegment = trailing.length > 0 ? trailing.split('/')[0] : ''
+  const segments = trailing.length > 0 ? trailing.split('/') : []
+  const firstSegment = segments[0] ?? ''
 
   const threadId =
     firstSegment.length > 0 && !RESERVED_FIRST_SEGMENTS.has(firstSegment)
       ? firstSegment
       : undefined
 
-  // Project pages render their own content; suppressing ChatPageShell here
-  // prevents the chat thread + composer from double-rendering behind it.
-  const isProjectRoute = firstSegment === 'projects'
+  const isProjectsArea = firstSegment === 'projects'
+  const projectIdFromPath =
+    isProjectsArea && segments.length >= 2 ? segments[1] : undefined
+  /**
+   * Project sub-pages (sources, parameters/settings) own their own page
+   * chrome, so we suppress the chat shell to avoid the welcome screen +
+   * composer rendering behind them. The project landing route, by
+   * contrast, *is* the welcome + composer for that project.
+   */
+  const isProjectSubPage = isProjectsArea && segments.length > 2
 
-  const projectId = threadId ? undefined : searchProjectId
+  /**
+   * Resolved project context for the chat session. Path takes precedence
+   * over the legacy `?projectId=` query param so that `/chat/projects/<id>`
+   * always bootstraps a project-scoped chat.
+   */
+  const projectId = threadId
+    ? undefined
+    : projectIdFromPath ?? searchProjectId
 
   return (
     <ChatProvider threadId={threadId} projectId={projectId}>
-      {isProjectRoute ? null : <ChatPageShell />}
+      {isProjectSubPage ? null : <ChatPageShell />}
       <Outlet />
     </ChatProvider>
   )

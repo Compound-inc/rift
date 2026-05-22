@@ -3,13 +3,16 @@ import { memo, useCallback, useMemo } from 'react'
 import type { RefObject } from 'react'
 import { isReasoningUIPart } from 'ai'
 import type { UIMessage } from 'ai'
+import { useQuery } from '@rocicorp/zero/react'
 import { useChatMessageActions, useChatMessages } from './chat-context'
 import { ChatMessage } from './chat-message'
 import { usePinToLastUserMessage } from '@rift/chat-scroll'
+import { ChatProjectWelcomeScreen } from './chat-project-welcome-screen'
 import { ChatWelcomeScreen } from './chat-welcome-screen'
 import { setComposerDraft } from './composer-draft-store'
 import { ReasoningMotionIcon } from './message-parts/components/reasoning-motion-icon'
 import { useChatSearchReveal } from './use-chat-search-reveal'
+import { queries } from '@/integrations/zero'
 import { m } from '@/paraglide/messages.js'
 
 type BranchSelectorState = {
@@ -134,6 +137,7 @@ export function ChatThread() {
     messages,
     status,
     activeThreadId,
+    activeProjectId,
     hasHydratedActiveThread,
     branchSelectorsByAnchorMessageId,
   } = useChatMessages()
@@ -279,10 +283,16 @@ export function ChatThread() {
         <>
           <div className="relative z-10 flex h-full min-h-0 w-full flex-1 items-center justify-center px-4 py-9">
             <div className="mx-auto flex w-full max-w-2xl translate-y-10 items-center md:translate-y-12">
-              <ChatWelcomeScreen
-                onSuggestionClick={handleSuggestionClick}
-                disabled={isStreaming}
-              />
+              {activeProjectId ? (
+                <ChatProjectWelcomeScreenContainer
+                  projectId={activeProjectId}
+                />
+              ) : (
+                <ChatWelcomeScreen
+                  onSuggestionClick={handleSuggestionClick}
+                  disabled={isStreaming}
+                />
+              )}
             </div>
           </div>
         </>
@@ -342,4 +352,25 @@ export function ChatThread() {
       <div ref={bottomRef} />
     </div>
   )
+}
+
+/**
+ * Subscribes to the active project's row so the welcome screen shows the
+ * current name even while the user is editing it in the Parameters page.
+ * Kept inline here (rather than passed via context) so the `ChatProvider`
+ * does not need to fan out a project query for every chat page just for
+ * this single in-zero render path.
+ */
+function ChatProjectWelcomeScreenContainer({
+  projectId,
+}: {
+  projectId: string
+}) {
+  const [project] = useQuery(queries.projects.byId({ projectId }))
+
+  if (!project) {
+    return null
+  }
+
+  return <ChatProjectWelcomeScreen projectName={project.name} />
 }

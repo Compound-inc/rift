@@ -7,6 +7,7 @@
 
 export type VectorScopeType =
   | 'attachment'
+  | 'project_source'
   | 'org_knowledge'
   | 'workspace_knowledge'
 
@@ -17,8 +18,9 @@ export type VectorScopeType =
 export type VectorAccessScope = {
   readonly userId?: string
   readonly ownerOrgId?: string
+  readonly projectId?: string
   readonly workspaceId?: string
-  readonly accessScope?: 'user' | 'workspace' | 'org'
+  readonly accessScope?: 'user' | 'workspace' | 'project' | 'org'
   readonly accessGroupIds?: readonly string[]
 }
 
@@ -50,6 +52,7 @@ export type VectorSearchRequest = {
   readonly threadId?: string
   readonly userId?: string
   readonly ownerOrgId?: string
+  readonly projectId?: string
   readonly workspaceId?: string
   readonly requiredGroupIds?: readonly string[]
 }
@@ -64,4 +67,3 @@ export type VectorSearchHit = {
   readonly content: string
   readonly score: number
 }
-

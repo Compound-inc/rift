@@ -23,7 +23,8 @@ export type AttachmentPersistenceRow = {
   readonly embeddingStatus?: string
   readonly ownerOrgId?: string
   readonly workspaceId?: string
-  readonly accessScope?: 'user' | 'workspace' | 'org'
+  readonly projectId?: string
+  readonly accessScope?: 'user' | 'workspace' | 'project' | 'org'
   readonly orgKnowledgeKind?: string
   readonly orgKnowledgeActive?: boolean
   readonly accessGroupIds?: readonly string[]
@@ -52,6 +53,26 @@ export type OrgKnowledgeAttachmentRecord = {
   readonly fileContent: string
   readonly orgKnowledgeKind?: string
   readonly orgKnowledgeActive?: boolean
+  readonly embeddingModel?: string
+  readonly embeddingTokens?: number
+  readonly embeddingDimensions?: number
+  readonly embeddingChunks?: number
+  readonly embeddingStatus?: string
+  readonly vectorIndexedAt?: number
+  readonly vectorError?: string
+  readonly status?: 'deleted' | 'uploaded'
+}
+
+export type ProjectSourceAttachmentRecord = {
+  readonly id: string
+  readonly userId: string
+  readonly ownerOrgId?: string
+  readonly projectId?: string
+  readonly attachmentUrl: string
+  readonly fileName: string
+  readonly mimeType: string
+  readonly fileSize: number
+  readonly fileContent: string
   readonly embeddingModel?: string
   readonly embeddingTokens?: number
   readonly embeddingDimensions?: number
@@ -93,6 +114,7 @@ export const insertAttachmentRecordEffect = Effect.fn(
           embedding_status,
           owner_org_id,
           workspace_id,
+          project_id,
           access_scope,
           org_knowledge_kind,
           org_knowledge_active,
@@ -120,6 +142,7 @@ export const insertAttachmentRecordEffect = Effect.fn(
           ${input.embeddingStatus ?? null},
           ${input.ownerOrgId ?? null},
           ${input.workspaceId ?? null},
+          ${input.projectId ?? null},
           ${input.accessScope ?? 'user'},
           ${input.orgKnowledgeKind ?? null},
           ${input.orgKnowledgeActive ?? false},
@@ -131,6 +154,48 @@ export const insertAttachmentRecordEffect = Effect.fn(
           ${input.updatedAt}
         )
       `
+    }),
+)
+
+export const getProjectSourceAttachmentRecordEffect = Effect.fn(
+  'AttachmentRecords.getProjectSourceAttachmentRecord',
+)(
+  (
+    projectId: string,
+    attachmentId: string,
+  ): Effect.Effect<
+    ProjectSourceAttachmentRecord | null,
+    unknown,
+    PgClient.PgClient
+  > =>
+    Effect.gen(function* () {
+      const sql = yield* PgClient.PgClient
+      const rows = yield* sql<ProjectSourceAttachmentRecord>`
+        select id,
+               user_id as "userId",
+               owner_org_id as "ownerOrgId",
+               project_id as "projectId",
+               attachment_url as "attachmentUrl",
+               file_name as "fileName",
+               mime_type as "mimeType",
+               file_size as "fileSize",
+               file_content as "fileContent",
+               embedding_model as "embeddingModel",
+               embedding_tokens as "embeddingTokens",
+               embedding_dimensions as "embeddingDimensions",
+               embedding_chunks as "embeddingChunks",
+               embedding_status as "embeddingStatus",
+               vector_indexed_at as "vectorIndexedAt",
+               vector_error as "vectorError",
+               status
+          from attachments
+         where id = ${attachmentId}
+           and project_id = ${projectId}
+           and org_knowledge_kind is null
+         limit 1
+      `
+
+      return rows[0] ?? null
     }),
 )
 
@@ -183,6 +248,36 @@ export const listAttachmentContentRowsByIdsForUserEffect = Effect.fn(
          from attachments
          where user_id = ${input.userId}
            and id in ${sql.in(input.attachmentIds)}
+           and coalesce(status, 'uploaded') = 'uploaded'
+         order by created_at asc
+      `
+    }),
+)
+
+export const listAttachmentContentRowsByIdsForProjectEffect = Effect.fn(
+  'AttachmentRecords.listAttachmentContentRowsByIdsForProject',
+)(
+  (input: {
+    readonly projectId: string
+    readonly attachmentIds: readonly string[]
+  }): Effect.Effect<
+    readonly AttachmentContentRow[],
+    unknown,
+    PgClient.PgClient
+  > =>
+    Effect.gen(function* () {
+      if (input.attachmentIds.length === 0) return []
+      const sql = yield* PgClient.PgClient
+
+      return yield* sql<AttachmentContentRow>`
+        select id,
+               file_name as "fileName",
+               mime_type as "mimeType",
+               file_content as "fileContent"
+         from attachments
+         where project_id = ${input.projectId}
+           and id in ${sql.in(input.attachmentIds)}
+           and org_knowledge_kind is null
            and coalesce(status, 'uploaded') = 'uploaded'
          order by created_at asc
       `

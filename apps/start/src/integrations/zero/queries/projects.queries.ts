@@ -119,6 +119,7 @@ export const projectQueryDefinitions = {
       return zql.attachment
         .where('projectId', args.projectId)
         .where('status', 'uploaded')
+        .where('orgKnowledgeKind', 'IS', null)
         .whereExists('project', (project) =>
           project
             .where('id', args.projectId)

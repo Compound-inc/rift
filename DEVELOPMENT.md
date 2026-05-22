@@ -31,7 +31,7 @@ bun run dev
 
 The app will be available at `https://rift.localhost`.
 
-On first run, [portless](https://portless.sh) will set up a local CA and bind port 443. This requires a one-time sudo prompt. If you'd rather do it ahead of time, run `bunx portless trust` from `apps/start/` before `bun run dev`.
+On first run, [portless](https://portless.sh) will set up a local CA and bind port 443. This requires a one-time sudo prompt. If you'd rather do it ahead of time, run `bunx portless trust` from `apps/start/` before `bun run dev`. On Arch (and any system where sudo resets `HOME`), start the proxy yourself once with `sudo HOME=$HOME ./node_modules/.bin/portless proxy start` so the proxy and the unprivileged client share `~/.portless/`; otherwise the dev script may report `Proxy is already running on port 443 with a different config` because the elevated proxy's state lives in `/root/.portless` while the client reads `~/.portless`.
 
 ## Detailed Setup
 
@@ -176,7 +176,7 @@ If these are taken, you can modify ports in the respective config files. To bypa
 
 ### portless TLS trust prompt
 
-On first run, portless generates a local CA and asks for sudo to install it and bind port 443. If your browser still shows a TLS warning for `https://rift.localhost`, run `bunx portless trust` from `apps/start/` to re-trust the CA.
+On first run, portless generates a local CA and asks for sudo to install it and bind port 443. If your browser still shows a TLS warning for `https://rift.localhost`, run `bunx portless trust` from `apps/start/` to re-trust the CA. After running `portless trust` you also need `sudo update-ca-trust` on Arch (the user-mode trust command can stage the CA into `/etc/ca-certificates/trust-source/anchors/` but cannot rebuild the system bundle without root). Firefox-family browsers don't use the system bundle by default — set `security.enterprise_roots.enabled` to `true` in `about:config` or import `~/.portless/ca.pem` manually.
 
 ### Database connection errors
 

@@ -214,6 +214,12 @@ type ChatMessagesContextValue = {
   messages: ChatUIMessage[]
   status: ReturnType<typeof useAIChat<ChatUIMessage>>['status']
   activeThreadId?: string
+  /**
+   * Project the chat is scoped to: either the project of the active thread,
+   * or the bootstrap project for a new chat. Drives project-aware UI like the
+   * project welcome screen and chat header chip.
+   */
+  activeProjectId?: string
   hasHydratedActiveThread: boolean
   branchSelectorsByAnchorMessageId: Record<string, BranchSelectorState>
   latestAssistantUsage?: LanguageModelUsage
@@ -584,6 +590,9 @@ export function ChatProvider({
   const threadIdRef = useRef<string | undefined>(threadId)
   const previousThreadIdRef = useRef<string | undefined>(threadId)
   const bootstrapProjectIdRef = useRef<string | undefined>(projectId)
+  // Captures the project for the first POST; route navigation to /chat/:id can
+  // clear the route-level project hint before the AI SDK prepares the request.
+  const createIfMissingProjectIdRef = useRef<string | undefined>(undefined)
   const lastAppliedBranchVersionRef = useRef<number | undefined>(undefined)
   const allowShrinkOnNextBranchVersionRef = useRef(false)
   const resumeAttemptedThreadIdRef = useRef<string | undefined>(undefined)
@@ -1074,6 +1083,10 @@ export function ChatProvider({
               attachments:
                 requestTrigger === 'submit-message' ? attachments : undefined,
               createIfMissing: createIfMissingRef.current,
+              projectId:
+                createIfMissingRef.current
+                  ? createIfMissingProjectIdRef.current
+                  : undefined,
               modelId: selectedModelIdRef.current,
               modeId: selectedModeIdRef.current,
               reasoningEffort: selectedReasoningEffortRef.current,
@@ -1573,6 +1586,7 @@ export function ChatProvider({
       let resolvedThreadId = threadIdRef.current
       if (!resolvedThreadId) {
         try {
+          const bootstrapProjectId = bootstrapProjectIdRef.current
           const inFlight =
             inFlightThreadRef.current ??
             (async () => {
@@ -1586,7 +1600,7 @@ export function ChatProvider({
                   modeId: draftModeId,
                   contextWindowMode: selectedContextWindowModeRef.current,
                   disabledToolKeys: [...draftDisabledToolKeys],
-                  projectId: bootstrapProjectIdRef.current,
+                  projectId: bootstrapProjectId,
                 }),
               )
               await write.client
@@ -1619,6 +1633,7 @@ export function ChatProvider({
               // can safely win the race if it receives the first send before
               // the mutator commit has landed upstream.
               createIfMissingRef.current = true
+              createIfMissingProjectIdRef.current = bootstrapProjectId
               bootstrapSendInFlightRef.current = true
 
               return newThreadId
@@ -1666,6 +1681,7 @@ export function ChatProvider({
         pendingAttachmentsRef.current = attachments
         await sendAIMessageRef.current({ text })
         createIfMissingRef.current = false
+        createIfMissingProjectIdRef.current = undefined
         if (creatingThread) {
           setDraftModeId(undefined)
           setDraftDisabledToolKeys([])
@@ -2246,6 +2262,7 @@ export function ChatProvider({
       messages,
       status,
       activeThreadId,
+      activeProjectId: projectId,
       hasHydratedActiveThread,
       branchSelectorsByAnchorMessageId,
       latestAssistantUsage,
@@ -2256,6 +2273,7 @@ export function ChatProvider({
       messages,
       status,
       activeThreadId,
+      projectId,
       hasHydratedActiveThread,
       branchSelectorsByAnchorMessageId,
       latestAssistantUsage,
