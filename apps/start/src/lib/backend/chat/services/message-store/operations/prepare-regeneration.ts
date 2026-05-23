@@ -41,7 +41,10 @@ export const makePrepareRegenerationOperation = (dependencies: {
           try: async () => {
             return await db.transaction(async (tx) => {
               const thread = await tx.run(
-                zql.thread.where('id', threadDbId).where('userId', userId).one(),
+                zql.thread
+                  .where('id', threadDbId)
+                  .where('userId', userId)
+                  .one(),
               )
               if (!thread) {
                 throw new Error('thread not found')
@@ -49,7 +52,8 @@ export const makePrepareRegenerationOperation = (dependencies: {
 
               if (thread.branchVersion !== expectedBranchVersion) {
                 throw new BranchVersionConflictError({
-                  message: 'Branch version mismatch while preparing regeneration',
+                  message:
+                    'Branch version mismatch while preparing regeneration',
                   requestId,
                   threadId,
                   expectedBranchVersion,

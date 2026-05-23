@@ -1,8 +1,6 @@
 import { PgClient } from '@effect/sql-pg'
 import { Effect } from 'effect'
-import {
-  sqlJson,
-} from '@/lib/backend/server-effect/services/upstream-postgres.service'
+import { sqlJson } from '@/lib/backend/server-effect/services/upstream-postgres.service'
 import { ORG_KNOWLEDGE_KIND } from '@/lib/shared/org-knowledge'
 
 export type AttachmentPersistenceRow = {
@@ -81,7 +79,9 @@ export type ProjectSourceAttachmentRecord = ScopedAttachmentRecord
 export const insertAttachmentRecordEffect = Effect.fn(
   'AttachmentRecords.insertAttachmentRecord',
 )(
-  (input: AttachmentPersistenceRow): Effect.Effect<void, unknown, PgClient.PgClient> =>
+  (
+    input: AttachmentPersistenceRow,
+  ): Effect.Effect<void, unknown, PgClient.PgClient> =>
     Effect.gen(function* () {
       const sql = yield* PgClient.PgClient
 

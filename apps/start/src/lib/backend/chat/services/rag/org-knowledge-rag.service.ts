@@ -59,37 +59,36 @@ export class OrgKnowledgeRagService extends ServiceMap.Service<
         catch: (error) => error,
       }),
     ),
-    searchOrgKnowledge: Effect.fn(
-      'OrgKnowledgeRagService.searchOrgKnowledge',
-    )(({ request }: { readonly request: VectorSearchRequest }) =>
-      Effect.tryPromise({
-        try: async () => {
-          if (
-            request.scopeType !== 'org_knowledge' ||
-            !request.ownerOrgId ||
-            !request.sourceIds ||
-            request.sourceIds.length === 0
-          ) {
-            return []
-          }
+    searchOrgKnowledge: Effect.fn('OrgKnowledgeRagService.searchOrgKnowledge')(
+      ({ request }: { readonly request: VectorSearchRequest }) =>
+        Effect.tryPromise({
+          try: async () => {
+            if (
+              request.scopeType !== 'org_knowledge' ||
+              !request.ownerOrgId ||
+              !request.sourceIds ||
+              request.sourceIds.length === 0
+            ) {
+              return []
+            }
 
-          const rows = await searchOrgKnowledgeVectors({
-            organizationId: request.ownerOrgId,
-            attachmentIds: request.sourceIds,
-            queryEmbedding: request.queryEmbedding,
-            limit: request.limit,
-          })
+            const rows = await searchOrgKnowledgeVectors({
+              organizationId: request.ownerOrgId,
+              attachmentIds: request.sourceIds,
+              queryEmbedding: request.queryEmbedding,
+              limit: request.limit,
+            })
 
-          return rows.map((row) => ({
-            id: row.id,
-            sourceId: row.attachmentId,
-            chunkIndex: row.chunkIndex,
-            content: row.content,
-            score: row.score,
-          }))
-        },
-        catch: (error) => error,
-      }),
+            return rows.map((row) => ({
+              id: row.id,
+              sourceId: row.attachmentId,
+              chunkIndex: row.chunkIndex,
+              content: row.content,
+              score: row.score,
+            }))
+          },
+          catch: (error) => error,
+        }),
     ),
     deleteOrgKnowledgeChunks: Effect.fn(
       'OrgKnowledgeRagService.deleteOrgKnowledgeChunks',

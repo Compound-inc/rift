@@ -9,7 +9,10 @@ import { getZeroUpstreamPool } from '@/lib/backend/server-effect/infra/zero-upst
 const pool = getZeroUpstreamPool()
 const zeroDatabase = pool ? zeroNodePg(schema, pool) : null
 
-export type ZeroServerTransaction = ServerTransaction<ZeroSchema, NodePgTransaction>
+export type ZeroServerTransaction = ServerTransaction<
+  ZeroSchema,
+  NodePgTransaction
+>
 
 // Shared ZQL builder for server-side repositories. Keep a single builder so query
 // shapes stay centralized and strongly typed against the same schema as Zero clients.
@@ -18,4 +21,3 @@ export const zql = createBuilder(schema)
 export function getZeroDatabase() {
   return zeroDatabase
 }
-

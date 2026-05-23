@@ -30,53 +30,54 @@ function serializeJson(input: JsonInput): string | null {
   return input === undefined ? null : JSON.stringify(input)
 }
 
-export const makeFinalizeAssistantMessageOperation =
-  ({ sql }: {
-    readonly sql: PgClient.PgClient
-  }): MessageStoreServiceShape['finalizeAssistantMessage'] => {
-    /**
-     * Assistant finalization writes both public and private analytics fields.
-     * Those private columns are intentionally absent from the client Zero
-     * schema, so this operation writes directly to upstream Postgres rather
-     * than going through Zero mutators.
-     */
-    return Effect.fn('MessageStoreService.finalizeAssistantMessage')(
-      ({
-        threadDbId,
-        threadModel,
-        threadId,
-        userId,
-        assistantMessageId,
-        parentMessageId,
-        branchAnchorMessageId,
-        regenSourceMessageId,
-        ok,
-        finalContent,
-        reasoning,
-        errorMessage,
-        errorCode,
-        errorI18nKey,
-        modelParams,
-        providerMetadata,
-        generationAnalytics,
-        requestId,
-      }) =>
-        Effect.gen(function* () {
-          const now = Date.now()
-          const serverError = !ok
-            ? {
-                type: 'stream_error',
-                message: errorMessage ?? 'Assistant stream failed',
-                code: errorCode,
-                i18nKey: errorI18nKey,
-              }
-            : undefined
+export const makeFinalizeAssistantMessageOperation = ({
+  sql,
+}: {
+  readonly sql: PgClient.PgClient
+}): MessageStoreServiceShape['finalizeAssistantMessage'] => {
+  /**
+   * Assistant finalization writes both public and private analytics fields.
+   * Those private columns are intentionally absent from the client Zero
+   * schema, so this operation writes directly to upstream Postgres rather
+   * than going through Zero mutators.
+   */
+  return Effect.fn('MessageStoreService.finalizeAssistantMessage')(
+    ({
+      threadDbId,
+      threadModel,
+      threadId,
+      userId,
+      assistantMessageId,
+      parentMessageId,
+      branchAnchorMessageId,
+      regenSourceMessageId,
+      ok,
+      finalContent,
+      reasoning,
+      errorMessage,
+      errorCode,
+      errorI18nKey,
+      modelParams,
+      providerMetadata,
+      generationAnalytics,
+      requestId,
+    }) =>
+      Effect.gen(function* () {
+        const now = Date.now()
+        const serverError = !ok
+          ? {
+              type: 'stream_error',
+              message: errorMessage ?? 'Assistant stream failed',
+              code: errorCode,
+              i18nKey: errorI18nKey,
+            }
+          : undefined
 
-          yield* sql.withTransaction(
-            Effect.gen(function* () {
-              const [thread] = yield* sql<{
-                active_child_by_parent: unknown
-              }>`
+        yield* sql.withTransaction(
+          Effect.gen(function* () {
+            const [thread] = yield* sql<{
+              active_child_by_parent: unknown
+            }>`
                 select active_child_by_parent
                 from threads
                 where id = ${threadDbId}
@@ -84,11 +85,11 @@ export const makeFinalizeAssistantMessageOperation =
                 limit 1
               `
 
-              if (!thread) {
-                return yield* Effect.fail(new Error('thread not found'))
-              }
+            if (!thread) {
+              return yield* Effect.fail(new Error('thread not found'))
+            }
 
-              const [existing] = yield* sql<{ id: string }>`
+            const [existing] = yield* sql<{ id: string }>`
                 select id
                 from messages
                 where id = ${assistantMessageId}
@@ -96,8 +97,8 @@ export const makeFinalizeAssistantMessageOperation =
                 limit 1
               `
 
-              if (existing) {
-                yield* sql`
+            if (existing) {
+              yield* sql`
                   update messages
                   set
                     content = ${finalContent},
@@ -125,10 +126,10 @@ export const makeFinalizeAssistantMessageOperation =
                   where id = ${existing.id}
                     and user_id = ${userId}
                 `
-              } else {
-                const [nextBranchIndexRow] = yield* sql<{
-                  next_branch_index: number
-                }>`
+            } else {
+              const [nextBranchIndexRow] = yield* sql<{
+                next_branch_index: number
+              }>`
                   select coalesce(max(branch_index), 0) + 1 as next_branch_index
                   from messages
                   where thread_id = ${threadId}
@@ -137,14 +138,14 @@ export const makeFinalizeAssistantMessageOperation =
                       parentMessageId ?? null
                     }
                 `
-                const branchIndex =
-                  nextBranchIndexRow?.next_branch_index ??
-                  nextBranchIndexForParent({
-                    messages: [],
-                    parentMessageId,
-                  })
+              const branchIndex =
+                nextBranchIndexRow?.next_branch_index ??
+                nextBranchIndexForParent({
+                  messages: [],
+                  parentMessageId,
+                })
 
-                yield* sql`
+              yield* sql`
                   insert into messages (
                     id,
                     message_id,
@@ -213,38 +214,37 @@ export const makeFinalizeAssistantMessageOperation =
                     ${serializeJson(serverError)}::jsonb
                   )
                 `
-              }
+            }
 
-              const activeChildByParent = normalizeThreadActiveChildMap(
-                thread.active_child_by_parent,
-              )
-              if (parentMessageId) {
-                activeChildByParent[parentMessageId] = assistantMessageId
-              }
+            const activeChildByParent = normalizeThreadActiveChildMap(
+              thread.active_child_by_parent,
+            )
+            if (parentMessageId) {
+              activeChildByParent[parentMessageId] = assistantMessageId
+            }
 
-              yield* sql`
+            yield* sql`
                 update threads
                 set
-                  active_child_by_parent = ${
-                    sqlJson(sql, activeChildByParent)
-                  },
+                  active_child_by_parent = ${sqlJson(sql, activeChildByParent)},
                   generation_status = ${ok ? 'completed' : 'failed'},
                   updated_at = ${now},
                   last_message_at = ${now}
                 where id = ${threadDbId}
                   and user_id = ${userId}
               `
-            }),
-          )
-        }).pipe(
-          Effect.mapError((error) =>
+          }),
+        )
+      }).pipe(
+        Effect.mapError(
+          (error) =>
             new MessagePersistenceError({
               message: 'Failed to finalize assistant message',
               requestId,
               threadId,
               cause: formatSqlClientCause(error),
             }),
-          ),
         ),
-    )
-  }
+      ),
+  )
+}

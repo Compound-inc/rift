@@ -181,7 +181,6 @@ async function ensureCollection(vectorSize: number): Promise<void> {
       createPayloadIndex(collection, 'attachmentId', 'keyword'),
       createPayloadIndex(collection, 'scopeType', 'keyword'),
       createPayloadIndex(collection, 'userId', 'keyword'),
-      createPayloadIndex(collection, 'threadId', 'keyword'),
       createPayloadIndex(collection, 'ownerOrgId', 'keyword'),
       createPayloadIndex(collection, 'projectId', 'keyword'),
       createPayloadIndex(collection, 'workspaceId', 'keyword'),
@@ -280,37 +279,12 @@ export async function deleteAttachmentVectors(input: {
   }
 
   const collection = getQdrantCollectionName()
-  await qdrantRequest('POST', `/collections/${collection}/points/delete?wait=true`, {
-    filter: {
-      must,
-    },
-  })
-}
-
-export async function linkAttachmentVectorsToThread(input: {
-  readonly attachmentId: string
-  readonly userId: string
-  readonly threadId: string
-  readonly messageId: string
-  readonly updatedAt: number
-}): Promise<void> {
-  if (!isQdrantEnabled()) return
-  const collection = getQdrantCollectionName()
   await qdrantRequest(
     'POST',
-    `/collections/${collection}/points/payload?wait=true`,
+    `/collections/${collection}/points/delete?wait=true`,
     {
-      payload: {
-        threadId: input.threadId,
-        messageId: input.messageId,
-        updatedAt: input.updatedAt,
-      },
       filter: {
-        must: [
-          { key: 'attachmentId', match: { value: input.attachmentId } },
-          { key: 'scopeType', match: { value: 'attachment' } },
-          { key: 'userId', match: { value: input.userId } },
-        ],
+        must,
       },
     },
   )
@@ -319,24 +293,19 @@ export async function linkAttachmentVectorsToThread(input: {
 /**
  * Discriminated scope for vector retrieval.
  *
- * The four historical search functions (per-thread attachments, per-user
- * attachments, org knowledge, project sources) shared everything except
- * the Qdrant `must` filter. Capturing the difference as a typed scope
- * lets `searchAttachmentVectorsForScope` carry the only Qdrant search
+ * The three search functions (per-user attachments, org knowledge,
+ * project sources) share everything except the Qdrant `must` filter.
+ * Capturing the difference as a typed scope lets
+ * `searchAttachmentVectorsForScope` carry the only Qdrant search
  * implementation in this file, with each variant adding the right
  * combination of `scopeType` plus per-scope id filters.
  */
 export type VectorRetrievalScope =
   /**
-   * Attachment chunks for a specific thread, scoped to one user. Used
-   * for the per-thread/per-message attachment retrieval path the
-   * orchestrator runs every turn.
-   */
-  | { readonly kind: 'thread-attachment'; readonly threadId: string; readonly userId: string }
-  /**
-   * Attachment chunks owned by a single user, ignoring thread/message
-   * linkage. Used by the pending-attachment fallback before vectors
-   * have been linked to the new thread.
+   * Attachment chunks owned by a single user. Used for the
+   * per-thread/per-message attachment retrieval path the orchestrator
+   * runs every turn (thread membership lives in the SQL layer; the
+   * vector layer only filters by user).
    */
   | { readonly kind: 'user-attachment'; readonly userId: string }
   /**
@@ -355,11 +324,6 @@ function buildScopeFilter(
   const must: Array<Record<string, unknown>> = []
 
   switch (scope.kind) {
-    case 'thread-attachment':
-      must.push({ key: 'threadId', match: { value: scope.threadId } })
-      must.push({ key: 'userId', match: { value: scope.userId } })
-      must.push({ key: 'scopeType', match: { value: 'attachment' } })
-      break
     case 'user-attachment':
       must.push({ key: 'userId', match: { value: scope.userId } })
       must.push({ key: 'scopeType', match: { value: 'attachment' } })
@@ -400,6 +364,7 @@ export async function searchAttachmentVectorsForScope(input: {
 
   await ensureCollection(input.queryEmbedding.length)
   const collection = getQdrantCollectionName()
+  const must = buildScopeFilter(input.scope, input.attachmentIds)
   const hits = await qdrantRequest<readonly QdrantSearchHit[]>(
     'POST',
     `/collections/${collection}/points/search`,
@@ -408,9 +373,7 @@ export async function searchAttachmentVectorsForScope(input: {
       limit: input.limit,
       with_payload: true,
       with_vector: false,
-      filter: {
-        must: buildScopeFilter(input.scope, input.attachmentIds),
-      },
+      filter: { must },
     },
     { timeoutMs: getQdrantRetrievalTimeoutMs() },
   )
@@ -446,24 +409,6 @@ export async function searchAttachmentVectorsForScope(input: {
  * `ProjectSourceRagService`) keep their current call sites; each becomes
  * a one-line scope selection over the unified search above.
  */
-export const searchAttachmentVectors = (input: {
-  readonly threadId: string
-  readonly userId: string
-  readonly attachmentIds: readonly string[]
-  readonly queryEmbedding: readonly number[]
-  readonly limit: number
-}) =>
-  searchAttachmentVectorsForScope({
-    scope: {
-      kind: 'thread-attachment',
-      threadId: input.threadId,
-      userId: input.userId,
-    },
-    attachmentIds: input.attachmentIds,
-    queryEmbedding: input.queryEmbedding,
-    limit: input.limit,
-  })
-
 export const searchUserAttachmentVectors = (input: {
   readonly userId: string
   readonly attachmentIds: readonly string[]
