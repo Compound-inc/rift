@@ -6,7 +6,7 @@ import {
 } from './context-block.pipeline'
 import type { RetrievalChunk } from './context-block.pipeline'
 
-const { selectChunksUnderBudget, composeIntentEnrichedQuery } =
+const { selectChunksUnderBudget, selectFallbackSectionsUnderBudget, composeIntentEnrichedQuery } =
   contextBlockTesting
 
 /**
@@ -346,5 +346,117 @@ describe('retrieveContextBlock', () => {
     // fallback mode (it's filtered out at the queryEmbedding === null
     // branch).
     expect(block).not.toContain('should-not-show')
+  })
+
+  it('caps the fallback emission at the per-turn char budget so a project with many large files cannot overflow context', async () => {
+    // With 4 sources, `getRetrievalLimits` returns maxChars = 16_000
+    // (4 * 4_000 perSourceCharMultiplier, above the 12_000 base).
+    // Four 5_000-char fallback entries total 20_000 chars, so the
+    // first three fit and the fourth must be dropped to keep the
+    // emission under the same budget the success path obeys.
+    const sourceIds = ['cv-1', 'cv-2', 'cv-3', 'cv-4'] as const
+    const filler = (label: string) => `${label}-`.repeat(2_500).slice(0, 5_000)
+    const block = await Effect.runPromise(
+      retrieveContextBlock({
+        intro: ['Intro.'],
+        sectionLabel: 'Source',
+        requestId: 'req',
+        threadId: 'thread',
+        query: { embedding: null },
+        attachmentMeta: new Map(
+          sourceIds.map((id) => [
+            id,
+            { fileName: `${id}.pdf`, mimeType: 'application/pdf' },
+          ]),
+        ),
+        searchChunks: () => Effect.succeed([]),
+        loadFallbackContent: () =>
+          Effect.succeed(
+            sourceIds.map((id) => ({
+              fileName: `${id}.pdf`,
+              mimeType: 'application/pdf',
+              content: filler(id),
+            })),
+          ),
+      }),
+    )
+
+    expect(block).toContain('cv-1.pdf')
+    expect(block).toContain('cv-2.pdf')
+    expect(block).toContain('cv-3.pdf')
+    // The fourth source overflows the aggregate budget and must be
+    // dropped so the prompt cannot be inflated past the per-turn
+    // limit. Heading and content both gone.
+    expect(block).not.toContain('cv-4.pdf')
+    expect(block).not.toContain('cv-4-')
+  })
+})
+
+describe('selectFallbackSectionsUnderBudget', () => {
+  it('returns every section unchanged when the total fits the budget', () => {
+    const sections = [
+      { heading: 'a.pdf (application/pdf)', content: 'aaa' },
+      { heading: 'b.pdf (application/pdf)', content: 'bbbb' },
+    ]
+    const { accepted, droppedCount } = selectFallbackSectionsUnderBudget(
+      sections,
+      1_000,
+    )
+    expect(accepted).toEqual(sections)
+    expect(droppedCount).toBe(0)
+  })
+
+  it('drops sections that overflow the aggregate char budget', () => {
+    const sections = [
+      { heading: 'a.pdf', content: 'a'.repeat(800) },
+      { heading: 'b.pdf', content: 'b'.repeat(800) },
+      { heading: 'c.pdf', content: 'c'.repeat(800) },
+    ]
+    const { accepted, droppedCount } = selectFallbackSectionsUnderBudget(
+      sections,
+      1_700,
+    )
+    expect(accepted).toHaveLength(2)
+    expect(accepted[0]?.heading).toBe('a.pdf')
+    expect(accepted[1]?.heading).toBe('b.pdf')
+    expect(droppedCount).toBe(1)
+  })
+
+  it('continues past an oversized section so a later smaller one can still fit', () => {
+    // A single huge section (e.g. one large file followed by smaller
+    // ones) must not block later, smaller files from being included.
+    // The reviewer's worry is total overflow; we want to fill the
+    // budget greedily, not bail at the first overflow.
+    const sections = [
+      { heading: 'a.pdf', content: 'a'.repeat(1_500) },
+      { heading: 'b.pdf', content: 'b'.repeat(300) },
+      { heading: 'c.pdf', content: 'c'.repeat(300) },
+    ]
+    const { accepted, droppedCount } = selectFallbackSectionsUnderBudget(
+      sections,
+      1_000,
+    )
+    expect(accepted.map((s) => s.heading)).toEqual(['b.pdf', 'c.pdf'])
+    expect(droppedCount).toBe(1)
+  })
+
+  it('returns nothing when the budget is zero or negative', () => {
+    const sections = [{ heading: 'a.pdf', content: 'aaa' }]
+    const zero = selectFallbackSectionsUnderBudget(sections, 0)
+    expect(zero.accepted).toEqual([])
+    expect(zero.droppedCount).toBe(1)
+
+    const negative = selectFallbackSectionsUnderBudget(sections, -10)
+    expect(negative.accepted).toEqual([])
+    expect(negative.droppedCount).toBe(1)
+  })
+
+  it('returns nothing for an empty input regardless of budget', () => {
+    const { accepted, droppedCount } = selectFallbackSectionsUnderBudget(
+      [],
+      1_000,
+    )
+    expect(accepted).toEqual([])
+    expect(droppedCount).toBe(0)
   })
 })

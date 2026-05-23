@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import {
-  ORG_KNOWLEDGE_UPLOAD_POLICY,
+  PROJECT_SOURCES_UPLOAD_POLICY,
   getUploadValidationError,
 } from '@/lib/shared/upload/upload-validation'
 
@@ -28,7 +28,7 @@ function validateProjectSourceUpload(input: unknown): FormData {
   for (const file of files) {
     const validationError = getUploadValidationError(
       file,
-      ORG_KNOWLEDGE_UPLOAD_POLICY,
+      PROJECT_SOURCES_UPLOAD_POLICY,
     )
     if (validationError) throw new Error(validationError)
   }

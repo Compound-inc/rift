@@ -216,6 +216,57 @@ function selectChunksUnderBudget<
 }
 
 /**
+ * Internal: enforce an aggregate `maxChars` cap across fallback
+ * sections, mirroring what `selectChunksUnderBudget` does for the
+ * success path.
+ *
+ * Each fallback entry has already been clamped to `fallbackExcerptChars`
+ * by its scope's `loadFallbackContent` (via `truncateFallbackExcerpt`),
+ * so the per-file budget is already enforced. This pass adds the
+ * missing aggregate guarantee: when retrieval returns no usable chunks
+ * (embeddings disabled, vector lookup fails, embedding null) and a
+ * project / thread happens to have many large files, we cannot let
+ * `count * fallbackExcerptChars` overflow the per-turn char budget
+ * and crowd out the conversation history.
+ *
+ * Walks `sections` in caller order (sources are sorted `updatedAt desc`
+ * upstream, so newer files win), accepting any whose content fits in
+ * the remaining budget and skipping anything that overflows. A later
+ * smaller section can still slot in after an oversized one is skipped
+ * — there is no early break — so the budget is filled greedily with
+ * whatever fits.
+ *
+ * Returns the dropped count so the caller can log how many sources
+ * were silenced; observability for "why didn't my file show up?"
+ * matters more here than in the success path, where a file with no
+ * matching chunks is expected to be silent.
+ */
+function selectFallbackSectionsUnderBudget(
+  sections: readonly ContextSection[],
+  maxChars: number,
+): {
+  readonly accepted: readonly ContextSection[]
+  readonly droppedCount: number
+} {
+  if (sections.length === 0) return { accepted: [], droppedCount: 0 }
+  if (maxChars <= 0) {
+    return { accepted: [], droppedCount: sections.length }
+  }
+  const accepted: ContextSection[] = []
+  let usedChars = 0
+  let droppedCount = 0
+  for (const section of sections) {
+    if (usedChars + section.content.length > maxChars) {
+      droppedCount += 1
+      continue
+    }
+    accepted.push(section)
+    usedChars += section.content.length
+  }
+  return { accepted, droppedCount }
+}
+
+/**
  * Hints used to enrich the query embedding when the literal user
  * message is short, empty, or `"."`.
  *
@@ -385,6 +436,7 @@ export const buildRetrievalQuery = (input: {
  */
 export const __testing = {
   selectChunksUnderBudget,
+  selectFallbackSectionsUnderBudget,
   composeIntentEnrichedQuery,
 }
 
@@ -500,12 +552,34 @@ export const gatherContextSections = (input: RetrieveContextBlockInput) =>
       logContext,
     )
 
-    return fallback.map(
+    const fallbackSections = fallback.map(
       (entry): ContextSection => ({
         heading: `${entry.fileName} (${entry.mimeType})`,
         content: entry.content,
       }),
     )
+
+    // Aggregate-budget the fallback emission so a project / thread
+    // with many large files cannot blow the per-turn char budget.
+    // The success path already does this via `selectChunksUnderBudget`;
+    // without this, vector failure on a large project would silently
+    // produce a much bigger context block than a successful retrieval.
+    const { accepted, droppedCount } = selectFallbackSectionsUnderBudget(
+      fallbackSections,
+      limits.maxChars,
+    )
+    if (droppedCount > 0) {
+      yield* Effect.logWarning(
+        'Fallback context dropped sources to fit per-turn char budget',
+        {
+          ...logContext,
+          droppedCount,
+          keptCount: accepted.length,
+          maxChars: limits.maxChars,
+        },
+      )
+    }
+    return accepted
   })
 
 /**
