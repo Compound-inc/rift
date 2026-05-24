@@ -17,10 +17,10 @@ import { Streamdown } from 'streamdown'
 import { useRightSidebar } from '@/components/layout/right-sidebar-context'
 import { m } from '@/paraglide/messages.js'
 import {
+  streamdownRemarkPlugins,
   streamdownStaticComponents,
   streamdownStreamingComponents,
 } from '../renderers/streamdown-components'
-import { inlineCitationRemarkPlugin } from '../renderers/inline-citation-remark-plugin'
 import { useStreamdownPlugins } from '../renderers/use-streamdown-plugins'
 import { ReasoningMotionIcon } from './reasoning-motion-icon'
 
@@ -94,7 +94,7 @@ function ReasoningPanel({
           plugins={streamdownPlugins}
           controls={false}
           mode={isStreaming ? 'streaming' : 'static'}
-          remarkPlugins={[inlineCitationRemarkPlugin]}
+          remarkPlugins={streamdownRemarkPlugins}
           components={
             isStreaming
               ? streamdownStreamingComponents
