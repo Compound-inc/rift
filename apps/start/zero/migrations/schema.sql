@@ -710,15 +710,18 @@ CREATE TABLE IF NOT EXISTS projects (
   visibility          TEXT NOT NULL DEFAULT 'private',
   icon                TEXT,
   color               TEXT,
+  pinned              BOOLEAN NOT NULL DEFAULT FALSE,
   deleted_at          BIGINT,
   created_at          BIGINT NOT NULL,
   updated_at          BIGINT NOT NULL
 );
+ALTER TABLE projects
+ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS projects_user_visible
-  ON projects (user_id, updated_at DESC)
+  ON projects (user_id, pinned DESC, updated_at DESC)
   WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS projects_org_visible
-  ON projects (organization_id, updated_at DESC)
+  ON projects (organization_id, pinned DESC, updated_at DESC)
   WHERE deleted_at IS NULL AND visibility = 'org';
 
 ALTER TABLE threads

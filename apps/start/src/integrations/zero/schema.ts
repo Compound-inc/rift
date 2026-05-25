@@ -355,6 +355,7 @@ const project = table('project')
     visibility: enumeration<'private' | 'org'>(),
     icon: string().optional(),
     color: string().optional(),
+    pinned: boolean(),
     deletedAt: number().from('deleted_at').optional(),
     createdAt: number().from('created_at'),
     updatedAt: number().from('updated_at'),

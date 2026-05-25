@@ -48,6 +48,7 @@ const projectPatchArgs = projectIdArgs.extend({
       visibility: z.enum(['private', 'org']),
       icon: z.string().trim().max(PROJECT_ICON_MAX).nullable(),
       color: z.string().trim().max(PROJECT_COLOR_MAX).nullable(),
+      pinned: z.boolean(),
     })
     .partial()
     .refine(
@@ -72,6 +73,7 @@ function diffProjectPatch(
     readonly visibility: 'private' | 'org'
     readonly icon?: string | null
     readonly color?: string | null
+    readonly pinned: boolean
   },
   patch: z.infer<typeof projectPatchArgs>['patch'],
 ) {
@@ -82,6 +84,7 @@ function diffProjectPatch(
     visibility?: 'private' | 'org'
     icon?: string | undefined
     color?: string | undefined
+    pinned?: boolean
   } = {}
 
   if (patch.name !== undefined && patch.name !== current.name) {
@@ -113,6 +116,9 @@ function diffProjectPatch(
     if ((current.color ?? undefined) !== desired) {
       next.color = desired
     }
+  }
+  if (patch.pinned !== undefined && patch.pinned !== current.pinned) {
+    next.pinned = patch.pinned
   }
 
   return next
@@ -164,6 +170,7 @@ export const projectMutatorDefinitions = {
         visibility,
         icon: args.icon ?? undefined,
         color: args.color ?? undefined,
+        pinned: false,
         createdAt: args.createdAt,
         updatedAt: args.createdAt,
       })
