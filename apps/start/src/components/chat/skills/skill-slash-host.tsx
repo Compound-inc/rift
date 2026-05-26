@@ -57,16 +57,12 @@ function useSkillCatalog(input: {
 } {
   const { projectId, enabled } = input
 
-  const [personal] = useQuery(
-    enabled ? queries.skills.listPersonal({}) : null,
-  )
+  const [personal] = useQuery(enabled ? queries.skills.listPersonal({}) : null)
   const [orgShared] = useQuery(
     enabled ? queries.skills.listOrgShared({}) : null,
   )
   const [projectSkills] = useQuery(
-    enabled && projectId
-      ? queries.skills.listForProject({ projectId })
-      : null,
+    enabled && projectId ? queries.skills.listForProject({ projectId }) : null,
   )
   const [overrideRows] = useQuery(
     enabled && projectId
@@ -132,7 +128,11 @@ function useSkillCatalog(input: {
 function findActiveSlashToken(input: {
   readonly text: string
   readonly cursor: number
-}): { readonly start: number; readonly end: number; readonly name: string } | null {
+}): {
+  readonly start: number
+  readonly end: number
+  readonly name: string
+} | null {
   const tokens = parseSkillSlashTokens(input.text)
   for (const token of tokens) {
     if (input.cursor >= token.start && input.cursor <= token.end) {
@@ -184,11 +184,13 @@ export function SkillSlashHost({
     const textarea = textareaRef.current
     if (!textarea) return
     const handler = () => setCursor(textarea.selectionStart ?? 0)
+    textarea.addEventListener('input', handler)
     textarea.addEventListener('keyup', handler)
     textarea.addEventListener('click', handler)
     textarea.addEventListener('select', handler)
     textarea.addEventListener('focus', handler)
     return () => {
+      textarea.removeEventListener('input', handler)
       textarea.removeEventListener('keyup', handler)
       textarea.removeEventListener('click', handler)
       textarea.removeEventListener('select', handler)
@@ -212,19 +214,24 @@ export function SkillSlashHost({
   }, [activeToken, dismissed])
 
   const isOpen =
-    !!activeToken &&
-    !(dismissed && activeToken.start === dismissed.start)
+    !!activeToken && !(dismissed && activeToken.start === dismissed.start)
   const isOpenRef = useRef(isOpen)
   isOpenRef.current = isOpen
 
   const filterPrefix = activeToken?.name ?? ''
+  const lastFilterPrefixRef = useRef(filterPrefix)
+  useEffect(() => {
+    if (filterPrefix) lastFilterPrefixRef.current = filterPrefix
+  }, [filterPrefix])
+  const effectiveFilterPrefix = filterPrefix || lastFilterPrefixRef.current
+
   const filteredEntries = useMemo(() => {
-    if (!filterPrefix) return entries
-    const needle = canonicalSkillName(filterPrefix)
+    if (!effectiveFilterPrefix) return entries
+    const needle = canonicalSkillName(effectiveFilterPrefix)
     return entries.filter((entry) =>
       canonicalSkillName(entry.name).startsWith(needle),
     )
-  }, [entries, filterPrefix])
+  }, [entries, effectiveFilterPrefix])
 
   const applySelection = useCallback(
     (skill: SkillEntry) => {
@@ -234,7 +241,8 @@ export function SkillSlashHost({
       // Trailing space lets the user keep typing without one. Skip if
       // `after` already begins with whitespace, otherwise mid-sentence
       // selection produces double spaces.
-      const trailing = after.startsWith(' ') || after.startsWith('\n') ? '' : ' '
+      const trailing =
+        after.startsWith(' ') || after.startsWith('\n') ? '' : ' '
       const replacement = `/${skill.name}${trailing}`
       const next = `${before}${replacement}${after}`
       onValueChange(next)
@@ -269,9 +277,7 @@ export function SkillSlashHost({
       switch (event.key) {
         case 'ArrowDown':
           event.preventDefault()
-          setHighlightIndex(
-            (current) => (current + 1) % filteredEntries.length,
-          )
+          setHighlightIndex((current) => (current + 1) % filteredEntries.length)
           break
         case 'ArrowUp':
           event.preventDefault()
@@ -314,8 +320,7 @@ export function SkillSlashHost({
       <Popover
         open={isOpen}
         onOpenChange={(open) => {
-          if (!open && activeToken)
-            setDismissed({ start: activeToken.start })
+          if (!open && activeToken) setDismissed({ start: activeToken.start })
         }}
       >
         <PopoverTrigger
@@ -349,7 +354,9 @@ export function SkillSlashHost({
               role="status"
               className="px-3 py-2 text-sm text-foreground-tertiary"
             >
-              {m.chat_skill_slash_no_match({ name: filterPrefix || '' })}
+              {m.chat_skill_slash_no_match({
+                name: effectiveFilterPrefix || '',
+              })}
             </div>
           ) : (
             <ul
@@ -432,8 +439,7 @@ function SkillSlashItem({
 }
 
 function SkillSourceIcon({ source }: { source: SkillEntry['source'] }) {
-  const Icon =
-    source === 'project' ? Folder : source === 'org' ? Users : User
+  const Icon = source === 'project' ? Folder : source === 'org' ? Users : User
   const label =
     source === 'project'
       ? m.chat_skill_badge_source_project()
