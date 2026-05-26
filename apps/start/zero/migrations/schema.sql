@@ -731,3 +731,49 @@ CREATE INDEX IF NOT EXISTS threads_project_id ON threads (project_id);
 ALTER TABLE attachments
 ADD COLUMN IF NOT EXISTS project_id TEXT;
 CREATE INDEX IF NOT EXISTS attachments_project_id ON attachments (project_id);
+
+-- ----------------------------------------------------------------------------
+-- skills (Skills feature). See ADR-0005 and CONTEXT.md.
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS skills (
+  id                  TEXT PRIMARY KEY,
+  user_id             TEXT NOT NULL,
+  organization_id     TEXT,
+  project_id          TEXT,
+  name                TEXT NOT NULL,
+  body                TEXT NOT NULL,
+  description         TEXT,
+  allow_admin_edit    BOOLEAN NOT NULL DEFAULT FALSE,
+  deleted_at          BIGINT,
+  created_at          BIGINT NOT NULL,
+  updated_at          BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS skills_personal_unique
+  ON skills (user_id, name)
+  WHERE project_id IS NULL AND organization_id IS NULL AND deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS skills_project_unique
+  ON skills (project_id, name)
+  WHERE project_id IS NOT NULL AND deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS skills_org_shared_unique
+  ON skills (organization_id, name)
+  WHERE organization_id IS NOT NULL AND project_id IS NULL AND deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS skills_personal_list
+  ON skills (user_id, updated_at DESC)
+  WHERE project_id IS NULL AND organization_id IS NULL AND deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS skills_project_list
+  ON skills (project_id, updated_at DESC)
+  WHERE project_id IS NOT NULL AND deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS skills_org_shared_list
+  ON skills (organization_id, updated_at DESC)
+  WHERE organization_id IS NOT NULL AND project_id IS NULL AND deleted_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS skill_project_overrides (
+  id                  TEXT PRIMARY KEY,
+  project_id          TEXT NOT NULL,
+  skill_id            TEXT NOT NULL,
+  created_at          BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS skill_project_overrides_unique
+  ON skill_project_overrides (project_id, skill_id);
+CREATE INDEX IF NOT EXISTS skill_project_overrides_by_project
+  ON skill_project_overrides (project_id);

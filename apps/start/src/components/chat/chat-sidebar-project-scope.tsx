@@ -26,6 +26,7 @@ import ArrowLeft from 'lucide-react/dist/esm/icons/arrow-left'
 import FileText from 'lucide-react/dist/esm/icons/file-text'
 import Link2 from 'lucide-react/dist/esm/icons/link-2'
 import Settings from 'lucide-react/dist/esm/icons/settings'
+import Wand2 from 'lucide-react/dist/esm/icons/wand-2'
 
 import { queries } from '@/integrations/zero'
 import { CACHE_CHAT_NAV } from '@/integrations/zero/query-cache-policy'
@@ -95,6 +96,12 @@ export function ChatProjectScopedSidebarContent({
     href: `/chat/projects/${projectId}/sources`,
     exact: true,
   }
+  const skillsItem: NavItemType = {
+    name: m.chat_project_tab_skills(),
+    icon: Wand2,
+    href: `/chat/projects/${projectId}/skills`,
+    exact: true,
+  }
   const parametersItem: NavItemType = {
     name: m.chat_project_tab_parameters(),
     icon: Settings,
@@ -123,6 +130,7 @@ export function ChatProjectScopedSidebarContent({
       >
         <SidebarNavItem item={newChatItem} pathname={pathname} />
         <SidebarNavItem item={sourcesItem} pathname={pathname} />
+        <SidebarNavItem item={skillsItem} pathname={pathname} />
         <SidebarNavItem item={parametersItem} pathname={pathname} />
       </div>
 

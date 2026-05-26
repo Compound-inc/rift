@@ -167,7 +167,7 @@ export interface FormDialogProps {
   /** Dialog heading; also used for aria-labelledby. */
   title: string
   /** Short description rendered below the title. */
-  description: string
+  description?: string
   /** Body content rendered between the header and the footer. */
   children?: ReactNode
   /**
@@ -198,6 +198,12 @@ export interface FormDialogProps {
   submitButtonDisabled?: boolean
   /** When true, only the secondary button is disabled. */
   secondaryButtonDisabled?: boolean
+  /**
+   * Optional destructive action rendered to the left of the cancel /
+   * submit buttons (e.g. `<Button variant="dangerLight">Delete</Button>`).
+   * Hidden during submit so it cannot race with the primary action.
+   */
+  tertiaryAction?: ReactNode
   /** Variant for the submit button. Defaults to "default". */
   buttonVariant?: "default" | "danger" | "ghost" | "dangerLight"
   /**
@@ -223,6 +229,7 @@ export function FormDialog({
   buttonDisabled,
   submitButtonDisabled,
   secondaryButtonDisabled,
+  tertiaryAction,
   buttonVariant = "default",
   handleSubmit,
 }: FormDialogProps) {
@@ -336,7 +343,13 @@ export function FormDialog({
                   >
                     {title}
                   </h2>
-                  <p className="text-sm text-foreground-tertiary">{description}</p>
+                  {/* Skip the `<p>` when empty — an empty paragraph
+                      still claims one line-height of vertical space. */}
+                  {description ? (
+                    <p className="text-sm text-foreground-tertiary">
+                      {description}
+                    </p>
+                  ) : null}
                 </div>
 
                 {/* Body */}
@@ -416,6 +429,7 @@ export function FormDialog({
 
                 {/* Actions */}
                 <div className="flex h-10 shrink-0 items-center gap-2">
+                  {tertiaryAction != null && !saving ? tertiaryAction : null}
                   {secondaryButtonText != null && (
                     <Button
                       type="button"

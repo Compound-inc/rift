@@ -39,6 +39,7 @@ import { Route as appLayoutChatRouteRouteImport } from './routes/(app)/_layout/c
 import { Route as eeSingularityLayoutIndexRouteImport } from './routes/(ee)/singularity/_layout/index'
 import { Route as appLayoutSettingsIndexRouteImport } from './routes/(app)/_layout/settings/index'
 import { Route as appLayoutChatIndexRouteImport } from './routes/(app)/_layout/chat/index'
+import { Route as appLayoutChatSkillsRouteImport } from './routes/(app)/_layout/chat/skills'
 import { Route as appLayoutSettingsSecurityRouteRouteImport } from './routes/(app)/_layout/settings/security/route'
 import { Route as appLayoutOrganizationSettingsRouteRouteImport } from './routes/(app)/_layout/organization/settings/route'
 import { Route as appLayoutChatThreadIdRouteRouteImport } from './routes/(app)/_layout/chat/$threadId/route'
@@ -58,6 +59,7 @@ import { Route as appLayoutChatProjectsProjectIdRouteRouteImport } from './route
 import { Route as appLayoutOrganizationSettingsModelsIndexRouteImport } from './routes/(app)/_layout/organization/settings/models/index'
 import { Route as appLayoutChatProjectsProjectIdIndexRouteImport } from './routes/(app)/_layout/chat/projects/$projectId/index'
 import { Route as appLayoutChatProjectsProjectIdSourcesRouteImport } from './routes/(app)/_layout/chat/projects/$projectId/sources'
+import { Route as appLayoutChatProjectsProjectIdSkillsRouteImport } from './routes/(app)/_layout/chat/projects/$projectId/skills'
 import { Route as appLayoutChatProjectsProjectIdSettingsRouteImport } from './routes/(app)/_layout/chat/projects/$projectId/settings'
 import { Route as appLayoutOrganizationSettingsModelsProviderIdRouteRouteImport } from './routes/(app)/_layout/organization/settings/models/$providerId/route'
 
@@ -214,6 +216,11 @@ const appLayoutChatIndexRoute = appLayoutChatIndexRouteImport.update({
   path: '/',
   getParentRoute: () => appLayoutChatRouteRoute,
 } as any)
+const appLayoutChatSkillsRoute = appLayoutChatSkillsRouteImport.update({
+  id: '/skills',
+  path: '/skills',
+  getParentRoute: () => appLayoutChatRouteRoute,
+} as any)
 const appLayoutSettingsSecurityRouteRoute =
   appLayoutSettingsSecurityRouteRouteImport.update({
     id: '/security',
@@ -328,6 +335,12 @@ const appLayoutChatProjectsProjectIdSourcesRoute =
     path: '/sources',
     getParentRoute: () => appLayoutChatProjectsProjectIdRouteRoute,
   } as any)
+const appLayoutChatProjectsProjectIdSkillsRoute =
+  appLayoutChatProjectsProjectIdSkillsRouteImport.update({
+    id: '/skills',
+    path: '/skills',
+    getParentRoute: () => appLayoutChatProjectsProjectIdRouteRoute,
+  } as any)
 const appLayoutChatProjectsProjectIdSettingsRoute =
   appLayoutChatProjectsProjectIdSettingsRouteImport.update({
     id: '/settings',
@@ -371,6 +384,7 @@ export interface FileRoutesByFullPath {
   '/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
   '/organization/settings': typeof appLayoutOrganizationSettingsRouteRouteWithChildren
   '/settings/security': typeof appLayoutSettingsSecurityRouteRoute
+  '/chat/skills': typeof appLayoutChatSkillsRoute
   '/chat/': typeof appLayoutChatIndexRoute
   '/settings/': typeof appLayoutSettingsIndexRoute
   '/singularity/': typeof eeSingularityLayoutIndexRoute
@@ -389,6 +403,7 @@ export interface FileRoutesByFullPath {
   '/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
   '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
   '/chat/projects/$projectId/settings': typeof appLayoutChatProjectsProjectIdSettingsRoute
+  '/chat/projects/$projectId/skills': typeof appLayoutChatProjectsProjectIdSkillsRoute
   '/chat/projects/$projectId/sources': typeof appLayoutChatProjectsProjectIdSourcesRoute
   '/chat/projects/$projectId/': typeof appLayoutChatProjectsProjectIdIndexRoute
   '/organization/settings/models/': typeof appLayoutOrganizationSettingsModelsIndexRoute
@@ -419,6 +434,7 @@ export interface FileRoutesByTo {
   '/': typeof appLayoutIndexRoute
   '/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
   '/settings/security': typeof appLayoutSettingsSecurityRouteRoute
+  '/chat/skills': typeof appLayoutChatSkillsRoute
   '/chat': typeof appLayoutChatIndexRoute
   '/settings': typeof appLayoutSettingsIndexRoute
   '/singularity': typeof eeSingularityLayoutIndexRoute
@@ -435,6 +451,7 @@ export interface FileRoutesByTo {
   '/organization/settings': typeof appLayoutOrganizationSettingsIndexRoute
   '/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
   '/chat/projects/$projectId/settings': typeof appLayoutChatProjectsProjectIdSettingsRoute
+  '/chat/projects/$projectId/skills': typeof appLayoutChatProjectsProjectIdSkillsRoute
   '/chat/projects/$projectId/sources': typeof appLayoutChatProjectsProjectIdSourcesRoute
   '/chat/projects/$projectId': typeof appLayoutChatProjectsProjectIdIndexRoute
   '/organization/settings/models': typeof appLayoutOrganizationSettingsModelsIndexRoute
@@ -471,6 +488,7 @@ export interface FileRoutesById {
   '/(app)/_layout/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
   '/(app)/_layout/organization/settings': typeof appLayoutOrganizationSettingsRouteRouteWithChildren
   '/(app)/_layout/settings/security': typeof appLayoutSettingsSecurityRouteRoute
+  '/(app)/_layout/chat/skills': typeof appLayoutChatSkillsRoute
   '/(app)/_layout/chat/': typeof appLayoutChatIndexRoute
   '/(app)/_layout/settings/': typeof appLayoutSettingsIndexRoute
   '/(ee)/singularity/_layout/': typeof eeSingularityLayoutIndexRoute
@@ -489,6 +507,7 @@ export interface FileRoutesById {
   '/(app)/_layout/organization/settings/': typeof appLayoutOrganizationSettingsIndexRoute
   '/(app)/_layout/organization/settings/models/$providerId': typeof appLayoutOrganizationSettingsModelsProviderIdRouteRoute
   '/(app)/_layout/chat/projects/$projectId/settings': typeof appLayoutChatProjectsProjectIdSettingsRoute
+  '/(app)/_layout/chat/projects/$projectId/skills': typeof appLayoutChatProjectsProjectIdSkillsRoute
   '/(app)/_layout/chat/projects/$projectId/sources': typeof appLayoutChatProjectsProjectIdSourcesRoute
   '/(app)/_layout/chat/projects/$projectId/': typeof appLayoutChatProjectsProjectIdIndexRoute
   '/(app)/_layout/organization/settings/models/': typeof appLayoutOrganizationSettingsModelsIndexRoute
@@ -525,6 +544,7 @@ export interface FileRouteTypes {
     | '/chat/$threadId'
     | '/organization/settings'
     | '/settings/security'
+    | '/chat/skills'
     | '/chat/'
     | '/settings/'
     | '/singularity/'
@@ -543,6 +563,7 @@ export interface FileRouteTypes {
     | '/organization/settings/'
     | '/organization/settings/models/$providerId'
     | '/chat/projects/$projectId/settings'
+    | '/chat/projects/$projectId/skills'
     | '/chat/projects/$projectId/sources'
     | '/chat/projects/$projectId/'
     | '/organization/settings/models/'
@@ -573,6 +594,7 @@ export interface FileRouteTypes {
     | '/'
     | '/chat/$threadId'
     | '/settings/security'
+    | '/chat/skills'
     | '/chat'
     | '/settings'
     | '/singularity'
@@ -589,6 +611,7 @@ export interface FileRouteTypes {
     | '/organization/settings'
     | '/organization/settings/models/$providerId'
     | '/chat/projects/$projectId/settings'
+    | '/chat/projects/$projectId/skills'
     | '/chat/projects/$projectId/sources'
     | '/chat/projects/$projectId'
     | '/organization/settings/models'
@@ -624,6 +647,7 @@ export interface FileRouteTypes {
     | '/(app)/_layout/chat/$threadId'
     | '/(app)/_layout/organization/settings'
     | '/(app)/_layout/settings/security'
+    | '/(app)/_layout/chat/skills'
     | '/(app)/_layout/chat/'
     | '/(app)/_layout/settings/'
     | '/(ee)/singularity/_layout/'
@@ -642,6 +666,7 @@ export interface FileRouteTypes {
     | '/(app)/_layout/organization/settings/'
     | '/(app)/_layout/organization/settings/models/$providerId'
     | '/(app)/_layout/chat/projects/$projectId/settings'
+    | '/(app)/_layout/chat/projects/$projectId/skills'
     | '/(app)/_layout/chat/projects/$projectId/sources'
     | '/(app)/_layout/chat/projects/$projectId/'
     | '/(app)/_layout/organization/settings/models/'
@@ -881,6 +906,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appLayoutChatIndexRouteImport
       parentRoute: typeof appLayoutChatRouteRoute
     }
+    '/(app)/_layout/chat/skills': {
+      id: '/(app)/_layout/chat/skills'
+      path: '/skills'
+      fullPath: '/chat/skills'
+      preLoaderRoute: typeof appLayoutChatSkillsRouteImport
+      parentRoute: typeof appLayoutChatRouteRoute
+    }
     '/(app)/_layout/settings/security': {
       id: '/(app)/_layout/settings/security'
       path: '/security'
@@ -1014,6 +1046,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof appLayoutChatProjectsProjectIdSourcesRouteImport
       parentRoute: typeof appLayoutChatProjectsProjectIdRouteRoute
     }
+    '/(app)/_layout/chat/projects/$projectId/skills': {
+      id: '/(app)/_layout/chat/projects/$projectId/skills'
+      path: '/skills'
+      fullPath: '/chat/projects/$projectId/skills'
+      preLoaderRoute: typeof appLayoutChatProjectsProjectIdSkillsRouteImport
+      parentRoute: typeof appLayoutChatProjectsProjectIdRouteRoute
+    }
     '/(app)/_layout/chat/projects/$projectId/settings': {
       id: '/(app)/_layout/chat/projects/$projectId/settings'
       path: '/settings'
@@ -1049,6 +1088,7 @@ const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
 
 interface appLayoutChatProjectsProjectIdRouteRouteChildren {
   appLayoutChatProjectsProjectIdSettingsRoute: typeof appLayoutChatProjectsProjectIdSettingsRoute
+  appLayoutChatProjectsProjectIdSkillsRoute: typeof appLayoutChatProjectsProjectIdSkillsRoute
   appLayoutChatProjectsProjectIdSourcesRoute: typeof appLayoutChatProjectsProjectIdSourcesRoute
   appLayoutChatProjectsProjectIdIndexRoute: typeof appLayoutChatProjectsProjectIdIndexRoute
 }
@@ -1057,6 +1097,8 @@ const appLayoutChatProjectsProjectIdRouteRouteChildren: appLayoutChatProjectsPro
   {
     appLayoutChatProjectsProjectIdSettingsRoute:
       appLayoutChatProjectsProjectIdSettingsRoute,
+    appLayoutChatProjectsProjectIdSkillsRoute:
+      appLayoutChatProjectsProjectIdSkillsRoute,
     appLayoutChatProjectsProjectIdSourcesRoute:
       appLayoutChatProjectsProjectIdSourcesRoute,
     appLayoutChatProjectsProjectIdIndexRoute:
@@ -1070,12 +1112,14 @@ const appLayoutChatProjectsProjectIdRouteRouteWithChildren =
 
 interface appLayoutChatRouteRouteChildren {
   appLayoutChatThreadIdRouteRoute: typeof appLayoutChatThreadIdRouteRoute
+  appLayoutChatSkillsRoute: typeof appLayoutChatSkillsRoute
   appLayoutChatIndexRoute: typeof appLayoutChatIndexRoute
   appLayoutChatProjectsProjectIdRouteRoute: typeof appLayoutChatProjectsProjectIdRouteRouteWithChildren
 }
 
 const appLayoutChatRouteRouteChildren: appLayoutChatRouteRouteChildren = {
   appLayoutChatThreadIdRouteRoute: appLayoutChatThreadIdRouteRoute,
+  appLayoutChatSkillsRoute: appLayoutChatSkillsRoute,
   appLayoutChatIndexRoute: appLayoutChatIndexRoute,
   appLayoutChatProjectsProjectIdRouteRoute:
     appLayoutChatProjectsProjectIdRouteRouteWithChildren,

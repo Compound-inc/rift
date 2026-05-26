@@ -362,6 +362,51 @@ const project = table('project')
   })
   .primaryKey('id')
 
+/**
+ * Skill (Skills feature). See ADR-0005 and CONTEXT.md.
+ *
+ * Scope is encoded by the nullable pair (`projectId`, `organizationId`):
+ *   - `projectId` set                          -> Project Skill
+ *   - both null                                -> Personal Skill
+ *   - `organizationId` set, `projectId` null   -> Org-Shared Skill
+ *
+ * `userId` is always the original creator. For Project Skills the actual
+ * editor is the project owner (per `checkProjectAccess`); `userId` is
+ * carried for attribution. For Personal and Org-Shared, `userId` is the
+ * permission anchor.
+ */
+const skill = table('skill')
+  .from('skills')
+  .columns({
+    id: string(),
+    userId: string().from('user_id'),
+    organizationId: string().from('organization_id').optional(),
+    projectId: string().from('project_id').optional(),
+    name: string(),
+    body: string(),
+    description: string().optional(),
+    allowAdminEdit: boolean().from('allow_admin_edit'),
+    deletedAt: number().from('deleted_at').optional(),
+    createdAt: number().from('created_at'),
+    updatedAt: number().from('updated_at'),
+  })
+  .primaryKey('id')
+
+/**
+ * Sparse override table: a row means the referenced global Skill is hidden
+ * in the named Project's slash menu (and skipped during server-side
+ * resolution). See ADR-0005.
+ */
+const skillProjectOverride = table('skillProjectOverride')
+  .from('skill_project_overrides')
+  .columns({
+    id: string(),
+    projectId: string().from('project_id'),
+    skillId: string().from('skill_id'),
+    createdAt: number().from('created_at'),
+  })
+  .primaryKey('id')
+
 // ---------------------------------------------------------------------------
 // Relationships (optional; use for .related() in ZQL)
 // ---------------------------------------------------------------------------
@@ -513,6 +558,49 @@ const threadProjectRelationship = relationships(thread, ({ one }) => ({
   }),
 }))
 
+/**
+ * Skill relationships. The override table joins back to both the Skill
+ * itself and the Project doing the hiding so reads can fan out either way.
+ */
+const skillRelationships = relationships(skill, ({ one, many }) => ({
+  user: one({
+    sourceField: ['userId'],
+    destField: ['id'],
+    destSchema: user,
+  }),
+  organization: one({
+    sourceField: ['organizationId'],
+    destField: ['id'],
+    destSchema: organization,
+  }),
+  project: one({
+    sourceField: ['projectId'],
+    destField: ['id'],
+    destSchema: project,
+  }),
+  projectOverrides: many({
+    sourceField: ['id'],
+    destSchema: skillProjectOverride,
+    destField: ['skillId'],
+  }),
+}))
+
+const skillProjectOverrideRelationships = relationships(
+  skillProjectOverride,
+  ({ one }) => ({
+    skill: one({
+      sourceField: ['skillId'],
+      destField: ['id'],
+      destSchema: skill,
+    }),
+    project: one({
+      sourceField: ['projectId'],
+      destField: ['id'],
+      destSchema: project,
+    }),
+  }),
+)
+
 // ---------------------------------------------------------------------------
 // Schema export and default types
 // ---------------------------------------------------------------------------
@@ -533,6 +621,8 @@ export const schema = createSchema({
     message,
     attachment,
     project,
+    skill,
+    skillProjectOverride,
   ],
   relationships: [
     organizationRelationships,
@@ -544,6 +634,8 @@ export const schema = createSchema({
     messageRelationships,
     projectRelationships,
     threadProjectRelationship,
+    skillRelationships,
+    skillProjectOverrideRelationships,
   ],
 })
 

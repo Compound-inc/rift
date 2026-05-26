@@ -51,6 +51,10 @@ vi.mock('./chat-context', () => ({
   }),
 }))
 
+vi.mock('./skills/skill-slash-host', () => ({
+  SkillSlashHost: ({ children }: { children: ReactNode }) => <>{children}</>,
+}))
+
 vi.mock('@/utils/app-feature-flags', () => ({
   get isEmbeddingFeatureEnabled() {
     return embeddingFlagState.enabled
@@ -88,8 +92,11 @@ vi.mock('./prompt-input', () => ({
     value,
     onChange,
     onPaste,
+    inputRef: _inputRef,
     ...props
-  }: TextareaHTMLAttributes<HTMLTextAreaElement>) => (
+  }: TextareaHTMLAttributes<HTMLTextAreaElement> & {
+    inputRef?: unknown
+  }) => (
     <textarea
       value={value}
       onChange={onChange}

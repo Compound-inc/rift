@@ -15,6 +15,7 @@ import Link2 from 'lucide-react/dist/esm/icons/link-2'
 import MessageCircle from 'lucide-react/dist/esm/icons/message-circle'
 import Pencil from 'lucide-react/dist/esm/icons/pencil'
 import Search from 'lucide-react/dist/esm/icons/search'
+import Wand2 from 'lucide-react/dist/esm/icons/wand-2'
 import { ContextMenuItem } from '@rift/ui/context-menu'
 import { toast } from 'sonner'
 import { isAreaPath } from '@/utils/nav-utils'
@@ -141,6 +142,12 @@ function getStaticSections(): NavSection[] {
           name: m.chat_search_trigger_label(),
           onSelect: () => openChatSearchCommand({ hideActions: true }),
           icon: Search,
+        },
+        {
+          name: m.chat_sidebar_skills(),
+          href: '/chat/skills',
+          icon: Wand2,
+          exact: true,
         },
       ],
     },

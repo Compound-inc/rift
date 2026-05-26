@@ -23,6 +23,10 @@ import {
   retrieveOrgKnowledgeContextBlock,
   retrieveProjectSourceContextBlock,
 } from '@/lib/backend/chat/services/rag/scope-retrieval'
+import {
+  expandUserMessageText,
+  loadSkillBodiesForContext,
+} from '@/lib/backend/skills/skill-resolver'
 import { resolveCanonicalBranch } from '@/lib/shared/chat-branching/branch-resolver'
 import { requireMessagePersistenceDb } from '../../message-persistence-db'
 import { normalizeThreadActiveChildMap } from '../helpers'
@@ -479,6 +483,29 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
           })
         }
 
+        // Skill body lookup for the resolution context. Loaded once per
+        // request and reused across every user message in `canonicalRows`
+        // so we issue at most two extra queries (skills, overrides) per
+        // turn regardless of history length. See ADR-0005.
+        //
+        // Short-circuit: if no user message in the canonical history
+        // contains a forward slash, there is nothing to expand and we can
+        // skip the lookup entirely. The chat composer is overwhelmingly
+        // slash-free, so this saves two queries on every normal turn.
+        const anyUserMessageContainsSlash = canonicalRows.some(
+          (row) => row.role === 'user' && row.content.includes('/'),
+        )
+        const skillBodyByName = anyUserMessageContainsSlash
+          ? yield* loadSkillBodiesForContext({
+              db,
+              userId,
+              projectId: activeProjectId,
+              organizationId,
+              threadId,
+              requestId,
+            })
+          : (new Map<string, string>() as ReadonlyMap<string, string>)
+
         return canonicalRows.map((message) => {
           const attachmentIds = Array.isArray(message.attachmentsIds)
             ? message.attachmentsIds
@@ -510,6 +537,14 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
                 )
               : []
 
+          const expandedText =
+            message.role === 'user'
+              ? expandUserMessageText({
+                  text: message.content,
+                  bodyByName: skillBodyByName,
+                })
+              : message.content
+
           const modelText =
             message.role === 'user' &&
             latestUserMessageRow?.messageId === message.messageId &&
@@ -520,12 +555,12 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
               ? [
                   orgKnowledgeContextBlock,
                   projectSourceContextBlock,
-                  message.content,
+                  expandedText,
                   fallbackContextBlock,
                 ]
                   .filter((value) => value.length > 0)
                   .join('\n\n')
-              : message.content
+              : expandedText
 
           const messageParts: UIMessage['parts'] = [
             { type: 'text', text: modelText },

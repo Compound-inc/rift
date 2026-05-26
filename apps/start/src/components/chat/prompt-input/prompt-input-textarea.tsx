@@ -7,7 +7,15 @@ import type { ComponentProps, KeyboardEventHandler } from 'react'
 import { useRef, useCallback, useEffect, useImperativeHandle, forwardRef } from 'react'
 import { TEXTAREA_MAX_HEIGHT } from './constants'
 
-export type PromptInputTextareaProps = ComponentProps<typeof Textarea>
+export type PromptInputTextareaProps = ComponentProps<typeof Textarea> & {
+  /**
+   * Optional escape hatch for callers that need direct access to the
+   * underlying `<textarea>` element — e.g. to read `selectionStart` or
+   * splice text at the cursor. The component still owns auto-resize
+   * and Enter-to-submit; this just exposes the live DOM ref.
+   */
+  inputRef?: React.RefObject<HTMLTextAreaElement | null>
+}
 
 export type PromptInputTextareaRef = { focus: () => void }
 
@@ -25,10 +33,24 @@ export const PromptInputTextarea = forwardRef<
   PromptInputTextareaRef,
   PromptInputTextareaProps
 >(function PromptInputTextarea(
-  { onChange, className, placeholder = 'Ask anything', style, ...props },
+  { onChange, className, placeholder = 'Ask anything', style, inputRef, ...props },
   ref
 ) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Reflect the internal element ref into the optional caller-provided
+  // `inputRef`, so callers reading `selectionStart` etc. don't need a
+  // separate DOM query while we still control auto-resize.
+  useEffect(() => {
+    if (inputRef) {
+      inputRef.current = textareaRef.current
+    }
+    return () => {
+      if (inputRef) {
+        inputRef.current = null
+      }
+    }
+  })
 
   useImperativeHandle(ref, () => ({
     focus: () => textareaRef.current?.focus(),

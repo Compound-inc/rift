@@ -2,7 +2,7 @@
 'use client'
 
 import type { ClipboardEvent as ReactClipboardEvent } from 'react'
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpen } from 'lucide-react'
 import { useChatComposer, useChatMessages } from './chat-context'
 import {
@@ -13,6 +13,7 @@ import {
   PromptInputAttachments,
   PromptInputDropHint,
 } from './prompt-input'
+import { SkillSlashHost } from './skills/skill-slash-host'
 import {
   ModelSelectorPanel,
   ReasoningSelectorPanel,
@@ -459,16 +460,42 @@ const ComposerTextarea = memo(function ComposerTextarea({
   onPaste: (event: ReactClipboardEvent<HTMLTextAreaElement>) => void
 }) {
   const composerInput = useComposerDraftValue()
+  // Read the active project from chat context so the slash menu uses the
+  // same scope the server-side resolver will see at send time. The host
+  // also needs the live DOM ref to track cursor position and splice
+  // selections back into the draft.
+  const { activeProjectId } = useChatMessages()
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const projectId = useMemo(
+    () => activeProjectId ?? undefined,
+    [activeProjectId],
+  )
 
   return (
-    <PromptInputTextarea
+    <SkillSlashHost
+      textareaRef={textareaRef}
       value={composerInput}
-      onChange={(e) => setComposerDraft(e.target.value)}
-      onPaste={onPaste}
-      aria-label={m.chat_input_message_aria_label()}
-      placeholder={m.chat_prompt_placeholder()}
-      className="placeholder:text-foreground-primary/65"
-    />
+      onValueChange={setComposerDraft}
+      projectId={projectId}
+    >
+      <PromptInputTextarea
+        inputRef={textareaRef}
+        value={composerInput}
+        onChange={(e) => setComposerDraft(e.target.value)}
+        onPaste={onPaste}
+        aria-label={m.chat_input_message_aria_label()}
+        placeholder={m.chat_prompt_placeholder()}
+        // The slash-skill overlay (rendered by `SkillSlashHost`) sits
+        // BEHIND this textarea and paints the visible message text so
+        // it can colour `/skill` tokens differently from the rest of
+        // the message. To make that paint visible we have to make the
+        // textarea's own text transparent — otherwise the textarea's
+        // `text-foreground-strong` would cover the overlay's paint.
+        // The caret and selection are kept visible explicitly so the
+        // user still has the usual editing affordances.
+        className="text-transparent caret-foreground-strong selection:text-transparent placeholder:text-foreground-primary/65"
+      />
+    </SkillSlashHost>
   )
 })
 
