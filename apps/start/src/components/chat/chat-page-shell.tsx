@@ -22,7 +22,7 @@ export function ChatPageShell() {
     useSideNav()
   const { isChatPageSidebarCollapsed, setIsChatPageSidebarCollapsed } =
     usePageSidebarVisibility()
-  const { activeProjectId, activeThreadId, messages } = useChatMessages()
+  const { isProjectLandingState } = useChatMessages()
 
   const toggleSidebar = () => {
     if (isMobile) {
@@ -53,18 +53,14 @@ export function ChatPageShell() {
   )
 
   /**
-   * Decorative doodles backdrop is reserved for the project landing page \u2014
-   * the in-project welcome + composer state. It would compete with thread
-   * messages on `/chat/$threadId` and isn't called for on the empty global
-   * `/chat` welcome. The condition matches the welcome-screen guard in
-   * `ChatThread` so the backdrop appears in lockstep with the project hero.
+   * Decorative doodles backdrop is reserved for the project landing
+   * page. The matching welcome-screen branch in `ChatThread` reads the
+   * same `isProjectLandingState` flag from chat context, so the two
+   * views cannot disagree on when the backdrop should appear.
    */
-  const showProjectLandingBackdrop =
-    activeProjectId != null && activeThreadId == null && messages.length === 0
-
   return (
     <div className="relative flex min-h-full flex-1 flex-col overflow-visible">
-      {showProjectLandingBackdrop ? <ChatProjectLandingBackdrop /> : null}
+      {isProjectLandingState ? <ChatProjectLandingBackdrop /> : null}
       <div className="pointer-events-none sticky top-0 z-30 h-0 overflow-visible px-2 pt-2 md:px-4 md:pt-3">
         <div className="flex w-full items-center justify-start gap-2">
           <div className="pointer-events-auto">

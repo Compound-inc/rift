@@ -60,6 +60,10 @@ import {
   emitBranchVersionConflictTelemetry,
   emitInvalidEditTargetTelemetry,
 } from './chat-orchestrator/failure-telemetry'
+import {
+  resolveOpenRouterRequestOptions,
+  withGatewayComplianceProviderOptions,
+} from './chat-orchestrator/zdr-policy'
 import { normalizeStreamCommand } from './chat-orchestrator/command'
 import { buildPersistedGenerationAnalytics } from '../domain/generation-metrics'
 import { nanoUsdToUsd } from '@/lib/backend/billing/services/workspace-usage/shared'
@@ -78,51 +82,6 @@ function getResolvedCatalogModel(modelId: string) {
   }
 
   return catalogModel
-}
-
-function withGatewayComplianceProviderOptions(input: {
-  readonly providerOptions?: Record<string, unknown>
-  readonly orgPolicy?: OrgAiPolicy
-  readonly hasProviderKeyOverride?: boolean
-}): Record<string, unknown> | undefined {
-  const gatewayOptions =
-    input.providerOptions?.gateway &&
-    typeof input.providerOptions.gateway === 'object' &&
-    !Array.isArray(input.providerOptions.gateway)
-      ? (input.providerOptions.gateway as Record<string, unknown>)
-      : undefined
-
-  const requireZdr = Boolean(input.orgPolicy?.complianceFlags.require_zdr)
-  const applyZdr = requireZdr && !input.hasProviderKeyOverride
-
-  return {
-    ...(input.providerOptions ?? {}),
-    gateway: {
-      ...(gatewayOptions ?? {}),
-      caching: 'auto',
-      ...(applyZdr ? { zeroDataRetention: true } : {}),
-    },
-  }
-}
-
-/**
- * Resolves OpenRouter-specific request options for a single chat turn.
- * Returns `undefined` for non-OpenRouter routes so callers can ignore the
- * result without branching. ZDR enforcement is dynamic: when the org has
- * `require_zdr` enabled we forward `provider.zdr: true` to OpenRouter, which
- * restricts routing to ZDR endpoints regardless of the upstream model picked
- * by the auto-router.
- */
-function resolveOpenRouterRequestOptions(input: {
-  readonly modelId: string
-  readonly orgPolicy?: OrgAiPolicy
-}): { readonly enforceZdr: boolean } | undefined {
-  const catalogModel = getCatalogModel(input.modelId)
-  if (catalogModel?.providerId !== 'openrouter') return undefined
-
-  return {
-    enforceZdr: Boolean(input.orgPolicy?.complianceFlags.require_zdr),
-  }
 }
 
 /**
@@ -319,19 +278,14 @@ export class ChatOrchestratorService extends ServiceMap.Service<
            * If the Thread belongs to a Project, concatenate the Project's
            * `custom_instruction` after the mode's system prompt so it can
            * extend (not be overridden by) the mode's tone/role guidance.
+           * The instruction is resolved as part of `assertThreadAccess` so
+           * we don't pay a second project query per turn.
            */
-          const projectInstruction = threadAccess.projectId
-            ? yield* threads.loadProjectInstruction({
-                userId,
-                projectId: threadAccess.projectId,
-                requestId,
-              })
-            : { instruction: undefined as string | undefined }
           const baseSystemPrompt = effectiveMode?.definition.systemPrompt
           const assembledSystemPrompt =
-            baseSystemPrompt && projectInstruction.instruction
-              ? `${baseSystemPrompt}\n\n${projectInstruction.instruction}`
-              : (projectInstruction.instruction ?? baseSystemPrompt)
+            baseSystemPrompt && threadAccess.projectInstruction
+              ? `${baseSystemPrompt}\n\n${threadAccess.projectInstruction}`
+              : (threadAccess.projectInstruction ?? baseSystemPrompt)
 
           if (
             attachments &&

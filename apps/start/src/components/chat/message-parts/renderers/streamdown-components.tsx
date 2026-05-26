@@ -1,5 +1,6 @@
 import { isValidElement, memo } from 'react'
 import type { HTMLAttributes, ReactNode } from 'react'
+import { defaultRemarkPlugins } from 'streamdown'
 import type { Components } from 'streamdown'
 import { cn } from '@rift/utils'
 import {
@@ -27,6 +28,7 @@ import {
   isInlineCitationSourceLabel,
   parseInlineCitationLabel,
 } from '../components/inline-citation'
+import { inlineCitationRemarkPlugin } from './inline-citation-remark-plugin'
 import { m } from '@/paraglide/messages.js'
 
 const LANGUAGE_CLASS_PREFIX = 'language-'
@@ -264,6 +266,11 @@ const Table: NonNullable<Components['table']> = ({
     {children}
   </RenderedTableBlock>
 )
+
+export const streamdownRemarkPlugins = [
+  ...Object.values(defaultRemarkPlugins),
+  inlineCitationRemarkPlugin,
+]
 
 /**
  * Streamdown element overrides used by the chat renderer.

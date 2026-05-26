@@ -43,7 +43,11 @@ export class MarkdownConversionService extends ServiceMap.Service<
           const capabilities = getServerInstanceCapabilities()
           const workerUrl = readRequiredEnv('CF_MARKDOWN_WORKER_URL')
           const workerToken = readRequiredEnv('CF_MARKDOWN_WORKER_TOKEN')
-          if (!capabilities.markdownWorkerAvailable || !workerUrl || !workerToken) {
+          if (
+            !capabilities.markdownWorkerAvailable ||
+            !workerUrl ||
+            !workerToken
+          ) {
             return yield* Effect.fail(
               new FileConversionError({
                 message:
@@ -115,7 +119,7 @@ export class MarkdownConversionService extends ServiceMap.Service<
                   },
                 })
 
-                const workerPayload = (yield* Effect.tryPromise({
+                const workerPayload = yield* Effect.tryPromise({
                   try: async () => {
                     try {
                       return (await response.json()) as MarkdownWorkerResponse
@@ -130,7 +134,7 @@ export class MarkdownConversionService extends ServiceMap.Service<
                       statusCode: 502,
                       cause: String(error),
                     }),
-                }))
+                })
 
                 return { response, workerPayload }
               }),
@@ -170,6 +174,18 @@ export class MarkdownConversionService extends ServiceMap.Service<
             workerPayload && typeof workerPayload.tokens === 'number'
               ? workerPayload.tokens
               : 0
+
+          // Metadata-only log so we can diagnose conversion latency
+          // and token volume without dumping the full markdown
+          // (which can be tens of KB and may contain user PII).
+          // Use Effect.logDebug + `EFFECT_MIN_LOG_LEVEL=Debug` if you
+          // need the full markdown body locally; never log it in prod.
+          yield* Effect.logInfo('markdown_conversion_succeeded', {
+            requestId,
+            fileName,
+            tokenCount,
+            markdownChars: markdown.length,
+          })
 
           return {
             markdown,

@@ -69,6 +69,7 @@ export const projectQueryDefinitions = {
           projectVisibleToCaller({ userID: ctx.userID, organizationId: orgId }),
         )
         .where('deletedAt', 'IS', null)
+        .orderBy('pinned', 'desc')
         .orderBy('updatedAt', 'desc')
         .orderBy('id', 'desc')
     }),

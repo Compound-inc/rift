@@ -7,7 +7,6 @@ import {
 import { getUserMessageText } from '@/lib/backend/chat/domain/schemas'
 import { zql } from '@/lib/backend/chat/infra/zero/db'
 import type { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
-import type { AttachmentRagService } from '@/lib/backend/chat/services/rag'
 import { resolveCanonicalBranch } from '@/lib/shared/chat-branching/branch-resolver'
 import { requireMessagePersistenceDb } from '../../message-persistence-db'
 import {
@@ -19,13 +18,15 @@ import type { MessageStoreServiceShape } from '../../message-store.service'
 
 export const makeAppendUserMessageOperation = (dependencies: {
   readonly zeroDatabase: ZeroDatabaseService['Service']
-  readonly attachmentRag: AttachmentRagService['Service']
 }): MessageStoreServiceShape['appendUserMessage'] => {
   /**
-   * Persists a new user turn with optimistic branch-version checks and links
-   * any validated attachments to both the relational and vector stores.
+   * Persists a new user turn with optimistic branch-version checks and
+   * links any validated attachments to the relational store. Vector
+   * payloads are not stamped with thread/message metadata: the SQL
+   * layer's `attachments.thread_id` is the source of truth for thread
+   * membership and the vector layer only needs `userId` for tenancy.
    */
-  const { zeroDatabase, attachmentRag } = dependencies
+  const { zeroDatabase } = dependencies
 
   return Effect.fn('MessageStoreService.appendUserMessage')(
     ({
@@ -51,19 +52,15 @@ export const makeAppendUserMessageOperation = (dependencies: {
         const now = Date.now()
         const linkedAttachmentsForReturn: ChatAttachment[] = []
         let insertedParentMessageId: string | undefined
-        const vectorLinks: Array<{
-          attachmentId: string
-          userId: string
-          threadId: string
-          messageId: string
-          updatedAt: number
-        }> = []
 
         yield* Effect.tryPromise({
           try: () =>
             db.transaction(async (tx) => {
               const thread = await tx.run(
-                zql.thread.where('id', threadDbId).where('userId', userId).one(),
+                zql.thread
+                  .where('id', threadDbId)
+                  .where('userId', userId)
+                  .one(),
               )
               if (!thread) {
                 throw new Error('thread not found')
@@ -71,7 +68,8 @@ export const makeAppendUserMessageOperation = (dependencies: {
 
               if (thread.branchVersion !== expectedBranchVersion) {
                 throw new BranchVersionConflictError({
-                  message: 'Branch version mismatch while appending user message',
+                  message:
+                    'Branch version mismatch while appending user message',
                   requestId,
                   threadId,
                   expectedBranchVersion,
@@ -81,7 +79,10 @@ export const makeAppendUserMessageOperation = (dependencies: {
 
               try {
                 const existing = await tx.run(
-                  zql.message.where('id', message.id).where('userId', userId).one(),
+                  zql.message
+                    .where('id', message.id)
+                    .where('userId', userId)
+                    .one(),
                 )
                 if (existing) return
 
@@ -92,7 +93,10 @@ export const makeAppendUserMessageOperation = (dependencies: {
 
                 for (const attachmentId of attachmentIds) {
                   const existingAttachment = await tx.run(
-                    zql.attachment.where('id', attachmentId).where('userId', userId).one(),
+                    zql.attachment
+                      .where('id', attachmentId)
+                      .where('userId', userId)
+                      .one(),
                   )
                   if (!existingAttachment) continue
                   if (existingAttachment.status === 'deleted') continue
@@ -110,14 +114,6 @@ export const makeAppendUserMessageOperation = (dependencies: {
                     id: existingAttachment.id,
                     messageId: message.id,
                     threadId,
-                    updatedAt: now,
-                  })
-
-                  vectorLinks.push({
-                    attachmentId: existingAttachment.id,
-                    userId,
-                    threadId,
-                    messageId: message.id,
                     updatedAt: now,
                   })
                 }
@@ -170,7 +166,9 @@ export const makeAppendUserMessageOperation = (dependencies: {
                     url: attachment.url,
                     title: attachment.name,
                   })),
-                  attachmentsIds: linkedAttachments.map((attachment) => attachment.id),
+                  attachmentsIds: linkedAttachments.map(
+                    (attachment) => attachment.id,
+                  ),
                 })
               } catch {
                 // Duplicate insert on retry; row already exists.
@@ -207,12 +205,6 @@ export const makeAppendUserMessageOperation = (dependencies: {
             })
           },
         })
-
-        for (const link of vectorLinks) {
-          yield* attachmentRag
-            .linkAttachmentToThread(link)
-            .pipe(Effect.catch(() => Effect.void))
-        }
 
         return toUserMessage(message, linkedAttachmentsForReturn)
       }),

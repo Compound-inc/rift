@@ -224,21 +224,43 @@ export async function upsertOrganizationUsagePolicyOverrideRecord(input: {
   await runBillingSqlEffect(upsertOrganizationUsagePolicyOverrideRecordEffect(input))
 }
 
-function mergeUsageTemplate(input: {
+/**
+ * Merges plan defaults with the optional template row and per-org override
+ * row. Each field falls back through override → template → defaults via `??`,
+ * so partial override rows (e.g. only `organization_monthly_budget_nano_usd`
+ * set, every other column NULL) cannot blow away plan defaults the way a
+ * naive object-spread merge would.
+ */
+export function mergeUsageTemplate(input: {
   readonly planId: Exclude<WorkspacePlanId, 'free'>
   readonly templateRow: UsagePolicyTemplateRow | null
   readonly overrideRow: UsagePolicyOverrideRow | null
 }): UsagePolicyTemplate {
   const defaults = resolveDefaultUsagePolicyTemplate(input.planId)
+  const templateRow = input.templateRow ?? {}
+  const overrideRow = input.overrideRow ?? {}
 
   return {
-    ...defaults,
-    ...(input.templateRow ?? {}),
-    ...(input.overrideRow ?? {}),
     planId: input.planId,
     featureKey: CHAT_USAGE_FEATURE_KEY,
+    targetMarginRatioBps:
+      overrideRow.targetMarginRatioBps
+      ?? templateRow.targetMarginRatioBps
+      ?? defaults.targetMarginRatioBps,
+    reserveHeadroomRatioBps:
+      overrideRow.reserveHeadroomRatioBps
+      ?? templateRow.reserveHeadroomRatioBps
+      ?? defaults.reserveHeadroomRatioBps,
+    minReserveNanoUsd:
+      overrideRow.minReserveNanoUsd
+      ?? templateRow.minReserveNanoUsd
+      ?? defaults.minReserveNanoUsd,
+    organizationMonthlyBudgetNanoUsd:
+      overrideRow.organizationMonthlyBudgetNanoUsd
+      ?? templateRow.organizationMonthlyBudgetNanoUsd
+      ?? defaults.organizationMonthlyBudgetNanoUsd,
     enabled:
-      input.overrideRow?.enabled ?? input.templateRow?.enabled ?? defaults.enabled,
+      overrideRow.enabled ?? templateRow.enabled ?? defaults.enabled,
   }
 }
 

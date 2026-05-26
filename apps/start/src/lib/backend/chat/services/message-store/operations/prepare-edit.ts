@@ -57,7 +57,10 @@ export const makePrepareEditOperation = (dependencies: {
 
             return await db.transaction(async (tx) => {
               const thread = await tx.run(
-                zql.thread.where('id', threadDbId).where('userId', userId).one(),
+                zql.thread
+                  .where('id', threadDbId)
+                  .where('userId', userId)
+                  .one(),
               )
               if (!thread) {
                 throw new Error('thread not found')
@@ -132,7 +135,8 @@ export const makePrepareEditOperation = (dependencies: {
               const activeChildByParent = normalizeThreadActiveChildMap(
                 thread.activeChildByParent,
               )
-              activeChildByParent[editableTarget.parentSelectionKey] = nextMessageId
+              activeChildByParent[editableTarget.parentSelectionKey] =
+                nextMessageId
 
               await tx.mutate.thread.update({
                 id: threadDbId,

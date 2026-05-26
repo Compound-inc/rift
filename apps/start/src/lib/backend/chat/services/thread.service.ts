@@ -11,6 +11,7 @@ import {
   buildBootstrapThreadRecord,
   DEFAULT_THREAD_TITLE,
 } from '@/lib/shared/chat'
+import { checkProjectAccess } from '@/lib/shared/projects/access'
 import {
   MessagePersistenceError,
   ThreadForbiddenError,
@@ -65,6 +66,14 @@ export type ThreadServiceShape = {
         | 'failed'
       readonly branchVersion: number
       readonly projectId?: string
+      /**
+       * Project's `custom_instruction` when the thread belongs to an
+       * accessible project, otherwise `undefined`. Resolved during the
+       * same project lookup that decides `projectId`, so the chat
+       * orchestrator never has to re-query the project row to fetch
+       * the instruction text.
+       */
+      readonly projectInstruction?: string
     },
     ThreadNotFoundError | ThreadForbiddenError | MessagePersistenceError
   >
@@ -79,20 +88,6 @@ export type ThreadServiceShape = {
     readonly threadId: string
     readonly requestId: string
   }) => Effect.Effect<void, MessagePersistenceError>
-  /**
-   * Loads the Project's `custom_instruction` for a Thread that belongs to
-   * a Project. Returns `{ instruction: undefined }` when the project is
-   * missing, soft-deleted, or not owned by `userId` so the caller can
-   * gracefully fall back to no project context.
-   */
-  readonly loadProjectInstruction: (input: {
-    readonly userId: string
-    readonly projectId: string
-    readonly requestId: string
-  }) => Effect.Effect<
-    { readonly instruction?: string },
-    MessagePersistenceError
-  >
   readonly setThreadMode: (input: {
     readonly userId: string
     readonly threadId: string
@@ -280,33 +275,26 @@ export class ThreadService extends ServiceMap.Service<
                         .where('id', normalizedRequestedProjectId)
                         .one(),
                     )
-                    if (
-                      !project ||
-                      project.userId !== userId ||
-                      project.deletedAt
-                    ) {
-                      throw new ThreadForbiddenError({
-                        message: 'Project is not available for thread creation',
-                        requestId,
-                        threadId,
-                        userId,
-                      })
-                    }
-
-                    const threadOrgId = organizationId?.trim() || undefined
-                    const projectOrgId =
-                      project.organizationId?.trim() || undefined
-                    if (threadOrgId !== projectOrgId) {
+                    const access = checkProjectAccess(project, {
+                      userId,
+                      orgContext: {
+                        enforce: true,
+                        organizationId,
+                      },
+                    })
+                    if (access.kind !== 'ok') {
                       throw new ThreadForbiddenError({
                         message:
-                          'Project is not available in the active organization',
+                          access.kind === 'org-mismatch'
+                            ? 'Project is not available in the active organization'
+                            : 'Project is not available for thread creation',
                         requestId,
                         threadId,
                         userId,
                       })
                     }
 
-                    resolvedProjectId = project.id
+                    resolvedProjectId = access.project.id
                   }
 
                   try {
@@ -381,11 +369,23 @@ export class ThreadService extends ServiceMap.Service<
               )
             }
 
-            const threadProjectId = thread.projectId
-            if (threadProjectId) {
+            // Soft-deleted or missing parent projects make the thread
+            // unprojected from the orchestrator's point of view, matching
+            // ADR-0001's "hidden from UI but data preserved" stance: the
+            // thread itself remains accessible to its owner so a future
+            // restore can bring everything back. The project context just
+            // stops applying for new turns.
+            //
+            // Loading the project row here also returns its
+            // `custom_instruction`, so the orchestrator does not need a
+            // second query to assemble the system prompt.
+            const persistedProjectId = thread.projectId ?? undefined
+            let effectiveProjectId = persistedProjectId
+            let effectiveProjectInstruction: string | undefined
+            if (persistedProjectId) {
               const projectRow = yield* Effect.tryPromise({
                 try: () =>
-                  db.run(zql.project.where('id', threadProjectId).one()),
+                  db.run(zql.project.where('id', persistedProjectId).one()),
                 catch: (error) =>
                   new MessagePersistenceError({
                     message: 'Failed to validate project access',
@@ -394,14 +394,17 @@ export class ThreadService extends ServiceMap.Service<
                     cause: String(error),
                   }),
               })
-              if (!projectRow || projectRow.deletedAt) {
-                return yield* Effect.fail(
-                  new ThreadNotFoundError({
-                    message: 'Thread not found',
-                    requestId,
-                    threadId,
-                  }),
-                )
+              const access = checkProjectAccess(projectRow, {
+                userId,
+                orgContext: { enforce: false },
+              })
+              if (access.kind === 'ok') {
+                const trimmed = access.project.customInstruction?.trim()
+                if (typeof trimmed === 'string' && trimmed.length > 0) {
+                  effectiveProjectInstruction = trimmed
+                }
+              } else {
+                effectiveProjectId = undefined
               }
             }
 
@@ -424,7 +427,8 @@ export class ThreadService extends ServiceMap.Service<
                 : [],
               generationStatus: thread.generationStatus,
               branchVersion: thread.branchVersion,
-              projectId: thread.projectId ?? undefined,
+              projectId: effectiveProjectId,
+              projectInstruction: effectiveProjectInstruction,
             }
           }),
       )
@@ -564,48 +568,6 @@ User message: ${trimmedMessage}`,
                   cause: String(error),
                 }),
             })
-          }),
-      )
-
-      const loadProjectInstruction = Effect.fn(
-        'ThreadService.loadProjectInstruction',
-      )(
-        ({
-          userId,
-          projectId,
-          requestId,
-        }: {
-          readonly userId: string
-          readonly projectId: string
-          readonly requestId: string
-        }) =>
-          Effect.gen(function* () {
-            const db = yield* loadDb({ requestId, threadId: projectId })
-            const project = yield* Effect.tryPromise({
-              try: () => db.run(zql.project.where('id', projectId).one()),
-              catch: (error) =>
-                new MessagePersistenceError({
-                  message: 'Failed to load project instruction',
-                  requestId,
-                  threadId: projectId,
-                  cause: String(error),
-                }),
-            })
-
-            // A missing, soft-deleted, or foreign-owned project falls back
-            // to no instruction; the orchestrator should still be able to
-            // generate a response without one.
-            if (!project || project.userId !== userId || project.deletedAt) {
-              return { instruction: undefined }
-            }
-
-            const trimmed = project.customInstruction?.trim()
-            return {
-              instruction:
-                typeof trimmed === 'string' && trimmed.length > 0
-                  ? trimmed
-                  : undefined,
-            }
           }),
       )
 
@@ -833,7 +795,6 @@ User message: ${trimmedMessage}`,
         assertThreadAccess,
         autoGenerateTitle,
         markThreadGenerationFailed,
-        loadProjectInstruction,
         setThreadMode,
         setThreadDisabledToolKeys,
         setThreadContextWindowMode,
@@ -971,9 +932,6 @@ User message: ${trimmedMessage}`,
     markThreadGenerationFailed: Effect.fn(
       'ThreadService.markThreadGenerationFailedMemory',
     )(() => Effect.void),
-    loadProjectInstruction: Effect.fn(
-      'ThreadService.loadProjectInstructionMemory',
-    )(() => Effect.succeed({ instruction: undefined })),
     setThreadMode: Effect.fn('ThreadService.setThreadModeMemory')(
       ({ userId, threadId, modeId, requestId }) =>
         Effect.gen(function* () {

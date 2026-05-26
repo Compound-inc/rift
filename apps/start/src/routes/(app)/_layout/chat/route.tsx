@@ -18,10 +18,12 @@ export const Route = createFileRoute('/(app)/_layout/chat')({
 })
 
 /**
- * First-path-segments under `/chat/` that are not thread IDs. Today only
- * `projects` is reserved.
+ * First-path-segments under `/chat/` that are not thread IDs. Today
+ * `projects` covers the project area (its own nested layout) and
+ * `skills` covers the top-level Skills management page (ADR-0005). Add
+ * to this set whenever a new sibling page is introduced.
  */
-const RESERVED_FIRST_SEGMENTS = new Set(['projects'])
+const RESERVED_FIRST_SEGMENTS = new Set(['projects', 'skills'])
 
 function ChatLayout() {
   const { pathname } = useLocation()
@@ -49,8 +51,14 @@ function ChatLayout() {
    * chrome, so we suppress the chat shell to avoid the welcome screen +
    * composer rendering behind them. The project landing route, by
    * contrast, *is* the welcome + composer for that project.
+   *
+   * Top-level reserved pages other than `projects` (currently just
+   * `skills`) are pure settings surfaces and never want the chat shell.
    */
   const isProjectSubPage = isProjectsArea && segments.length > 2
+  const isReservedTopLevelPage =
+    !isProjectsArea && RESERVED_FIRST_SEGMENTS.has(firstSegment)
+  const suppressChatShell = isProjectSubPage || isReservedTopLevelPage
 
   /**
    * Resolved project context for the chat session. Path takes precedence
@@ -63,7 +71,7 @@ function ChatLayout() {
 
   return (
     <ChatProvider threadId={threadId} projectId={projectId}>
-      {isProjectSubPage ? null : <ChatPageShell />}
+      {suppressChatShell ? null : <ChatPageShell />}
       <Outlet />
     </ChatProvider>
   )

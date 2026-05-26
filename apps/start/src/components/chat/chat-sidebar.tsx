@@ -11,19 +11,12 @@ import {
 import { useZero } from '@rocicorp/zero/react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { Button, buttonVariants } from '@rift/ui/button'
-import { copyToClipboard } from '@rift/utils'
-import AlertTriangle from 'lucide-react/dist/esm/icons/alert-triangle'
-import Copy from 'lucide-react/dist/esm/icons/copy'
 import Link2 from 'lucide-react/dist/esm/icons/link-2'
 import MessageCircle from 'lucide-react/dist/esm/icons/message-circle'
 import Pencil from 'lucide-react/dist/esm/icons/pencil'
-import Pin from 'lucide-react/dist/esm/icons/pin'
-import PinOff from 'lucide-react/dist/esm/icons/pin-off'
 import Search from 'lucide-react/dist/esm/icons/search'
-import Trash2 from 'lucide-react/dist/esm/icons/trash-2'
-import { SidebarGroupTooltip } from '@rift/ui/tooltip'
-import { ContextMenuItem, ContextMenuSeparator } from '@rift/ui/context-menu'
-import { Spinner } from '@rift/ui/spinner'
+import Wand2 from 'lucide-react/dist/esm/icons/wand-2'
+import { ContextMenuItem } from '@rift/ui/context-menu'
 import { toast } from 'sonner'
 import { isAreaPath } from '@/utils/nav-utils'
 import { SidebarAreaLayout } from '@/components/layout/sidebar/sidebar-area-layout'
@@ -38,7 +31,6 @@ import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 import { useOrgBillingSummary } from '@/lib/frontend/billing/use-org-billing'
 import { m } from '@/paraglide/messages.js'
 import { openChatSearchCommand } from './chat-search-command'
-import { ThreadMoveToProjectSubmenu } from './chat-sidebar-move-to-project'
 import { ChatProjectScopedSidebarContent } from './chat-sidebar-project-scope'
 import { ChatSidebarProjects } from './chat-sidebar-projects'
 import { useChatSidebarProjectScope } from './use-chat-sidebar-project-scope'
@@ -51,6 +43,11 @@ import {
 import { ChatSidebarUpgradeCta } from './chat-sidebar-upgrade-cta'
 import { resolveChatSidebarBottomPanelVisibility } from './chat-sidebar.logic'
 import { syncThreadGenerationStatuses } from './thread-status-store'
+import {
+  ThreadRowContextMenuItems,
+  getThreadRowTrailingElement,
+  useThreadRowActions,
+} from './thread-row-shared'
 
 export const CHAT_HREF = '/chat'
 export const CHAT_AREA_KEY = 'default' as const
@@ -146,6 +143,12 @@ function getStaticSections(): NavSection[] {
           onSelect: () => openChatSearchCommand({ hideActions: true }),
           icon: Search,
         },
+        {
+          name: m.chat_sidebar_skills(),
+          href: '/chat/skills',
+          icon: Wand2,
+          exact: true,
+        },
       ],
     },
   ]
@@ -187,9 +190,7 @@ function buildThreadItem({
   startEditingThread,
   submitRenameThread,
   cancelEditingThread,
-  handleCopyThreadLink,
-  handleDeleteThread,
-  handleSetThreadPinned,
+  rowActions,
   isPersisted,
 }: {
   thread: ThreadItemRow
@@ -200,48 +201,13 @@ function buildThreadItem({
   startEditingThread: (threadId: string, currentTitle: string) => void
   submitRenameThread: (threadId: string, currentTitle: string) => Promise<void>
   cancelEditingThread: () => void
-  handleCopyThreadLink: (threadId: string) => Promise<void>
-  handleDeleteThread: (threadId: string) => Promise<void>
-  handleSetThreadPinned: (threadId: string, pinned: boolean) => Promise<void>
+  rowActions: ReturnType<typeof useThreadRowActions>
   isPersisted: boolean
 }): NavItemType {
-  const status = thread.generationStatus
   const currentTitle = thread.title || m.chat_sidebar_thread_untitled()
-  const showSpinner =
-    status === 'pending' || status === 'generation' || status === undefined
-  const showError = status === 'failed'
   const isEditing = editingThreadId === thread.threadId
 
-  const trailing = showSpinner ? (
-    <SidebarGroupTooltip
-      name={
-        status === 'pending'
-          ? m.chat_sidebar_status_pending()
-          : m.chat_sidebar_status_generating()
-      }
-      description={
-        status === 'pending'
-          ? m.chat_sidebar_status_pending_description()
-          : m.chat_sidebar_status_generating_description()
-      }
-    >
-      <span className="inline-flex shrink-0">
-        <Spinner
-          className="size-4 animate-spin text-foreground-secondary"
-          aria-hidden
-        />
-      </span>
-    </SidebarGroupTooltip>
-  ) : showError ? (
-    <SidebarGroupTooltip
-      name={m.chat_sidebar_status_error()}
-      description={m.chat_sidebar_status_error_description()}
-    >
-      <span className="inline-flex shrink-0">
-        <AlertTriangle className="size-4 text-foreground-error" aria-hidden />
-      </span>
-    </SidebarGroupTooltip>
-  ) : undefined
+  const trailing = getThreadRowTrailingElement(thread)
 
   return {
     name: currentTitle,
@@ -261,6 +227,12 @@ function buildThreadItem({
         />
       ),
     }),
+    /**
+     * The global sidebar prepends a Rename item before the shared
+     * action subtree (copy, pin, move, delete) so users can launch
+     * the inline rename editor. The project-scoped sidebar omits
+     * rename and renders the same shared subtree directly.
+     */
     contextMenuContent:
       isPersisted && !isEditing ? (
         <>
@@ -272,36 +244,11 @@ function buildThreadItem({
             <Pencil />
             {m.chat_sidebar_rename()}
           </ContextMenuItem>
-          <ContextMenuItem
-            onClick={() => {
-              void handleCopyThreadLink(thread.threadId)
-            }}
-          >
-            <Copy />
-            {m.chat_sidebar_copy_link()}
-          </ContextMenuItem>
-          <ContextMenuItem
-            onClick={() => {
-              void handleSetThreadPinned(thread.threadId, !thread.pinned)
-            }}
-          >
-            {thread.pinned ? <PinOff /> : <Pin />}
-            {thread.pinned ? m.chat_sidebar_unpin() : m.chat_sidebar_pin()}
-          </ContextMenuItem>
-          <ThreadMoveToProjectSubmenu
-            threadId={thread.threadId}
+          <ThreadRowContextMenuItems
+            thread={thread}
             currentProjectId={thread.projectId ?? null}
+            actions={rowActions}
           />
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            variant="destructive"
-            onClick={() => {
-              void handleDeleteThread(thread.threadId)
-            }}
-          >
-            <Trash2 />
-            {m.chat_sidebar_delete()}
-          </ContextMenuItem>
         </>
       ) : undefined,
   }
@@ -666,54 +613,34 @@ function ChatSidebarHistory({
     [editingTitle, cancelEditingThread, z],
   )
 
-  const handleDeleteThread = useCallback(
-    async (threadId: string) => {
-      try {
-        const write = z.mutate(mutators.threads.delete({ threadId }))
-        await write.client
-        z.preload(
-          queries.threads.historyPage({
-            organizationId: activeOrganizationId,
-            limit: CHAT_SIDEBAR_PAGE_SIZE,
-            start: null,
-            dir: 'forward',
-            inclusive: true,
-          }),
-          CACHE_CHAT_NAV,
-        )
-        toast.success(m.chat_sidebar_thread_deleted())
-        if (activeThreadId === threadId) {
-          navigate({ to: CHAT_HREF })
-        }
-        const serverRes = await write.server
-        if (serverRes.type === 'error') {
-          toast.error(m.chat_sidebar_thread_delete_failed())
-        }
-      } catch (error) {
-        console.error('Failed to delete thread:', error)
-        toast.error(m.chat_sidebar_thread_delete_failed())
-      }
+  const rowActions = useThreadRowActions({
+    redirectTargetOnDelete: CHAT_HREF,
+    activeThreadId,
+    /**
+     * After a delete, prime the history page query so the next render
+     * sees the deleted row gone instead of waiting for the next Zero
+     * tick. Specific to the global sidebar's virtualizer.
+     */
+    onAfterDelete: () => {
+      z.preload(
+        queries.threads.historyPage({
+          organizationId: activeOrganizationId,
+          limit: CHAT_SIDEBAR_PAGE_SIZE,
+          start: null,
+          dir: 'forward',
+          inclusive: true,
+        }),
+        CACHE_CHAT_NAV,
+      )
     },
-    [activeOrganizationId, activeThreadId, navigate, z],
-  )
-
-  const handleSetThreadPinned = useCallback(
-    async (threadId: string, pinned: boolean) => {
-      try {
-        await z.mutate(mutators.threads.setPinned({ threadId, pinned })).client
-        setDiscoveredHistoryGroups([])
-      } catch (error) {
-        console.error('Failed to update thread pin state:', error)
-        toast.error(m.chat_sidebar_thread_pin_failed())
-      }
+    /**
+     * Pinning rearranges date groups (the row jumps to / leaves the
+     * pinned group), so the discovered-groups memo needs to refresh.
+     */
+    onAfterPinChange: () => {
+      setDiscoveredHistoryGroups([])
     },
-    [z],
-  )
-
-  const handleCopyThreadLink = useCallback(async (threadId: string) => {
-    const origin = window.location.origin
-    await copyToClipboard(`${origin}${CHAT_HREF}/${threadId}`)
-  }, [])
+  })
 
   const renderRow = useCallback(
     (thread: ThreadItemRow, style: CSSProperties, isPersisted: boolean) => {
@@ -726,9 +653,7 @@ function ChatSidebarHistory({
         startEditingThread,
         submitRenameThread,
         cancelEditingThread,
-        handleCopyThreadLink,
-        handleDeleteThread,
-        handleSetThreadPinned,
+        rowActions,
         isPersisted,
       })
 
@@ -752,13 +677,12 @@ function ChatSidebarHistory({
     },
     [
       cancelEditingThread,
+      contextMenuResetToken,
       editingThreadId,
       editingTitle,
-      handleCopyThreadLink,
-      handleDeleteThread,
-      handleSetThreadPinned,
       pathname,
       preloadThreadMessages,
+      rowActions,
       startEditingThread,
       submitRenameThread,
     ],
@@ -837,72 +761,71 @@ export function ChatSidebarContent({ pathname }: { pathname: string }) {
 
   /**
    * When the user enters a project (`/chat/projects/<id>/...`), the
-   * sidebar swaps to a project-scoped variant: a back row, the project's
-   * identity, sub-page links, and a project-scoped thread list.
-   *
-   * The bottom panel (login / upgrade CTA) intentionally stays the same in
-   * both modes — it's a billing affordance, not a navigation one.
+   * sidebar swaps the body to a project-scoped variant: a back row,
+   * the project's identity, sub-page links, and a project-scoped
+   * thread list. The bottom panel (login / upgrade CTA) stays the
+   * same in both modes — it's a billing affordance, not a navigation
+   * one — and is rendered once below the body.
    */
-  if (projectId) {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {projectId ? (
           <ChatProjectScopedSidebarContent
             projectId={projectId}
             pathname={pathname}
           />
-        </div>
-        {shouldShowBottomPanel ? (
-          <div className="flex-shrink-0 bg-surface-overlay px-3 py-3">
-            {shouldShowLoginButton ? (
-              <Button asChild size="default" className="w-full">
-                <Link to="/auth/sign-in" preload="intent">
-                  {m.auth_login_sign_in()}
-                </Link>
-              </Button>
-            ) : null}
-            {shouldShowUpgradeCta ? <ChatSidebarUpgradeCta /> : null}
-          </div>
-        ) : null}
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <SidebarAreaLayout
-          title={CHAT_SIDEBAR_TITLE()}
-          sections={staticSections}
-          pathname={pathname}
-        />
-        {shouldRenderHistory ? (
-          <div className="mt-6">
-            <ChatSidebarProjects pathname={pathname} />
-          </div>
-        ) : null}
-        <div className="mt-8 flex min-h-0 flex-1 flex-col">
-          {shouldRenderHistory ? (
-            <ChatSidebarHistory
+        ) : (
+          <>
+            <SidebarAreaLayout
+              title={CHAT_SIDEBAR_TITLE()}
+              sections={staticSections}
               pathname={pathname}
-              activeOrganizationId={normalizedOrganizationId}
-              historyOwnerId={user.id}
             />
-          ) : null}
-        </div>
+            {shouldRenderHistory ? (
+              <div className="mt-6">
+                <ChatSidebarProjects pathname={pathname} />
+              </div>
+            ) : null}
+            <div className="mt-8 flex min-h-0 flex-1 flex-col">
+              {shouldRenderHistory ? (
+                <ChatSidebarHistory
+                  pathname={pathname}
+                  activeOrganizationId={normalizedOrganizationId}
+                  historyOwnerId={user.id}
+                />
+              ) : null}
+            </div>
+          </>
+        )}
       </div>
       {shouldShowBottomPanel ? (
-        <div className="flex-shrink-0 bg-surface-overlay px-3 py-3">
-          {shouldShowLoginButton ? (
-            <Button asChild size="default" className="w-full">
-              <Link to="/auth/sign-in" preload="intent">
-                {m.auth_login_sign_in()}
-              </Link>
-            </Button>
-          ) : null}
-          {shouldShowUpgradeCta ? <ChatSidebarUpgradeCta /> : null}
-        </div>
+        <ChatSidebarBottomPanel
+          shouldShowLoginButton={shouldShowLoginButton}
+          shouldShowUpgradeCta={shouldShowUpgradeCta}
+        />
       ) : null}
+    </div>
+  )
+}
+
+function ChatSidebarBottomPanel({
+  shouldShowLoginButton,
+  shouldShowUpgradeCta,
+}: {
+  shouldShowLoginButton: boolean
+  shouldShowUpgradeCta: boolean
+}) {
+  return (
+    <div className="flex-shrink-0 bg-surface-overlay px-3 py-3">
+      {shouldShowLoginButton ? (
+        <Button asChild size="default" className="w-full">
+          <Link to="/auth/sign-in" preload="intent">
+            {m.auth_login_sign_in()}
+          </Link>
+        </Button>
+      ) : null}
+      {shouldShowUpgradeCta ? <ChatSidebarUpgradeCta /> : null}
     </div>
   )
 }

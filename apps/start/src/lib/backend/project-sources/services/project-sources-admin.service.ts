@@ -20,6 +20,7 @@ import {
 } from '@/lib/backend/upload/upload.service'
 import { PROJECT_SOURCES_UPLOAD_POLICY } from '@/lib/shared/upload/upload-validation'
 import { summarizeProjectSourceIndexError } from '@/lib/shared/project-sources'
+import { checkProjectAccess } from '@/lib/shared/projects/access'
 import { ProjectSourcesPersistenceError } from '../domain/errors'
 
 type ProjectSourceAttachmentRow = {
@@ -113,21 +114,33 @@ export class ProjectSourcesAdminService extends ServiceMap.Service<
             projectId,
           }, (db) =>
             Effect.tryPromise({
-              try: async () => {
-                const project = await db.run(zql.project.where('id', projectId).one())
-                if (!project || project.userId !== userId || project.deletedAt) {
-                  throw new Error('Project is not available')
-                }
-                return project
-              },
+              try: () => db.run(zql.project.where('id', projectId).one()),
               catch: (error) =>
                 new ProjectSourcesPersistenceError({
-                  message: 'Project is not available',
+                  message: 'Failed to load project',
                   requestId,
                   projectId,
                   cause: String(error),
                 }),
-            }),
+            }).pipe(
+              Effect.flatMap((project) => {
+                const access = checkProjectAccess(project, {
+                  userId,
+                  orgContext: { enforce: false },
+                })
+                if (access.kind !== 'ok') {
+                  return Effect.fail(
+                    new ProjectSourcesPersistenceError({
+                      message: 'Project is not available',
+                      requestId,
+                      projectId,
+                      cause: `project_access_${access.kind}`,
+                    }),
+                  )
+                }
+                return Effect.succeed(access.project)
+              }),
+            ),
           ),
       )
 

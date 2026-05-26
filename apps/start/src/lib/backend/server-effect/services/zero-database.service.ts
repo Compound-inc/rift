@@ -8,7 +8,7 @@ export class ZeroDatabaseNotConfiguredError extends Schema.TaggedErrorClass<Zero
   },
 ) {}
 
-type ZeroDatabase = NonNullable<ReturnType<typeof getZeroDatabase>>
+export type ZeroDatabase = NonNullable<ReturnType<typeof getZeroDatabase>>
 
 export type ZeroDatabaseServiceShape = {
   readonly getOrFail: Effect.Effect<
@@ -48,9 +48,8 @@ export class ZeroDatabaseService extends ServiceMap.Service<
         ),
       )
 
-      const withDatabase: ZeroDatabaseServiceShape['withDatabase'] = (
-        run,
-      ) => Effect.flatMap(getOrFail, run)
+      const withDatabase: ZeroDatabaseServiceShape['withDatabase'] = (run) =>
+        Effect.flatMap(getOrFail, run)
 
       return {
         getOrFail,

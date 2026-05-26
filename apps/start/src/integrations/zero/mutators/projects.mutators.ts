@@ -1,5 +1,9 @@
 import { defineMutator } from '@rocicorp/zero'
 import { z } from 'zod'
+import {
+  PROJECT_ACCESS_FAILURE_CODE,
+  checkProjectAccess,
+} from '@/lib/shared/projects/access'
 import { zql } from '../zql'
 
 const PROJECT_NAME_MAX = 80
@@ -23,43 +27,101 @@ const projectIdArgs = z.object({
   projectId: z.string().trim().min(1),
 })
 
-const renameProjectArgs = projectIdArgs.extend({
-  name: z.string().trim().min(1).max(PROJECT_NAME_MAX),
+/**
+ * Patch shape for the unified `update` mutator. Every field is optional;
+ * only fields actually supplied in the patch are written, and each one is
+ * skipped when the new value matches the stored value (no-op-if-equal).
+ *
+ * `null` is the sentinel for "clear this field" on every nullable column —
+ * matching the historical per-field setters that accepted `null` to clear.
+ * `name` is non-nullable, so it accepts only a non-empty string.
+ */
+const projectPatchArgs = projectIdArgs.extend({
+  patch: z
+    .object({
+      name: z.string().trim().min(1).max(PROJECT_NAME_MAX),
+      description: z.string().trim().max(PROJECT_DESCRIPTION_MAX).nullable(),
+      customInstruction: z
+        .string()
+        .max(PROJECT_INSTRUCTION_MAX)
+        .nullable(),
+      visibility: z.enum(['private', 'org']),
+      icon: z.string().trim().max(PROJECT_ICON_MAX).nullable(),
+      color: z.string().trim().max(PROJECT_COLOR_MAX).nullable(),
+      pinned: z.boolean(),
+    })
+    .partial()
+    .refine(
+      (patch) => Object.keys(patch).length > 0,
+      'project_update_patch_empty',
+    ),
 })
 
-const setDescriptionArgs = projectIdArgs.extend({
-  description: z.string().trim().max(PROJECT_DESCRIPTION_MAX).nullable(),
-})
+/**
+ * Builds the field subset to write to `project.update`, comparing each
+ * patch entry against the stored value and skipping unchanged fields so
+ * the mutator stays a no-op when the patch is "the same value the row
+ * already has". `undefined` here means "do not write this field"; `null`
+ * patches translate to `undefined` in the storage call so Zero clears the
+ * column.
+ */
+function diffProjectPatch(
+  current: {
+    readonly name: string
+    readonly description?: string | null
+    readonly customInstruction?: string | null
+    readonly visibility: 'private' | 'org'
+    readonly icon?: string | null
+    readonly color?: string | null
+    readonly pinned: boolean
+  },
+  patch: z.infer<typeof projectPatchArgs>['patch'],
+) {
+  const next: {
+    name?: string
+    description?: string | undefined
+    customInstruction?: string | undefined
+    visibility?: 'private' | 'org'
+    icon?: string | undefined
+    color?: string | undefined
+    pinned?: boolean
+  } = {}
 
-const setCustomInstructionArgs = projectIdArgs.extend({
-  customInstruction: z.string().max(PROJECT_INSTRUCTION_MAX).nullable(),
-})
-
-const setVisibilityArgs = projectIdArgs.extend({
-  visibility: z.enum(['private', 'org']),
-})
-
-const setIconArgs = projectIdArgs.extend({
-  icon: z.string().trim().max(PROJECT_ICON_MAX).nullable(),
-})
-
-const setColorArgs = projectIdArgs.extend({
-  color: z.string().trim().max(PROJECT_COLOR_MAX).nullable(),
-})
-
-/** Loads the project iff it exists, the caller owns it, and it is not soft-deleted. */
-async function loadOwnedProject(input: {
-  readonly tx: any
-  readonly userID: string
-  readonly projectId: string
-}) {
-  const project = await input.tx.run(
-    zql.project.where('id', input.projectId).one(),
-  )
-  if (!project || project.userId !== input.userID || project.deletedAt) {
-    return null
+  if (patch.name !== undefined && patch.name !== current.name) {
+    next.name = patch.name
   }
-  return project
+  if (patch.description !== undefined) {
+    const desired = patch.description ?? undefined
+    if ((current.description ?? undefined) !== desired) {
+      next.description = desired
+    }
+  }
+  if (patch.customInstruction !== undefined) {
+    const desired = patch.customInstruction ?? undefined
+    if ((current.customInstruction ?? undefined) !== desired) {
+      next.customInstruction = desired
+    }
+  }
+  if (patch.visibility !== undefined && patch.visibility !== current.visibility) {
+    next.visibility = patch.visibility
+  }
+  if (patch.icon !== undefined) {
+    const desired = patch.icon ?? undefined
+    if ((current.icon ?? undefined) !== desired) {
+      next.icon = desired
+    }
+  }
+  if (patch.color !== undefined) {
+    const desired = patch.color ?? undefined
+    if ((current.color ?? undefined) !== desired) {
+      next.color = desired
+    }
+  }
+  if (patch.pinned !== undefined && patch.pinned !== current.pinned) {
+    next.pinned = patch.pinned
+  }
+
+  return next
 }
 
 /**
@@ -67,7 +129,11 @@ async function loadOwnedProject(input: {
  *
  * Authorization: only the owner (`userId === ctx.userID`) can mutate or
  * soft-delete a project; org members reading an org-shared project cannot
- * mutate it in v1
+ * mutate it in v1.
+ *
+ * Access predicates (ownership / soft-delete) live in
+ * `lib/shared/projects/access.ts` so this file, the chat mutators, and the
+ * thread service all enforce the same rules.
  */
 export const projectMutatorDefinitions = {
   projects: {
@@ -104,110 +170,39 @@ export const projectMutatorDefinitions = {
         visibility,
         icon: args.icon ?? undefined,
         color: args.color ?? undefined,
+        pinned: false,
         createdAt: args.createdAt,
         updatedAt: args.createdAt,
       })
     }),
 
-    rename: defineMutator(renameProjectArgs, async ({ tx, args, ctx }) => {
-      const project = await loadOwnedProject({
-        tx,
-        userID: ctx.userID,
-        projectId: args.projectId,
-      })
-      if (!project || project.name === args.name) return
+    /**
+     * Unified field-update mutator. Replaces the historical `rename`,
+     * `setDescription`, `setCustomInstruction`, `setVisibility`, `setIcon`,
+     * and `setColor` mutators which all shared the same body. The patch
+     * may carry one or many fields; `org` visibility additionally requires
+     * the caller to have an active organization context.
+     */
+    update: defineMutator(projectPatchArgs, async ({ tx, args, ctx }) => {
+      const project = await tx.run(
+        zql.project.where('id', args.projectId).one(),
+      )
+      const access = checkProjectAccess(project, { userId: ctx.userID })
+      if (access.kind !== 'ok') return
+
+      if (
+        args.patch.visibility === 'org' &&
+        !ctx.organizationId?.trim()
+      ) {
+        throw new Error('project_visibility_requires_org_context')
+      }
+
+      const next = diffProjectPatch(access.project, args.patch)
+      if (Object.keys(next).length === 0) return
+
       await tx.mutate.project.update({
-        id: project.id,
-        name: args.name,
-        updatedAt: Date.now(),
-      })
-    }),
-
-    setDescription: defineMutator(
-      setDescriptionArgs,
-      async ({ tx, args, ctx }) => {
-        const project = await loadOwnedProject({
-          tx,
-          userID: ctx.userID,
-          projectId: args.projectId,
-        })
-        const next = args.description ?? undefined
-        if (!project || (project.description ?? undefined) === next) return
-        await tx.mutate.project.update({
-          id: project.id,
-          description: next,
-          updatedAt: Date.now(),
-        })
-      },
-    ),
-
-    setCustomInstruction: defineMutator(
-      setCustomInstructionArgs,
-      async ({ tx, args, ctx }) => {
-        const project = await loadOwnedProject({
-          tx,
-          userID: ctx.userID,
-          projectId: args.projectId,
-        })
-        const next = args.customInstruction ?? undefined
-        if (!project || (project.customInstruction ?? undefined) === next) {
-          return
-        }
-        await tx.mutate.project.update({
-          id: project.id,
-          customInstruction: next,
-          updatedAt: Date.now(),
-        })
-      },
-    ),
-
-    setVisibility: defineMutator(
-      setVisibilityArgs,
-      async ({ tx, args, ctx }) => {
-        const project = await loadOwnedProject({
-          tx,
-          userID: ctx.userID,
-          projectId: args.projectId,
-        })
-        if (!project) return
-        if (args.visibility === 'org' && !ctx.organizationId?.trim()) {
-          throw new Error('project_visibility_requires_org_context')
-        }
-        if (project.visibility === args.visibility) return
-        await tx.mutate.project.update({
-          id: project.id,
-          visibility: args.visibility,
-          updatedAt: Date.now(),
-        })
-      },
-    ),
-
-    setIcon: defineMutator(setIconArgs, async ({ tx, args, ctx }) => {
-      const project = await loadOwnedProject({
-        tx,
-        userID: ctx.userID,
-        projectId: args.projectId,
-      })
-      const next = args.icon ?? undefined
-      if (!project || (project.icon ?? undefined) === next) return
-      await tx.mutate.project.update({
-        id: project.id,
-        icon: next,
-        updatedAt: Date.now(),
-      })
-    }),
-
-    setColor: defineMutator(setColorArgs, async ({ tx, args, ctx }) => {
-      const project = await loadOwnedProject({
-        tx,
-        userID: ctx.userID,
-        projectId: args.projectId,
-      })
-      const next = args.color ?? undefined
-      if (!project || (project.color ?? undefined) === next) return
-      await tx.mutate.project.update({
-        id: project.id,
-        color: next,
+        id: access.project.id,
+        ...next,
         updatedAt: Date.now(),
       })
     }),
@@ -218,18 +213,22 @@ export const projectMutatorDefinitions = {
      * NULL` filter applied on every read path.
      */
     delete: defineMutator(projectIdArgs, async ({ tx, args, ctx }) => {
-      const project = await loadOwnedProject({
-        tx,
-        userID: ctx.userID,
-        projectId: args.projectId,
-      })
-      if (!project) return
+      const project = await tx.run(
+        zql.project.where('id', args.projectId).one(),
+      )
+      const access = checkProjectAccess(project, { userId: ctx.userID })
+      if (access.kind !== 'ok') return
+
       const now = Date.now()
       await tx.mutate.project.update({
-        id: project.id,
+        id: access.project.id,
         deletedAt: now,
         updatedAt: now,
       })
     }),
   },
 }
+
+// Re-export for places that want to surface the failure-code strings
+// directly (e.g. server-side parity in chat.mutators.createThread).
+export { PROJECT_ACCESS_FAILURE_CODE }

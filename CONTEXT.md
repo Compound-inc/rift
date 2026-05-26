@@ -34,6 +34,28 @@ are not yet a real feature (see ADR-0003); the dangling
 `threads.custom_instruction_id` column is unused.
 _Avoid_: System prompt (reserved for the assembled, full system message).
 
+**Skill**:
+A named, user-authored markdown fragment a user opts into for a single
+turn by typing `/[skillname]` in the composer. Distinct from a
+**Custom Instruction** in three ways: (1) named and individually
+invokable, (2) opt-in per turn rather than always-on, (3) many can
+exist per Project, plus a personal pool that can be used in any
+context. A Skill does not have to invoke a tool or agent — its only
+required job is to expand into prompt text so the user can avoid
+copy-pasting.
+
+A Skill has one of three scopes:
+- **Project Skill**: scoped to a single Project; visible to everyone
+  with access to that Project.
+- **Personal Skill**: scoped to one user across all their Projects and
+  Project-less Threads; never visible to anyone else.
+- **Org-Shared Skill**: a Personal Skill the creator has shared with
+  their Organization. Visible as a global to every member of that
+  Organization. Owned and edited by the original creator (optionally
+  co-edited by Org admins via a per-skill toggle on the Skill).
+_Avoid_: Macro, Snippet, Command (slash menus often contain non-Skill
+commands).
+
 **Organization**:
 The multi-tenant auth/billing boundary backed by Better Auth. Owns
 subscriptions, member access, BYOK keys, AI policy, and org-wide

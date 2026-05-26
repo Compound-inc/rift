@@ -149,7 +149,6 @@ export class MessageStoreService extends ServiceMap.Service<
         }),
         appendUserMessage: makeAppendUserMessageOperation({
           zeroDatabase,
-          attachmentRag,
         }),
         prepareRegeneration: makePrepareRegenerationOperation({ zeroDatabase }),
         prepareEdit: makePrepareEditOperation({ zeroDatabase }),
@@ -162,196 +161,204 @@ export class MessageStoreService extends ServiceMap.Service<
 
   /** Test-only adapter retained for deterministic unit tests. */
   static readonly layerMemory = Layer.succeed(MessageStoreService, {
-  loadThreadMessages: ({
-    threadId,
-    model: _model,
-    untilMessageId,
-    pendingUserMessage,
-    requestId,
-  }) =>
-    Effect.sync(() => {
-      const existing = getMemoryState().messages.get(threadId)
-      if (!existing) {
-        throw new Error('missing thread message store')
-      }
-      const loaded = (() => {
-        if (!untilMessageId) return existing.slice()
-        const endIndex = existing.findIndex((message) => message.id === untilMessageId)
-        return endIndex >= 0 ? existing.slice(0, endIndex + 1) : existing.slice()
-      })()
-      if (!pendingUserMessage) return loaded
-      return [...loaded, toUserMessage(pendingUserMessage, [])]
-    }).pipe(
-      Effect.catch((error) =>
-        Effect.fail(
-          new MessagePersistenceError({
-            message: 'Failed to load messages',
-            requestId,
-            threadId,
-            cause: String(error),
-          }),
+    loadThreadMessages: ({
+      threadId,
+      model: _model,
+      untilMessageId,
+      pendingUserMessage,
+      requestId,
+    }) =>
+      Effect.sync(() => {
+        const existing = getMemoryState().messages.get(threadId)
+        if (!existing) {
+          throw new Error('missing thread message store')
+        }
+        const loaded = (() => {
+          if (!untilMessageId) return existing.slice()
+          const endIndex = existing.findIndex(
+            (message) => message.id === untilMessageId,
+          )
+          return endIndex >= 0
+            ? existing.slice(0, endIndex + 1)
+            : existing.slice()
+        })()
+        if (!pendingUserMessage) return loaded
+        return [...loaded, toUserMessage(pendingUserMessage, [])]
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.fail(
+            new MessagePersistenceError({
+              message: 'Failed to load messages',
+              requestId,
+              threadId,
+              cause: String(error),
+            }),
+          ),
         ),
       ),
-    ),
 
-  appendUserMessage: ({ threadId, message, requestId }) =>
-    Effect.sync(() => {
-      const existing = getMemoryState().messages.get(threadId)
-      if (!existing) {
-        throw new Error('missing thread message store')
-      }
-      const uiMessage = toUserMessage(message, [])
-      existing.push(uiMessage)
-      return uiMessage
-    }).pipe(
-      Effect.catch((error) =>
-        Effect.fail(
-          new MessagePersistenceError({
-            message: 'Failed to append user message',
-            requestId,
-            threadId,
-            cause: String(error),
-          }),
+    appendUserMessage: ({ threadId, message, requestId }) =>
+      Effect.sync(() => {
+        const existing = getMemoryState().messages.get(threadId)
+        if (!existing) {
+          throw new Error('missing thread message store')
+        }
+        const uiMessage = toUserMessage(message, [])
+        existing.push(uiMessage)
+        return uiMessage
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.fail(
+            new MessagePersistenceError({
+              message: 'Failed to append user message',
+              requestId,
+              threadId,
+              cause: String(error),
+            }),
+          ),
         ),
       ),
-    ),
 
-  prepareRegeneration: ({ threadId, targetMessageId, requestId }) =>
-    Effect.sync(() => {
-      const existing = getMemoryState().messages.get(threadId)
-      if (!existing) {
-        throw new Error('missing thread message store')
-      }
+    prepareRegeneration: ({ threadId, targetMessageId, requestId }) =>
+      Effect.sync(() => {
+        const existing = getMemoryState().messages.get(threadId)
+        if (!existing) {
+          throw new Error('missing thread message store')
+        }
 
-      const targetIndex = existing.findIndex((message) => message.id === targetMessageId)
-      if (targetIndex < 0) {
-        throw new Error('target message not found')
-      }
+        const targetIndex = existing.findIndex(
+          (message) => message.id === targetMessageId,
+        )
+        if (targetIndex < 0) {
+          throw new Error('target message not found')
+        }
 
-      const target = existing[targetIndex]
-      if (target.role === 'user') {
+        const target = existing[targetIndex]
+        if (target.role === 'user') {
+          return {
+            anchorMessageId: target.id,
+            regenSourceMessageId: target.id,
+          }
+        }
+
+        const previous = targetIndex > 0 ? existing[targetIndex - 1] : undefined
+        if (!previous || previous.role !== 'user') {
+          throw new Error('assistant regenerate requires parent user')
+        }
+
         return {
-          anchorMessageId: target.id,
+          anchorMessageId: previous.id,
           regenSourceMessageId: target.id,
         }
-      }
-
-      const previous = targetIndex > 0 ? existing[targetIndex - 1] : undefined
-      if (!previous || previous.role !== 'user') {
-        throw new Error('assistant regenerate requires parent user')
-      }
-
-      return {
-        anchorMessageId: previous.id,
-        regenSourceMessageId: target.id,
-      }
-    }).pipe(
-      Effect.catch((error) =>
-        Effect.fail(
-          new MessagePersistenceError({
-            message: 'Failed to prepare regeneration',
-            requestId,
-            threadId,
-            cause: String(error),
-          }),
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.fail(
+            new MessagePersistenceError({
+              message: 'Failed to prepare regeneration',
+              requestId,
+              threadId,
+              cause: String(error),
+            }),
+          ),
         ),
       ),
-    ),
 
-  prepareEdit: ({ threadId, targetMessageId, editedText, requestId }) =>
-    Effect.sync(() => {
-      const existing = getMemoryState().messages.get(threadId)
-      if (!existing) {
-        throw new Error('missing thread message store')
-      }
-      const targetIndex = existing.findIndex(
-        (message) => message.id === targetMessageId,
-      )
-      if (targetIndex < 0) {
-        throw new Error('target message not found')
-      }
-      const target = existing[targetIndex]
-      if (target.role !== 'user') {
-        throw new Error('target message is not editable')
-      }
-      const nextId = crypto.randomUUID()
-      const nextText = editedText.trim()
-      if (nextText.length === 0) {
-        throw new Error('edited text cannot be empty')
-      }
+    prepareEdit: ({ threadId, targetMessageId, editedText, requestId }) =>
+      Effect.sync(() => {
+        const existing = getMemoryState().messages.get(threadId)
+        if (!existing) {
+          throw new Error('missing thread message store')
+        }
+        const targetIndex = existing.findIndex(
+          (message) => message.id === targetMessageId,
+        )
+        if (targetIndex < 0) {
+          throw new Error('target message not found')
+        }
+        const target = existing[targetIndex]
+        if (target.role !== 'user') {
+          throw new Error('target message is not editable')
+        }
+        const nextId = crypto.randomUUID()
+        const nextText = editedText.trim()
+        if (nextText.length === 0) {
+          throw new Error('edited text cannot be empty')
+        }
 
-      const truncated = existing.slice(0, targetIndex + 1)
-      const nextParts = target.parts.map((part) =>
-        part.type === 'text' ? { ...part, text: nextText } : part,
-      )
-      truncated[targetIndex] = {
-        ...target,
-        id: nextId,
-        parts: nextParts,
-      }
-      getMemoryState().messages.set(threadId, truncated)
+        const truncated = existing.slice(0, targetIndex + 1)
+        const nextParts = target.parts.map((part) =>
+          part.type === 'text' ? { ...part, text: nextText } : part,
+        )
+        truncated[targetIndex] = {
+          ...target,
+          id: nextId,
+          parts: nextParts,
+        }
+        getMemoryState().messages.set(threadId, truncated)
 
-      return {
-        editedMessageId: nextId,
-        regenSourceMessageId: nextId,
-      }
-    }).pipe(
-      Effect.catch((error) =>
-        Effect.fail(
-          new MessagePersistenceError({
-            message: 'Failed to prepare edit',
-            requestId,
-            threadId,
-            cause: String(error),
-          }),
+        return {
+          editedMessageId: nextId,
+          regenSourceMessageId: nextId,
+        }
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.fail(
+            new MessagePersistenceError({
+              message: 'Failed to prepare edit',
+              requestId,
+              threadId,
+              cause: String(error),
+            }),
+          ),
         ),
       ),
-    ),
 
-  finalizeAssistantMessage: ({
-    threadId,
-    assistantMessageId,
-    finalContent,
-    reasoning,
-    requestId,
-  }) =>
-    Effect.sync(() => {
-      const existing = getMemoryState().messages.get(threadId)
-      if (!existing) {
-        throw new Error('missing thread message store')
-      }
-      const target = existing.find((message) => message.id === assistantMessageId)
-      if (!target) {
+    finalizeAssistantMessage: ({
+      threadId,
+      assistantMessageId,
+      finalContent,
+      reasoning,
+      requestId,
+    }) =>
+      Effect.sync(() => {
+        const existing = getMemoryState().messages.get(threadId)
+        if (!existing) {
+          throw new Error('missing thread message store')
+        }
+        const target = existing.find(
+          (message) => message.id === assistantMessageId,
+        )
+        if (!target) {
+          const parts: UIMessage['parts'] = []
+          if (reasoning && reasoning.trim().length > 0) {
+            parts.push({ type: 'reasoning', text: reasoning, state: 'done' })
+          }
+          parts.push({ type: 'text', text: finalContent })
+          existing.push({
+            id: assistantMessageId,
+            role: 'assistant',
+            parts,
+          })
+          return
+        }
+
         const parts: UIMessage['parts'] = []
         if (reasoning && reasoning.trim().length > 0) {
           parts.push({ type: 'reasoning', text: reasoning, state: 'done' })
         }
         parts.push({ type: 'text', text: finalContent })
-        existing.push({
-          id: assistantMessageId,
-          role: 'assistant',
-          parts,
-        })
-        return
-      }
-
-      const parts: UIMessage['parts'] = []
-      if (reasoning && reasoning.trim().length > 0) {
-        parts.push({ type: 'reasoning', text: reasoning, state: 'done' })
-      }
-      parts.push({ type: 'text', text: finalContent })
-      target.parts = parts
-    }).pipe(
-      Effect.catch((error) =>
-        Effect.fail(
-          new MessagePersistenceError({
-            message: 'Failed to finalize assistant message',
-            requestId,
-            threadId,
-            cause: String(error),
-          }),
+        target.parts = parts
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.fail(
+            new MessagePersistenceError({
+              message: 'Failed to finalize assistant message',
+              requestId,
+              threadId,
+              cause: String(error),
+            }),
+          ),
         ),
       ),
-    ),
   })
 }

@@ -39,7 +39,14 @@ type QdrantSearchHit = {
 }
 
 const DEFAULT_QDRANT_COLLECTION = 'attachment_chunks_v1'
+/**
+ * Default request timeout. Indexing large project sources can take tens of
+ * seconds, so the default is generous; retrieval calls override this with
+ * `RETRIEVAL_QDRANT_TIMEOUT_MS` so a slow Qdrant cannot stall an
+ * interactive chat turn.
+ */
 const DEFAULT_QDRANT_TIMEOUT_MS = 30_000
+const RETRIEVAL_QDRANT_TIMEOUT_MS = 5_000
 const DEFAULT_QDRANT_BATCH_SIZE = 128
 let ensureReadyPromise: Promise<void> | null = null
 
@@ -81,6 +88,13 @@ function getQdrantTimeoutMs(): number {
   )
 }
 
+function getQdrantRetrievalTimeoutMs(): number {
+  return parsePositiveInt(
+    process.env.QDRANT_RETRIEVAL_TIMEOUT_MS,
+    RETRIEVAL_QDRANT_TIMEOUT_MS,
+  )
+}
+
 function getQdrantBatchSize(): number {
   return parsePositiveInt(
     process.env.QDRANT_UPSERT_BATCH_SIZE,
@@ -100,6 +114,7 @@ async function qdrantRequest<T>(
   method: 'GET' | 'POST' | 'PUT',
   path: string,
   body?: unknown,
+  options?: { readonly timeoutMs?: number },
 ): Promise<T> {
   const baseUrl = getQdrantUrl()
   if (!baseUrl || !isQdrantEnabled()) {
@@ -107,7 +122,8 @@ async function qdrantRequest<T>(
   }
 
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), getQdrantTimeoutMs())
+  const timeout = options?.timeoutMs ?? getQdrantTimeoutMs()
+  const timeoutId = setTimeout(() => controller.abort(), timeout)
   try {
     const response = await fetch(`${baseUrl}${path}`, {
       method,
@@ -165,7 +181,6 @@ async function ensureCollection(vectorSize: number): Promise<void> {
       createPayloadIndex(collection, 'attachmentId', 'keyword'),
       createPayloadIndex(collection, 'scopeType', 'keyword'),
       createPayloadIndex(collection, 'userId', 'keyword'),
-      createPayloadIndex(collection, 'threadId', 'keyword'),
       createPayloadIndex(collection, 'ownerOrgId', 'keyword'),
       createPayloadIndex(collection, 'projectId', 'keyword'),
       createPayloadIndex(collection, 'workspaceId', 'keyword'),
@@ -264,45 +279,76 @@ export async function deleteAttachmentVectors(input: {
   }
 
   const collection = getQdrantCollectionName()
-  await qdrantRequest('POST', `/collections/${collection}/points/delete?wait=true`, {
-    filter: {
-      must,
-    },
-  })
-}
-
-export async function linkAttachmentVectorsToThread(input: {
-  readonly attachmentId: string
-  readonly userId: string
-  readonly threadId: string
-  readonly messageId: string
-  readonly updatedAt: number
-}): Promise<void> {
-  if (!isQdrantEnabled()) return
-  const collection = getQdrantCollectionName()
   await qdrantRequest(
     'POST',
-    `/collections/${collection}/points/payload?wait=true`,
+    `/collections/${collection}/points/delete?wait=true`,
     {
-      payload: {
-        threadId: input.threadId,
-        messageId: input.messageId,
-        updatedAt: input.updatedAt,
-      },
       filter: {
-        must: [
-          { key: 'attachmentId', match: { value: input.attachmentId } },
-          { key: 'scopeType', match: { value: 'attachment' } },
-          { key: 'userId', match: { value: input.userId } },
-        ],
+        must,
       },
     },
   )
 }
 
-export async function searchAttachmentVectors(input: {
-  readonly threadId: string
-  readonly userId: string
+/**
+ * Discriminated scope for vector retrieval.
+ *
+ * The three search functions (per-user attachments, org knowledge,
+ * project sources) share everything except the Qdrant `must` filter.
+ * Capturing the difference as a typed scope lets
+ * `searchAttachmentVectorsForScope` carry the only Qdrant search
+ * implementation in this file, with each variant adding the right
+ * combination of `scopeType` plus per-scope id filters.
+ */
+export type VectorRetrievalScope =
+  /**
+   * Attachment chunks owned by a single user. Used for the
+   * per-thread/per-message attachment retrieval path the orchestrator
+   * runs every turn (thread membership lives in the SQL layer; the
+   * vector layer only filters by user).
+   */
+  | { readonly kind: 'user-attachment'; readonly userId: string }
+  /**
+   * Org-knowledge chunks for a single organization.
+   */
+  | { readonly kind: 'org-knowledge'; readonly organizationId: string }
+  /**
+   * Project-source chunks for a single project.
+   */
+  | { readonly kind: 'project-source'; readonly projectId: string }
+
+function buildScopeFilter(
+  scope: VectorRetrievalScope,
+  attachmentIds: readonly string[],
+): Array<Record<string, unknown>> {
+  const must: Array<Record<string, unknown>> = []
+
+  switch (scope.kind) {
+    case 'user-attachment':
+      must.push({ key: 'userId', match: { value: scope.userId } })
+      must.push({ key: 'scopeType', match: { value: 'attachment' } })
+      break
+    case 'org-knowledge':
+      must.push({ key: 'scopeType', match: { value: 'org_knowledge' } })
+      must.push({ key: 'ownerOrgId', match: { value: scope.organizationId } })
+      break
+    case 'project-source':
+      must.push({ key: 'scopeType', match: { value: 'project_source' } })
+      must.push({ key: 'projectId', match: { value: scope.projectId } })
+      break
+  }
+
+  must.push({ key: 'attachmentId', match: { any: [...attachmentIds] } })
+  return must
+}
+
+/**
+ * Single Qdrant search implementation. The four legacy `search*Vectors`
+ * exports below are thin wrappers that pick a `VectorRetrievalScope`,
+ * preserved for caller convenience.
+ */
+export async function searchAttachmentVectorsForScope(input: {
+  readonly scope: VectorRetrievalScope
   readonly attachmentIds: readonly string[]
   readonly queryEmbedding: readonly number[]
   readonly limit: number
@@ -318,6 +364,7 @@ export async function searchAttachmentVectors(input: {
 
   await ensureCollection(input.queryEmbedding.length)
   const collection = getQdrantCollectionName()
+  const must = buildScopeFilter(input.scope, input.attachmentIds)
   const hits = await qdrantRequest<readonly QdrantSearchHit[]>(
     'POST',
     `/collections/${collection}/points/search`,
@@ -326,15 +373,9 @@ export async function searchAttachmentVectors(input: {
       limit: input.limit,
       with_payload: true,
       with_vector: false,
-      filter: {
-        must: [
-          { key: 'threadId', match: { value: input.threadId } },
-          { key: 'userId', match: { value: input.userId } },
-          { key: 'scopeType', match: { value: 'attachment' } },
-          { key: 'attachmentId', match: { any: [...input.attachmentIds] } },
-        ],
-      },
+      filter: { must },
     },
+    { timeoutMs: getQdrantRetrievalTimeoutMs() },
   )
 
   return hits
@@ -361,179 +402,48 @@ export async function searchAttachmentVectors(input: {
     .filter((row): row is VectorChunkSearchResult => !!row)
 }
 
-export async function searchUserAttachmentVectors(input: {
+/**
+ * Backwards-compatible wrappers.
+ *
+ * Existing callers (`AttachmentRagService`, `OrgKnowledgeRagService`,
+ * `ProjectSourceRagService`) keep their current call sites; each becomes
+ * a one-line scope selection over the unified search above.
+ */
+export const searchUserAttachmentVectors = (input: {
   readonly userId: string
   readonly attachmentIds: readonly string[]
   readonly queryEmbedding: readonly number[]
   readonly limit: number
-}): Promise<readonly VectorChunkSearchResult[]> {
-  if (
-    !isQdrantEnabled() ||
-    input.attachmentIds.length === 0 ||
-    input.limit <= 0 ||
-    input.queryEmbedding.length === 0
-  ) {
-    return []
-  }
+}) =>
+  searchAttachmentVectorsForScope({
+    scope: { kind: 'user-attachment', userId: input.userId },
+    attachmentIds: input.attachmentIds,
+    queryEmbedding: input.queryEmbedding,
+    limit: input.limit,
+  })
 
-  await ensureCollection(input.queryEmbedding.length)
-  const collection = getQdrantCollectionName()
-  const hits = await qdrantRequest<readonly QdrantSearchHit[]>(
-    'POST',
-    `/collections/${collection}/points/search`,
-    {
-      vector: [...input.queryEmbedding],
-      limit: input.limit,
-      with_payload: true,
-      with_vector: false,
-      filter: {
-        must: [
-          { key: 'userId', match: { value: input.userId } },
-          { key: 'scopeType', match: { value: 'attachment' } },
-          { key: 'attachmentId', match: { any: [...input.attachmentIds] } },
-        ],
-      },
-    },
-  )
-
-  return hits
-    .map((hit) => {
-      const payload = hit.payload ?? {}
-      const attachmentId = payload.attachmentId
-      const content = payload.content
-      const chunkIndex = payload.chunkIndex
-      if (
-        typeof attachmentId !== 'string' ||
-        typeof content !== 'string' ||
-        typeof chunkIndex !== 'number'
-      ) {
-        return null
-      }
-      return {
-        id: String(hit.id),
-        attachmentId,
-        chunkIndex,
-        content,
-        score: Number.isFinite(hit.score) ? hit.score : 0,
-      }
-    })
-    .filter((row): row is VectorChunkSearchResult => !!row)
-}
-
-export async function searchOrgKnowledgeVectors(input: {
+export const searchOrgKnowledgeVectors = (input: {
   readonly organizationId: string
   readonly attachmentIds: readonly string[]
   readonly queryEmbedding: readonly number[]
   readonly limit: number
-}): Promise<readonly VectorChunkSearchResult[]> {
-  if (
-    !isQdrantEnabled() ||
-    input.attachmentIds.length === 0 ||
-    input.limit <= 0 ||
-    input.queryEmbedding.length === 0
-  ) {
-    return []
-  }
+}) =>
+  searchAttachmentVectorsForScope({
+    scope: { kind: 'org-knowledge', organizationId: input.organizationId },
+    attachmentIds: input.attachmentIds,
+    queryEmbedding: input.queryEmbedding,
+    limit: input.limit,
+  })
 
-  await ensureCollection(input.queryEmbedding.length)
-  const collection = getQdrantCollectionName()
-  const hits = await qdrantRequest<readonly QdrantSearchHit[]>(
-    'POST',
-    `/collections/${collection}/points/search`,
-    {
-      vector: [...input.queryEmbedding],
-      limit: input.limit,
-      with_payload: true,
-      with_vector: false,
-      filter: {
-        must: [
-          { key: 'scopeType', match: { value: 'org_knowledge' } },
-          { key: 'ownerOrgId', match: { value: input.organizationId } },
-          { key: 'attachmentId', match: { any: [...input.attachmentIds] } },
-        ],
-      },
-    },
-  )
-
-  return hits
-    .map((hit) => {
-      const payload = hit.payload ?? {}
-      const attachmentId = payload.attachmentId
-      const content = payload.content
-      const chunkIndex = payload.chunkIndex
-      if (
-        typeof attachmentId !== 'string' ||
-        typeof content !== 'string' ||
-        typeof chunkIndex !== 'number'
-      ) {
-        return null
-      }
-      return {
-        id: String(hit.id),
-        attachmentId,
-        chunkIndex,
-        content,
-        score: Number.isFinite(hit.score) ? hit.score : 0,
-      }
-    })
-    .filter((row): row is VectorChunkSearchResult => !!row)
-}
-
-export async function searchProjectSourceVectors(input: {
+export const searchProjectSourceVectors = (input: {
   readonly projectId: string
   readonly attachmentIds: readonly string[]
   readonly queryEmbedding: readonly number[]
   readonly limit: number
-}): Promise<readonly VectorChunkSearchResult[]> {
-  if (
-    !isQdrantEnabled() ||
-    input.attachmentIds.length === 0 ||
-    input.limit <= 0 ||
-    input.queryEmbedding.length === 0
-  ) {
-    return []
-  }
-
-  await ensureCollection(input.queryEmbedding.length)
-  const collection = getQdrantCollectionName()
-  const hits = await qdrantRequest<readonly QdrantSearchHit[]>(
-    'POST',
-    `/collections/${collection}/points/search`,
-    {
-      vector: [...input.queryEmbedding],
-      limit: input.limit,
-      with_payload: true,
-      with_vector: false,
-      filter: {
-        must: [
-          { key: 'scopeType', match: { value: 'project_source' } },
-          { key: 'projectId', match: { value: input.projectId } },
-          { key: 'attachmentId', match: { any: [...input.attachmentIds] } },
-        ],
-      },
-    },
-  )
-
-  return hits
-    .map((hit) => {
-      const payload = hit.payload ?? {}
-      const attachmentId = payload.attachmentId
-      const content = payload.content
-      const chunkIndex = payload.chunkIndex
-      if (
-        typeof attachmentId !== 'string' ||
-        typeof content !== 'string' ||
-        typeof chunkIndex !== 'number'
-      ) {
-        return null
-      }
-      return {
-        id: String(hit.id),
-        attachmentId,
-        chunkIndex,
-        content,
-        score: Number.isFinite(hit.score) ? hit.score : 0,
-      }
-    })
-    .filter((row): row is VectorChunkSearchResult => !!row)
-}
+}) =>
+  searchAttachmentVectorsForScope({
+    scope: { kind: 'project-source', projectId: input.projectId },
+    attachmentIds: input.attachmentIds,
+    queryEmbedding: input.queryEmbedding,
+    limit: input.limit,
+  })
