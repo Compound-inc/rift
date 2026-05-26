@@ -70,8 +70,10 @@ with project / org access respectively.
 ## Persistence is raw
 
 User messages are stored as the user typed them (`/refactor make foo
-faster`), not as the expanded text. Expansion happens server-side on every
-send to the model — including re-rolls of past turns.
+faster`), not as the expanded text. Expansion happens server-side on
+every send to the model — including re-rolls of past turns — and the
+expanded latest-user text also feeds the RAG intent-enrichment query
+(ADR-0004).
 
 This means editing a Skill silently changes what the model sees on re-roll
 of past turns that referenced it. We considered snapshotting the resolved

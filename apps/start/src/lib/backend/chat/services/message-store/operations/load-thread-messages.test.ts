@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Effect } from 'effect'
+import { embed } from 'ai'
 import { makeLoadThreadMessagesOperation } from './load-thread-messages'
 
 // Stub the AI SDK's `embed` so `buildRetrievalQuery` resolves to a
@@ -691,6 +692,93 @@ describe('makeLoadThreadMessagesOperation', () => {
         },
       ],
     })
+  })
+
+  it('expands skill slash tokens into the RAG query embedding', async () => {
+    // ADR-0004 / ADR-0005: skill slash tokens are expanded before the
+    // retrieval query is built so the skill body, not the bare
+    // `/refactor` literal, is what the embedder sees.
+    vi.mocked(embed).mockClear()
+
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          messageId: 'user-1',
+          role: 'user',
+          parentMessageId: null,
+          branchIndex: 0,
+          created_at: Date.now(),
+          content: '/refactor make the rate limiter faster',
+          userId: 'user-1',
+          attachmentsIds: [],
+        },
+      ])
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: 'skill-personal',
+          userId: 'user-1',
+          organizationId: null,
+          projectId: null,
+          name: 'refactor',
+          body: 'Refactor the target code to maximise readability and remove duplication.',
+          deletedAt: null,
+        },
+      ])
+
+    const loadThreadMessages = makeLoadThreadMessagesOperation({
+      zeroDatabase: {
+        getOrFail: Effect.succeed({ run } as never),
+        withDatabase: (withDatabaseRun: (db: { run: typeof run }) => unknown) =>
+          withDatabaseRun({ run } as never),
+      } as never,
+      attachmentRecord: {
+        listAttachmentContentRowsByThread: () => Effect.succeed([]),
+      } as never,
+      attachmentRag: {
+        searchUserAttachments: () => Effect.succeed([]),
+      } as never,
+      orgKnowledgeRag: {
+        searchOrgKnowledge: () => Effect.succeed([]),
+      } as never,
+      projectSourceRag: {
+        searchProjectSources: () => Effect.succeed([]),
+      } as never,
+      orgKnowledgeRepository: {
+        listActiveAttachmentIds: () => Effect.succeed([]),
+      } as never,
+    })
+
+    const messages = await Effect.runPromise(
+      loadThreadMessages({
+        threadId: 'thread-1',
+        model: 'openai/gpt-5-mini',
+        userId: 'user-1',
+        requestId: 'req-skill-rag-expansion',
+      }),
+    )
+
+    const embeddedValue = vi.mocked(embed).mock.calls[0]?.[0]?.value
+    expect(embeddedValue).toContain(
+      'Refactor the target code to maximise readability',
+    )
+    expect(embeddedValue).toContain('make the rate limiter faster')
+
+    const latestText = messages
+      .at(-1)
+      ?.parts.filter(
+        (part): part is { type: 'text'; text: string } =>
+          part.type === 'text' &&
+          typeof (part as { text?: unknown }).text === 'string',
+      )
+      .map((part) => part.text)
+      .join('\n')
+    expect(latestText).toContain(
+      'Refactor the target code to maximise readability',
+    )
+    expect(latestText).not.toMatch(/(^|\s)\/refactor(\s|$)/)
   })
 
   describe('inline path for small attachments', () => {

@@ -320,7 +320,6 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
         const latestUserMessageRow = [...canonicalRows]
           .reverse()
           .find((row) => row.role === 'user')
-        const latestUserText = latestUserMessageRow?.content ?? ''
         const activeProjectId =
           typeof threadRow?.projectId === 'string' && threadRow.projectId.trim()
             ? threadRow.projectId
@@ -330,6 +329,36 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
           threadRow.title.trim().length > 0
             ? threadRow.title.trim()
             : undefined
+
+        // Skill body lookup runs before the retrieval query so
+        // `/skillname` tokens in the latest user message expand into
+        // their full body and feed the RAG embedding (ADR-0004 intent
+        // enrichment, ADR-0005 skills). The map is reused by the
+        // per-message expansion below.
+        //
+        // Short-circuit: if no user message in the canonical history
+        // contains a forward slash, there is nothing to expand and we
+        // can skip the lookup entirely. The chat composer is
+        // overwhelmingly slash-free, so this saves two queries on every
+        // normal turn.
+        const anyUserMessageContainsSlash = canonicalRows.some(
+          (row) => row.role === 'user' && row.content.includes('/'),
+        )
+        const skillBodyByName = anyUserMessageContainsSlash
+          ? yield* loadSkillBodiesForContext({
+              db,
+              userId,
+              projectId: activeProjectId,
+              organizationId,
+              threadId,
+              requestId,
+            })
+          : (new Map<string, string>() as ReadonlyMap<string, string>)
+
+        const latestUserText = expandUserMessageText({
+          text: latestUserMessageRow?.content ?? '',
+          bodyByName: skillBodyByName,
+        })
 
         // The custom instruction lives on the Project row. We need it
         // for intent-enrichment of the query embedding (see
@@ -482,29 +511,6 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
             projectId: activeProjectId,
           })
         }
-
-        // Skill body lookup for the resolution context. Loaded once per
-        // request and reused across every user message in `canonicalRows`
-        // so we issue at most two extra queries (skills, overrides) per
-        // turn regardless of history length. See ADR-0005.
-        //
-        // Short-circuit: if no user message in the canonical history
-        // contains a forward slash, there is nothing to expand and we can
-        // skip the lookup entirely. The chat composer is overwhelmingly
-        // slash-free, so this saves two queries on every normal turn.
-        const anyUserMessageContainsSlash = canonicalRows.some(
-          (row) => row.role === 'user' && row.content.includes('/'),
-        )
-        const skillBodyByName = anyUserMessageContainsSlash
-          ? yield* loadSkillBodiesForContext({
-              db,
-              userId,
-              projectId: activeProjectId,
-              organizationId,
-              threadId,
-              requestId,
-            })
-          : (new Map<string, string>() as ReadonlyMap<string, string>)
 
         return canonicalRows.map((message) => {
           const attachmentIds = Array.isArray(message.attachmentsIds)

@@ -7,10 +7,12 @@ passes through:
 
 1. **Intent enrichment** (always on). The literal user message, the
    Project's `custom_instruction`, the thread title, and the attached
-   file names are composed into a single query string. Short or empty
-   user messages (e.g. `"."`) drop the literal in favour of the
-   intent hints so the embedding model sees the actual task framing
-   instead of noise.
+   file names are composed into a single query string. Slash tokens
+   in the user message are first expanded to their resolved Skill
+   bodies (ADR-0005) so the embedder sees the skill body, not the
+   bare `/refactor` literal. Short or empty user messages (e.g.
+   `"."`) drop the literal in favour of the intent hints so the
+   embedding model sees the actual task framing instead of noise.
 2. **Inline pass for small documents** (always on). Per-thread
    attachments and project sources are partitioned by size: any
    PDF whose `### Page N` count is at or below `inlineMaxPages`
