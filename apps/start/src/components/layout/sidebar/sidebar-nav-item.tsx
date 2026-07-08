@@ -32,6 +32,7 @@ export function SidebarNavItem({
     contextMenuContent,
     label: customLabel,
     disableLink,
+    disabled,
   } = item
 
   const isActionItem = typeof onSelect === 'function'
@@ -40,8 +41,8 @@ export function SidebarNavItem({
       isActionItem || !href
         ? false
         : customIsActive
-        ? customIsActive(pathname, href)
-        : isPathActive(pathname, href, exact),
+          ? customIsActive(pathname, href)
+          : isPathActive(pathname, href, exact),
     [pathname, href, exact, customIsActive, isActionItem],
   )
 
@@ -61,7 +62,21 @@ export function SidebarNavItem({
     </span>
   )
 
-  const linkContent = disableLink ? (
+  const linkContent = disabled ? (
+    <div
+      className={cn(
+        buttonVariants({ variant: 'sidebarNavItem', size: 'sidebarNavItem' }),
+        'group cursor-not-allowed opacity-50',
+      )}
+      aria-disabled="true"
+      role="link"
+      title={name}
+    >
+      <span className="flex w-full items-center gap-2" data-active={false}>
+        {rowContent}
+      </span>
+    </div>
+  ) : disableLink ? (
     <div
       className={cn(
         buttonVariants({ variant: 'sidebarNavItem', size: 'sidebarNavItem' }),

@@ -1036,7 +1036,7 @@
   "chat_skill_empty_sample_plan_description": "Outline an approach before writing code.",
   "chat_skill_empty_sample_standup_name": "standup",
   "chat_skill_empty_sample_standup_description": "Summarise yesterday, today, and blockers.",
-  "chat_skill_error_name_invalid": "Skill name must be 1\u201332 characters, letters / numbers / dashes / underscores only.",
+  "chat_skill_error_name_invalid": "Skill name must be 1–32 characters, letters / numbers / dashes / underscores only.",
   "chat_skill_error_name_taken": "A skill with this name already exists in this scope.",
   "chat_skill_error_body_empty": "Skill body cannot be empty.",
   "chat_skill_error_body_too_long": "Skill body cannot exceed {max} characters.",
@@ -1054,5 +1054,6 @@
   "chat_skill_slash_will_expand": "will expand",
   "chat_skill_slash_no_match_chip": "no match",
   "chat_project_tab_skills": "Skills",
-  "chat_sidebar_skills": "Skills"
+  "chat_sidebar_skills": "Skills",
+  "chat_sidebar_projects_sign_in_required": "Sign in to use projects"
 }

@@ -784,7 +784,10 @@ export function ChatSidebarContent({ pathname }: { pathname: string }) {
             />
             {shouldRenderHistory ? (
               <div className="mt-6">
-                <ChatSidebarProjects pathname={pathname} />
+                <ChatSidebarProjects
+                  pathname={pathname}
+                  disabled={isAnonymous}
+                />
               </div>
             ) : null}
             <div className="mt-8 flex min-h-0 flex-1 flex-col">

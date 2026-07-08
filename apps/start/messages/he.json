@@ -1054,5 +1054,6 @@
   "chat_skill_slash_will_expand": "יורחב",
   "chat_skill_slash_no_match_chip": "אין התאמה",
   "chat_project_tab_skills": "מיומנויות",
-  "chat_sidebar_skills": "מיומנויות"
+  "chat_sidebar_skills": "מיומנויות",
+  "chat_sidebar_projects_sign_in_required": "יש להיכנס כדי להשתמש בפרויקטים"
 }
