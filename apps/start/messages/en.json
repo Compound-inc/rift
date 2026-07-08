@@ -1054,6 +1054,5 @@
   "chat_skill_slash_will_expand": "will expand",
   "chat_skill_slash_no_match_chip": "no match",
   "chat_project_tab_skills": "Skills",
-  "chat_sidebar_skills": "Skills",
-  "chat_sidebar_projects_sign_in_required": "Sign in to use projects"
+  "chat_sidebar_skills": "Skills"
 }

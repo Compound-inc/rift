@@ -37,8 +37,6 @@ export type NavItemType = {
   label?: React.ReactNode
   /** When true, item is not a link (e.g. while editing). */
   disableLink?: boolean
-  /** When true, render the row as unavailable and ignore selection. */
-  disabled?: boolean
 }
 
 export type NavSection = {

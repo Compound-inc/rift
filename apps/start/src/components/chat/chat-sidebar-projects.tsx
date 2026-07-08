@@ -91,16 +91,10 @@ function ProjectRenameInput({
   )
 }
 
-export function ChatSidebarProjects({
-  pathname,
-  disabled = false,
-}: {
-  pathname: string
-  disabled?: boolean
-}) {
+export function ChatSidebarProjects({ pathname }: { pathname: string }) {
   const z = useZero()
   const navigate = useNavigate()
-  const { isAnonymous, user } = useAppAuth()
+  const { user } = useAppAuth()
   const [projects] = useQuery(queries.projects.list({}))
   const [creating, setCreating] = useState(false)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
@@ -125,10 +119,7 @@ export function ChatSidebarProjects({
   )
 
   const handleCreateProject = useCallback(async () => {
-    if (creating || disabled || isAnonymous) {
-      setCreateError(m.chat_sidebar_projects_sign_in_required())
-      return
-    }
+    if (creating) return
     const name = createName.trim()
     if (!name) {
       setCreateError(m.chat_sidebar_project_name_empty_error())
@@ -159,15 +150,7 @@ export function ChatSidebarProjects({
     } finally {
       setCreating(false)
     }
-  }, [
-    createName,
-    creating,
-    disabled,
-    isAnonymous,
-    navigate,
-    resetCreateDialog,
-    z,
-  ])
+  }, [createName, creating, navigate, resetCreateDialog, z])
 
   const startEditingProject = useCallback((project: ProjectRow) => {
     setEditingProjectId(project.id)
@@ -246,13 +229,10 @@ export function ChatSidebarProjects({
   const newProjectItem: NavItemType = {
     name: m.chat_sidebar_project_create(),
     icon: Plus,
-    disabled,
-    onSelect: disabled
-      ? undefined
-      : () => {
-          resetCreateDialog()
-          setCreateDialogOpen(true)
-        },
+    onSelect: () => {
+      resetCreateDialog()
+      setCreateDialogOpen(true)
+    },
   }
 
   return (
@@ -321,11 +301,6 @@ export function ChatSidebarProjects({
           )
         })}
         <SidebarNavItem item={newProjectItem} pathname={pathname} />
-        {disabled ? (
-          <div className="px-3 py-1 text-xs text-foreground-tertiary">
-            {m.chat_sidebar_projects_sign_in_required()}
-          </div>
-        ) : null}
       </div>
 
       <FormDialog
