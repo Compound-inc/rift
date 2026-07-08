@@ -782,7 +782,7 @@ export function ChatSidebarContent({ pathname }: { pathname: string }) {
               sections={staticSections}
               pathname={pathname}
             />
-            {shouldRenderHistory ? (
+            {shouldRenderHistory && !isAnonymous ? (
               <div className="mt-6">
                 <ChatSidebarProjects pathname={pathname} />
               </div>

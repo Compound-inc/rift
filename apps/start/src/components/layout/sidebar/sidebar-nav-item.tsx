@@ -40,8 +40,8 @@ export function SidebarNavItem({
       isActionItem || !href
         ? false
         : customIsActive
-        ? customIsActive(pathname, href)
-        : isPathActive(pathname, href, exact),
+          ? customIsActive(pathname, href)
+          : isPathActive(pathname, href, exact),
     [pathname, href, exact, customIsActive, isActionItem],
   )
 
