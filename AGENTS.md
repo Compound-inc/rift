@@ -28,6 +28,15 @@ Run from repo root unless noted.
 - Current state: there are few/no committed app tests yet.
 - Add tests as `*.test.ts` / `*.test.tsx`, colocated with code in `apps/start/src` (or package `src` for shared logic).
 
+## Design Context
+
+Design work is governed by two root files (impeccable skill):
+
+- `PRODUCT.md`: strategic context (register, users, brand personality, anti-references, design principles). Register is `product`.
+- `DESIGN.md`: the visual system (colors, typography, elevation, components) in Google Stitch DESIGN.md format, with a `.impeccable/design.json` sidecar carrying tonal ramps, motion/shadow tokens, and component snippets.
+
+Read both before building or changing UI so new screens stay on-brand.
+
 ## Comments in code
 
 - You need to add comprehensive documentation for the code you write, so future devs and underestend the code with ease

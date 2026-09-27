@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-30T00:00:00.000Z",
+  "title": "Design System: Rift",
+  "extensions": {
+    "colorMeta": {
+      "accent-primary": { "role": "primary", "displayName": "Rift Blue", "canonical": "#3673fc", "tonalRamp": ["#0a1f4d", "#10306f", "#1842a0", "#2456d6", "#3673fc", "#6a99fd", "#a3c1fe", "#d6e3ff"] },
+      "ai-violet": { "role": "secondary", "displayName": "AI Violet", "canonical": "#ad46ff", "tonalRamp": ["#2e0a52", "#451178", "#5f1aa3", "#8326d6", "#ad46ff", "#c378ff", "#daabff", "#efddff"] },
+      "surface-base": { "role": "neutral", "displayName": "Canvas", "canonical": "#fcfcfc", "tonalRamp": ["#161616", "#202020", "#2d2d2d", "#525252", "#a3a3a3", "#d4d4d4", "#f5f5f5", "#fcfcfc"] },
+      "surface-raised": { "role": "neutral", "displayName": "Raised", "canonical": "#fafafa", "tonalRamp": ["#171717", "#202020", "#2d2d2d", "#525252", "#a3a3a3", "#d4d4d4", "#f5f5f5", "#fafafa"] },
+      "surface-strong": { "role": "neutral", "displayName": "Strong", "canonical": "#e5e5e5", "tonalRamp": ["#111111", "#1f1f1f", "#2d2d2d", "#525252", "#a3a3a3", "#cfcfcf", "#e5e5e5", "#f2f2f2"] },
+      "foreground-strong": { "role": "neutral", "displayName": "Foreground Strong", "canonical": "#171717", "tonalRamp": ["#0a0a0a", "#171717", "#262626", "#404040", "#737373", "#a3a3a3", "#d4d4d4", "#fafafa"] },
+      "foreground-primary": { "role": "neutral", "displayName": "Foreground Primary", "canonical": "#404040", "tonalRamp": ["#171717", "#262626", "#404040", "#525252", "#737373", "#a3a3a3", "#d4d4d4", "#f5f5f5"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page-level titles; the largest thing on a screen, used sparingly." },
+      "headline": { "displayName": "Headline", "purpose": "Section headers and dialog titles." },
+      "title": { "displayName": "Title", "purpose": "Card and panel headers, row group labels." },
+      "body": { "displayName": "Body", "purpose": "Default UI text; cap prose at 65-75ch." },
+      "label": { "displayName": "Label", "purpose": "Buttons, badges, captions, form labels, metadata." },
+      "mono": { "displayName": "Mono", "purpose": "Code, IDs, tokens, technical values (Geist Mono)." }
+    },
+    "shadows": [
+      { "name": "floating-soft", "value": "0 2px 12px rgb(0,0,0,0.05)", "purpose": "Dialogs and modal content; the default lift for surfaces that overlay the app." },
+      { "name": "popover-lift", "value": "0 4px 6px -1px rgb(0,0,0,0.1), 0 2px 4px -2px rgb(0,0,0,0.1)", "purpose": "Dropdowns, popovers, hover cards, selects (framework shadow-md)." }
+    ],
+    "motion": [
+      { "name": "duration-fast", "value": "100ms", "purpose": "Most state transitions; default snappy feedback." },
+      { "name": "duration-standard", "value": "200ms", "purpose": "Slightly larger transitions (dialog content, expanding regions)." },
+      { "name": "duration-deliberate", "value": "250ms", "purpose": "Background/border crossfades that need to read as intentional." },
+      { "name": "ease-out", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Default easing; exponential ease-out, no bounce." },
+      { "name": "ease-pulse", "value": "cubic-bezier(1, 0, 0, 1)", "purpose": "AI thinking-dot pulse loop." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single primary action on a screen; Rift Blue fill.",
+      "html": "<button class=\"ds-btn-primary\">Add to shortlist</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; height: 2rem; padding: 0 0.625rem; font-family: Geist, system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; color: #fff; background: #3673fc; border: 1px solid transparent; border-radius: 0.5rem; transition: background 100ms cubic-bezier(0.22,1,0.36,1); cursor: pointer; } .ds-btn-primary:hover { background: rgba(54,115,252,0.7); } .ds-btn-primary:active { background: rgba(54,115,252,0.5); } .ds-btn-primary:focus-visible { outline: none; border-color: #a3a3a3; box-shadow: 0 0 0 3px rgba(163,163,163,0.5); }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Low-emphasis workhorse action; transparent with a faint hover tint.",
+      "html": "<button class=\"ds-btn-ghost\">Skip</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; height: 2rem; padding: 0 0.625rem; font-family: Geist, system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; color: #404040; background: transparent; border: 1px solid transparent; border-radius: 0.5rem; transition: background 100ms cubic-bezier(0.22,1,0.36,1); cursor: pointer; } .ds-btn-ghost:hover { background: rgba(23,23,23,0.05); } .ds-btn-ghost:active { background: rgba(23,23,23,0.1); } .ds-btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(163,163,163,0.5); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input-default",
+      "description": "Default field; transparent with hairline border, border-shift focus, no glow.",
+      "html": "<input class=\"ds-input\" placeholder=\"Search candidates\" />",
+      "css": ".ds-input { display: block; width: 100%; height: 2.25rem; padding: 0.5rem 0.75rem; font-family: Geist, system-ui, sans-serif; font-size: 0.875rem; color: #171717; background: transparent; border: 1px solid rgba(5,5,5,0.06); border-radius: 0.375rem; transition: border-color 100ms cubic-bezier(0.22,1,0.36,1); } .ds-input::placeholder { color: #a3a3a3; } .ds-input:focus-visible { outline: none; border-color: #737373; box-shadow: 0 0 0 3px rgba(115,115,115,0.5); }"
+    },
+    {
+      "name": "Default Badge",
+      "kind": "chip",
+      "refersTo": "badge-default",
+      "description": "Pill-shaped status/label chip; blue fill default.",
+      "html": "<span class=\"ds-badge\">Shortlisted</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; gap: 0.25rem; height: 1.25rem; padding: 0.125rem 0.5rem; font-family: Geist, system-ui, sans-serif; font-size: 0.75rem; font-weight: 500; color: #fff; background: #3673fc; border: 1px solid transparent; border-radius: 2rem; white-space: nowrap; }"
+    },
+    {
+      "name": "Secondary Badge",
+      "kind": "chip",
+      "refersTo": "badge-secondary",
+      "description": "Muted pill chip for meta and non-primary tags.",
+      "html": "<span class=\"ds-badge-secondary\">Senior</span>",
+      "css": ".ds-badge-secondary { display: inline-flex; align-items: center; gap: 0.25rem; height: 1.25rem; padding: 0.125rem 0.5rem; font-family: Geist, system-ui, sans-serif; font-size: 0.75rem; font-weight: 500; color: #a3a3a3; background: #fafafa; border: 1px solid transparent; border-radius: 2rem; white-space: nowrap; }"
+    },
+    {
+      "name": "Sidebar Nav Item",
+      "kind": "nav",
+      "refersTo": null,
+      "description": "Sidebar navigation row; selected state combines tinted background, info text, and medium weight.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item\" href=\"#\">Candidates</a><a class=\"ds-nav-item ds-nav-item--active\" href=\"#\">Pipeline</a><a class=\"ds-nav-item\" href=\"#\">Settings</a></nav>",
+      "css": ".ds-nav { display: flex; flex-direction: column; gap: 0.125rem; width: 14rem; } .ds-nav-item { display: flex; align-items: center; height: 2rem; padding: 0.5rem; font-family: Geist, system-ui, sans-serif; font-size: 0.875rem; font-weight: 400; color: #404040; border-radius: 0.5rem; text-decoration: none; transition: background 100ms cubic-bezier(0.22,1,0.36,1); } .ds-nav-item:hover { background: rgba(23,23,23,0.05); } .ds-nav-item:active { background: rgba(23,23,23,0.1); } .ds-nav-item--active { background: rgba(191,219,254,0.25); color: #1d4ed8; font-weight: 500; } .ds-nav-item--active:hover { background: rgba(191,219,254,0.45); }"
+    },
+    {
+      "name": "Dialog",
+      "kind": "custom",
+      "refersTo": "dialog",
+      "description": "Floating modal surface; the one place a soft shadow is allowed. No card primitive exists in @rift/ui.",
+      "html": "<div class=\"ds-dialog\"><div class=\"ds-dialog-title\">Confirm shortlist</div><div class=\"ds-dialog-body\">Move 4 candidates to the final round?</div></div>",
+      "css": ".ds-dialog { width: 24rem; max-width: calc(100% - 2rem); padding: 1rem; background: #fafafa; color: #171717; border: 1px solid rgba(5,5,5,0.06); border-radius: 0.75rem; box-shadow: 0 2px 12px rgb(0,0,0,0.05); font-family: Geist, system-ui, sans-serif; } .ds-dialog-title { font-size: 1.25rem; font-weight: 600; line-height: 1.25; letter-spacing: -0.01em; } .ds-dialog-body { margin-top: 0.5rem; font-size: 0.875rem; line-height: 1.5; color: #404040; }"
+    },
+    {
+      "name": "Select Trigger",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Dropdown select trigger; shares the input form-control vocabulary, trailing chevron.",
+      "html": "<button class=\"ds-select\" type=\"button\"><span>Senior Engineer</span><svg class=\"ds-select-chevron\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m6 9 6 6 6-6\"/></svg></button>",
+      "css": ".ds-select { display: inline-flex; align-items: center; justify-content: space-between; gap: 0.375rem; height: 2.25rem; padding: 0.5rem 0.75rem; font-family: Geist, system-ui, sans-serif; font-size: 0.875rem; color: #171717; background: transparent; border: 1px solid rgba(5,5,5,0.06); border-radius: 0.375rem; white-space: nowrap; cursor: pointer; transition: border-color 100ms cubic-bezier(0.22,1,0.36,1); } .ds-select-chevron { color: #a3a3a3; flex-shrink: 0; } .ds-select:focus-visible { outline: none; border-color: #737373; box-shadow: 0 0 0 3px rgba(115,115,115,0.5); }"
+    },
+    {
+      "name": "Data Table",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Dense, token-driven table; row hover tint and selected-row background carry state without color alone.",
+      "html": "<table class=\"ds-table\"><thead><tr><th>Candidate</th><th>Role</th><th>Stage</th></tr></thead><tbody><tr><td>Ada L.</td><td>Senior Engineer</td><td>Screening</td></tr><tr class=\"ds-row--selected\"><td>Grace H.</td><td>Staff Engineer</td><td>Shortlist</td></tr><tr><td>Alan T.</td><td>Engineer</td><td>Screening</td></tr></tbody></table>",
+      "css": ".ds-table { width: 100%; border-collapse: collapse; font-family: Geist, system-ui, sans-serif; font-size: 0.875rem; color: #404040; } .ds-table thead tr { border-bottom: 1px solid #f5f5f5; } .ds-table th { height: 2.5rem; padding: 0 0.5rem; text-align: left; font-weight: 500; white-space: nowrap; } .ds-table td { padding: 0.5rem; white-space: nowrap; vertical-align: middle; } .ds-table tbody tr { border-bottom: 1px solid #f5f5f5; transition: background 100ms cubic-bezier(0.22,1,0.36,1); } .ds-table tbody tr:last-child { border-bottom: 0; } .ds-table tbody tr:hover { background: rgba(23,23,23,0.05); } .ds-row--selected, .ds-row--selected:hover { background: #f7f7f7; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Workbench",
+    "overview": "Rift is a workbench, not a showroom. HR users sit down to move through a stack of candidates and walk away with a shortlist they trust. The interface earns that trust by getting out of the way: a near-white neutral surface, a single confident blue that appears only where a decision lives, and motion that confirms the user just did something rather than performing for them. Speed is the felt quality. Every hover, selection, and transition resolves in well under a quarter-second so the product feels like it is keeping up with the user's thinking, not the other way around. Density is deliberate and local. The chrome (navigation, toolbars, settings) is calm and sparse; the data (candidate records, tables, threads) is allowed to be dense because that is where trust is built. The system borrows Attio's record/table rigor, Notion's low-friction flexible surfaces, and Linear's keyboard-fast snappiness, then strips anything decorative. Geist carries everything in one tuned family. This system explicitly rejects enterprise heaviness, hard-to-navigate density as a default, generic AI-chat skins, and anything that reads as AI-slop template output.",
+    "keyCharacteristics": [
+      "Near-white, lightly-tinted neutral canvas; flat at rest, depth only on intent.",
+      "One blue accent (#3673fc) reserved for primary actions, current selection, and active state.",
+      "Single type family (Geist) across the entire surface; tight scale, weight-led hierarchy.",
+      "Fast, state-confirming motion (100-250ms, ease-out); never choreography.",
+      "Borders and tonal layering do the work that shadows do elsewhere."
+    ],
+    "rules": [
+      { "name": "The One Blue Rule", "body": "Rift Blue appears on a small fraction of any screen: the primary action, the current selection, the active state. If two things compete for the blue, one is not the primary action. Its scarcity is the signal.", "section": "colors" },
+      { "name": "The Violet Quarantine Rule", "body": "#ad46ff belongs to AI activity only. Never borrow it for a button, a badge, or an accent. Crossing that line breaks the 'what is the model doing' signal.", "section": "colors" },
+      { "name": "The One Voice Rule", "body": "Geist is the only family. No display serif, no second sans, no mono in UI labels. Reach for weight (400 -> 500 -> 600) and size first.", "section": "typography" },
+      { "name": "The Flat-At-Rest Rule", "body": "If a surface is part of the page (a card, a row, a panel), it has no shadow. Shadows are reserved for surfaces that float above the page and disappear (dialogs, popovers). Separate in-page regions with a border or a tonal step.", "section": "elevation" },
+      { "name": "The Audit Test", "body": "If a card has a drop shadow at rest, it is wrong. If a dialog's shadow is darker than rgb(0,0,0,0.08) or its blur tighter than ~10px, it is too heavy.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep Rift Blue (#3673fc) on a small fraction of every screen: primary action, current selection, active state only.",
+      "Do convey depth with hairline border-base borders and the canvas -> raised -> strong tonal steps; keep surfaces flat at rest.",
+      "Do keep transitions in the 100-250ms range with ease-out; motion should confirm a state change, nothing more.",
+      "Do use Geist for everything and build hierarchy from weight (400/500/600) and size.",
+      "Do show full keyboard focus rings (focus-visible); this is a keyboard-first product.",
+      "Do communicate status with icon-or-label plus color, so it survives color blindness.",
+      "Do let candidate data and tables be dense; that local density is where trust is earned.",
+      "Do honor prefers-reduced-motion for the shimmer, pulse, and all transitions."
+    ],
+    "donts": [
+      "Don't build enterprise heaviness: no dense, slow, ceremony-laden Workday/SAP layouts. Calm chrome, local density only.",
+      "Don't clutter or bury the next action; show the next decision, hide the rest.",
+      "Don't ship a generic AI-chat skin (ChatGPT-clone gray bubble dumps) or any AI-slop template output.",
+      "Don't use #000 or #fff; the neutrals are tinted (#fcfcfc, #161616).",
+      "Don't borrow AI Violet (#ad46ff) for buttons, badges, or accents; it belongs to AI activity only.",
+      "Don't put shadows on in-page surfaces (cards, rows, panels); shadows are for floating, transient surfaces only.",
+      "Don't introduce a second font family or use Geist Mono in UI labels.",
+      "Don't add a colored border-left/border-right stripe as an accent; use full borders, tints, or leading icons.",
+      "Don't rely on color alone to signal selection or status.",
+      "Don't animate layout properties or add orchestrated page-load choreography; users load into a task."
+    ]
+  }
+}
