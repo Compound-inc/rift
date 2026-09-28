@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rift Backend Effect"
+  short_description: "Rift backend Effect playbook plus v4 topic map"
+  default_prompt: "Use $rift-backend-effect to implement or review a Rift backend service, runtime, or route boundary, and consult the bundled Effect v4 topic map when the task touches HttpClient, HttpApi, SQL, testing, or observability."
