@@ -154,8 +154,6 @@ function normalizeUsage(
       ?? openrouterTotalTokens
       ?? addDefined(inputTokens, outputTokens),
     raw: usage?.raw,
-    reasoningTokens,
-    cachedInputTokens: cacheReadTokens,
   }
 }
 

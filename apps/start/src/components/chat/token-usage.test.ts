@@ -80,7 +80,6 @@ describe('resolveCurrentContextTokens', () => {
           reasoningTokens: 30,
         },
         totalTokens: 1_080,
-        reasoningTokens: 30,
       }),
     ).toBe(1_050)
   })

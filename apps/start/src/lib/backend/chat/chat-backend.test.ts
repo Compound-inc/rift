@@ -1,6 +1,6 @@
 // Smoke tests for the chat backend scaffold (memory layers + error envelope).
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { LanguageModelUsage, UIMessage } from 'ai'
+import type { LanguageModelUsage, TextStreamPart, ToolSet, UIMessage } from 'ai'
 import { Effect, Layer } from 'effect'
 import { resolveChatAccessPolicy } from '@/lib/backend/access-control'
 import {
@@ -35,7 +35,6 @@ import { ToolRegistryService } from '@/lib/backend/chat/services/tool-registry.s
 let lastStreamRequest: {
   readonly messages?: readonly UIMessage[]
   readonly providerOptions?: Record<string, unknown>
-  readonly generateMessageId?: (() => string) | undefined
 } | null = null
 
 const TestModelGatewayLive = Layer.succeed(ModelGatewayService, {
@@ -46,49 +45,53 @@ const TestModelGatewayLive = Layer.succeed(ModelGatewayService, {
         providerOptions,
       }
 
-      return {
-        totalUsage: Promise.resolve({
-          inputTokens: 5,
-          inputTokenDetails: {
-            noCacheTokens: 5,
-            cacheReadTokens: 0,
-            cacheWriteTokens: 0,
-          },
-          outputTokens: 3,
-          outputTokenDetails: {
-            textTokens: 3,
-            reasoningTokens: 0,
-          },
-          totalTokens: 8,
-        } satisfies LanguageModelUsage),
-        providerMetadata: Promise.resolve(undefined),
-        toUIMessageStreamResponse: (options) => {
-          const onFinish = options?.onFinish
-          lastStreamRequest = {
-            ...lastStreamRequest,
-            generateMessageId: options?.generateMessageId,
-          }
-          const assistantMessage: UIMessage = {
-            id: 'assistant-1',
-            role: 'assistant',
-            parts: [
-              { type: 'reasoning', text: 'Mocked reasoning trace', state: 'done' },
-              { type: 'text', text: 'Mocked assistant response' },
-            ],
-            metadata: { totalTokens: 8 },
-          }
-
-          const finishedMessages = [...messages, assistantMessage]
-
-          void onFinish?.({
-            messages: finishedMessages,
-            isAborted: false,
-            responseMessage: assistantMessage,
-            isContinuation: false,
-          })
-
-          return new Response('stream-ok', { status: 200 })
+      const usage: LanguageModelUsage = {
+        inputTokens: 5,
+        inputTokenDetails: {
+          noCacheTokens: 5,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
         },
+        outputTokens: 3,
+        outputTokenDetails: {
+          textTokens: 3,
+          reasoningTokens: 0,
+        },
+        totalTokens: 8,
+      }
+      return {
+        usage: Promise.resolve(usage),
+        finalStep: Promise.resolve({ providerMetadata: undefined }),
+        stream: new ReadableStream<TextStreamPart<ToolSet>>({
+          start(controller) {
+            for (const chunk of [
+              { type: 'start' },
+              { type: 'reasoning-start', id: 'reasoning-1' },
+              {
+                type: 'reasoning-delta',
+                id: 'reasoning-1',
+                text: 'Mocked reasoning trace',
+              },
+              { type: 'reasoning-end', id: 'reasoning-1' },
+              { type: 'text-start', id: 'text-1' },
+              {
+                type: 'text-delta',
+                id: 'text-1',
+                text: 'Mocked assistant response',
+              },
+              { type: 'text-end', id: 'text-1' },
+              {
+                type: 'finish',
+                finishReason: 'stop',
+                rawFinishReason: 'stop',
+                totalUsage: usage,
+              },
+            ] satisfies TextStreamPart<ToolSet>[]) {
+              controller.enqueue(chunk)
+            }
+            controller.close()
+          },
+        }),
       }
     }),
 })
@@ -250,6 +253,7 @@ describe('chat-backend scaffold', () => {
 
     expect(result.response.status).toBe(200)
 
+    const sse = await result.response.text()
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     const messages = getMemoryState().messages.get(result.created.threadId)
@@ -263,7 +267,10 @@ describe('chat-backend scaffold', () => {
     expect(lastStreamRequest?.messages?.map((message) => message.id)).toContain(
       'user-message-1',
     )
-    expect(lastStreamRequest?.generateMessageId?.()).toBe(messages?.[1]?.id)
+    expect(sse).toContain(`"messageId":"${messages?.[1]?.id}"`)
+    expect(sse).toContain('"type":"reasoning-delta"')
+    expect(sse).toContain('"totalTokens":8')
+    expect(result.response.headers.get('x-vercel-ai-ui-message-stream')).toBe('v1')
   })
 
   it('applies disabled tool keys during the first create-if-missing turn', async () => {
@@ -494,7 +501,7 @@ describe('chat-backend scaffold', () => {
           modelId: 'openai/gpt-5-mini',
         })
 
-        yield* orchestrator.streamChat({
+        const firstResponse = yield* orchestrator.streamChat({
           userId: 'user-edit',
           threadId: created.threadId,
           accessPolicy: paidAccessPolicy,
@@ -507,6 +514,8 @@ describe('chat-backend scaffold', () => {
             parts: [{ type: 'text', text: 'original question' }],
           },
         })
+
+        yield* Effect.promise(() => firstResponse.text())
 
         const response = yield* orchestrator.streamChat({
           userId: 'user-edit',
@@ -525,6 +534,7 @@ describe('chat-backend scaffold', () => {
     )
 
     expect(result.response.status).toBe(200)
+    await result.response.text()
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     const messages = getMemoryState().messages.get(result.created.threadId)

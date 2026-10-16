@@ -1,3 +1,4 @@
+import { createUIMessageStreamResponse, toUIMessageStream } from 'ai'
 import type { UIMessage } from 'ai'
 import type { ReadonlyJSONValue } from '@rocicorp/zero'
 import { Duration, Effect, Layer, ServiceMap } from 'effect'
@@ -897,9 +898,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             },
           })
 
-          return result.toUIMessageStreamResponse({
-            originalMessages: messages,
-            generateMessageId: () => assistantMessageId,
+          return createUIMessageStreamResponse({
             headers: {
               'Content-Encoding': 'none',
               'Cache-Control': 'no-cache, no-transform',
@@ -974,167 +973,174 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                   }),
               })
             },
-            onError: (error: unknown) => {
-              // The AI SDK can invoke stream error hooks more than once for the same
-              // transport failure. We only persist/log once per request.
-              if (transportErrorHandled) {
-                return defaultStreamFailureMessage
-              }
-              transportErrorHandled = true
-
-              const readableMessage = toReadableErrorMessage(
-                error,
-                defaultStreamFailureMessage,
-              )
-              const classification = classifyUnknownChatError()
-              if (wideEvent) {
-                finalizeWideEventFailure(wideEvent, {
-                  status: classification.status,
-                  level: classification.severity,
-                  captureMode: classification.captureMode,
-                  retryable: true,
-                  errorTag: getErrorTag(error),
-                  message: readableMessage,
-                  errorCode: chatErrorCodeFromTag(getErrorTag(error)),
-                  i18nKey: classification.i18nKey,
-                  cause: error instanceof Error ? error.message : undefined,
-                })
-                void Effect.runPromise(drainWideEvent(wideEvent)).catch(
-                  () => undefined,
-                )
-              }
-              void finalizeAssistant({
-                ok: false,
-                errorMessage: GENERIC_ASSISTANT_FAILURE_MESSAGE,
-                errorCode: ChatErrorCode.Unknown,
-                errorI18nKey: ChatErrorI18nKey.Unknown,
-              })
-              cleanupActiveStream()
-
-              return JSON.stringify(
-                buildChatApiErrorEnvelope({
-                  requestId,
-                  code: classification.code,
-                  i18nKey: classification.i18nKey,
-                  i18nParams: classification.i18nParams,
-                  retryable: classification.retryable,
-                  tag: getErrorTag(error),
-                  detailsMessage: readableMessage,
-                  threadId,
-                }),
-              )
-            },
-            messageMetadata: ({ part }: { part: any }) => {
-              // Metadata is attached only for lifecycle events consumed by the client.
-              if (part.type === 'start') {
-                return {
-                  threadId,
-                  requestId,
-                  model: modelResolution.modelId,
-                  modelSource: modelResolution.source,
-                  startedAt,
+            stream: toUIMessageStream({
+              stream: result.stream,
+              tools: toolRegistry.tools,
+              originalMessages: messages,
+              generateMessageId: () => assistantMessageId,
+              onError: (error: unknown) => {
+                // The AI SDK can invoke stream error hooks more than once for the same
+                // transport failure. We only persist/log once per request.
+                if (transportErrorHandled) {
+                  return defaultStreamFailureMessage
                 }
-              }
-              if (part.type === 'finish') {
-                return {
-                  threadId,
-                  requestId,
-                  model: modelResolution.modelId,
-                  modelSource: modelResolution.source,
-                  completedAt: Date.now(),
-                  totalTokens: part.totalUsage.totalTokens,
-                }
-              }
-              return undefined
-            },
-            onFinish: async ({
-              isAborted,
-              responseMessage,
-            }: {
-              isAborted: boolean
-              responseMessage: UIMessage
-            }) => {
-              // If chunk-level callbacks missed content, hydrate from final payload.
-              hydrateAssistantBufferFromResponse(
-                assistantBuffer,
-                responseMessage,
-              )
+                transportErrorHandled = true
 
-              const ok = assistantBuffer.text.length > 0
-              const persistedGeneration = await Promise.all([
-                result.totalUsage,
-                result.providerMetadata,
-              ])
-                .then(([totalUsage, providerMetadata]) =>
-                  buildPersistedGenerationAnalytics({
-                    usage: totalUsage,
-                    providerMetadata,
-                    usedByok: Boolean(modelResolution.providerApiKeyOverride),
-                    generationMetadata: {
-                      activeToolKeys: resolvedToolPolicy.activeToolKeys,
-                      deniedToolKeysByReason: resolvedToolPolicy.toolEntries
-                        .filter((entry) => entry.reasons.length > 0)
-                        .map((entry) => ({
-                          key: entry.key,
-                          reasons: [...entry.reasons],
-                        })),
-                      orgProviderNativeToolsEnabled:
-                        orgPolicy?.toolPolicy.providerNativeToolsEnabled ??
-                        true,
-                      threadDisabledToolKeys: sanitizedDisabledToolKeys,
-                    },
-                  }),
+                const readableMessage = toReadableErrorMessage(
+                  error,
+                  defaultStreamFailureMessage,
                 )
-                .catch(() => undefined)
-
-              if (wideEvent) {
-                setWideEventContext(wideEvent, {
-                  usage: {
-                    totalTokens: persistedGeneration?.totalTokens,
-                    outputTokens: persistedGeneration?.outputTokens,
-                    actualCostUsd:
-                      persistedGeneration?.aiCost ??
-                      persistedGeneration?.publicCost,
-                    usedByok: persistedGeneration?.usedByok,
-                  },
-                  stream: { aborted: isAborted, activePhase: 'finished' },
-                })
-                if (ok && !isAborted) {
-                  finalizeWideEventSuccess(wideEvent, { status: 200 })
-                } else if (!wideEvent.outcome) {
-                  const classification = classifyUnknownChatError()
+                const classification = classifyUnknownChatError()
+                if (wideEvent) {
                   finalizeWideEventFailure(wideEvent, {
-                    status: 502,
+                    status: classification.status,
                     level: classification.severity,
                     captureMode: classification.captureMode,
                     retryable: true,
-                    errorTag: 'StreamFailed',
-                    errorCode: classification.code,
-                    message: isAborted
-                      ? 'Stream aborted before completion'
-                      : 'No assistant content generated',
+                    errorTag: getErrorTag(error),
+                    message: readableMessage,
+                    errorCode: chatErrorCodeFromTag(getErrorTag(error)),
                     i18nKey: classification.i18nKey,
+                    cause: error instanceof Error ? error.message : undefined,
                   })
+                  void Effect.runPromise(drainWideEvent(wideEvent)).catch(
+                    () => undefined,
+                  )
                 }
-                await Effect.runPromise(drainWideEvent(wideEvent)).catch(
-                  () => undefined,
-                )
-              }
+                void finalizeAssistant({
+                  ok: false,
+                  errorMessage: GENERIC_ASSISTANT_FAILURE_MESSAGE,
+                  errorCode: ChatErrorCode.Unknown,
+                  errorI18nKey: ChatErrorI18nKey.Unknown,
+                })
+                cleanupActiveStream()
 
-              await finalizeAssistant({
-                ok,
-                providerMetadata: persistedGeneration?.providerMetadata,
-                generationAnalytics: persistedGeneration,
-                errorMessage: isAborted
-                  ? GENERIC_ASSISTANT_FAILURE_MESSAGE
-                  : ok
-                    ? undefined
-                    : GENERIC_ASSISTANT_FAILURE_MESSAGE,
-                errorCode: ok ? undefined : ChatErrorCode.Unknown,
-                errorI18nKey: ok ? undefined : ChatErrorI18nKey.Unknown,
-              })
-              cleanupActiveStream()
-            },
+                return JSON.stringify(
+                  buildChatApiErrorEnvelope({
+                    requestId,
+                    code: classification.code,
+                    i18nKey: classification.i18nKey,
+                    i18nParams: classification.i18nParams,
+                    retryable: classification.retryable,
+                    tag: getErrorTag(error),
+                    detailsMessage: readableMessage,
+                    threadId,
+                  }),
+                )
+              },
+              messageMetadata: ({ part }) => {
+                // Metadata is attached only for lifecycle events consumed by the client.
+                if (part.type === 'start') {
+                  return {
+                    threadId,
+                    requestId,
+                    model: modelResolution.modelId,
+                    modelSource: modelResolution.source,
+                    startedAt,
+                  }
+                }
+                if (part.type === 'finish') {
+                  return {
+                    threadId,
+                    requestId,
+                    model: modelResolution.modelId,
+                    modelSource: modelResolution.source,
+                    completedAt: Date.now(),
+                    totalTokens: part.totalUsage.totalTokens,
+                  }
+                }
+                return undefined
+              },
+              onEnd: async ({
+                isAborted,
+                responseMessage,
+              }: {
+                isAborted: boolean
+                responseMessage: UIMessage
+              }) => {
+                // If chunk-level callbacks missed content, hydrate from final payload.
+                hydrateAssistantBufferFromResponse(
+                  assistantBuffer,
+                  responseMessage,
+                )
+
+                const ok = assistantBuffer.text.length > 0
+                // v7 exposes all-step token totals and final-step provider accounting separately.
+                const persistedGeneration = await Promise.all([
+                  result.usage,
+                  result.finalStep,
+                ])
+                  .then(([usage, finalStep]) =>
+                    buildPersistedGenerationAnalytics({
+                      usage,
+                      providerMetadata: finalStep.providerMetadata,
+                      usedByok: Boolean(modelResolution.providerApiKeyOverride),
+                      generationMetadata: {
+                        activeToolKeys: resolvedToolPolicy.activeToolKeys,
+                        deniedToolKeysByReason: resolvedToolPolicy.toolEntries
+                          .filter((entry) => entry.reasons.length > 0)
+                          .map((entry) => ({
+                            key: entry.key,
+                            reasons: [...entry.reasons],
+                          })),
+                        orgProviderNativeToolsEnabled:
+                          orgPolicy?.toolPolicy.providerNativeToolsEnabled ??
+                          true,
+                        threadDisabledToolKeys: sanitizedDisabledToolKeys,
+                      },
+                    }),
+                  )
+                  .catch(() => undefined)
+
+                if (wideEvent) {
+                  setWideEventContext(wideEvent, {
+                    usage: {
+                      totalTokens: persistedGeneration?.totalTokens,
+                      outputTokens: persistedGeneration?.outputTokens,
+                      actualCostUsd:
+                        persistedGeneration?.aiCost ??
+                        persistedGeneration?.publicCost,
+                      usedByok: persistedGeneration?.usedByok,
+                    },
+                    stream: { aborted: isAborted, activePhase: 'finished' },
+                  })
+                  if (ok && !isAborted) {
+                    finalizeWideEventSuccess(wideEvent, { status: 200 })
+                  } else if (!wideEvent.outcome) {
+                    const classification = classifyUnknownChatError()
+                    finalizeWideEventFailure(wideEvent, {
+                      status: 502,
+                      level: classification.severity,
+                      captureMode: classification.captureMode,
+                      retryable: true,
+                      errorTag: 'StreamFailed',
+                      errorCode: classification.code,
+                      message: isAborted
+                        ? 'Stream aborted before completion'
+                        : 'No assistant content generated',
+                      i18nKey: classification.i18nKey,
+                    })
+                  }
+                  await Effect.runPromise(drainWideEvent(wideEvent)).catch(
+                    () => undefined,
+                  )
+                }
+
+                await finalizeAssistant({
+                  ok,
+                  providerMetadata: persistedGeneration?.providerMetadata,
+                  generationAnalytics: persistedGeneration,
+                  errorMessage: isAborted
+                    ? GENERIC_ASSISTANT_FAILURE_MESSAGE
+                    : ok
+                      ? undefined
+                      : GENERIC_ASSISTANT_FAILURE_MESSAGE,
+                  errorCode: ok ? undefined : ChatErrorCode.Unknown,
+                  errorI18nKey: ok ? undefined : ChatErrorI18nKey.Unknown,
+                })
+                cleanupActiveStream()
+              },
+            }),
           })
         }).pipe(
           Effect.tapError((error) =>

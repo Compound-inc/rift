@@ -1,5 +1,5 @@
 import { convertToModelMessages, smoothStream, streamText } from 'ai'
-import type { IdGenerator, LanguageModelUsage, ToolSet, UIMessage } from 'ai'
+import type { LanguageModelUsage, TextStreamPart, ToolSet, UIMessage } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
@@ -116,24 +116,11 @@ function resolveRuntimeModel(input: {
 
 /** Minimal stream contract consumed by chat orchestration. */
 export type ModelStreamResult = {
-  readonly totalUsage: PromiseLike<LanguageModelUsage>
-  readonly providerMetadata: PromiseLike<Record<string, unknown> | undefined>
-  readonly toUIMessageStreamResponse: (options?: {
-    readonly originalMessages?: UIMessage[]
-    readonly generateMessageId?: IdGenerator
-    readonly headers?: HeadersInit
-    readonly onError?: (error: unknown) => string
-    readonly consumeSseStream?: (options: {
-      readonly stream: ReadableStream<string>
-    }) => PromiseLike<void> | void
-    readonly messageMetadata?: (options: { part: unknown }) => unknown
-    readonly onFinish?: (event: {
-      readonly messages: UIMessage[]
-      readonly isAborted: boolean
-      readonly responseMessage: UIMessage
-      readonly isContinuation: boolean
-    }) => Promise<void> | void
-  }) => Response
+  readonly usage: PromiseLike<LanguageModelUsage>
+  readonly finalStep: PromiseLike<{
+    readonly providerMetadata?: Record<string, unknown>
+  }>
+  readonly stream: ReadableStream<TextStreamPart<ToolSet>>
 }
 
 /** Service contract for starting model streams. */
@@ -219,8 +206,15 @@ export class ModelGatewayService extends ServiceMap.Service<
 
             return streamText({
               model: runtimeModel,
-              system: systemPrompt ?? SYSTEM_PROMPT,
-              messages: modelMessages,
+              // Legacy system rows come from server-loaded history. Keep them out
+              // of v7's messages list while retaining the mode/project prompt.
+              instructions: [
+                { role: 'system', content: systemPrompt ?? SYSTEM_PROMPT },
+                ...modelMessages.filter((message) => message.role === 'system'),
+              ],
+              messages: modelMessages.filter(
+                (message) => message.role !== 'system',
+              ),
               tools,
               activeTools: activeTools ? [...activeTools] : undefined,
               providerOptions: providerOptions as any,
@@ -243,7 +237,7 @@ export class ModelGatewayService extends ServiceMap.Service<
               // AI SDK defaults to `console.error` for stream errors; we disable that
               // because chat-orchestrator emits structured, normalized wide events.
               onError: () => {},
-            }) as unknown as ModelStreamResult
+            })
           },
           catch: (error) => {
             const message = toReadableErrorMessage(
