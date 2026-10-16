@@ -359,6 +359,7 @@ export const MISTRAL_MODELS: readonly AiModelCatalogEntry<'mistral'>[] = [
   },
   {
     id: 'mistral/devstral-2',
+    legacy: true,
     providerId: 'mistral',
     providers: ['gateway'],
     name: 'Devstral 2',

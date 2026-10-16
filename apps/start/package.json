@@ -6,6 +6,7 @@
     "#/*": "./src/*"
   },
   "scripts": {
+    "models:audit": "bun run scripts/audit-model-catalog.ts",
     "i18n:compile": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide",
     "predev": "bun run i18n:compile",
     "dev": "portless rift bun --bun vite dev --host 127.0.0.1",
