@@ -88,6 +88,8 @@ export type AiModelCatalogEntry<
   readonly id: string
   readonly providerId: TProviderId
   readonly name: string
+  /** Older model generation, hidden behind the picker's legacy disclosure. */
+  readonly legacy?: boolean
   readonly description: string
   readonly contextWindow: number
   /** ZDR: Zero Data Retention. True when the provider does not retain training data. */

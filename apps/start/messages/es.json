@@ -222,6 +222,7 @@
   "chat_model_filter_by_provider_aria_label": "Filtrar por proveedor",
   "chat_model_no_search_results": "Ningún modelo coincide con tu búsqueda.",
   "chat_model_search_aria_label": "Buscar modelos",
+  "chat_model_legacy_models": "Modelos anteriores",
   "chat_model_search_placeholder": "Buscar modelos...",
   "chat_model_select_aria_label": "Seleccionar modelo",
   "chat_model_select_trigger": "Seleccionar modelo",

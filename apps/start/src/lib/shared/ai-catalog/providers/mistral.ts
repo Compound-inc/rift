@@ -8,8 +8,119 @@ function mistralDefaultProviderOptions(): Record<string, unknown> {
 }
 
 export const MISTRAL_MODELS: readonly AiModelCatalogEntry<'mistral'>[] = [
+  // Chat models verified against https://ai-gateway.vercel.sh/v1/models on 2026-10-16.
+  {
+    id: 'mistral/mistral-large-4',
+    providerId: 'mistral',
+    providers: ['gateway'],
+    name: 'Mistral Large 4',
+    description:
+      "Mistral Large 4 is Mistral AI's open-weight, natively multimodal model, available in public preview with 1.05 trillion total parameters and 49 billion active parameters. It leads aggregated benchmarks among open-weight models from the US and Europe, with strengths in cyber defense, manufacturing, finance, and visual grounding.",
+    contextWindow: 524288,
+    zeroDataRetention: true,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: false,
+      supportsPdfInput: false,
+    },
+    providerToolIds: [],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: [],
+    defaultMaxOutputTokens: 262144,
+    pricing: {
+      inputPerToken: '0.00000068',
+      outputPerToken: '0.00000209',
+      inputCacheReadPerToken: '0.00000007',
+    },
+  },
+  {
+    id: 'mistral/mistral-medium-3.5',
+    providerId: 'mistral',
+    providers: ['gateway'],
+    name: 'Mistral Medium Latest',
+    description:
+      "Mistral's frontier-class multimodal model optimized for agentic and coding use cases.",
+    contextWindow: 262144,
+    zeroDataRetention: true,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: false,
+      supportsPdfInput: false,
+    },
+    providerToolIds: [],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: [],
+    defaultMaxOutputTokens: 256000,
+    pricing: {
+      inputPerToken: '0.0000015',
+      outputPerToken: '0.0000075',
+      inputCacheReadPerToken: '0.00000015',
+    },
+  },
+  {
+    id: 'mistral/ministral-3b',
+    providerId: 'mistral',
+    providers: ['gateway'],
+    name: 'Ministral 3B',
+    description:
+      'A compact, efficient model for on-device tasks like smart assistants and local analytics, offering low-latency performance.',
+    contextWindow: 131072,
+    zeroDataRetention: true,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: false,
+      supportsImageInput: true,
+      supportsFileInput: false,
+      supportsPdfInput: false,
+    },
+    providerToolIds: [],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: [],
+    defaultMaxOutputTokens: 4000,
+    pricing: {
+      inputPerToken: '0.0000001',
+      outputPerToken: '0.0000001',
+      inputCacheReadPerToken: '0.00000001',
+    },
+  },
+  {
+    id: 'mistral/mistral-nemo',
+    providerId: 'mistral',
+    providers: ['gateway'],
+    name: 'Mistral Nemo 12B',
+    description:
+      '12B model trained jointly by Mistral AI and NVIDIA, it significantly outperforms existing models smaller or similar in size.',
+    contextWindow: 131072,
+    zeroDataRetention: true,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: false,
+      supportsImageInput: false,
+      supportsFileInput: false,
+      supportsPdfInput: false,
+    },
+    providerToolIds: [],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: [],
+    defaultMaxOutputTokens: 131072,
+    legacy: true,
+    pricing: {
+      inputPerToken: '0.000000029',
+      outputPerToken: '0.00000003',
+    },
+  },
+
   {
     id: 'mistral/mistral-large-3',
+    legacy: true,
     providerId: 'mistral',
     providers: ['gateway'],
     name: 'Mistral Large 3',
@@ -36,6 +147,7 @@ export const MISTRAL_MODELS: readonly AiModelCatalogEntry<'mistral'>[] = [
   },
   {
     id: 'mistral/mistral-medium',
+    legacy: true,
     providerId: 'mistral',
     providers: ['gateway'],
     name: 'Mistral Medium 3.1',
@@ -88,6 +200,7 @@ export const MISTRAL_MODELS: readonly AiModelCatalogEntry<'mistral'>[] = [
   },
   {
     id: 'mistral/pixtral-large',
+    legacy: true,
     providerId: 'mistral',
     providers: ['gateway'],
     name: 'Pixtral Large',
@@ -140,6 +253,7 @@ export const MISTRAL_MODELS: readonly AiModelCatalogEntry<'mistral'>[] = [
   },
   {
     id: 'mistral/magistral-medium',
+    legacy: true,
     providerId: 'mistral',
     providers: ['gateway'],
     name: 'Magistral Medium 1.2',
@@ -166,6 +280,7 @@ export const MISTRAL_MODELS: readonly AiModelCatalogEntry<'mistral'>[] = [
   },
   {
     id: 'mistral/magistral-small',
+    legacy: true,
     providerId: 'mistral',
     providers: ['gateway'],
     name: 'Magistral Small 1.2',

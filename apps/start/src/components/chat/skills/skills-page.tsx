@@ -192,7 +192,9 @@ export function SkillsPage({ scope }: { scope: SkillsPageScope }) {
               personalGlobals={personal ?? []}
               orgGlobals={orgShared ?? []}
               overrideSkillIds={overrideSkillIds}
-              onToggleOverride={toggleOverride}
+              onToggleOverride={(params) => {
+                void toggleOverride(params)
+              }}
             />
           ) : null}
         </>

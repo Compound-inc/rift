@@ -58,7 +58,8 @@ function withDefaultProviderTools<TProviderId extends CatalogProviderId>(
 
 /**
  * Global model catalog. This is append-only in practice so policy/state can
- * reference stable model IDs over time.
+ * reference stable model IDs over time. Current generations sort first so
+ * fallback model selection prefers them over legacy entries.
  */
 export const AI_CATALOG: readonly AiModelCatalogEntry[] = [
   ...OPENAI_MODELS,
@@ -74,7 +75,9 @@ export const AI_CATALOG: readonly AiModelCatalogEntry[] = [
   ...XAI_MODELS,
   ...XIAOMI_MODELS,
   ...ZAI_MODELS,
-].map((model) => withDefaultProviderTools(model as AiModelCatalogEntry))
+]
+  .map((model) => withDefaultProviderTools(model as AiModelCatalogEntry))
+  .sort((a, b) => Number(Boolean(a.legacy)) - Number(Boolean(b.legacy)))
 
 /** O(1) catalog lookup for request-path model resolution. */
 export const AI_CATALOG_BY_ID = new Map(

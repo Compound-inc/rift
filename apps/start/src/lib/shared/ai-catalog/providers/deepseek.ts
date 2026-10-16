@@ -8,8 +8,119 @@ function deepseekDefaultProviderOptions(): Record<string, unknown> {
 }
 
 export const DEEPSEEK_MODELS: readonly AiModelCatalogEntry<'deepseek'>[] = [
+  // Chat models verified against https://ai-gateway.vercel.sh/v1/models on 2026-10-16.
+  {
+    id: 'deepseek/deepseek-v4.1-flash',
+    providerId: 'deepseek',
+    providers: ['gateway'],
+    name: 'DeepSeek V4.1 Flash',
+    description:
+      'DeepSeek V4.1 Flash is an AI model from DeepSeek designed for fast, efficient multimodal interactions. It combines native multimodal capabilities with a new architecture focused on stronger performance, faster responses, and lower computational cost.',
+    contextWindow: 1048576,
+    zeroDataRetention: false,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: false,
+      supportsPdfInput: false,
+    },
+    providerToolIds: [],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: [],
+    defaultMaxOutputTokens: 32768,
+    pricing: {
+      inputPerToken: '0.0000003',
+      outputPerToken: '0.0000012',
+      inputCacheReadPerToken: '0.000000007',
+    },
+  },
+  {
+    id: 'deepseek/deepseek-v4-flash-vision-exp',
+    providerId: 'deepseek',
+    providers: ['gateway'],
+    name: 'DeepSeek V4 Flash Vision Exp',
+    description:
+      'DeepSeek-V4-Flash-Vision-Exp is an experimental multimodal model that combines the agentic reasoning, coding, and world knowledge capabilities of DeepSeek-V4-Flash with advanced visual understanding. It delivers major gains on vision-dependent agent workflows while performing strongly across leading coding, repository, data science, automation, and multimodal benchmarks.',
+    contextWindow: 1048576,
+    zeroDataRetention: false,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: false,
+      supportsPdfInput: false,
+    },
+    providerToolIds: [],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: [],
+    defaultMaxOutputTokens: 1048576,
+    pricing: {
+      inputPerToken: '0.0000002156',
+      outputPerToken: '0.0000006468',
+      inputCacheReadPerToken: '0.0000000068',
+    },
+  },
+  {
+    id: 'deepseek/deepseek-v4-pro-0813',
+    providerId: 'deepseek',
+    providers: ['gateway'],
+    name: 'DeepSeek V4 Pro 0813',
+    description: 'This is the 8/13 updated weights version of DeepSeek V4 Pro.',
+    contextWindow: 1000000,
+    zeroDataRetention: false,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: false,
+      supportsFileInput: false,
+      supportsPdfInput: false,
+    },
+    providerToolIds: [],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: [],
+    defaultMaxOutputTokens: 384000,
+    legacy: true,
+    pricing: {
+      inputPerToken: '0.00000066',
+      outputPerToken: '0.00000198',
+      inputCacheReadPerToken: '0.000000066',
+    },
+  },
+  {
+    id: 'deepseek/deepseek-v4-flash-0731',
+    providerId: 'deepseek',
+    providers: ['gateway'],
+    name: 'DeepSeek V4 Flash 0731',
+    description: 'DeepSeek V4 Flash 0731',
+    contextWindow: 1000000,
+    zeroDataRetention: false,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: false,
+      supportsFileInput: false,
+      supportsPdfInput: false,
+    },
+    providerToolIds: [],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: [],
+    defaultMaxOutputTokens: 384000,
+    legacy: true,
+    pricing: {
+      inputPerToken: '0.000000076',
+      outputPerToken: '0.000000153',
+      inputCacheReadPerToken: '0.000000014',
+    },
+  },
+
   {
     id: 'deepseek/deepseek-v4-pro',
+    legacy: true,
     providerId: 'deepseek',
     providers: ['gateway'],
     name: 'DeepSeek V4 Pro',
@@ -37,6 +148,7 @@ export const DEEPSEEK_MODELS: readonly AiModelCatalogEntry<'deepseek'>[] = [
   },
   {
     id: 'deepseek/deepseek-v4-flash',
+    legacy: true,
     providerId: 'deepseek',
     providers: ['gateway'],
     name: 'DeepSeek V4 Flash',
@@ -64,6 +176,7 @@ export const DEEPSEEK_MODELS: readonly AiModelCatalogEntry<'deepseek'>[] = [
   },
   {
     id: 'deepseek/deepseek-v3.2',
+    legacy: true,
     providerId: 'deepseek',
     providers: ['gateway'],
     name: 'DeepSeek V3.2',
@@ -90,6 +203,7 @@ export const DEEPSEEK_MODELS: readonly AiModelCatalogEntry<'deepseek'>[] = [
   },
   {
     id: 'deepseek/deepseek-v3.2-thinking',
+    legacy: true,
     providerId: 'deepseek',
     providers: ['gateway'],
     name: 'DeepSeek V3.2 Thinking',
@@ -116,6 +230,7 @@ export const DEEPSEEK_MODELS: readonly AiModelCatalogEntry<'deepseek'>[] = [
   },
   {
     id: 'deepseek/deepseek-v3.1',
+    legacy: true,
     providerId: 'deepseek',
     providers: ['gateway'],
     name: 'DeepSeek-V3.1',
@@ -142,6 +257,7 @@ export const DEEPSEEK_MODELS: readonly AiModelCatalogEntry<'deepseek'>[] = [
   },
   {
     id: 'deepseek/deepseek-r1',
+    legacy: true,
     providerId: 'deepseek',
     providers: ['gateway'],
     name: 'DeepSeek-R1',
@@ -169,10 +285,12 @@ export const DEEPSEEK_MODELS: readonly AiModelCatalogEntry<'deepseek'>[] = [
   },
   {
     id: 'deepseek/deepseek-v3',
+    legacy: true,
     providerId: 'deepseek',
     providers: ['gateway'],
     name: 'DeepSeek V3 0324',
-    description: 'Fast general-purpose LLM with enhanced reasoning capabilities.',
+    description:
+      'Fast general-purpose LLM with enhanced reasoning capabilities.',
     contextWindow: 163840,
     zeroDataRetention: false,
     capabilities: {

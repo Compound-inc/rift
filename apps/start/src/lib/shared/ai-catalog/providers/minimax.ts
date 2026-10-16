@@ -8,8 +8,38 @@ function minimaxDefaultProviderOptions(): Record<string, unknown> {
 }
 
 export const MINIMAX_MODELS: readonly AiModelCatalogEntry<'minimax'>[] = [
+  // Chat models verified against https://ai-gateway.vercel.sh/v1/models on 2026-10-16.
+  {
+    id: 'minimax/minimax-m3',
+    providerId: 'minimax',
+    providers: ['gateway'],
+    name: 'MiniMax M3',
+    description:
+      "MiniMax-M3 is a frontier-class foundation model that unites the three capabilities defining today's frontier: a 1M-token context window, frontier coding and agentic performance, and native multimodality — the first open-weight model to deliver all three in a single system.",
+    contextWindow: 512000,
+    zeroDataRetention: false,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: true,
+      supportsPdfInput: true,
+    },
+    providerToolIds: [],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: [],
+    defaultMaxOutputTokens: 512000,
+    pricing: {
+      inputPerToken: '0.0000003',
+      outputPerToken: '0.0000012',
+      inputCacheReadPerToken: '0.00000006',
+    },
+  },
+
   {
     id: 'minimax/minimax-m2.7',
+    legacy: true,
     providerId: 'minimax',
     providers: ['gateway'],
     name: 'Minimax M2.7',
@@ -38,6 +68,7 @@ export const MINIMAX_MODELS: readonly AiModelCatalogEntry<'minimax'>[] = [
   },
   {
     id: 'minimax/minimax-m2.5',
+    legacy: true,
     providerId: 'minimax',
     providers: ['gateway'],
     name: 'MiniMax M2.5',
@@ -66,6 +97,7 @@ export const MINIMAX_MODELS: readonly AiModelCatalogEntry<'minimax'>[] = [
   },
   {
     id: 'minimax/minimax-m2.1',
+    legacy: true,
     providerId: 'minimax',
     providers: ['gateway'],
     name: 'MiniMax M2.1',
@@ -93,6 +125,7 @@ export const MINIMAX_MODELS: readonly AiModelCatalogEntry<'minimax'>[] = [
   },
   {
     id: 'minimax/minimax-m2',
+    legacy: true,
     providerId: 'minimax',
     providers: ['gateway'],
     name: 'MiniMax M2',

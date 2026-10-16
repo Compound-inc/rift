@@ -9,7 +9,7 @@ import {
   useZeroVirtualizer,
 } from '@rocicorp/zero-virtual/react'
 import { useZero } from '@rocicorp/zero/react'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { Button, buttonVariants } from '@rift/ui/button'
 import Link2 from 'lucide-react/dist/esm/icons/link-2'
 import MessageCircle from 'lucide-react/dist/esm/icons/message-circle'
@@ -347,7 +347,6 @@ function ChatSidebarHistory({
   activeOrganizationId?: string
   historyOwnerId: string
 }) {
-  const navigate = useNavigate()
   const z = useZero()
   const listRef = useRef<HTMLDivElement>(null)
   const editingInputRef = useRef<HTMLInputElement>(null)

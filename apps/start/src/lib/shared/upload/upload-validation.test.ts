@@ -41,14 +41,14 @@ describe('upload validation policies', () => {
     expect(getUploadValidationError(file, ORG_KNOWLEDGE_UPLOAD_POLICY)).toBeNull()
   })
 
-  it('rejects markdown files for general chat attachments', () => {
+  it('accepts markdown files for general chat attachments', () => {
     const file = {
       name: 'handbook.md',
       type: 'text/markdown',
       size: 128,
     } satisfies Pick<File, 'name' | 'type' | 'size'>
 
-    expect(isAcceptedUploadFile(file, CHAT_ATTACHMENT_UPLOAD_POLICY)).toBe(false)
+    expect(isAcceptedUploadFile(file, CHAT_ATTACHMENT_UPLOAD_POLICY)).toBe(true)
   })
 
   it('rejects empty org knowledge uploads', () => {
