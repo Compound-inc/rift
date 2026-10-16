@@ -7,7 +7,7 @@
     "packages/*",
     "apps/*"
   ],
-  "packageManager": "bun@1.2.23",
+  "packageManager": "bun@1.4.3",
   "scripts": {
     "dev": "turbo run dev zero-cache --filter=tanstack --ui tui",
     "build": "turbo run build --filter=tanstack",
