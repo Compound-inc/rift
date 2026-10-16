@@ -1,4 +1,5 @@
 import { defineMutator } from '@rocicorp/zero'
+import type { Transaction } from '@rocicorp/zero'
 import { z } from 'zod'
 import {
   PROJECT_ACCESS_FAILURE_CODE,
@@ -14,6 +15,7 @@ import {
 } from '@/lib/shared/skills/skill-grammar'
 import type { SkillRow } from '@/lib/shared/skills/skill-row'
 import { zql } from '../zql'
+import type { Schema } from '../schema'
 
 /**
  * Skills mutators (ADR-0005). Authorization rules live in
@@ -21,7 +23,8 @@ import { zql } from '../zql'
  * lookups) plus name-uniqueness handling.
  */
 
-type ZeroTransaction = Parameters<Parameters<typeof defineMutator>[1]>[0]['tx']
+// Preserve the app schema when transactions cross helper boundaries.
+type ZeroTransaction = Transaction<Schema>
 
 const skillIdArgs = z.object({
   skillId: z.string().trim().min(1),

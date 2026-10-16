@@ -15,7 +15,11 @@ export type UsagePolicyTemplateRow = Partial<UsagePolicyTemplate> & {
   featureKey?: typeof CHAT_USAGE_FEATURE_KEY
 }
 
-export type UsagePolicyOverrideRow = Partial<UsagePolicyTemplate> & {
+/** SQL NULL means this field inherits the template or plan default. */
+export type UsagePolicyOverrideRow = {
+  targetMarginRatioBps?: number | null
+  reserveHeadroomRatioBps?: number | null
+  minReserveNanoUsd?: number | null
   organizationMonthlyBudgetNanoUsd?: number | null
   enabled?: boolean | null
 }

@@ -88,8 +88,563 @@ function anthropicDefaultProviderOptions(): Record<string, unknown> {
  * between the 20260120 and 20250825 tool revisions.
  */
 export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
+  // Chat models verified against https://ai-gateway.vercel.sh/v1/models on 2026-10-16.
+  {
+    id: 'anthropic/claude-haiku-5.5',
+    providerId: 'anthropic',
+    providers: ['gateway'],
+    name: 'Claude Haiku 5.5',
+    description:
+      'Claude Haiku 5.5 brings adaptive reasoning to Anthropic’s low-cost Haiku family for everyday tasks, tool use, and scaled sub-agent deployments. It is the first Haiku with adjustable effort levels, letting developers balance reasoning depth and token usage for each task, with the option to turn thinking off for simpler requests.',
+    contextWindow: 1000000,
+    zeroDataRetention: true,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: true,
+      supportsPdfInput: true,
+    },
+    providerToolIds: ['web_search_20250305'],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: ['low', 'medium', 'high', 'max'],
+    defaultMaxOutputTokens: 128000,
+    defaultReasoningEffort: 'medium',
+    providerOptionsByReasoning: {
+      low: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'low',
+        },
+      },
+      medium: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'medium',
+        },
+      },
+      high: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'high',
+        },
+      },
+      max: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'max',
+        },
+      },
+    },
+    pricing: {
+      inputPerToken: '0.0000001',
+      outputPerToken: '0.0000005',
+      inputCacheReadPerToken: '0.00000001',
+      inputCacheWritePerToken: '0.000000125',
+      inputTiers: [
+        {
+          cost: '0.0000001',
+          min: 0,
+          max: 100001,
+        },
+        {
+          cost: '0.0000005',
+          min: 100001,
+        },
+      ],
+      outputTiers: [
+        {
+          cost: '0.0000005',
+          min: 0,
+          max: 100001,
+        },
+        {
+          cost: '0.0000025',
+          min: 100001,
+        },
+      ],
+      inputCacheReadTiers: [
+        {
+          cost: '0.00000001',
+          min: 0,
+          max: 100001,
+        },
+        {
+          cost: '0.00000005',
+          min: 100001,
+        },
+      ],
+      inputCacheWriteTiers: [
+        {
+          cost: '0.000000125',
+          min: 0,
+          max: 100001,
+        },
+        {
+          cost: '0.000000625',
+          min: 100001,
+        },
+      ],
+    },
+  },
+  {
+    id: 'anthropic/claude-sonnet-5.5',
+    providerId: 'anthropic',
+    providers: ['gateway'],
+    name: 'Claude Sonnet 5.5',
+    description:
+      'Claude Sonnet 5.5 is a step-change improvement over Sonnet 5 for well-scoped everyday work like building features, fixing bugs, and creating polished documents, slides, and spreadsheets. It also writes more clearly than Sonnet 5.',
+    contextWindow: 1000000,
+    zeroDataRetention: true,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: true,
+      supportsPdfInput: true,
+    },
+    providerToolIds: ['web_search_20250305'],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: ['low', 'medium', 'high', 'max'],
+    defaultMaxOutputTokens: 128000,
+    defaultReasoningEffort: 'medium',
+    providerOptionsByReasoning: {
+      low: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'low',
+        },
+      },
+      medium: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'medium',
+        },
+      },
+      high: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'high',
+        },
+      },
+      max: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'max',
+        },
+      },
+    },
+    pricing: {
+      inputPerToken: '0.000002',
+      outputPerToken: '0.00001',
+      inputCacheReadPerToken: '0.0000001',
+      inputCacheWritePerToken: '0.0000025',
+    },
+  },
+  {
+    id: 'anthropic/claude-opus-5.5',
+    providerId: 'anthropic',
+    providers: ['gateway'],
+    name: 'Claude Opus 5.5',
+    description:
+      'Claude Opus 5.5 is a step-change improvement over Opus 5 for agentic coding, long-running agentic tasks, knowledge work, communication, and vision. It is more token-efficient per completed task and reports progress, findings, and next steps in clear language.',
+    contextWindow: 1000000,
+    zeroDataRetention: true,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: true,
+      supportsPdfInput: true,
+    },
+    providerToolIds: ['web_search_20250305'],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: ['low', 'medium', 'high', 'max'],
+    defaultMaxOutputTokens: 128000,
+    defaultReasoningEffort: 'medium',
+    providerOptionsByReasoning: {
+      low: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'low',
+        },
+      },
+      medium: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'medium',
+        },
+      },
+      high: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'high',
+        },
+      },
+      max: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'max',
+        },
+      },
+    },
+    pricing: {
+      inputPerToken: '0.000004',
+      outputPerToken: '0.00002',
+      inputCacheReadPerToken: '0.0000002',
+      inputCacheWritePerToken: '0.000005',
+    },
+  },
+  {
+    id: 'anthropic/claude-fable-5.1',
+    providerId: 'anthropic',
+    providers: ['gateway'],
+    name: 'Claude Fable 5.1',
+    description:
+      'Claude Fable 5.1 improves on Fable 5 across long-running agentic coding, knowledge work, and research, following instructions precisely over sessions that run unattended for hours.',
+    contextWindow: 1000000,
+    zeroDataRetention: false,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: true,
+      supportsPdfInput: true,
+    },
+    providerToolIds: [],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: ['low', 'medium', 'high', 'max'],
+    defaultMaxOutputTokens: 128000,
+    defaultReasoningEffort: 'medium',
+    providerOptionsByReasoning: {
+      low: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'low',
+        },
+      },
+      medium: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'medium',
+        },
+      },
+      high: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'high',
+        },
+      },
+      max: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'max',
+        },
+      },
+    },
+    pricing: {
+      inputPerToken: '0.00001',
+      outputPerToken: '0.00005',
+      inputCacheReadPerToken: '0.00000025',
+      inputCacheWritePerToken: '0.0000125',
+    },
+  },
+  {
+    id: 'anthropic/claude-opus-5',
+    providerId: 'anthropic',
+    providers: ['gateway'],
+    name: 'Claude Opus 5',
+    description:
+      "Claude Opus 5 is the latest model in Anthropic's Opus family and a step-change improvement over Opus 4.8. It delivers major gains over Opus 4.8 in agentic coding, professional knowledge work, and long-horizon reasoning, and it is stronger per token across effort levels.",
+    contextWindow: 1000000,
+    zeroDataRetention: true,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: true,
+      supportsPdfInput: true,
+    },
+    providerToolIds: ['web_search_20250305'],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: ['low', 'medium', 'high', 'max'],
+    defaultMaxOutputTokens: 128000,
+    legacy: true,
+    defaultReasoningEffort: 'medium',
+    providerOptionsByReasoning: {
+      low: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'low',
+        },
+      },
+      medium: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'medium',
+        },
+      },
+      high: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'high',
+        },
+      },
+      max: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'max',
+        },
+      },
+    },
+    pricing: {
+      inputPerToken: '0.000005',
+      outputPerToken: '0.000025',
+      inputCacheReadPerToken: '0.0000005',
+      inputCacheWritePerToken: '0.00000625',
+    },
+  },
+  {
+    id: 'anthropic/claude-fable-5',
+    providerId: 'anthropic',
+    providers: ['gateway'],
+    name: 'Claude Fable 5',
+    description:
+      'Claude Fable 5 is a Mythos-class model with robust safeguards. It can handle long-running, complex, and asynchronous tasks where previous models would have needed more frequent check-ins.',
+    contextWindow: 1000000,
+    zeroDataRetention: false,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: true,
+      supportsPdfInput: true,
+    },
+    providerToolIds: [],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: ['low', 'medium', 'high', 'max'],
+    defaultMaxOutputTokens: 128000,
+    legacy: true,
+    defaultReasoningEffort: 'medium',
+    providerOptionsByReasoning: {
+      low: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'low',
+        },
+      },
+      medium: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'medium',
+        },
+      },
+      high: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'high',
+        },
+      },
+      max: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'max',
+        },
+      },
+    },
+    pricing: {
+      inputPerToken: '0.00001',
+      outputPerToken: '0.00005',
+      inputCacheReadPerToken: '0.000001',
+      inputCacheWritePerToken: '0.0000125',
+    },
+  },
+  {
+    id: 'anthropic/claude-sonnet-5',
+    providerId: 'anthropic',
+    providers: ['gateway'],
+    name: 'Claude Sonnet 5',
+    description:
+      'Sonnet 5 is an upgrade to Sonnet 4.6, with gains across agentic coding and professional work. It builds on the strengths of previous Sonnet models, bringing top-tier intelligence at Sonnet pricing for coding, agents, and everyday professional work at scale.',
+    contextWindow: 1000000,
+    zeroDataRetention: true,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: true,
+      supportsPdfInput: true,
+    },
+    providerToolIds: ['web_search_20250305'],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: ['low', 'medium', 'high', 'max'],
+    defaultMaxOutputTokens: 128000,
+    legacy: true,
+    defaultReasoningEffort: 'medium',
+    providerOptionsByReasoning: {
+      low: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'low',
+        },
+      },
+      medium: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'medium',
+        },
+      },
+      high: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'high',
+        },
+      },
+      max: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'max',
+        },
+      },
+    },
+    pricing: {
+      inputPerToken: '0.000002',
+      outputPerToken: '0.00001',
+      inputCacheReadPerToken: '0.0000002',
+      inputCacheWritePerToken: '0.0000025',
+    },
+  },
+  {
+    id: 'anthropic/claude-opus-4.8',
+    providerId: 'anthropic',
+    providers: ['gateway'],
+    name: 'Claude Opus 4.8',
+    description:
+      "Opus 4.8 is a focused upgrade to Opus 4.7 and is Anthropic's best generally available model for coding, agentic tasks, and enterprise workflows. It builds on the strengths of previous Opus models with stronger performance on complex, multi-step coding tasks. Anthropic recommends using it on long-horizon coding and agentic tasks. It is also stronger on professional work, including document drafting, data analysis, and presentations.",
+    contextWindow: 1000000,
+    zeroDataRetention: true,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: true,
+      supportsPdfInput: true,
+    },
+    providerToolIds: ['web_search_20250305'],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: ['low', 'medium', 'high', 'max'],
+    defaultMaxOutputTokens: 128000,
+    legacy: true,
+    defaultReasoningEffort: 'medium',
+    providerOptionsByReasoning: {
+      low: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'low',
+        },
+      },
+      medium: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'medium',
+        },
+      },
+      high: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'high',
+        },
+      },
+      max: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'max',
+        },
+      },
+    },
+    pricing: {
+      inputPerToken: '0.000005',
+      outputPerToken: '0.000025',
+      inputCacheReadPerToken: '0.0000005',
+      inputCacheWritePerToken: '0.00000625',
+    },
+  },
+
   {
     id: 'anthropic/claude-opus-4.7',
+    legacy: true,
     providerId: 'anthropic',
     providers: ['anthropic', 'gateway'],
     providerModelIds: { anthropic: 'claude-opus-4-7' },
@@ -147,6 +702,7 @@ export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
   },
   {
     id: 'anthropic/claude-opus-4.6',
+    legacy: true,
     providerId: 'anthropic',
     providers: ['anthropic', 'gateway'],
     providerModelIds: { anthropic: 'claude-opus-4-6' },
@@ -204,6 +760,7 @@ export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
   },
   {
     id: 'anthropic/claude-opus-4.5',
+    legacy: true,
     providerId: 'anthropic',
     providers: ['anthropic', 'gateway'],
     providerModelIds: { anthropic: 'claude-opus-4-5' },
@@ -245,6 +802,7 @@ export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
   },
   {
     id: 'anthropic/claude-sonnet-4.6',
+    legacy: true,
     providerId: 'anthropic',
     providers: ['anthropic', 'gateway'],
     providerModelIds: { anthropic: 'claude-sonnet-4-6' },
@@ -301,6 +859,7 @@ export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
   },
   {
     id: 'anthropic/claude-sonnet-4.5',
+    legacy: true,
     providerId: 'anthropic',
     providers: ['anthropic', 'gateway'],
     providerModelIds: { anthropic: 'claude-sonnet-4-5' },
@@ -357,6 +916,7 @@ export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
   },
   {
     id: 'anthropic/claude-sonnet-4',
+    legacy: true,
     providerId: 'anthropic',
     providers: ['anthropic', 'gateway'],
     providerModelIds: { anthropic: 'claude-sonnet-4-0' },
@@ -405,6 +965,7 @@ export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
   },
   {
     id: 'anthropic/claude-haiku-4.5',
+    legacy: true,
     providerId: 'anthropic',
     providers: ['anthropic', 'gateway'],
     providerModelIds: { anthropic: 'claude-haiku-4-5' },
@@ -441,6 +1002,7 @@ export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
   },
   {
     id: 'anthropic/claude-3.7-sonnet',
+    legacy: true,
     providerId: 'anthropic',
     providers: ['anthropic', 'gateway'],
     providerModelIds: { anthropic: 'claude-3-7-sonnet-latest' },
@@ -480,6 +1042,7 @@ export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
   },
   {
     id: 'anthropic/claude-3.5-sonnet',
+    legacy: true,
     providerId: 'anthropic',
     providers: ['anthropic', 'gateway'],
     providerModelIds: { anthropic: 'claude-3-5-sonnet-latest' },
@@ -509,6 +1072,7 @@ export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
   },
   {
     id: 'anthropic/claude-3.5-haiku',
+    legacy: true,
     providerId: 'anthropic',
     providers: ['anthropic', 'gateway'],
     providerModelIds: { anthropic: 'claude-3-5-haiku-latest' },
@@ -542,6 +1106,7 @@ export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
   },
   {
     id: 'anthropic/claude-3-haiku',
+    legacy: true,
     providerId: 'anthropic',
     providers: ['anthropic', 'gateway'],
     providerModelIds: { anthropic: 'claude-3-haiku-20240307' },

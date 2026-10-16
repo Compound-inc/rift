@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery, useZero } from '@rocicorp/zero/react'
+import type { QueryResultType } from '@rocicorp/zero'
 
 import { mutators, queries } from '@/integrations/zero'
 import { m } from '@/paraglide/messages.js'
@@ -38,9 +39,7 @@ type FieldDefinition = {
   readonly successMessage: () => string
 }
 
-type ProjectRow = NonNullable<
-  ReturnType<typeof useQuery<ReturnType<(typeof queries.projects)['byId']>>>[0]
->
+type ProjectRow = NonNullable<QueryResultType<typeof queries.projects.byId>>
 
 /**
  * Per-field policy. Centralizing this means adding a new editable column
@@ -214,9 +213,7 @@ export function useProjectSettingsPageLogic({
       setDeleteDialogOpen(false)
       navigate({ to: '/chat' })
     } catch (cause) {
-      setDeleteMessage(
-        getErrorMessage(cause, m.chat_project_delete_failed()),
-      )
+      setDeleteMessage(getErrorMessage(cause, m.chat_project_delete_failed()))
     } finally {
       setDeleteSubmitting(false)
     }

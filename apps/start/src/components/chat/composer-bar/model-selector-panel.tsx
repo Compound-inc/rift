@@ -18,7 +18,8 @@ import { getModelCostTier } from '@/lib/shared/ai-catalog/cost-tier'
 import type { AiModelCostTier } from '@/lib/shared/ai-catalog/cost-tier'
 import type { AiModelCatalogEntry } from '@/lib/shared/ai-catalog/types'
 import type { CatalogProviderId } from '@/lib/shared/ai-catalog/provider-tools'
-import type {PaidWorkspacePlanId} from '@/lib/shared/access-control';
+import type { PaidWorkspacePlanId } from '@/lib/shared/access-control'
+import { groupModelsByProvider } from './model-selector-groups'
 import { getLocalizedFeatureAccessGateMessage } from '@/lib/frontend/access-control'
 import { m } from '@/paraglide/messages.js'
 
@@ -41,6 +42,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   moonshotai: 'Moonshot',
   xai: 'xAI',
   zai: 'Z.AI',
+  xiaomi: 'Xiaomi',
 }
 
 const CAPABILITY_ICONS = {
@@ -203,11 +205,34 @@ export function ModelSelectorPanel({
       }
     }
     pinned.sort(
-      (a, b) =>
-        (pinnedIndex.get(a.id) ?? 0) - (pinnedIndex.get(b.id) ?? 0),
+      (a, b) => (pinnedIndex.get(a.id) ?? 0) - (pinnedIndex.get(b.id) ?? 0),
     )
     return [...pinned, ...rest]
   }, [options, query, selectedProvider])
+
+  const modelGroups = React.useMemo(
+    () => groupModelsByProvider(filteredModels),
+    [filteredModels],
+  )
+
+  const renderModel = (opt: SelectableModelOption) => {
+    const catalog = getCatalogModel(opt.id)
+    if (!catalog) return null
+    return (
+      <ModelRow
+        key={opt.id}
+        model={catalog}
+        displayName={opt.name}
+        isSelected={value === opt.id}
+        locked={opt.locked}
+        minimumPlanId={opt.minimumPlanId}
+        onSelect={handleSelect}
+        capabilityLabels={capabilityLabels}
+        costTierLabels={costTierLabels}
+        style={{ contentVisibility: 'auto', containIntrinsicSize: '0 60px' }}
+      />
+    )
+  }
 
   const providersInOptions = React.useMemo(() => {
     const set = new Set<CatalogProviderId>()
@@ -233,7 +258,9 @@ export function ModelSelectorPanel({
     [options],
   )
   const triggerLabel =
-    optionsById.get(value)?.name ?? selectedCatalog?.name ?? m.chat_model_select_trigger()
+    optionsById.get(value)?.name ??
+    selectedCatalog?.name ??
+    m.chat_model_select_trigger()
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -299,11 +326,11 @@ export function ModelSelectorPanel({
           'animate-none data-open:animate-none data-closed:animate-none',
         )}
       >
-          <div
-            className="flex h-full min-h-0 outline-none"
-            onMouseDown={(e) => e.stopPropagation()}
-            tabIndex={-1}
-          >
+        <div
+          className="flex h-full min-h-0 outline-none"
+          onMouseDown={(e) => e.stopPropagation()}
+          tabIndex={-1}
+        >
           <aside
             className={cn(
               'w-[64px] py-3 overflow-y-auto shrink-0 flex flex-col items-center gap-1',
@@ -388,28 +415,47 @@ export function ModelSelectorPanel({
                   {m.chat_model_no_search_results()}
                 </div>
               ) : (
-                <div className="space-y-1">
-                  {filteredModels.map((opt) => {
-                    const catalog = getCatalogModel(opt.id)
-                    if (!catalog) return null
-                    return (
-                      <ModelRow
-                        key={opt.id}
-                        model={catalog}
-                        displayName={opt.name}
-                        isSelected={value === opt.id}
-                        locked={opt.locked}
-                        minimumPlanId={opt.minimumPlanId}
-                        onSelect={handleSelect}
-                        capabilityLabels={capabilityLabels}
-                        costTierLabels={costTierLabels}
-                        style={{
-                          contentVisibility: 'auto',
-                          containIntrinsicSize: '0 60px',
-                        }}
-                      />
-                    )
-                  })}
+                <div className="space-y-3">
+                  {modelGroups.map((group) => (
+                    <section
+                      key={group.providerId}
+                      aria-label={
+                        PROVIDER_NAMES[group.providerId] ?? group.providerId
+                      }
+                    >
+                      {!HIDDEN_SIDEBAR_PROVIDERS.has(group.providerId) && (
+                        <h3 className="px-3 py-2 text-xs font-medium text-foreground-secondary">
+                          {PROVIDER_NAMES[group.providerId] ?? group.providerId}
+                        </h3>
+                      )}
+                      <div className="space-y-1">
+                        {group.current.map(renderModel)}
+                      </div>
+                      {group.legacy.length > 0 && (
+                        <details
+                          className="group/legacy mt-1"
+                          open={
+                            Boolean(query.trim()) ||
+                            group.legacy.some((model) => model.id === value)
+                          }
+                        >
+                          <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-lg px-3 text-xs text-foreground-secondary hover:bg-surface-inverse/5 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-border-strong/50 [&::-webkit-details-marker]:hidden">
+                            <ChevronDown
+                              className="size-3.5 -rotate-90 transition-transform duration-150 group-open/legacy:rotate-0 motion-reduce:transition-none"
+                              aria-hidden
+                            />
+                            <span>{m.chat_model_legacy_models()}</span>
+                            <span className="ml-auto tabular-nums">
+                              {group.legacy.length}
+                            </span>
+                          </summary>
+                          <div className="space-y-1">
+                            {group.legacy.map(renderModel)}
+                          </div>
+                        </details>
+                      )}
+                    </section>
+                  ))}
                 </div>
               )}
             </div>
@@ -478,7 +524,9 @@ const ModelRow = React.memo(function ModelRow({
                 className={cn(
                   'size-4 shrink-0 mt-0.5 grayscale group-hover:grayscale-0',
                   isSelected && 'grayscale-0',
-                  isSelected ? 'text-foreground-info' : 'text-foreground-secondary',
+                  isSelected
+                    ? 'text-foreground-info'
+                    : 'text-foreground-secondary',
                 )}
                 aria-hidden
               />
@@ -509,7 +557,9 @@ const ModelRow = React.memo(function ModelRow({
             <div
               className={cn(
                 'text-xs line-clamp-1 mt-0.5',
-                isSelected ? 'text-foreground-info/80' : 'text-foreground-secondary',
+                isSelected
+                  ? 'text-foreground-info/80'
+                  : 'text-foreground-secondary',
               )}
             >
               {model.description}

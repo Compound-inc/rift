@@ -2,6 +2,8 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChatSearchCommand, openChatSearchCommand } from './chat-search-command'
+// Preload the dialog before fake timers; these tests cover search, not lazy loading.
+import './chat-search-command-dialog'
 
 const navigateMock = vi.fn()
 const searchChatThreadsMock = vi.fn()
@@ -134,7 +136,7 @@ describe('ChatSearchCommand', () => {
       openChatSearchCommand()
     })
     await act(async () => {
-      await vi.dynamicImportSettled()
+      await Promise.resolve()
     })
     fireEvent.change(screen.getByLabelText('query'), {
       target: { value: 'stale query' },
@@ -197,7 +199,7 @@ describe('ChatSearchCommand', () => {
       openChatSearchCommand()
     })
     await act(async () => {
-      await vi.dynamicImportSettled()
+      await Promise.resolve()
     })
     fireEvent.change(screen.getByLabelText('query'), {
       target: { value: 'duplicate' },
