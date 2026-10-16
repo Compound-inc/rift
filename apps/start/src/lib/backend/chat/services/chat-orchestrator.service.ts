@@ -60,6 +60,7 @@ import {
   emitBranchVersionConflictTelemetry,
   emitInvalidEditTargetTelemetry,
 } from './chat-orchestrator/failure-telemetry'
+import { withDirectProviderPromptCaching } from './chat-orchestrator/prompt-caching'
 import {
   resolveOpenRouterRequestOptions,
   withGatewayComplianceProviderOptions,
@@ -541,6 +542,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               organizationId,
               orgPolicy,
               untilMessageId: regeneration.anchorMessageId,
+              contextWindowTokens: activeContextWindow,
               requestId,
             })
           } else if (requestTrigger === 'edit-message') {
@@ -570,6 +572,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               organizationId,
               orgPolicy,
               untilMessageId: edited.editedMessageId,
+              contextWindowTokens: activeContextWindow,
               requestId,
             })
             yield* Effect.annotateLogs(Effect.logInfo('chat_edit_prepared'), {
@@ -587,6 +590,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               orgPolicy,
               pendingUserMessage: command.message!,
               pendingAttachments: attachments,
+              contextWindowTokens: activeContextWindow,
               requestId,
             })
             const usedTokens = estimatePromptTokens(preparedMessages)
@@ -870,16 +874,20 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             requestId,
             tools: toolRegistry.tools,
             activeTools: toolRegistry.activeTools,
-            providerOptions: withGatewayComplianceProviderOptions({
-              providerOptions: modelResolution.reasoningEffort
-                ? toolRegistry.providerOptionsByReasoning[
-                    modelResolution.reasoningEffort
-                  ]
-                : toolRegistry.defaultProviderOptions,
-              orgPolicy,
-              hasProviderKeyOverride: Boolean(
-                modelResolution.providerApiKeyOverride,
-              ),
+            providerOptions: withDirectProviderPromptCaching({
+              providerOptions: withGatewayComplianceProviderOptions({
+                providerOptions: modelResolution.reasoningEffort
+                  ? toolRegistry.providerOptionsByReasoning[
+                      modelResolution.reasoningEffort
+                    ]
+                  : toolRegistry.defaultProviderOptions,
+                orgPolicy,
+                hasProviderKeyOverride: Boolean(
+                  modelResolution.providerApiKeyOverride,
+                ),
+              }),
+              providerKeyOverrideProviderId:
+                modelResolution.providerApiKeyOverride?.providerId,
             }),
             reasoningEffort: modelResolution.reasoningEffort,
             abortSignal: streamAbortController.signal,

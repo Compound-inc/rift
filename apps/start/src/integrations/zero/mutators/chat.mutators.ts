@@ -453,7 +453,12 @@ export const chatMutatorDefinitions = {
       })
     }),
 
-    /** Permanently delete thread and all its messages. */
+    /**
+     * Permanently delete thread and all its messages. The thread's
+     * attachments are marked deleted in the same transaction; their vectors
+     * are removed after commit by the `/api/zero/mutate` route (server only,
+     * see `purgeDeletedThreadDocuments`).
+     */
     delete: defineMutator(deleteThreadArgs, async ({ tx, args, ctx }) => {
       const thread = await tx.run(
         zql.thread.where('threadId', args.threadId).one(),
@@ -477,6 +482,20 @@ export const chatMutatorDefinitions = {
       )
       for (const message of messages) {
         await tx.mutate.message.delete({ id: message.id })
+      }
+      const attachments = await tx.run(
+        zql.attachment
+          .where('threadId', args.threadId)
+          .where('userId', ctx.userID),
+      )
+      const now = Date.now()
+      for (const attachment of attachments) {
+        if (attachment.status === 'deleted') continue
+        await tx.mutate.attachment.update({
+          id: attachment.id,
+          status: 'deleted',
+          updatedAt: now,
+        })
       }
       await tx.mutate.thread.delete({ id: thread.id })
     }),

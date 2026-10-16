@@ -16,6 +16,7 @@
     "preview": "vite preview",
     "zero-cache": "portless zero.rift sh -c 'ZERO_PORT=\"$PORT\" zero-cache-dev'",
     "zero:migrate": "bun run scripts/zero-migrate.ts",
+    "rag:reindex": "bun run scripts/rag-reindex.ts",
     "db:reset": "bun run scripts/db-reset.ts",
     "zero:reset": "bun run scripts/zero-dev-reset.ts",
     "postgres:drop-all-tables": "bun run scripts/postgres-drop-all-tables.ts",

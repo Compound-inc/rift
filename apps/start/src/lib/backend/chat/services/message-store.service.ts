@@ -14,16 +14,10 @@ import type {
   InvalidRequestError,
 } from '@/lib/backend/chat/domain/errors'
 import { MessagePersistenceError } from '@/lib/backend/chat/domain/errors'
-import { OrgKnowledgeRepositoryService } from '@/lib/backend/org-knowledge/services/org-knowledge-repository.service'
 import type { IncomingUserMessage } from '@/lib/backend/chat/domain/schemas'
 import { getMemoryState } from '@/lib/backend/chat/infra/memory/state'
 import { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
-import { AttachmentRecordService } from './attachment-record.service'
-import {
-  AttachmentRagService,
-  OrgKnowledgeRagService,
-  ProjectSourceRagService,
-} from './rag'
+import { RagContextService } from '@/lib/backend/rag'
 import { toUserMessage } from './message-store/helpers'
 import { makeAppendUserMessageOperation } from './message-store/operations/append-user-message'
 import { makeFinalizeAssistantMessageOperation } from './message-store/operations/finalize-assistant-message'
@@ -45,6 +39,11 @@ export type MessageStoreServiceShape = {
     readonly untilMessageId?: string
     readonly pendingUserMessage?: IncomingUserMessage
     readonly pendingAttachments?: readonly ChatAttachmentInput[]
+    /**
+     * Active context window in tokens (respects the Standard/Max mode). Sizes
+     * the document budget for RAG; falls back to the model's catalog window.
+     */
+    readonly contextWindowTokens?: number
     readonly requestId: string
   }) => Effect.Effect<UIMessage[], MessagePersistenceError>
   readonly appendUserMessage: (input: {
@@ -130,22 +129,14 @@ export class MessageStoreService extends ServiceMap.Service<
   static readonly layer = Layer.effect(
     MessageStoreService,
     Effect.gen(function* () {
-      const attachmentRecord = yield* AttachmentRecordService
-      const attachmentRag = yield* AttachmentRagService
-      const orgKnowledgeRag = yield* OrgKnowledgeRagService
-      const projectSourceRag = yield* ProjectSourceRagService
-      const orgKnowledgeRepository = yield* OrgKnowledgeRepositoryService
+      const ragContext = yield* RagContextService
       const sql = yield* PgClient.PgClient
       const zeroDatabase = yield* ZeroDatabaseService
 
       return {
         loadThreadMessages: makeLoadThreadMessagesOperation({
           zeroDatabase,
-          attachmentRecord,
-          attachmentRag,
-          orgKnowledgeRag,
-          projectSourceRag,
-          orgKnowledgeRepository,
+          ragContext,
         }),
         appendUserMessage: makeAppendUserMessageOperation({
           zeroDatabase,

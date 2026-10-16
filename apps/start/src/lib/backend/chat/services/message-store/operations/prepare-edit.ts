@@ -105,6 +105,16 @@ export const makePrepareEditOperation = (dependencies: {
 
               const nextMessageId = crypto.randomUUID()
               const now = Date.now()
+              // An edit rewrites the text, not the files: the new branch keeps
+              // the original message's attachments so they stay in context.
+              const targetRow = threadMessages.find(
+                (message) => message.messageId === targetMessageId,
+              )
+              const carriedAttachmentIds = Array.isArray(targetRow?.attachmentsIds)
+                ? (targetRow.attachmentsIds as readonly unknown[]).filter(
+                    (id): id is string => typeof id === 'string',
+                  )
+                : []
               const branchIndex = nextBranchIndexForParent({
                 messages: threadMessages,
                 parentMessageId: editableTarget.parentMessageId,
@@ -129,7 +139,7 @@ export const makePrepareEditOperation = (dependencies: {
                 modelParams: {
                   reasoningEffort,
                 },
-                attachmentsIds: [],
+                attachmentsIds: [...carriedAttachmentIds],
               })
 
               const activeChildByParent = normalizeThreadActiveChildMap(

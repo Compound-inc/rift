@@ -77,7 +77,11 @@ _Avoid_: Knowledge base (in user-facing copy when ambiguous).
 - A Thread inside a Project receives that Project's **Project Context**
   unconditionally (ADR-0003).
 - RAG retrieval for a Thread inside a Project unions per-message,
-  per-thread, project, and org-knowledge sources (ADR-0002).
+  per-thread, project, and org-knowledge sources (ADR-0002). All of them go
+  through one pipeline (ADR-0006): **pinned** sources (conversation and
+  Project Files) are read in full while they fit the context budget and
+  retrieved otherwise; **Org Knowledge** is ambient and only retrieved when
+  relevant.
 - Project deletion is a soft delete with a Windows-folder cascade: the
   project, its Threads, and its Project Files are hidden together. FKs
   are preserved on the soft-deleted side (ADR-0001).

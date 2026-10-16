@@ -1,9 +1,8 @@
 import { Effect, Layer, ServiceMap } from 'effect'
 import {
-  buildAttachmentChunkRows,
+  RagIndexerService,
   normalizeMarkdownForStorage,
-} from '@/lib/backend/chat/services/rag/attachment-content.pipeline'
-import { ProjectSourceRagService } from '@/lib/backend/chat/services/rag'
+} from '@/lib/backend/rag'
 import { AttachmentRecordService } from '@/lib/backend/chat/services/attachment-record.service'
 import { zql } from '@/lib/backend/chat/infra/zero/db'
 import {
@@ -28,6 +27,7 @@ type ProjectSourceAttachmentRow = {
   readonly userId: string
   readonly ownerOrgId?: string
   readonly projectId?: string
+  readonly fileName: string
   readonly fileContent?: string
   readonly status?: 'deleted' | 'uploaded'
 }
@@ -59,7 +59,9 @@ export type ProjectSourcesAdminServiceShape = {
 /**
  * Owner-managed project source lifecycle. Project files are always active for
  * every Thread in the Project, so unlike org knowledge there is no per-file
- * activation flag.
+ * activation flag. Indexing goes through the shared `RagIndexerService`; an
+ * indexing failure is recorded on the row (retryable) and never fails the
+ * upload.
  */
 export class ProjectSourcesAdminService extends ServiceMap.Service<
   ProjectSourcesAdminService,
@@ -70,7 +72,7 @@ export class ProjectSourcesAdminService extends ServiceMap.Service<
     Effect.gen(function* () {
       const attachmentRecord = yield* AttachmentRecordService
       const markdownConversion = yield* MarkdownConversionService
-      const projectSourceRag = yield* ProjectSourceRagService
+      const ragIndexer = yield* RagIndexerService
       const zeroDatabase = yield* ZeroDatabaseService
 
       const withDb = <TValue>(
@@ -225,86 +227,54 @@ export class ProjectSourcesAdminService extends ServiceMap.Service<
           ),
       )
 
-      const indexStoredMarkdown = Effect.fn(
-        'ProjectSourcesAdminService.indexStoredMarkdown',
+      const reindexStoredMarkdown = Effect.fn(
+        'ProjectSourcesAdminService.reindexStoredMarkdown',
       )(
         (input: {
           readonly projectId: string
           readonly organizationId?: string
           readonly attachmentId: string
+          readonly fileName: string
           readonly userId: string
           readonly markdown: string
           readonly requestId: string
         }) =>
           Effect.gen(function* () {
-            const chunkBuild = yield* Effect.tryPromise({
-              try: () =>
-                buildAttachmentChunkRows({
-                  attachmentId: input.attachmentId,
-                  userId: input.userId,
-                  markdown: input.markdown,
-                  now: Date.now(),
-                }),
-              catch: (error) =>
-                new ProjectSourcesPersistenceError({
-                  message: 'Failed to prepare project source chunks',
-                  requestId: input.requestId,
-                  projectId: input.projectId,
-                  attachmentId: input.attachmentId,
-                  cause: String(error),
-                }),
-            })
-
-            yield* projectSourceRag.indexProjectSourceChunks({
-              chunks: chunkBuild.chunks.map((chunk) => ({
-                ...chunk,
-                scopeType: 'project_source' as const,
-                sourceId: chunk.attachmentId,
+            const index = yield* ragIndexer.indexDocument({
+              scope: 'project_source',
+              attachmentId: input.attachmentId,
+              fileName: input.fileName,
+              markdown: input.markdown,
+              ownership: {
+                userId: input.userId,
                 ownerOrgId: input.organizationId,
                 projectId: input.projectId,
-                accessScope: 'project' as const,
-                embedding: chunk.embedding ?? [],
-                embeddingModel: chunkBuild.metrics.embeddingModel,
-              })),
-            }).pipe(
-              Effect.catch((error) =>
-                updateIndexState({
-                  projectId: input.projectId,
-                  attachmentId: input.attachmentId,
-                  embeddingStatus: 'failed',
-                  vectorError: summarizeProjectSourceIndexError(
-                    error instanceof Error ? error.message : String(error),
-                  ),
-                  requestId: input.requestId,
-                }).pipe(
-                  Effect.flatMap(() =>
-                    Effect.fail(
-                      new ProjectSourcesPersistenceError({
-                        message: 'Failed to index project source vectors',
-                        requestId: input.requestId,
-                        projectId: input.projectId,
-                        attachmentId: input.attachmentId,
-                        cause: String(error),
-                      }),
-                    ),
-                  ),
-                ),
-              ),
-            )
+                accessScope: 'project',
+              },
+              replaceExisting: true,
+            })
 
             yield* updateIndexState({
               projectId: input.projectId,
               attachmentId: input.attachmentId,
-              embeddingStatus: chunkBuild.metrics.embeddingStatus,
-              vectorIndexedAt:
-                chunkBuild.metrics.embeddingStatus === 'indexed'
-                  ? Date.now()
-                  : undefined,
-              vectorError: undefined,
+              embeddingStatus: index.embeddingStatus,
+              vectorIndexedAt: index.vectorIndexedAt,
+              vectorError: index.vectorError,
               requestId: input.requestId,
             })
 
-            return chunkBuild.metrics
+            if (index.embeddingStatus === 'failed') {
+              return yield* Effect.fail(
+                new ProjectSourcesPersistenceError({
+                  message: 'Failed to index project source vectors',
+                  requestId: input.requestId,
+                  projectId: input.projectId,
+                  attachmentId: input.attachmentId,
+                  cause: index.vectorError,
+                }),
+              )
+            }
+            return index
           }),
       )
 
@@ -372,28 +342,24 @@ export class ProjectSourcesAdminService extends ServiceMap.Service<
                   ),
                 ))
               const markdown = normalizeMarkdownForStorage(markdownRaw)
-              const chunkBuild = yield* Effect.tryPromise({
-                try: () =>
-                  buildAttachmentChunkRows({
-                    attachmentId,
-                    userId,
-                    markdown,
-                    now,
-                  }),
-                catch: (error) =>
-                  new ProjectSourcesPersistenceError({
-                    message: 'Failed to prepare project source chunks',
-                    requestId,
-                    projectId,
-                    attachmentId,
-                    cause: String(error),
-                  }),
+              const ownerOrgId = project.organizationId ?? undefined
+              const index = yield* ragIndexer.indexDocument({
+                scope: 'project_source',
+                attachmentId,
+                fileName: uploaded.name,
+                markdown,
+                ownership: {
+                  userId,
+                  ownerOrgId,
+                  projectId,
+                  accessScope: 'project',
+                },
               })
 
               yield* attachmentRecord.insertAttachmentRecord({
                 id: attachmentId,
                 userId,
-                ownerOrgId: project.organizationId ?? undefined,
+                ownerOrgId,
                 projectId,
                 fileKey: uploaded.key,
                 attachmentUrl: uploaded.url,
@@ -401,17 +367,27 @@ export class ProjectSourcesAdminService extends ServiceMap.Service<
                 mimeType: uploaded.contentType,
                 fileSize: uploaded.size,
                 fileContent: markdown,
-                embeddingModel: chunkBuild.metrics.embeddingModel,
-                embeddingTokens: chunkBuild.metrics.embeddingTokens,
-                embeddingDimensions: chunkBuild.metrics.embeddingDimensions,
-                embeddingChunks: chunkBuild.metrics.embeddingChunks,
-                embeddingStatus: chunkBuild.metrics.embeddingStatus,
+                embeddingModel: index.embeddingModel,
+                embeddingTokens: index.embeddingTokens,
+                embeddingDimensions: index.embeddingDimensions,
+                embeddingChunks: index.embeddingChunks,
+                embeddingStatus: index.embeddingStatus,
+                vectorIndexedAt: index.vectorIndexedAt,
+                vectorError: summarizeProjectSourceIndexError(index.vectorError),
                 accessScope: 'project',
                 accessGroupIds: [],
                 status: 'uploaded',
                 createdAt: now,
                 updatedAt: now,
               }).pipe(
+                Effect.tapError(() =>
+                  ragIndexer
+                    .deleteDocuments({
+                      tenant: { scope: 'project_source', projectId },
+                      attachmentIds: [attachmentId],
+                    })
+                    .pipe(Effect.ignore),
+                ),
                 Effect.mapError(
                   (error) =>
                     new ProjectSourcesPersistenceError({
@@ -421,56 +397,6 @@ export class ProjectSourcesAdminService extends ServiceMap.Service<
                       attachmentId,
                       cause: String(error),
                     }),
-                ),
-              )
-
-              yield* projectSourceRag.indexProjectSourceChunks({
-                chunks: chunkBuild.chunks.map((chunk) => ({
-                  ...chunk,
-                  scopeType: 'project_source' as const,
-                  sourceId: chunk.attachmentId,
-                  ownerOrgId: project.organizationId ?? undefined,
-                  projectId,
-                  accessScope: 'project' as const,
-                  embedding: chunk.embedding ?? [],
-                  embeddingModel: chunkBuild.metrics.embeddingModel,
-                })),
-              }).pipe(
-                Effect.flatMap(() =>
-                  updateIndexState({
-                    projectId,
-                    attachmentId,
-                    embeddingStatus: chunkBuild.metrics.embeddingStatus,
-                    vectorIndexedAt:
-                      chunkBuild.metrics.embeddingStatus === 'indexed'
-                        ? Date.now()
-                        : undefined,
-                    vectorError: undefined,
-                    requestId,
-                  }),
-                ),
-                Effect.catch((error) =>
-                  updateIndexState({
-                    projectId,
-                    attachmentId,
-                    embeddingStatus: 'failed',
-                    vectorError: summarizeProjectSourceIndexError(
-                      error instanceof Error ? error.message : String(error),
-                    ),
-                    requestId,
-                  }).pipe(
-                    Effect.flatMap(() =>
-                      Effect.fail(
-                        new ProjectSourcesPersistenceError({
-                          message: 'Failed to index project source vectors',
-                          requestId,
-                          projectId,
-                          attachmentId,
-                          cause: String(error),
-                        }),
-                      ),
-                    ),
-                  ),
                 ),
               )
 
@@ -499,8 +425,8 @@ export class ProjectSourcesAdminService extends ServiceMap.Service<
                 )
               }
 
-              yield* projectSourceRag.deleteProjectSourceChunks({
-                projectId,
+              yield* ragIndexer.deleteDocuments({
+                tenant: { scope: 'project_source', projectId },
                 attachmentIds: [attachmentId],
               }).pipe(
                 Effect.catch((error) =>
@@ -569,10 +495,11 @@ export class ProjectSourcesAdminService extends ServiceMap.Service<
                 )
               }
 
-              yield* indexStoredMarkdown({
+              yield* reindexStoredMarkdown({
                 projectId,
                 organizationId: attachment.ownerOrgId,
                 attachmentId,
+                fileName: attachment.fileName,
                 userId: attachment.userId,
                 markdown: attachment.fileContent,
                 requestId,

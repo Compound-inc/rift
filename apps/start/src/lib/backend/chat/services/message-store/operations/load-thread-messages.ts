@@ -8,26 +8,14 @@ import type {
 import { MessagePersistenceError } from '@/lib/backend/chat/domain/errors'
 import { getUserMessageText } from '@/lib/backend/chat/domain/schemas'
 import { zql } from '@/lib/backend/chat/infra/zero/db'
-import type { OrgKnowledgeRepositoryService } from '@/lib/backend/org-knowledge/services/org-knowledge-repository.service'
 import type { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
-import type { AttachmentRecordService } from '@/lib/backend/chat/services/attachment-record.service'
-import type {
-  AttachmentRagService,
-  OrgKnowledgeRagService,
-  ProjectSourceRagService,
-} from '@/lib/backend/chat/services/rag'
-import { getRetrievalLimits } from '@/lib/backend/chat/services/rag/attachment-content.pipeline'
-import { buildRetrievalQuery } from '@/lib/backend/chat/services/rag/context-block.pipeline'
-import {
-  retrieveAttachmentContextBlock,
-  retrieveOrgKnowledgeContextBlock,
-  retrieveProjectSourceContextBlock,
-} from '@/lib/backend/chat/services/rag/scope-retrieval'
+import type { RagContextService } from '@/lib/backend/rag'
 import {
   expandUserMessageText,
   loadSkillBodiesForContext,
 } from '@/lib/backend/skills/skill-resolver'
 import { resolveCanonicalBranch } from '@/lib/shared/chat-branching/branch-resolver'
+import { DEFAULT_THREAD_TITLE } from '@/lib/shared/chat/thread-bootstrap'
 import { requireMessagePersistenceDb } from '../../message-persistence-db'
 import { normalizeThreadActiveChildMap } from '../helpers'
 import type { MessageStoreServiceShape } from '../../message-store.service'
@@ -44,10 +32,10 @@ function supportsNativeAttachment(input: {
 }): boolean {
   const { mimeType, capabilities } = input
   if (isImageMimeType(mimeType)) return capabilities.supportsImageInput
-  // PDFs and generic files are intentionally routed through the RAG /
-  // markdown fallback path even when the model advertises native PDF
-  // support, because retrieving relevant excerpts is significantly more
-  // token-efficient than uploading the full document on every turn.
+  // PDFs and generic files always go through the RAG context service even
+  // when the model advertises native PDF support: the extracted text is read
+  // in full when it fits and retrieved when it does not, which is cheaper and
+  // behaves the same for every model.
   return false
 }
 
@@ -90,27 +78,24 @@ function uniqueAttachmentIds(
   ]
 }
 
+/**
+ * Prepend a context block to a message's text, keeping the user's words last
+ * (documents first, question last reads best for long-context models).
+ */
+function withContextPrefix(block: string, text: string): string {
+  return block.length > 0 ? `${block}\n\n${text}` : text
+}
+
 export const makeLoadThreadMessagesOperation = (dependencies: {
   readonly zeroDatabase: ZeroDatabaseService['Service']
-  readonly attachmentRecord: AttachmentRecordService['Service']
-  readonly attachmentRag: AttachmentRagService['Service']
-  readonly orgKnowledgeRag: OrgKnowledgeRagService['Service']
-  readonly projectSourceRag: ProjectSourceRagService['Service']
-  readonly orgKnowledgeRepository: OrgKnowledgeRepositoryService['Service']
+  readonly ragContext: RagContextService['Service']
 }): MessageStoreServiceShape['loadThreadMessages'] => {
   /**
    * Loads canonical thread history and, when present, appends the pending user
    * turn before retrieval. This lets the first model response see context from
    * freshly uploaded attachments before those attachments are linked in storage.
    */
-  const {
-    zeroDatabase,
-    attachmentRecord,
-    attachmentRag,
-    orgKnowledgeRag,
-    projectSourceRag,
-    orgKnowledgeRepository,
-  } = dependencies
+  const { zeroDatabase, ragContext } = dependencies
 
   return Effect.fn('MessageStoreService.loadThreadMessages')(
     ({
@@ -122,6 +107,7 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
       untilMessageId,
       pendingUserMessage,
       pendingAttachments,
+      contextWindowTokens,
       requestId,
     }) =>
       Effect.gen(function* () {
@@ -218,44 +204,6 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
         const attachmentsById = new Map(
           attachmentRows.map((attachment) => [attachment.id, attachment]),
         )
-        const threadAttachmentContentRows = yield* attachmentRecord
-          .listAttachmentContentRowsByThread(threadId)
-          .pipe(
-            Effect.mapError(
-              (error) =>
-                new MessagePersistenceError({
-                  message: 'Failed to load attachment content',
-                  requestId,
-                  threadId,
-                  cause: String(error),
-                }),
-            ),
-          )
-        const pendingAttachmentContentRows =
-          userId && pendingAttachmentIds.length > 0
-            ? yield* attachmentRecord
-                .listAttachmentContentRowsByIdsForUser({
-                  userId,
-                  attachmentIds: pendingAttachmentIds,
-                })
-                .pipe(
-                  Effect.mapError(
-                    (error) =>
-                      new MessagePersistenceError({
-                        message: 'Failed to load pending attachment content',
-                        requestId,
-                        threadId,
-                        cause: String(error),
-                      }),
-                  ),
-                )
-            : []
-        const attachmentContentById = new Map(
-          [...threadAttachmentContentRows, ...pendingAttachmentContentRows].map(
-            (attachment) => [attachment.id, attachment],
-          ),
-        )
-
         const persistedMessageRows = (
           messageRows as readonly MessagePromptRow[]
         ).filter((message) => !userId || message.userId === userId)
@@ -315,25 +263,30 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
         const canonicalRowIdSet = new Set(
           canonicalRows.map((row) => row.messageId),
         )
-        const modelCapabilities = getCatalogModel(model)?.capabilities
+        const modelCatalogEntry = getCatalogModel(model)
+        const modelCapabilities = modelCatalogEntry?.capabilities
 
-        const latestUserMessageRow = [...canonicalRows]
-          .reverse()
-          .find((row) => row.role === 'user')
+        const userRows = canonicalRows.filter((row) => row.role === 'user')
+        const firstUserMessageRow = userRows.at(0)
+        const latestUserMessageRow = userRows.at(-1)
+        const previousUserMessageRow = userRows.at(-2)
         const activeProjectId =
           typeof threadRow?.projectId === 'string' && threadRow.projectId.trim()
             ? threadRow.projectId
             : undefined
+        // The placeholder title of a new thread carries no meaning and only
+        // adds noise to the retrieval query.
         const threadTitle =
           typeof threadRow?.title === 'string' &&
-          threadRow.title.trim().length > 0
+          threadRow.title.trim().length > 0 &&
+          threadRow.title !== DEFAULT_THREAD_TITLE
             ? threadRow.title.trim()
             : undefined
 
         // Skill body lookup runs before the retrieval query so
         // `/skillname` tokens in the latest user message expand into
-        // their full body and feed the RAG embedding (ADR-0004 intent
-        // enrichment, ADR-0005 skills). The map is reused by the
+        // their full body and feed the RAG query (ADR-0005 skills,
+        // ADR-0006 RAG). The map is reused by the
         // per-message expansion below.
         //
         // Short-circuit: if no user message in the canonical history
@@ -360,11 +313,10 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
           bodyByName: skillBodyByName,
         })
 
-        // The custom instruction lives on the Project row. We need it
-        // for intent-enrichment of the query embedding (see
-        // `composeIntentEnrichedQuery` in context-block.pipeline) so a
-        // turn whose user text is short or empty (e.g. `"."`) still
-        // produces meaningful retrieval. Loaded best-effort: if the
+        // The custom instruction lives on the Project row. It enriches the
+        // retrieval query (see `composeRetrievalQuery`) so a turn whose
+        // user text is short or empty (e.g. `"."`) still produces
+        // meaningful retrieval. Loaded best-effort: if the
         // lookup fails the embedding falls back to whatever signal
         // remains in the user text + file names.
         const projectCustomInstruction = activeProjectId
@@ -395,15 +347,27 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
             )
           : undefined
 
-        // Per-message-and-thread attachment candidates: only attachments
-        // that are linked to a canonical message OR pending in this turn,
-        // and only those the active model cannot ingest natively.
+        // Per-message-and-thread attachment candidates: attachments linked to
+        // a canonical message (by `attachments.message_id`, or listed in a
+        // canonical message's `attachmentsIds` — an edited message reuses
+        // the original's files) OR pending in this turn, and only those the
+        // active model cannot ingest natively.
+        const canonicalAttachmentIds = new Set(
+          canonicalRows.flatMap((row) =>
+            Array.isArray(row.attachmentsIds)
+              ? (row.attachmentsIds as readonly unknown[]).filter(
+                  (id): id is string => typeof id === 'string',
+                )
+              : [],
+          ),
+        )
         const fallbackAttachmentById = new Map(
           attachmentRows
             .filter(
               (attachment) =>
                 (typeof attachment.messageId === 'string' &&
                   canonicalRowIdSet.has(attachment.messageId)) ||
+                canonicalAttachmentIds.has(attachment.id) ||
                 pendingAttachmentIds.includes(attachment.id),
             )
             .filter((attachment) =>
@@ -417,100 +381,38 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
             .map((attachment) => [attachment.id, attachment]),
         )
 
-        // The retrieval query bundle is computed once and shared
-        // across all the scoped retrievals below. ADR-0002 requires
-        // the union of the active sources, so paying for the
-        // embedding once and reusing it across `retrieveContextBlock`
-        // calls is significantly cheaper than the historical per-
-        // source duplication.
-        //
-        // Intent hints (custom instruction, file names, thread title)
-        // are appended so a `"."`-style short message still produces
-        // a meaningful query string. See `composeIntentEnrichedQuery`
-        // in `context-block.pipeline.ts` for the precise composition
-        // rule.
-        const intentFileNames = [
-          ...new Set(
-            [...fallbackAttachmentById.values()].map((row) => row.fileName),
-          ),
-        ]
-        const query = yield* buildRetrievalQuery({
-          latestUserText,
+        // One call builds the document context for every knowledge scope
+        // (conversation files, project files, org knowledge) with the same
+        // rules; see `RagContextService` and ADR-0006.
+        const turnContext = yield* ragContext.buildTurnContext({
           requestId,
           threadId,
-          intentHints: {
-            customInstruction: projectCustomInstruction,
-            fileNames: intentFileNames,
+          userId: latestUserMessageRow?.userId || userId || undefined,
+          attachmentIds: [...fallbackAttachmentById.keys()],
+          projectId: activeProjectId,
+          organizationId:
+            organizationId && orgPolicy?.orgKnowledgeEnabled
+              ? organizationId
+              : undefined,
+          query: {
+            latestUserText,
+            previousUserText: previousUserMessageRow
+              ? expandUserMessageText({
+                  text: previousUserMessageRow.content,
+                  bodyByName: skillBodyByName,
+                })
+              : undefined,
             threadTitle,
+            customInstruction: projectCustomInstruction,
+            fileNames: [
+              ...new Set(
+                [...fallbackAttachmentById.values()].map((row) => row.fileName),
+              ),
+            ],
           },
+          contextWindowTokens:
+            contextWindowTokens ?? modelCatalogEntry?.contextWindow,
         })
-
-        // Adaptive retrieval candidate limit — the upper-bound search
-        // request size is set against the per-thread-attachment source
-        // count because that's the source group most affected by
-        // bursty multi-file uploads (e.g. comparing many CVs in one
-        // turn). The other sources still benefit from the resulting
-        // larger candidate pool.
-        const retrievalLimits = getRetrievalLimits({
-          sourceCount: fallbackAttachmentById.size,
-        })
-        const retrievalCandidateLimit = retrievalLimits.maxChunks * 3
-        const commonScopeInput = {
-          query,
-          requestId,
-          threadId,
-          retrievalCandidateLimit,
-        } as const
-
-        // Source 1: per-thread / per-message attachments (user-provided).
-        const fallbackContextBlock = yield* retrieveAttachmentContextBlock({
-          ...commonScopeInput,
-          attachmentRag,
-          userId: latestUserMessageRow?.userId || userId || '',
-          fallbackAttachmentRows: fallbackAttachmentById,
-          attachmentContentById,
-        })
-
-        // Source 2: organization knowledge.
-        //
-        // Org knowledge has no fallback excerpt path, so it can only
-        // contribute when we managed to build a query embedding
-        // (which succeeds whenever the literal user text or any
-        // intent hint produces a non-empty enriched query — e.g. a
-        // project's custom instruction is enough on its own).
-        let orgKnowledgeContextBlock = ''
-        if (
-          organizationId &&
-          orgPolicy?.orgKnowledgeEnabled &&
-          query.embedding
-        ) {
-          orgKnowledgeContextBlock = yield* retrieveOrgKnowledgeContextBlock({
-            ...commonScopeInput,
-            orgKnowledgeRag,
-            orgKnowledgeRepository,
-            db,
-            organizationId,
-          })
-        }
-
-        // Source 3: project sources.
-        //
-        // Project sources have a fallback excerpt path that runs even
-        // when the query embedding is null, so the only gate here is
-        // having an active project. The fallback path emits a
-        // per-source excerpt of every project source so the model
-        // still sees the curated context (e.g. company description,
-        // ranking criteria) on a `"."` user turn inside the project.
-        let projectSourceContextBlock = ''
-        if (activeProjectId) {
-          projectSourceContextBlock = yield* retrieveProjectSourceContextBlock({
-            ...commonScopeInput,
-            projectSourceRag,
-            attachmentRecord,
-            db,
-            projectId: activeProjectId,
-          })
-        }
 
         return canonicalRows.map((message) => {
           const attachmentIds = Array.isArray(message.attachmentsIds)
@@ -551,22 +453,16 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
                 })
               : message.content
 
-          const modelText =
-            message.role === 'user' &&
-            latestUserMessageRow?.messageId === message.messageId &&
-            canonicalRowIdSet.has(message.messageId) &&
-            (orgKnowledgeContextBlock.length > 0 ||
-              projectSourceContextBlock.length > 0 ||
-              fallbackContextBlock.length > 0)
-              ? [
-                  orgKnowledgeContextBlock,
-                  projectSourceContextBlock,
-                  expandedText,
-                  fallbackContextBlock,
-                ]
-                  .filter((value) => value.length > 0)
-                  .join('\n\n')
-              : expandedText
+          // Full-text documents ride on the first user message so the prompt
+          // prefix is identical from turn to turn (provider prompt caching);
+          // question-specific excerpts ride on the latest user message.
+          let modelText = expandedText
+          if (message.messageId === latestUserMessageRow?.messageId) {
+            modelText = withContextPrefix(turnContext.turnBlock, modelText)
+          }
+          if (message.messageId === firstUserMessageRow?.messageId) {
+            modelText = withContextPrefix(turnContext.libraryBlock, modelText)
+          }
 
           const messageParts: UIMessage['parts'] = [
             { type: 'text', text: modelText },

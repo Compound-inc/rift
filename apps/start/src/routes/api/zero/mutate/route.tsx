@@ -10,6 +10,12 @@ import { ChatErrorCode } from '@/lib/shared/chat-contracts/error-codes'
 import { getZeroUpstreamPool } from '@/lib/backend/server-effect/infra/zero-upstream-pool'
 import { requireZeroAppUserAuth } from '@/lib/backend/server-effect/http/zero-server-auth'
 import { ServerRuntime } from '@/lib/backend/server-effect'
+import { runUpstreamPostgresEffect } from '@/lib/backend/server-effect/runtime/upstream-postgres-runtime'
+import {
+  RagIndexerService,
+  extractDeletedThreadIds,
+  purgeDeletedThreadDocuments,
+} from '@/lib/backend/rag'
 
 /**
  * Zero mutate endpoint. zero-cache calls this to run mutators against Postgres.
@@ -84,6 +90,16 @@ export const Route = createFileRoute('/api/zero/mutate')({
               }
           const requestId =
             request.headers.get('x-request-id') ?? crypto.randomUUID()
+          // Read before the processor consumes the body: thread deletions
+          // need a server-only follow-up (vector cleanup) after commit.
+          const deletedThreadIds = extractDeletedThreadIds(
+            yield* Effect.promise(() =>
+              request
+                .clone()
+                .json()
+                .catch(() => null),
+            ),
+          )
           const processor = new PushProcessor(dbProvider, context, 'error')
           const result = yield* Effect.tryPromise({
             try: () => processor.process(mutators, request),
@@ -128,6 +144,26 @@ export const Route = createFileRoute('/api/zero/mutate')({
               ? 400
               : 500
             : 200
+
+          if (!failed && deletedThreadIds.length > 0) {
+            // Fire and forget: the user's delete already succeeded, and a
+            // failed cleanup only leaves harmless orphan vectors.
+            void runUpstreamPostgresEffect(
+              purgeDeletedThreadDocuments({
+                userId: authContext.userId,
+                threadIds: deletedThreadIds,
+              }).pipe(
+                Effect.provide(RagIndexerService.layer),
+                Effect.catch((error) =>
+                  Effect.logWarning('rag_thread_vector_cleanup_failed', {
+                    requestId,
+                    threadIds: deletedThreadIds,
+                    cause: String(error),
+                  }),
+                ),
+              ),
+            ).catch(() => undefined)
+          }
 
           return new Response(JSON.stringify(result), {
             status,

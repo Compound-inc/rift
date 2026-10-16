@@ -691,6 +691,10 @@ ALTER TABLE attachments
 ADD COLUMN IF NOT EXISTS org_knowledge_kind TEXT;
 ALTER TABLE attachments
 ADD COLUMN IF NOT EXISTS org_knowledge_active BOOLEAN NOT NULL DEFAULT FALSE;
+-- Character length of `file_content`, read by the RAG context planner so it
+-- can budget documents without loading their full text.
+ALTER TABLE attachments
+ADD COLUMN IF NOT EXISTS content_chars INTEGER;
 CREATE INDEX IF NOT EXISTS attachments_thread_id ON attachments (thread_id);
 CREATE INDEX IF NOT EXISTS attachments_message_id ON attachments (message_id);
 CREATE INDEX IF NOT EXISTS attachments_user_id ON attachments (user_id);
