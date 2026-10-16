@@ -1,15 +1,13 @@
 import { convertToModelMessages, smoothStream, streamText } from 'ai'
-import type {
-  IdGenerator,
-  LanguageModelUsage,
-  ToolSet,
-  UIMessage,
-} from 'ai'
+import type { IdGenerator, LanguageModelUsage, ToolSet, UIMessage } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { Effect, Layer, ServiceMap } from 'effect'
-import { getCatalogModel, getCatalogModelProviderRoute } from '@/lib/shared/ai-catalog'
+import {
+  getCatalogModel,
+  getCatalogModelProviderRoute,
+} from '@/lib/shared/ai-catalog'
 import {
   toReadableErrorCause,
   toReadableErrorMessage,
@@ -90,7 +88,13 @@ function resolveRuntimeModel(input: {
     })
   }
 
-  if (!providerApiKeyOverride) return modelId
+  if (!providerApiKeyOverride) {
+    // Saved catalog IDs may predate a Gateway namespace change.
+    return (
+      getCatalogModelProviderRoute({ modelId, providerId: 'gateway' })
+        ?.modelId ?? modelId
+    )
+  }
   const providerRoute = getCatalogModelProviderRoute({
     modelId,
     providerId: providerApiKeyOverride.providerId,

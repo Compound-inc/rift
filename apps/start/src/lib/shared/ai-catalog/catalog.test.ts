@@ -42,6 +42,8 @@ describe('model catalog', () => {
     'moonshotai/kimi-k3',
     'xiaomi/mimo-v2.6-pro',
     'zai/glm-5.3',
+    'spacexai/grok-4.7',
+    'spacexai/grok-build-0.1',
   ])('routes %s using its published gateway ID', (modelId) => {
     expect(
       getCatalogModelProviderRoute({ modelId, providerId: 'gateway' }),
