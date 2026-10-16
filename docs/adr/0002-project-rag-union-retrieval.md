@@ -17,6 +17,10 @@ plausible options — narrowing it later (e.g. excluding org-knowledge from
 project threads, or gating it behind a per-Project toggle) does not require a
 schema change.
 
+_Implementation note: since ADR-0006 all four sources go through one
+`RagContextService` with a single budget; the paragraph below describes
+the original per-source design._
+
 Implementation-wise the orchestrator branches by source: per-message and
 per-thread attachments flow through `attachment-rag.service.ts`; org-knowledge
 flows through `org-knowledge-rag.service.ts`; project files flow through a

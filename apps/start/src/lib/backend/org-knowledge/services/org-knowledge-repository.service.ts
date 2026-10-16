@@ -47,15 +47,13 @@ type PersistedAttachmentInput = {
   readonly embeddingDimensions: number
   readonly embeddingChunks: number
   readonly embeddingStatus: 'indexed' | 'disabled' | 'failed'
+  readonly vectorIndexedAt?: number
+  readonly vectorError?: string
   readonly createdAt: number
   readonly updatedAt: number
 }
 
 export type OrgKnowledgeRepositoryServiceShape = {
-  readonly listActiveAttachmentIds: (input: {
-    readonly organizationId: string
-    readonly requestId: string
-  }) => Effect.Effect<readonly string[], OrgKnowledgePersistenceError>
   readonly insertKnowledgeAttachment: (input: {
     readonly attachment: PersistedAttachmentInput
     readonly requestId: string
@@ -132,38 +130,6 @@ export class OrgKnowledgeRepositoryService extends ServiceMap.Service<
           ),
         )
 
-      const listActiveAttachmentIds: OrgKnowledgeRepositoryServiceShape['listActiveAttachmentIds'] =
-        Effect.fn('OrgKnowledgeRepositoryService.listActiveAttachmentIds')(
-          ({ organizationId, requestId }) =>
-            withOrgKnowledgeDb({
-              message: 'Failed to load active organization knowledge attachments',
-              requestId,
-              organizationId,
-            }, (db) =>
-              Effect.tryPromise({
-                try: async () => {
-                  const rows = await db.run(
-                    zql.attachment
-                      .where('ownerOrgId', organizationId)
-                      .where('orgKnowledgeKind', ORG_KNOWLEDGE_KIND)
-                      .where('orgKnowledgeActive', true)
-                      .where('embeddingStatus', 'indexed')
-                      .where('status', 'uploaded')
-                      .orderBy('updatedAt', 'desc'),
-                  )
-                  return rows.map((row) => row.id)
-                },
-                catch: (error) =>
-                  new OrgKnowledgePersistenceError({
-                    message: 'Failed to load active organization knowledge attachments',
-                    requestId,
-                    organizationId,
-                    cause: String(error),
-                  }),
-              }),
-            ),
-        )
-
       const insertKnowledgeAttachment: OrgKnowledgeRepositoryServiceShape['insertKnowledgeAttachment'] =
         Effect.fn('OrgKnowledgeRepositoryService.insertKnowledgeAttachment')(
           ({ attachment, requestId }) =>
@@ -182,6 +148,8 @@ export class OrgKnowledgeRepositoryService extends ServiceMap.Service<
               embeddingDimensions: attachment.embeddingDimensions,
               embeddingChunks: attachment.embeddingChunks,
               embeddingStatus: attachment.embeddingStatus,
+              vectorIndexedAt: attachment.vectorIndexedAt,
+              vectorError: summarizeOrgKnowledgeIndexError(attachment.vectorError),
               accessScope: 'org',
               orgKnowledgeKind: ORG_KNOWLEDGE_KIND,
               orgKnowledgeActive: false,
@@ -423,7 +391,6 @@ export class OrgKnowledgeRepositoryService extends ServiceMap.Service<
         )
 
       return {
-        listActiveAttachmentIds,
         insertKnowledgeAttachment,
         setAttachmentActive,
         markAttachmentDeleted,

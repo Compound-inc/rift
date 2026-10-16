@@ -1,5 +1,9 @@
 # RAG retrieval pipeline: dense search
 
+> **Superseded by ADR-0006.** Kept for history. The inline-by-page-count
+> rule, per-scope budgets and per-scope services described here no longer
+> exist.
+
 The per-turn retrieval pipeline runs four stages on top of the
 union of context sources defined in ADR-0002. From the user's
 intent to the chunks injected into the model prompt, each turn

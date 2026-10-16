@@ -1,7 +1,7 @@
 import { Layer } from 'effect'
 import { makeRuntimeRunner } from '@/lib/backend/server-effect'
 import { AttachmentRecordService } from '@/lib/backend/chat/services/attachment-record.service'
-import { AttachmentRagService } from '@/lib/backend/chat/services/rag'
+import { RagIndexerService } from '@/lib/backend/rag'
 import { UpstreamPostgresLayer } from '@/lib/backend/server-effect/services/upstream-postgres.service'
 import { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
 import { FileUploadOrchestratorService } from '../services/file-upload-orchestrator.service'
@@ -21,7 +21,7 @@ const layer = Layer.mergeAll(
 ).pipe(
   Layer.provideMerge(UpstreamPostgresLayer),
   Layer.provideMerge(ZeroDatabaseService.layer),
-  Layer.provideMerge(AttachmentRagService.layer),
+  Layer.provideMerge(RagIndexerService.layer),
 )
 
 const runtime = makeRuntimeRunner(layer)

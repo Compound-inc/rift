@@ -1,17 +1,13 @@
 import { Effect, Layer, ServiceMap } from 'effect'
 import {
-  buildAttachmentChunkRows,
+  RagIndexerService,
   normalizeMarkdownForStorage,
-} from '@/lib/backend/chat/services/rag/attachment-content.pipeline'
-import { OrgKnowledgeRagService } from '@/lib/backend/chat/services/rag'
+} from '@/lib/backend/rag'
 import {
   MarkdownConversionService,
 } from '@/lib/backend/file/services/markdown-conversion.service'
 import { readDirectTextFileContent } from '@/lib/backend/file/services/plain-text-file'
-import {
-  ORG_KNOWLEDGE_KIND,
-  summarizeOrgKnowledgeIndexError,
-} from '@/lib/shared/org-knowledge'
+import { ORG_KNOWLEDGE_KIND } from '@/lib/shared/org-knowledge'
 import { ORG_KNOWLEDGE_UPLOAD_POLICY } from '@/lib/shared/upload/upload-validation'
 import {
   UploadServiceError,
@@ -52,8 +48,10 @@ export type OrgKnowledgeAdminServiceShape = {
 
 /**
  * Admin-oriented orchestration for org-wide knowledge uploads and lifecycle
- * changes. This reuses the existing markdown conversion and embedding pipeline
- * while persisting rows onto the shared `attachments` table.
+ * changes. Indexing goes through the shared `RagIndexerService`, the same
+ * path as chat attachments and project files, and rows live on the shared
+ * `attachments` table. An indexing failure never fails the upload: the row is
+ * stored with `embeddingStatus: 'failed'` and can be retried from settings.
  */
 export class OrgKnowledgeAdminService extends ServiceMap.Service<
   OrgKnowledgeAdminService,
@@ -64,7 +62,7 @@ export class OrgKnowledgeAdminService extends ServiceMap.Service<
     Effect.gen(function* () {
       const markdownConversion = yield* MarkdownConversionService
       const orgKnowledgeRepository = yield* OrgKnowledgeRepositoryService
-      const orgKnowledgeRag = yield* OrgKnowledgeRagService
+      const ragIndexer = yield* RagIndexerService
 
       const uploadKnowledgeFile: OrgKnowledgeAdminServiceShape['uploadKnowledgeFile'] =
         Effect.fn('OrgKnowledgeAdminService.uploadKnowledgeFile')(
@@ -130,22 +128,16 @@ export class OrgKnowledgeAdminService extends ServiceMap.Service<
                   ),
                 ))
               const markdown = normalizeMarkdownForStorage(markdownRaw)
-              const chunkBuild = yield* Effect.tryPromise({
-                try: () =>
-                  buildAttachmentChunkRows({
-                    attachmentId,
-                    userId,
-                    markdown,
-                    now,
-                  }),
-                catch: (error) =>
-                  new OrgKnowledgePersistenceError({
-                    message: 'Failed to prepare organization knowledge chunks',
-                    requestId,
-                    organizationId,
-                    attachmentId,
-                    cause: String(error),
-                  }),
+              const index = yield* ragIndexer.indexDocument({
+                scope: 'org_knowledge',
+                attachmentId,
+                fileName: uploaded.name,
+                markdown,
+                ownership: {
+                  userId,
+                  ownerOrgId: organizationId,
+                  accessScope: 'org',
+                },
               })
 
               yield* orgKnowledgeRepository.insertKnowledgeAttachment({
@@ -159,68 +151,27 @@ export class OrgKnowledgeAdminService extends ServiceMap.Service<
                   mimeType: uploaded.contentType,
                   fileSize: uploaded.size,
                   fileContent: markdown,
-                  embeddingModel: chunkBuild.metrics.embeddingModel,
-                  embeddingTokens: chunkBuild.metrics.embeddingTokens,
-                  embeddingDimensions: chunkBuild.metrics.embeddingDimensions,
-                  embeddingChunks: chunkBuild.metrics.embeddingChunks,
-                  embeddingStatus: chunkBuild.metrics.embeddingStatus,
+                  embeddingModel: index.embeddingModel,
+                  embeddingTokens: index.embeddingTokens,
+                  embeddingDimensions: index.embeddingDimensions,
+                  embeddingChunks: index.embeddingChunks,
+                  embeddingStatus: index.embeddingStatus,
+                  vectorIndexedAt: index.vectorIndexedAt,
+                  vectorError: index.vectorError,
                   createdAt: now,
                   updatedAt: now,
                 },
                 requestId,
-              })
-
-              yield* orgKnowledgeRag
-                .indexOrgKnowledgeChunks({
-                  chunks: chunkBuild.chunks.map((chunk) => ({
-                    ...chunk,
-                    scopeType: 'org_knowledge' as const,
-                    sourceId: chunk.attachmentId,
-                    ownerOrgId: organizationId,
-                    accessScope: 'org' as const,
-                    embedding: chunk.embedding ?? [],
-                    embeddingModel: chunkBuild.metrics.embeddingModel,
-                  })),
-                })
-                .pipe(
-                  Effect.flatMap(() =>
-                    orgKnowledgeRepository.updateAttachmentIndexState({
-                      organizationId,
-                      attachmentId,
-                      embeddingStatus: chunkBuild.metrics.embeddingStatus,
-                      vectorIndexedAt:
-                        chunkBuild.metrics.embeddingStatus === 'indexed'
-                          ? Date.now()
-                          : undefined,
-                      requestId,
-                    }),
-                  ),
-                  Effect.catch((error) =>
-                    orgKnowledgeRepository
-                      .updateAttachmentIndexState({
-                        organizationId,
-                        attachmentId,
-                        embeddingStatus: 'failed',
-                        vectorError: summarizeOrgKnowledgeIndexError(
-                          error instanceof Error ? error.message : String(error),
-                        ),
-                        requestId,
-                      })
-                      .pipe(
-                        Effect.flatMap(() =>
-                          Effect.fail(
-                            new OrgKnowledgePersistenceError({
-                              message: 'Failed to index organization knowledge vectors',
-                              requestId,
-                              organizationId,
-                              attachmentId,
-                              cause: String(error),
-                            }),
-                          ),
-                        ),
-                      ),
-                  ),
-                )
+              }).pipe(
+                Effect.tapError(() =>
+                  ragIndexer
+                    .deleteDocuments({
+                      tenant: { scope: 'org_knowledge', organizationId },
+                      attachmentIds: [attachmentId],
+                    })
+                    .pipe(Effect.ignore),
+                ),
+              )
 
               return { attachmentId }
             }),
@@ -258,8 +209,8 @@ export class OrgKnowledgeAdminService extends ServiceMap.Service<
                 )
               }
 
-              yield* orgKnowledgeRag.deleteOrgKnowledgeChunks({
-                organizationId,
+              yield* ragIndexer.deleteDocuments({
+                tenant: { scope: 'org_knowledge', organizationId },
                 attachmentIds: [attachmentId],
               }).pipe(
                 Effect.catch((error) =>
@@ -308,73 +259,39 @@ export class OrgKnowledgeAdminService extends ServiceMap.Service<
                 )
               }
 
-              const chunkBuild = yield* Effect.tryPromise({
-                try: () =>
-                  buildAttachmentChunkRows({
-                    attachmentId,
-                    userId: attachment.userId,
-                    markdown: attachment.fileContent,
-                    now: Date.now(),
-                  }),
-                catch: (error) =>
-                  new OrgKnowledgePersistenceError({
-                    message: 'Failed to rebuild organization knowledge chunks',
-                    requestId,
-                    organizationId,
-                    attachmentId,
-                    cause: String(error),
-                  }),
-              })
-
-              yield* orgKnowledgeRag.indexOrgKnowledgeChunks({
-                chunks: chunkBuild.chunks.map((chunk) => ({
-                  ...chunk,
-                  scopeType: 'org_knowledge' as const,
-                  sourceId: chunk.attachmentId,
+              const index = yield* ragIndexer.indexDocument({
+                scope: 'org_knowledge',
+                attachmentId,
+                fileName: attachment.fileName,
+                markdown: attachment.fileContent,
+                ownership: {
+                  userId: attachment.userId,
                   ownerOrgId: organizationId,
-                  accessScope: 'org' as const,
-                  embedding: chunk.embedding ?? [],
-                  embeddingModel: chunkBuild.metrics.embeddingModel,
-                })),
-              }).pipe(
-                Effect.catch((error) =>
-                  orgKnowledgeRepository
-                    .updateAttachmentIndexState({
-                      organizationId,
-                      attachmentId,
-                      embeddingStatus: 'failed',
-                      vectorError: summarizeOrgKnowledgeIndexError(
-                        error instanceof Error ? error.message : String(error),
-                      ),
-                      requestId,
-                    })
-                    .pipe(
-                      Effect.flatMap(() =>
-                        Effect.fail(
-                          new OrgKnowledgePersistenceError({
-                            message: 'Failed to reindex organization knowledge vectors',
-                            requestId,
-                            organizationId,
-                            attachmentId,
-                            cause: String(error),
-                          }),
-                        ),
-                      ),
-                    ),
-                ),
-              )
+                  accessScope: 'org',
+                },
+                replaceExisting: true,
+              })
 
               yield* orgKnowledgeRepository.updateAttachmentIndexState({
                 organizationId,
                 attachmentId,
-                embeddingStatus: chunkBuild.metrics.embeddingStatus,
-                vectorIndexedAt:
-                  chunkBuild.metrics.embeddingStatus === 'indexed'
-                    ? Date.now()
-                    : undefined,
-                vectorError: undefined,
+                embeddingStatus: index.embeddingStatus,
+                vectorIndexedAt: index.vectorIndexedAt,
+                vectorError: index.vectorError,
                 requestId,
               })
+
+              if (index.embeddingStatus === 'failed') {
+                return yield* Effect.fail(
+                  new OrgKnowledgePersistenceError({
+                    message: 'Failed to reindex organization knowledge vectors',
+                    requestId,
+                    organizationId,
+                    attachmentId,
+                    cause: index.vectorError,
+                  }),
+                )
+              }
             }),
         )
 

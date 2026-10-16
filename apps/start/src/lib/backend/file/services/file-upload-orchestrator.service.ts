@@ -1,13 +1,10 @@
 import { Effect, Layer, ServiceMap } from 'effect'
-import { isEmbeddingFeatureEnabled } from '@/utils/app-feature-flags'
 import { emitWideErrorEvent } from '@/lib/backend/chat/observability/wide-event'
 import { AttachmentRecordService } from '@/lib/backend/chat/services/attachment-record.service'
-import { AttachmentRagService } from '@/lib/backend/chat/services/rag'
-import { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
 import {
-  buildAttachmentChunkRows,
+  RagIndexerService,
   normalizeMarkdownForStorage,
-} from '@/lib/backend/chat/services/rag/attachment-content.pipeline'
+} from '@/lib/backend/rag'
 import {
   UploadServiceError,
   uploadService,
@@ -21,7 +18,6 @@ import {
   FilePersistenceError,
   FileUploadStorageError,
 } from '../domain/errors'
-import { requireFilePersistenceDb } from './file-persistence-db'
 import { MarkdownConversionService } from './markdown-conversion.service'
 import { readDirectTextFileContent } from './plain-text-file'
 
@@ -62,8 +58,7 @@ export class FileUploadOrchestratorService extends ServiceMap.Service<
     FileUploadOrchestratorService,
     Effect.gen(function* () {
       const attachmentRecords = yield* AttachmentRecordService
-      const attachmentRag = yield* AttachmentRagService
-      const zeroDatabase = yield* ZeroDatabaseService
+      const ragIndexer = yield* RagIndexerService
       const markdownConversion = yield* MarkdownConversionService
 
       return {
@@ -164,41 +159,34 @@ export class FileUploadOrchestratorService extends ServiceMap.Service<
           const markdown = normalizeMarkdownForStorage(markdownRaw)
           const now = Date.now()
           const attachmentId = crypto.randomUUID()
-          const chunkBuild = yield* Effect.tryPromise({
-            try: () =>
-              buildAttachmentChunkRows({
-                attachmentId,
-                userId,
-                markdown,
-                now,
-              }),
-            catch: (error) =>
-              new FilePersistenceError({
-                message: 'Failed to prepare attachment chunks',
-                requestId,
-                cause: String(error),
-              }),
-          })
-          if (
-            isEmbeddingFeatureEnabled &&
-            chunkBuild.metrics.embeddingStatus === 'failed'
-          ) {
-            yield* Effect.logError(
-              'Attachment embeddings failed during upload; continuing with markdown fallback',
-              {
-                requestId,
-                route,
-                userId,
-                attachmentId,
-              },
-            )
-          }
+          const ownership = {
+            userId,
+            ownerOrgId,
+            workspaceId,
+            accessScope: accessScope ?? 'user',
+            accessGroupIds: accessGroupIds ?? [],
+          } as const
 
-          const db = yield* requireFilePersistenceDb({
-            zeroDatabase,
-            message: 'File storage is unavailable',
-            requestId,
+          // Indexing never fails the upload: a file without vectors is still
+          // read in full (or from its beginning) by the RAG context service.
+          const index = yield* ragIndexer.indexDocument({
+            scope: 'attachment',
+            attachmentId,
+            fileName: uploaded.name,
+            markdown,
+            ownership,
           })
+          if (index.embeddingStatus === 'failed') {
+            yield* emitWideErrorEvent({
+              eventName: 'file.upload.vector_index.failed',
+              route,
+              requestId,
+              userId,
+              errorTag: 'FileVectorIndexError',
+              message: 'Failed to index file chunks in vector store',
+              cause: index.vectorError,
+            })
+          }
 
           yield* attachmentRecords.insertAttachmentRecord({
             id: attachmentId,
@@ -209,19 +197,30 @@ export class FileUploadOrchestratorService extends ServiceMap.Service<
             mimeType: uploaded.contentType,
             fileSize: uploaded.size,
             fileContent: markdown,
-            embeddingModel: chunkBuild.metrics.embeddingModel,
-            embeddingTokens: chunkBuild.metrics.embeddingTokens,
-            embeddingDimensions: chunkBuild.metrics.embeddingDimensions,
-            embeddingChunks: chunkBuild.metrics.embeddingChunks,
-            embeddingStatus: chunkBuild.metrics.embeddingStatus,
-            ownerOrgId,
-            workspaceId,
-            accessScope: accessScope ?? 'user',
-            accessGroupIds: accessGroupIds ?? [],
+            embeddingModel: index.embeddingModel,
+            embeddingTokens: index.embeddingTokens,
+            embeddingDimensions: index.embeddingDimensions,
+            embeddingChunks: index.embeddingChunks,
+            embeddingStatus: index.embeddingStatus,
+            vectorIndexedAt: index.vectorIndexedAt,
+            vectorError: index.vectorError,
+            ownerOrgId: ownership.ownerOrgId,
+            workspaceId: ownership.workspaceId,
+            accessScope: ownership.accessScope,
+            accessGroupIds: ownership.accessGroupIds,
             status: 'uploaded',
             createdAt: now,
             updatedAt: now,
           }).pipe(
+            Effect.tapError(() =>
+              // Do not leave vectors behind for a row that was never written.
+              ragIndexer
+                .deleteDocuments({
+                  tenant: { scope: 'attachment', userId },
+                  attachmentIds: [attachmentId],
+                })
+                .pipe(Effect.ignore),
+            ),
             Effect.mapError(
               (error) =>
                 new FilePersistenceError({
@@ -231,72 +230,6 @@ export class FileUploadOrchestratorService extends ServiceMap.Service<
                 }),
             ),
           )
-
-          const hasEmbeddings = chunkBuild.chunks.some(
-            (chunk) =>
-              Array.isArray(chunk.embedding) && chunk.embedding.length > 0,
-          )
-          const shouldIndexVectors =
-            isEmbeddingFeatureEnabled
-            && chunkBuild.metrics.embeddingStatus === 'indexed'
-            && hasEmbeddings
-
-          if (shouldIndexVectors) {
-            yield* attachmentRag
-              .indexAttachmentChunks({
-                chunks: chunkBuild.chunks.map((chunk) => ({
-                  ...chunk,
-                  embeddingModel: chunkBuild.metrics.embeddingModel,
-                  ownerOrgId,
-                  workspaceId,
-                  accessScope: accessScope ?? 'user',
-                  accessGroupIds: accessGroupIds ?? [],
-                })),
-              })
-              .pipe(
-                Effect.tap(() =>
-                  Effect.tryPromise({
-                    try: () =>
-                      db.transaction(async (tx) => {
-                        await tx.mutate.attachment.update({
-                          id: attachmentId,
-                          vectorIndexedAt: Date.now(),
-                          vectorError: undefined,
-                          updatedAt: Date.now(),
-                        })
-                      }),
-                    catch: () => undefined,
-                  }).pipe(Effect.catch(() => Effect.void)),
-                ),
-                Effect.catch((error) =>
-                  emitWideErrorEvent({
-                    eventName: 'file.upload.vector_index.failed',
-                    route,
-                    requestId,
-                    userId,
-                    errorTag: 'FileVectorIndexError',
-                    message: 'Failed to index file chunks in vector store',
-                    cause: String(error),
-                  }).pipe(
-                    Effect.flatMap(() =>
-                      Effect.tryPromise({
-                        try: () =>
-                          db.transaction(async (tx) => {
-                            await tx.mutate.attachment.update({
-                              id: attachmentId,
-                              embeddingStatus: 'failed',
-                              vectorError: String(error),
-                              updatedAt: Date.now(),
-                            })
-                          }),
-                        catch: () => undefined,
-                      }).pipe(Effect.catch(() => Effect.void)),
-                    ),
-                    Effect.asVoid,
-                  ),
-                ),
-              )
-          }
 
               return {
                 id: attachmentId,

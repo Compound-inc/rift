@@ -33,13 +33,6 @@ export type AttachmentPersistenceRow = {
   readonly updatedAt: number
 }
 
-export type AttachmentContentRow = {
-  readonly id: string
-  readonly fileName: string
-  readonly mimeType: string
-  readonly fileContent: string
-}
-
 /**
  * Common shape returned by `getScopedAttachmentRecord`. Org knowledge and
  * project source records both populate the same wide row; consumers are
@@ -97,6 +90,7 @@ export const insertAttachmentRecordEffect = Effect.fn(
           mime_type,
           file_size,
           file_content,
+          content_chars,
           embedding_model,
           embedding_tokens,
           embedding_dimensions,
@@ -125,6 +119,7 @@ export const insertAttachmentRecordEffect = Effect.fn(
           ${input.mimeType},
           ${input.fileSize},
           ${input.fileContent},
+          ${input.fileContent.length},
           ${input.embeddingModel ?? null},
           ${input.embeddingTokens ?? null},
           ${input.embeddingDimensions ?? null},
@@ -157,24 +152,6 @@ export const insertAttachmentRecordEffect = Effect.fn(
 export type AttachmentRecordScope =
   | { readonly kind: 'org-knowledge'; readonly organizationId: string }
   | { readonly kind: 'project-source'; readonly projectId: string }
-
-/**
- * Discriminated scope for the list-content fetcher. The three historical
- * `listAttachmentContentRowsBy*` functions become one consumer with a
- * scope-shaped argument; only the WHERE clause changes between calls.
- */
-export type AttachmentContentScope =
-  | { readonly kind: 'thread'; readonly threadId: string }
-  | {
-      readonly kind: 'user-ids'
-      readonly userId: string
-      readonly attachmentIds: readonly string[]
-    }
-  | {
-      readonly kind: 'project-ids'
-      readonly projectId: string
-      readonly attachmentIds: readonly string[]
-    }
 
 export const getScopedAttachmentRecordEffect = Effect.fn(
   'AttachmentRecords.getScopedAttachmentRecord',
@@ -233,62 +210,10 @@ export const getScopedAttachmentRecordEffect = Effect.fn(
     }),
 )
 
-export const listAttachmentContentRowsEffect = Effect.fn(
-  'AttachmentRecords.listAttachmentContentRows',
-)(
-  (input: {
-    readonly scope: AttachmentContentScope
-  }): Effect.Effect<
-    readonly AttachmentContentRow[],
-    unknown,
-    PgClient.PgClient
-  > =>
-    Effect.gen(function* () {
-      const sql = yield* PgClient.PgClient
-      const baseSelect = sql`
-        select id,
-               file_name as "fileName",
-               mime_type as "mimeType",
-               file_content as "fileContent"
-         from attachments
-      `
-
-      switch (input.scope.kind) {
-        case 'thread':
-          return yield* sql<AttachmentContentRow>`
-            ${baseSelect}
-            where thread_id = ${input.scope.threadId}
-              and coalesce(status, 'uploaded') = 'uploaded'
-            order by created_at asc
-          `
-        case 'user-ids':
-          if (input.scope.attachmentIds.length === 0) return []
-          return yield* sql<AttachmentContentRow>`
-            ${baseSelect}
-            where user_id = ${input.scope.userId}
-              and id in ${sql.in(input.scope.attachmentIds)}
-              and coalesce(status, 'uploaded') = 'uploaded'
-            order by created_at asc
-          `
-        case 'project-ids':
-          if (input.scope.attachmentIds.length === 0) return []
-          return yield* sql<AttachmentContentRow>`
-            ${baseSelect}
-            where project_id = ${input.scope.projectId}
-              and id in ${sql.in(input.scope.attachmentIds)}
-              and org_knowledge_kind is null
-              and coalesce(status, 'uploaded') = 'uploaded'
-            order by created_at asc
-          `
-      }
-    }),
-)
-
 /**
  * Backwards-compatible wrappers preserving the historical names used by
  * the AttachmentRecordService and adapter test fixtures. New code should
- * call `getScopedAttachmentRecordEffect` / `listAttachmentContentRowsEffect`
- * directly.
+ * call `getScopedAttachmentRecordEffect` directly.
  */
 export const getProjectSourceAttachmentRecordEffect = (
   projectId: string,
@@ -306,33 +231,4 @@ export const getOrgKnowledgeAttachmentRecordEffect = (
   getScopedAttachmentRecordEffect({
     scope: { kind: 'org-knowledge', organizationId },
     attachmentId,
-  })
-
-export const listAttachmentContentRowsByThreadEffect = (threadId: string) =>
-  listAttachmentContentRowsEffect({
-    scope: { kind: 'thread', threadId },
-  })
-
-export const listAttachmentContentRowsByIdsForUserEffect = (input: {
-  readonly userId: string
-  readonly attachmentIds: readonly string[]
-}) =>
-  listAttachmentContentRowsEffect({
-    scope: {
-      kind: 'user-ids',
-      userId: input.userId,
-      attachmentIds: input.attachmentIds,
-    },
-  })
-
-export const listAttachmentContentRowsByIdsForProjectEffect = (input: {
-  readonly projectId: string
-  readonly attachmentIds: readonly string[]
-}) =>
-  listAttachmentContentRowsEffect({
-    scope: {
-      kind: 'project-ids',
-      projectId: input.projectId,
-      attachmentIds: input.attachmentIds,
-    },
   })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Effect, Layer } from 'effect'
-import { OrgKnowledgeRagService } from '@/lib/backend/chat/services/rag'
+import { RagIndexerService } from '@/lib/backend/rag'
 import { MarkdownConversionService } from '@/lib/backend/file/services/markdown-conversion.service'
 import { ORG_KNOWLEDGE_KIND } from '@/lib/shared/org-knowledge'
 import { OrgKnowledgeAdminService } from './org-knowledge-admin.service'
@@ -30,8 +30,8 @@ describe('OrgKnowledgeAdminService', () => {
         } as never),
       ),
       Layer.provideMerge(
-        Layer.succeed(OrgKnowledgeRagService, {
-          deleteOrgKnowledgeChunks: () =>
+        Layer.succeed(RagIndexerService, {
+          deleteDocuments: () =>
             Effect.sync(() => {
               calls.push('delete-vectors')
             }),

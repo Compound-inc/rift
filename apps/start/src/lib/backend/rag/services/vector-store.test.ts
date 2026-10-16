@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { checkVectorStoreHealth, isQdrantConnectionError } from './vector-db'
+import { checkVectorStoreHealth, isQdrantConnectionError } from './vector-store'
 
 /** Bun's fetch rejects a refused connection with this shape. */
 function bunConnectionRefused(): Error {
