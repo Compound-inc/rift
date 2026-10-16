@@ -11,6 +11,7 @@ import type {
   WorkspacePlanId,
 } from '@/lib/shared/access-control'
 import type { SingularityUsageResetMode } from '../shared/singularity-admin'
+import { SINGULARITY_MAX_SEAT_COUNT } from '../shared/singularity-admin'
 
 const BillingIntervalSchema = z.enum(MANUAL_BILLING_INTERVALS).nullable()
 
@@ -42,7 +43,7 @@ const CancelInvitationSchema = z.object({
 const SetPlanSchema = z.object({
   organizationId: z.string().trim().min(1),
   planId: z.string().trim().refine(isWorkspacePlanId),
-  seatCount: z.number().int().min(1),
+  seatCount: z.number().int().min(1).max(SINGULARITY_MAX_SEAT_COUNT),
   billingInterval: BillingIntervalSchema,
   monthlyUsageLimitUsd: z.number().min(0).max(1_000_000).nullable(),
   overrideReason: z.string().trim().max(500).nullable(),
@@ -117,6 +118,11 @@ export const getSingularityOrganizationProfile = createServerFn({ method: 'GET' 
     const { getSingularityOrganizationProfileAction } = await import('./singularity.server')
     return getSingularityOrganizationProfileAction(data)
   })
+
+export const listSingularityUsers = createServerFn({ method: 'GET' }).handler(async () => {
+  const { listSingularityUsersAction } = await import('./singularity.server')
+  return listSingularityUsersAction()
+})
 
 export const inviteSingularityOrganizationMember = createServerFn({ method: 'POST' })
   .inputValidator((input: unknown) => InviteMemberSchema.parse(input))

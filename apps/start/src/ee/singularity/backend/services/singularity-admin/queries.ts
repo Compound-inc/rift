@@ -32,6 +32,9 @@ type OrganizationListRow = {
   subscriptionStatus: string | null
   seatCount: number | null
   memberCount: number
+  pendingInvitationCount: number
+  restrictedMemberCount: number
+  memberSearchText: string | null
   isOverSeatLimit: boolean | null
   usageSyncStatus: string | null
 }
@@ -245,16 +248,28 @@ export const listOrganizationsEffect = Effect.fn(
           es.plan_id as "planId",
           es.subscription_status as "subscriptionStatus",
           es.seat_count as "seatCount",
+          directory."memberCount",
+          directory."memberSearchText",
+          directory."restrictedMemberCount",
           (
-            select count(*)::int
-            from member m
-            where m."organizationId" = o.id
-          ) as "memberCount",
+            select count(*)::int from invitation i
+            where i."organizationId" = o.id and i.status = 'pending'
+          ) as "pendingInvitationCount",
           es.is_over_seat_limit as "isOverSeatLimit",
           es.usage_sync_status as "usageSyncStatus"
         from organization o
         left join org_entitlement_snapshot es
           on es.organization_id = o.id
+        -- Aggregate each organization once instead of fetching every profile for search.
+        left join lateral (
+          select count(*)::int as "memberCount",
+            string_agg(concat_ws(' ', u.name, u.email, u.id), ' ') as "memberSearchText",
+            count(*) filter (where coalesce(ma.status, 'active') <> 'active')::int as "restrictedMemberCount"
+          from member m
+          join "user" u on u.id = m."userId"
+          left join org_member_access ma on ma.organization_id = m."organizationId" and ma.user_id = m."userId"
+          where m."organizationId" = o.id
+        ) directory on true
         order by lower(o.name) asc, o.id asc
       `
 
@@ -266,6 +281,9 @@ export const listOrganizationsEffect = Effect.fn(
         planId: row.planId ?? 'free',
         subscriptionStatus: row.subscriptionStatus ?? 'inactive',
         memberCount: row.memberCount,
+        pendingInvitationCount: row.pendingInvitationCount,
+        restrictedMemberCount: row.restrictedMemberCount,
+        memberSearchText: row.memberSearchText ?? '',
         seatCount: Math.max(1, row.seatCount ?? 1),
         isOverSeatLimit: Boolean(row.isOverSeatLimit),
         usageSyncStatus: toUsageSyncStatus(row.usageSyncStatus),
@@ -337,10 +355,11 @@ export const getOrganizationProfileEffect = Effect.fn(
           current_subscription."providerSubscriptionId" as "providerSubscriptionId",
           current_subscription."billingInterval" as "billingInterval",
           current_subscription.metadata as "subscriptionMetadata",
-          current_subscription.current_period_start as "billingPeriodStart",
-          current_subscription.current_period_end as "billingPeriodEnd",
+          -- pg returns BIGINT timestamps as strings; serialize milliseconds as numbers.
+          current_subscription.current_period_start::float8 as "billingPeriodStart",
+          current_subscription.current_period_end::float8 as "billingPeriodEnd",
           (
-            select min(paid_sub.created_at)
+            select min(paid_sub.created_at)::float8
             from org_subscription paid_sub
             where paid_sub.organization_id = o.id
               and paid_sub.plan_id <> 'free'

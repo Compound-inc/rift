@@ -33,6 +33,7 @@ import type {
   SingularityOrganizationDetail,
   SingularityOrganizationListItem,
   SingularityUsageResetMode,
+  SingularityUserListItem,
 } from '@/ee/singularity/shared/singularity-admin'
 import {
   SingularityNotFoundError,
@@ -47,8 +48,13 @@ import {
   readOrganizationMemberRoleEffect,
 } from './singularity-admin/queries'
 import { resetOrganizationUsageEffect } from './singularity-admin/usage-reset'
+import { listUsersEffect } from './singularity-admin/users'
 
 export type SingularityAdminServiceShape = {
+  readonly listUsers: () => Effect.Effect<
+    Array<SingularityUserListItem>,
+    SingularityPersistenceError
+  >
   readonly listOrganizations: () => Effect.Effect<
     Array<SingularityOrganizationListItem>,
     SingularityPersistenceError
@@ -243,6 +249,13 @@ export class SingularityAdminService extends ServiceMap.Service<
         Effect.provideService(effect, PgClient.PgClient, client)
 
       return {
+        listUsers: Effect.fn('SingularityAdminService.listUsers')(() =>
+          provideSql(listUsersEffect()).pipe(
+            Effect.mapError((cause) =>
+              toPersistenceError('Failed to list users for Singularity.', cause),
+            ),
+          ),
+        ),
         listOrganizations: Effect.fn(
           'SingularityAdminService.listOrganizations',
         )(() =>
