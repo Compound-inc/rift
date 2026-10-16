@@ -48,6 +48,13 @@ const DEFAULT_QDRANT_COLLECTION = 'attachment_chunks_v1'
 const DEFAULT_QDRANT_TIMEOUT_MS = 30_000
 const RETRIEVAL_QDRANT_TIMEOUT_MS = 5_000
 const DEFAULT_QDRANT_BATCH_SIZE = 128
+/**
+ * Qdrant runs with Railway app sleeping enabled. The first request after a
+ * sleep wakes the container but is refused while Qdrant boots (a few seconds),
+ * so connection failures are retried with backoff for up to this long.
+ */
+const DEFAULT_QDRANT_WAKE_TIMEOUT_MS = 15_000
+const QDRANT_WAKE_RETRY_DELAYS_MS = [250, 500, 1_000, 2_000] as const
 let ensureReadyPromise: Promise<void> | null = null
 
 function isQdrantEnabled(): boolean {
@@ -95,6 +102,34 @@ function getQdrantRetrievalTimeoutMs(): number {
   )
 }
 
+function getQdrantWakeTimeoutMs(): number {
+  return parsePositiveInt(
+    process.env.QDRANT_WAKE_TIMEOUT_MS,
+    DEFAULT_QDRANT_WAKE_TIMEOUT_MS,
+  )
+}
+
+/**
+ * True when fetch failed before any HTTP response (connection refused/reset),
+ * which is what a sleeping or still-booting Qdrant looks like. Aborts from our
+ * own request timeout are excluded so a slow Qdrant is not retried.
+ */
+export function isQdrantConnectionError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  if (error.name === 'AbortError' || error.name === 'TimeoutError') return false
+  if (error instanceof TypeError) return true
+  const code = (error as { code?: unknown }).code
+  return (
+    code === 'ECONNREFUSED' ||
+    code === 'ECONNRESET' ||
+    code === 'ConnectionRefused' ||
+    code === 'ConnectionClosed' ||
+    /unable to connect|connection refused|socket connection was closed/i.test(
+      error.message,
+    )
+  )
+}
+
 function getQdrantBatchSize(): number {
   return parsePositiveInt(
     process.env.QDRANT_UPSERT_BATCH_SIZE,
@@ -121,6 +156,30 @@ async function qdrantRequest<T>(
     throw new Error('Qdrant is not configured')
   }
 
+  const wakeDeadline = Date.now() + getQdrantWakeTimeoutMs()
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await qdrantRequestOnce<T>(baseUrl, method, path, body, options)
+    } catch (error) {
+      const delay =
+        QDRANT_WAKE_RETRY_DELAYS_MS[
+          Math.min(attempt, QDRANT_WAKE_RETRY_DELAYS_MS.length - 1)
+        ]
+      if (!isQdrantConnectionError(error) || Date.now() + delay > wakeDeadline) {
+        throw error
+      }
+      await new Promise((resolve) => setTimeout(resolve, delay))
+    }
+  }
+}
+
+async function qdrantRequestOnce<T>(
+  baseUrl: string,
+  method: 'GET' | 'POST' | 'PUT',
+  path: string,
+  body?: unknown,
+  options?: { readonly timeoutMs?: number },
+): Promise<T> {
   const controller = new AbortController()
   const timeout = options?.timeoutMs ?? getQdrantTimeoutMs()
   const timeoutId = setTimeout(() => controller.abort(), timeout)

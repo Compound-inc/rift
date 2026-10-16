@@ -4,7 +4,7 @@ This guide covers how to set up and run the Rift development environment locally
 
 ## Prerequisites
 
-- [Bun](https://bun.sh/) (v1.2.23 or later) - Runtime and package manager
+- [Bun](https://bun.sh/) (v1.4.3 or later) - Runtime and package manager
 - [Docker](https://docs.docker.com/get-docker/) - For PostgreSQL
 
 ## Quick Start

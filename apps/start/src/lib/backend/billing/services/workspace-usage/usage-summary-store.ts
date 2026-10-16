@@ -183,6 +183,30 @@ const persistOrgUserUsageSummaryRecordEffect = Effect.fn(
             monthly_remaining_percent = excluded.monthly_remaining_percent,
             monthly_reset_at = excluded.monthly_reset_at,
             updated_at = excluded.updated_at
+        -- Every write here is replicated to clients by Zero, so a read that
+        -- recomputes identical values must not touch the row. The row is still
+        -- rewritten when it is older than the entitlement snapshot, because the
+        -- client treats that as stale and would keep asking for a refresh.
+        where (
+            org_user_usage_summary.id,
+            org_user_usage_summary.kind,
+            org_user_usage_summary.seat_index,
+            org_user_usage_summary.monthly_used_percent,
+            org_user_usage_summary.monthly_remaining_percent,
+            org_user_usage_summary.monthly_reset_at
+          ) is distinct from (
+            excluded.id,
+            excluded.kind,
+            excluded.seat_index,
+            excluded.monthly_used_percent,
+            excluded.monthly_remaining_percent,
+            excluded.monthly_reset_at
+          )
+          or org_user_usage_summary.updated_at < coalesce((
+            select snapshot.computed_at
+            from org_entitlement_snapshot snapshot
+            where snapshot.organization_id = excluded.organization_id
+          ), 0)
       `
     }),
 )

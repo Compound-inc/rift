@@ -88,17 +88,53 @@ export function asOptionalNumber(value: unknown): number | null {
   return null
 }
 
+const DEFAULT_CYCLE_MS = 30 * 24 * 60 * 60 * 1000
+
+/**
+ * Resolves the usage cycle that contains `now`.
+ *
+ * Manually granted plans are stored with a period start and no period end, and
+ * nothing renews them, so the stored period alone would describe one cycle that
+ * ends 30 days after the grant and then stays in the past forever (seat budgets
+ * never reset and the client sees a passed reset date). Instead an ended or
+ * open-ended period rolls forward in whole cycles of its own length. A period
+ * that still contains `now` is returned unchanged.
+ *
+ * The result is a pure function of the stored period and `now`, so every caller
+ * within the same cycle agrees on the bounds and seat slots are created once
+ * per cycle.
+ */
 export function cycleBounds(input: {
   readonly now: number
   readonly currentPeriodStart: number | null
   readonly currentPeriodEnd: number | null
 }): { cycleStartAt: number; cycleEndAt: number } {
-  const cycleStartAt = asOptionalNumber(input.currentPeriodStart) ?? input.now
-  const cycleEndAt = asOptionalNumber(input.currentPeriodEnd) ?? (cycleStartAt + (30 * 24 * 60 * 60 * 1000))
-  return {
-    cycleStartAt,
-    cycleEndAt: Math.max(cycleEndAt, cycleStartAt + 1),
+  const periodStart = asOptionalNumber(input.currentPeriodStart)
+  const periodEnd = asOptionalNumber(input.currentPeriodEnd)
+
+  if (periodStart == null && periodEnd == null) {
+    // No anchor at all: use the calendar month so the cycle stays stable.
+    const now = new Date(input.now)
+    return {
+      cycleStartAt: Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+      cycleEndAt: Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+    }
   }
+
+  const anchorStart = periodStart ?? (periodEnd as number) - DEFAULT_CYCLE_MS
+  const cycleLength =
+    periodStart != null && periodEnd != null && periodEnd > periodStart
+      ? periodEnd - periodStart
+      : DEFAULT_CYCLE_MS
+  const anchorEnd = anchorStart + cycleLength
+
+  if (input.now < anchorEnd) {
+    return { cycleStartAt: anchorStart, cycleEndAt: anchorEnd }
+  }
+
+  const elapsedCycles = Math.floor((input.now - anchorStart) / cycleLength)
+  const cycleStartAt = anchorStart + elapsedCycles * cycleLength
+  return { cycleStartAt, cycleEndAt: cycleStartAt + cycleLength }
 }
 
 export function resolveSeatCycleBudget(input: {

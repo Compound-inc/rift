@@ -80,6 +80,25 @@ export function getNextUsageLabelTickAt(
     : timestampMs - (totalMinutes - 1) * 60_000
 }
 
+/**
+ * A passed reset boundary triggers at most one refresh per boundary value.
+ *
+ * The server can answer with a boundary that is still in the past (e.g. a
+ * lapsed or manually granted plan whose seat cycle was never rolled forward).
+ * Without this guard every completed refresh re-arms the effect and the tab
+ * calls the server function in a tight loop (~8 req/s per open tab), and each
+ * call used to rewrite `org_user_usage_summary`, churning Postgres and Zero.
+ */
+export function shouldRefreshForResetBoundary(input: {
+  resetAt: number | null
+  lastRefreshedResetAt: number | null
+  nowMs: number
+}): boolean {
+  if (input.resetAt == null) return false
+  if (input.resetAt > input.nowMs) return false
+  return input.resetAt !== input.lastRefreshedResetAt
+}
+
 type UsageSummaryRow = {
   kind: 'free' | 'paid'
   monthlyUsedPercent: number
@@ -227,6 +246,8 @@ function OrgUsageSummaryProviderCloud({ children }: { children: ReactNode }) {
    * context changes.
    */
   const terminalRefreshOrgIdRef = useRef<string | null>(null)
+  /** Last passed reset boundary that already triggered a refresh. */
+  const resetBoundaryRefreshedAtRef = useRef<number | null>(null)
   const requestIdRef = useRef(0)
   const [ensuredSummary, setEnsuredSummary] =
     useState<EnsuredOrgUsageSummary | null>(null)
@@ -329,6 +350,7 @@ function OrgUsageSummaryProviderCloud({ children }: { children: ReactNode }) {
     missingLiveSummaryRefreshOrgIdRef.current = null
     staleSummaryRefreshOrgIdRef.current = null
     terminalRefreshOrgIdRef.current = null
+    resetBoundaryRefreshedAtRef.current = null
     setNowMs(Date.now())
     setEnsuredSummary(null)
     setEnsuring(false)
@@ -364,15 +386,19 @@ function OrgUsageSummaryProviderCloud({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (
-      summaryRefreshAt == null ||
       ensuring ||
-      summaryRefreshAt > Date.now() ||
+      !shouldRefreshForResetBoundary({
+        resetAt: summaryRefreshAt,
+        lastRefreshedResetAt: resetBoundaryRefreshedAtRef.current,
+        nowMs: Date.now(),
+      }) ||
       terminalRefreshOrgIdRef.current === activeOrganizationIdRef.current ||
       (retryAtMs != null && retryAtMs > Date.now())
     ) {
       return
     }
 
+    resetBoundaryRefreshedAtRef.current = summaryRefreshAt
     void refresh()
   }, [ensuring, refresh, retryAtMs, summaryRefreshAt])
 
@@ -387,6 +413,17 @@ function OrgUsageSummaryProviderCloud({ children }: { children: ReactNode }) {
 
     const timeoutId = window.setTimeout(
       () => {
+        if (
+          !shouldRefreshForResetBoundary({
+            resetAt: summaryRefreshAt,
+            lastRefreshedResetAt: resetBoundaryRefreshedAtRef.current,
+            nowMs: Date.now(),
+          })
+        ) {
+          return
+        }
+
+        resetBoundaryRefreshedAtRef.current = summaryRefreshAt
         void refresh()
       },
       Math.max(250, summaryRefreshAt - Date.now() + 250),
