@@ -39,6 +39,7 @@ import { Route as appLayoutChatRouteRouteImport } from './routes/(app)/_layout/c
 import { Route as eeSingularityLayoutIndexRouteImport } from './routes/(ee)/singularity/_layout/index'
 import { Route as appLayoutSettingsIndexRouteImport } from './routes/(app)/_layout/settings/index'
 import { Route as appLayoutChatIndexRouteImport } from './routes/(app)/_layout/chat/index'
+import { Route as eeSingularityLayoutUsersRouteImport } from './routes/(ee)/singularity/_layout/users'
 import { Route as appLayoutChatSkillsRouteImport } from './routes/(app)/_layout/chat/skills'
 import { Route as appLayoutSettingsSecurityRouteRouteImport } from './routes/(app)/_layout/settings/security/route'
 import { Route as appLayoutOrganizationSettingsRouteRouteImport } from './routes/(app)/_layout/organization/settings/route'
@@ -216,6 +217,12 @@ const appLayoutChatIndexRoute = appLayoutChatIndexRouteImport.update({
   path: '/',
   getParentRoute: () => appLayoutChatRouteRoute,
 } as any)
+const eeSingularityLayoutUsersRoute =
+  eeSingularityLayoutUsersRouteImport.update({
+    id: '/users',
+    path: '/users',
+    getParentRoute: () => eeSingularityLayoutRouteRoute,
+  } as any)
 const appLayoutChatSkillsRoute = appLayoutChatSkillsRouteImport.update({
   id: '/skills',
   path: '/skills',
@@ -385,6 +392,7 @@ export interface FileRoutesByFullPath {
   '/organization/settings': typeof appLayoutOrganizationSettingsRouteRouteWithChildren
   '/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/chat/skills': typeof appLayoutChatSkillsRoute
+  '/singularity/users': typeof eeSingularityLayoutUsersRoute
   '/chat/': typeof appLayoutChatIndexRoute
   '/settings/': typeof appLayoutSettingsIndexRoute
   '/singularity/': typeof eeSingularityLayoutIndexRoute
@@ -435,6 +443,7 @@ export interface FileRoutesByTo {
   '/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
   '/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/chat/skills': typeof appLayoutChatSkillsRoute
+  '/singularity/users': typeof eeSingularityLayoutUsersRoute
   '/chat': typeof appLayoutChatIndexRoute
   '/settings': typeof appLayoutSettingsIndexRoute
   '/singularity': typeof eeSingularityLayoutIndexRoute
@@ -489,6 +498,7 @@ export interface FileRoutesById {
   '/(app)/_layout/organization/settings': typeof appLayoutOrganizationSettingsRouteRouteWithChildren
   '/(app)/_layout/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/(app)/_layout/chat/skills': typeof appLayoutChatSkillsRoute
+  '/(ee)/singularity/_layout/users': typeof eeSingularityLayoutUsersRoute
   '/(app)/_layout/chat/': typeof appLayoutChatIndexRoute
   '/(app)/_layout/settings/': typeof appLayoutSettingsIndexRoute
   '/(ee)/singularity/_layout/': typeof eeSingularityLayoutIndexRoute
@@ -545,6 +555,7 @@ export interface FileRouteTypes {
     | '/organization/settings'
     | '/settings/security'
     | '/chat/skills'
+    | '/singularity/users'
     | '/chat/'
     | '/settings/'
     | '/singularity/'
@@ -595,6 +606,7 @@ export interface FileRouteTypes {
     | '/chat/$threadId'
     | '/settings/security'
     | '/chat/skills'
+    | '/singularity/users'
     | '/chat'
     | '/settings'
     | '/singularity'
@@ -648,6 +660,7 @@ export interface FileRouteTypes {
     | '/(app)/_layout/organization/settings'
     | '/(app)/_layout/settings/security'
     | '/(app)/_layout/chat/skills'
+    | '/(ee)/singularity/_layout/users'
     | '/(app)/_layout/chat/'
     | '/(app)/_layout/settings/'
     | '/(ee)/singularity/_layout/'
@@ -905,6 +918,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/chat/'
       preLoaderRoute: typeof appLayoutChatIndexRouteImport
       parentRoute: typeof appLayoutChatRouteRoute
+    }
+    '/(ee)/singularity/_layout/users': {
+      id: '/(ee)/singularity/_layout/users'
+      path: '/users'
+      fullPath: '/singularity/users'
+      preLoaderRoute: typeof eeSingularityLayoutUsersRouteImport
+      parentRoute: typeof eeSingularityLayoutRouteRoute
     }
     '/(app)/_layout/chat/skills': {
       id: '/(app)/_layout/chat/skills'
@@ -1243,12 +1263,14 @@ const appLayoutRouteRouteWithChildren = appLayoutRouteRoute._addFileChildren(
 )
 
 interface eeSingularityLayoutRouteRouteChildren {
+  eeSingularityLayoutUsersRoute: typeof eeSingularityLayoutUsersRoute
   eeSingularityLayoutIndexRoute: typeof eeSingularityLayoutIndexRoute
   eeSingularityLayoutOrgsOrganizationIdRoute: typeof eeSingularityLayoutOrgsOrganizationIdRoute
 }
 
 const eeSingularityLayoutRouteRouteChildren: eeSingularityLayoutRouteRouteChildren =
   {
+    eeSingularityLayoutUsersRoute: eeSingularityLayoutUsersRoute,
     eeSingularityLayoutIndexRoute: eeSingularityLayoutIndexRoute,
     eeSingularityLayoutOrgsOrganizationIdRoute:
       eeSingularityLayoutOrgsOrganizationIdRoute,

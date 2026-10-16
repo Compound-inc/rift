@@ -67,6 +67,21 @@ export async function listSingularityOrganizationsAction() {
   })
 }
 
+export async function listSingularityUsersAction() {
+  return runSingularityAction({
+    route: '/singularity/users',
+    eventName: 'singularity.users.list.failed',
+    defaultMessage: 'Failed to load Singularity users.',
+    execute: async () =>
+      SingularityRuntime.run(
+        Effect.gen(function* () {
+          const service = yield* SingularityAdminService
+          return yield* service.listUsers()
+        }),
+      ),
+  })
+}
+
 export async function getSingularityOrganizationProfileAction(input: {
   organizationId: string
 }) {

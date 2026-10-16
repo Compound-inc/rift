@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   readOrganizationMemberRoleMock: vi.fn(),
   readOrganizationExistsMock: vi.fn(),
   listOrganizationsMock: vi.fn(),
+  listUsersMock: vi.fn(),
   getOrganizationProfileMock: vi.fn(),
   withBillingTransactionMock: vi.fn(),
   ensureOrganizationBillingBaselineMock: vi.fn(),
@@ -24,6 +25,14 @@ const mocks = vi.hoisted(() => ({
   removeMemberMock: vi.fn(),
   updateMemberRoleMock: vi.fn(),
   cancelInvitationMock: vi.fn(),
+}))
+
+vi.mock('./singularity-admin/users', () => ({
+  listUsersEffect: () =>
+    Effect.tryPromise({
+      try: () => Promise.resolve(mocks.listUsersMock()),
+      catch: (cause) => cause,
+    }),
 }))
 
 vi.mock('./singularity-admin/queries', () => ({
@@ -171,6 +180,7 @@ describe('SingularityAdminService', () => {
   beforeEach(() => {
     mocks.readOrganizationMemberRoleMock.mockReset()
     mocks.readOrganizationExistsMock.mockReset()
+    mocks.listUsersMock.mockReset()
     mocks.listOrganizationsMock.mockReset()
     mocks.getOrganizationProfileMock.mockReset()
     mocks.withBillingTransactionMock.mockReset()
@@ -223,6 +233,33 @@ describe('SingularityAdminService', () => {
       },
       usageSyncStatus: 'ok',
       usageSyncError: null,
+    })
+  })
+
+  it('returns global users through the service boundary', async () => {
+    const users = [{ userId: 'user-1', memberships: [] }]
+    mocks.listUsersMock.mockResolvedValue(users)
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const service = yield* SingularityAdminService
+        return yield* service.listUsers()
+      }).pipe(Effect.provide(SingularityTestLayer)),
+    )
+    expect(result).toEqual(users)
+  })
+
+  it('maps a user query failure into a tagged persistence error', async () => {
+    mocks.listUsersMock.mockRejectedValue(new Error('database unavailable'))
+    await expect(
+      Effect.runPromise(
+        Effect.gen(function* () {
+          const service = yield* SingularityAdminService
+          return yield* service.listUsers()
+        }).pipe(Effect.provide(SingularityTestLayer)),
+      ),
+    ).rejects.toMatchObject({
+      _tag: 'SingularityPersistenceError',
+      message: 'Failed to list users for Singularity.',
     })
   })
 

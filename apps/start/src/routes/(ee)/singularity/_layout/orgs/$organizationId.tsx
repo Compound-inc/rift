@@ -2,8 +2,12 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 import { isSingularityAccessError } from '@/ee/singularity/shared/errors'
 import { SingularityOrgDetailPage } from '@/ee/singularity/components/singularity-org-detail-page'
 import { getSingularityOrganizationProfile } from '@/ee/singularity/frontend/singularity.functions'
+import { parseSingularityProfileSearch } from '@/ee/singularity/shared/singularity-search'
 
-export const Route = createFileRoute('/(ee)/singularity/_layout/orgs/$organizationId')({
+export const Route = createFileRoute(
+  '/(ee)/singularity/_layout/orgs/$organizationId',
+)({
+  validateSearch: parseSingularityProfileSearch,
   loader: async ({ params }) => {
     try {
       return {
@@ -25,6 +29,14 @@ export const Route = createFileRoute('/(ee)/singularity/_layout/orgs/$organizati
 
 function SingularityOrganizationRouteComponent() {
   const { organization } = Route.useLoaderData()
+  const { tab = 'overview', member } = Route.useSearch()
 
-  return <SingularityOrgDetailPage organization={organization} />
+  return (
+    <SingularityOrgDetailPage
+      key={organization.organizationId}
+      organization={organization}
+      tab={tab}
+      memberQuery={member}
+    />
+  )
 }

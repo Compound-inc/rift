@@ -1,26 +1,29 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
-import { isSingularityAccessError } from '@/ee/singularity/shared/errors'
+import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { SingularityOrgListPage } from '@/ee/singularity/components/singularity-org-list-page'
-import { listSingularityOrganizations } from '@/ee/singularity/frontend/singularity.functions'
+import { parseSingularityDirectorySearch } from '@/ee/singularity/shared/singularity-search'
 
 export const Route = createFileRoute('/(ee)/singularity/_layout/')({
-  loader: async () => {
-    try {
-      return {
-        organizations: await listSingularityOrganizations(),
-      }
-    } catch (error) {
-      if (isSingularityAccessError(error)) {
-        throw redirect({ to: '/' })
-      }
-      throw error
-    }
-  },
+  validateSearch: parseSingularityDirectorySearch,
   component: SingularityIndexRouteComponent,
 })
 
 function SingularityIndexRouteComponent() {
-  const { organizations } = Route.useLoaderData()
+  const { organizations } = getRouteApi(
+    '/(ee)/singularity/_layout',
+  ).useLoaderData()
+  const search = Route.useSearch()
+  const navigate = Route.useNavigate()
 
-  return <SingularityOrgListPage organizations={organizations} />
+  return (
+    <SingularityOrgListPage
+      organizations={organizations}
+      search={search}
+      onSearchChange={(patch, replace = false) => {
+        void navigate({
+          search: (previous) => ({ ...previous, page: undefined, ...patch }),
+          replace,
+        })
+      }}
+    />
+  )
 }
