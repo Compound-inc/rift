@@ -1,5 +1,5 @@
 import { isAreaPath } from '@/utils/nav-utils'
-import { Lock, Settings, User } from 'lucide-react'
+import { Archive, Lock, Settings, User } from 'lucide-react'
 import { m } from '@/paraglide/messages.js'
 
 export const SETTINGS_HREF = '/settings'
@@ -16,6 +16,11 @@ export const settingsNavArea = () => ({
   content: [
     {
       items: [
+        {
+          name: m.archive_title(),
+          icon: Archive,
+          href: `${SETTINGS_HREF}/archived`,
+        },
         {
           name: m.settings_account_page_title(),
           icon: User,

@@ -14,6 +14,7 @@ import { Route as QrRouteRouteImport } from './routes/qr/route'
 import { Route as PricingRouteRouteImport } from './routes/pricing/route'
 import { Route as HealthRouteRouteImport } from './routes/health/route'
 import { Route as AuthRouteRouteImport } from './routes/auth/route'
+import { Route as ShareShareIdRouteRouteImport } from './routes/share/$shareId/route'
 import { Route as LegalTermsRouteRouteImport } from './routes/legal/terms/route'
 import { Route as LegalPrivacyRouteRouteImport } from './routes/legal/privacy/route'
 import { Route as LegalAcceptableUseRouteRouteImport } from './routes/legal/acceptable-use/route'
@@ -42,6 +43,7 @@ import { Route as appLayoutChatIndexRouteImport } from './routes/(app)/_layout/c
 import { Route as eeSingularityLayoutUsersRouteImport } from './routes/(ee)/singularity/_layout/users'
 import { Route as appLayoutChatSkillsRouteImport } from './routes/(app)/_layout/chat/skills'
 import { Route as appLayoutSettingsSecurityRouteRouteImport } from './routes/(app)/_layout/settings/security/route'
+import { Route as appLayoutSettingsArchivedRouteRouteImport } from './routes/(app)/_layout/settings/archived/route'
 import { Route as appLayoutOrganizationSettingsRouteRouteImport } from './routes/(app)/_layout/organization/settings/route'
 import { Route as appLayoutChatThreadIdRouteRouteImport } from './routes/(app)/_layout/chat/$threadId/route'
 import { Route as appLayoutOrganizationSettingsIndexRouteImport } from './routes/(app)/_layout/organization/settings/index'
@@ -87,6 +89,11 @@ const HealthRouteRoute = HealthRouteRouteImport.update({
 const AuthRouteRoute = AuthRouteRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShareShareIdRouteRoute = ShareShareIdRouteRouteImport.update({
+  id: '/share/$shareId',
+  path: '/share/$shareId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LegalTermsRouteRoute = LegalTermsRouteRouteImport.update({
@@ -234,6 +241,12 @@ const appLayoutSettingsSecurityRouteRoute =
     path: '/security',
     getParentRoute: () => appLayoutSettingsRouteRoute,
   } as any)
+const appLayoutSettingsArchivedRouteRoute =
+  appLayoutSettingsArchivedRouteRouteImport.update({
+    id: '/archived',
+    path: '/archived',
+    getParentRoute: () => appLayoutSettingsRouteRoute,
+  } as any)
 const appLayoutOrganizationSettingsRouteRoute =
   appLayoutOrganizationSettingsRouteRouteImport.update({
     id: '/settings',
@@ -373,6 +386,7 @@ export interface FileRoutesByFullPath {
   '/legal/acceptable-use': typeof LegalAcceptableUseRouteRoute
   '/legal/privacy': typeof LegalPrivacyRouteRoute
   '/legal/terms': typeof LegalTermsRouteRoute
+  '/share/$shareId': typeof ShareShareIdRouteRoute
   '/chat': typeof appLayoutChatRouteRouteWithChildren
   '/organization': typeof appLayoutOrganizationRouteRouteWithChildren
   '/settings': typeof appLayoutSettingsRouteRouteWithChildren
@@ -390,6 +404,7 @@ export interface FileRoutesByFullPath {
   '/': typeof appLayoutIndexRoute
   '/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
   '/organization/settings': typeof appLayoutOrganizationSettingsRouteRouteWithChildren
+  '/settings/archived': typeof appLayoutSettingsArchivedRouteRoute
   '/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/chat/skills': typeof appLayoutChatSkillsRoute
   '/singularity/users': typeof eeSingularityLayoutUsersRoute
@@ -428,6 +443,7 @@ export interface FileRoutesByTo {
   '/legal/acceptable-use': typeof LegalAcceptableUseRouteRoute
   '/legal/privacy': typeof LegalPrivacyRouteRoute
   '/legal/terms': typeof LegalTermsRouteRoute
+  '/share/$shareId': typeof ShareShareIdRouteRoute
   '/organization': typeof appLayoutOrganizationRouteRouteWithChildren
   '/api/files/markdown': typeof ApiFilesMarkdownRouteRoute
   '/api/files/object': typeof ApiFilesObjectRouteRoute
@@ -441,6 +457,7 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/': typeof appLayoutIndexRoute
   '/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
+  '/settings/archived': typeof appLayoutSettingsArchivedRouteRoute
   '/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/chat/skills': typeof appLayoutChatSkillsRoute
   '/singularity/users': typeof eeSingularityLayoutUsersRoute
@@ -479,6 +496,7 @@ export interface FileRoutesById {
   '/legal/acceptable-use': typeof LegalAcceptableUseRouteRoute
   '/legal/privacy': typeof LegalPrivacyRouteRoute
   '/legal/terms': typeof LegalTermsRouteRoute
+  '/share/$shareId': typeof ShareShareIdRouteRoute
   '/(app)/_layout/chat': typeof appLayoutChatRouteRouteWithChildren
   '/(app)/_layout/organization': typeof appLayoutOrganizationRouteRouteWithChildren
   '/(app)/_layout/settings': typeof appLayoutSettingsRouteRouteWithChildren
@@ -496,6 +514,7 @@ export interface FileRoutesById {
   '/(app)/_layout/': typeof appLayoutIndexRoute
   '/(app)/_layout/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
   '/(app)/_layout/organization/settings': typeof appLayoutOrganizationSettingsRouteRouteWithChildren
+  '/(app)/_layout/settings/archived': typeof appLayoutSettingsArchivedRouteRoute
   '/(app)/_layout/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/(app)/_layout/chat/skills': typeof appLayoutChatSkillsRoute
   '/(ee)/singularity/_layout/users': typeof eeSingularityLayoutUsersRoute
@@ -536,6 +555,7 @@ export interface FileRouteTypes {
     | '/legal/acceptable-use'
     | '/legal/privacy'
     | '/legal/terms'
+    | '/share/$shareId'
     | '/chat'
     | '/organization'
     | '/settings'
@@ -553,6 +573,7 @@ export interface FileRouteTypes {
     | '/'
     | '/chat/$threadId'
     | '/organization/settings'
+    | '/settings/archived'
     | '/settings/security'
     | '/chat/skills'
     | '/singularity/users'
@@ -591,6 +612,7 @@ export interface FileRouteTypes {
     | '/legal/acceptable-use'
     | '/legal/privacy'
     | '/legal/terms'
+    | '/share/$shareId'
     | '/organization'
     | '/api/files/markdown'
     | '/api/files/object'
@@ -604,6 +626,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/'
     | '/chat/$threadId'
+    | '/settings/archived'
     | '/settings/security'
     | '/chat/skills'
     | '/singularity/users'
@@ -641,6 +664,7 @@ export interface FileRouteTypes {
     | '/legal/acceptable-use'
     | '/legal/privacy'
     | '/legal/terms'
+    | '/share/$shareId'
     | '/(app)/_layout/chat'
     | '/(app)/_layout/organization'
     | '/(app)/_layout/settings'
@@ -658,6 +682,7 @@ export interface FileRouteTypes {
     | '/(app)/_layout/'
     | '/(app)/_layout/chat/$threadId'
     | '/(app)/_layout/organization/settings'
+    | '/(app)/_layout/settings/archived'
     | '/(app)/_layout/settings/security'
     | '/(app)/_layout/chat/skills'
     | '/(ee)/singularity/_layout/users'
@@ -696,6 +721,7 @@ export interface RootRouteChildren {
   LegalAcceptableUseRouteRoute: typeof LegalAcceptableUseRouteRoute
   LegalPrivacyRouteRoute: typeof LegalPrivacyRouteRoute
   LegalTermsRouteRoute: typeof LegalTermsRouteRoute
+  ShareShareIdRouteRoute: typeof ShareShareIdRouteRoute
   eeSingularityLayoutRouteRoute: typeof eeSingularityLayoutRouteRouteWithChildren
   ApiFilesMarkdownRouteRoute: typeof ApiFilesMarkdownRouteRoute
   ApiFilesObjectRouteRoute: typeof ApiFilesObjectRouteRoute
@@ -742,6 +768,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/share/$shareId': {
+      id: '/share/$shareId'
+      path: '/share/$shareId'
+      fullPath: '/share/$shareId'
+      preLoaderRoute: typeof ShareShareIdRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/legal/terms': {
@@ -938,6 +971,13 @@ declare module '@tanstack/react-router' {
       path: '/security'
       fullPath: '/settings/security'
       preLoaderRoute: typeof appLayoutSettingsSecurityRouteRouteImport
+      parentRoute: typeof appLayoutSettingsRouteRoute
+    }
+    '/(app)/_layout/settings/archived': {
+      id: '/(app)/_layout/settings/archived'
+      path: '/archived'
+      fullPath: '/settings/archived'
+      preLoaderRoute: typeof appLayoutSettingsArchivedRouteRouteImport
       parentRoute: typeof appLayoutSettingsRouteRoute
     }
     '/(app)/_layout/organization/settings': {
@@ -1227,12 +1267,14 @@ const appLayoutOrganizationRouteRouteWithChildren =
   )
 
 interface appLayoutSettingsRouteRouteChildren {
+  appLayoutSettingsArchivedRouteRoute: typeof appLayoutSettingsArchivedRouteRoute
   appLayoutSettingsSecurityRouteRoute: typeof appLayoutSettingsSecurityRouteRoute
   appLayoutSettingsIndexRoute: typeof appLayoutSettingsIndexRoute
 }
 
 const appLayoutSettingsRouteRouteChildren: appLayoutSettingsRouteRouteChildren =
   {
+    appLayoutSettingsArchivedRouteRoute: appLayoutSettingsArchivedRouteRoute,
     appLayoutSettingsSecurityRouteRoute: appLayoutSettingsSecurityRouteRoute,
     appLayoutSettingsIndexRoute: appLayoutSettingsIndexRoute,
   }
@@ -1292,6 +1334,7 @@ const rootRouteChildren: RootRouteChildren = {
   LegalAcceptableUseRouteRoute: LegalAcceptableUseRouteRoute,
   LegalPrivacyRouteRoute: LegalPrivacyRouteRoute,
   LegalTermsRouteRoute: LegalTermsRouteRoute,
+  ShareShareIdRouteRoute: ShareShareIdRouteRoute,
   eeSingularityLayoutRouteRoute: eeSingularityLayoutRouteRouteWithChildren,
   ApiFilesMarkdownRouteRoute: ApiFilesMarkdownRouteRoute,
   ApiFilesObjectRouteRoute: ApiFilesObjectRouteRoute,

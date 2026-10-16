@@ -5,8 +5,8 @@
  * (`chat-sidebar-project-scope.tsx`) historically forked a row's
  * action handlers, trailing-status element, and context-menu items in
  * ~80 lines of near-duplicate code. This module hosts the pieces both
- * sidebars actually share: the three Zero-mutator action callbacks
- * (`copy link`, `set pinned`, `delete`), the trailing status element
+ * sidebars actually share: the thread action callbacks
+ * for navigation links, pinning, archiving, and deletion, the trailing status element
  * (spinner / error / pin badge), and a context-menu item subtree
  * containing the actions every variant supports.
  *
@@ -29,6 +29,9 @@ import AlertTriangle from 'lucide-react/dist/esm/icons/alert-triangle'
 import Copy from 'lucide-react/dist/esm/icons/copy'
 import Pin from 'lucide-react/dist/esm/icons/pin'
 import PinOff from 'lucide-react/dist/esm/icons/pin-off'
+import Archive from 'lucide-react/dist/esm/icons/archive'
+import Share2 from 'lucide-react/dist/esm/icons/share-2'
+import { openThreadShare } from './thread-share-dialog'
 import Trash2 from 'lucide-react/dist/esm/icons/trash-2'
 import { toast } from 'sonner'
 
@@ -43,6 +46,7 @@ import { ThreadMoveToProjectSubmenu } from './chat-sidebar-move-to-project'
  */
 export type ThreadRowSubject = {
   readonly threadId: string
+  readonly visibility?: 'visible' | 'archived'
   readonly pinned: boolean
   readonly generationStatus?:
     | 'pending'
@@ -52,6 +56,7 @@ export type ThreadRowSubject = {
 }
 
 export type ThreadRowActionHandlers = {
+  readonly archiveThread: (threadId: string, archived: boolean) => Promise<void>
   readonly copyLink: (threadId: string) => Promise<void>
   readonly setPinned: (threadId: string, pinned: boolean) => Promise<void>
   readonly deleteThread: (threadId: string) => Promise<void>
@@ -64,13 +69,13 @@ export type ThreadRowActionHandlers = {
  * returned handlers from its UI.
  *
  * Optional callbacks let the global sidebar refresh its history page
- * cache after deletes / pins without those Zero-specific concerns
+ * cache after removing or pinning rows without those Zero-specific concerns
  * leaking into this hook.
  */
 export function useThreadRowActions(input: {
   readonly redirectTargetOnDelete: string
   readonly activeThreadId: string | null
-  readonly onAfterDelete?: () => void
+  readonly onAfterRemoveFromList?: () => void
   readonly onAfterPinChange?: () => void
 }): ThreadRowActionHandlers {
   const z = useZero()
@@ -99,7 +104,7 @@ export function useThreadRowActions(input: {
       try {
         const write = z.mutate(mutators.threads.delete({ threadId }))
         await write.client
-        input.onAfterDelete?.()
+        input.onAfterRemoveFromList?.()
         toast.success(m.chat_sidebar_thread_deleted())
         if (input.activeThreadId === threadId) {
           navigate({ to: input.redirectTargetOnDelete })
@@ -116,7 +121,22 @@ export function useThreadRowActions(input: {
     [input, navigate, z],
   )
 
-  return { copyLink, setPinned, deleteThread }
+  const archiveThread = useCallback(
+    async (threadId: string, archived: boolean) => {
+      try {
+        const result = await z.mutate(
+          mutators.threads.archive({ threadId, archived }),
+        ).server
+        if (result.type === 'error') throw new Error('archive_failed')
+        input.onAfterRemoveFromList?.()
+      } catch {
+        toast.error(m.archive_failed())
+      }
+    },
+    [input, z],
+  )
+
+  return { copyLink, setPinned, deleteThread, archiveThread }
 }
 
 /**
@@ -184,7 +204,7 @@ export function getThreadRowTrailingElement(
 
 /**
  * Shared context-menu items that both sidebars render: copy link,
- * pin / unpin, move to project, divider, delete. The global sidebar
+ * share, archive, pin / unpin, move to project, divider, delete. The global sidebar
  * prepends a Rename item before this fragment.
  */
 export function ThreadRowContextMenuItems({
@@ -203,6 +223,16 @@ export function ThreadRowContextMenuItems({
 }) {
   return (
     <>
+      <ContextMenuItem onClick={() => openThreadShare(thread.threadId)}>
+        <Share2 />
+        {m.share_title()}
+      </ContextMenuItem>
+      <ContextMenuItem
+        onClick={() => void actions.archiveThread(thread.threadId, thread.visibility !== 'archived')}
+      >
+        <Archive />
+        {thread.visibility === 'archived' ? m.archive_restore() : m.archive_action()}
+      </ContextMenuItem>
       <ContextMenuItem
         onClick={() => {
           void actions.copyLink(thread.threadId)

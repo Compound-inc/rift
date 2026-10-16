@@ -223,6 +223,12 @@ const thread = table('thread')
     allowAttachments: boolean().from('allow_attachments').optional(),
     orgOnly: boolean().from('org_only').optional(),
     shareName: boolean().from('share_name').optional(),
+    // Server-written provenance survives source revocation and chained forks.
+    shareProvenance: json<{
+      shareId: string
+      threadId: string
+      organizationIds: string[]
+    }>().from('share_provenance').optional(),
     ownerOrgId: string().from('owner_org_id').optional(),
     customInstructionId: string().from('custom_instruction_id').optional(),
     modeId: string().from('mode_id').optional(),

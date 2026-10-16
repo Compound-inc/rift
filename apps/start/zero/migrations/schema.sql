@@ -781,3 +781,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS skill_project_overrides_unique
   ON skill_project_overrides (project_id, skill_id);
 CREATE INDEX IF NOT EXISTS skill_project_overrides_by_project
   ON skill_project_overrides (project_id);
+
+-- No existing thread metadata field can hold immutable share provenance.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS share_provenance JSONB;
+CREATE INDEX IF NOT EXISTS threads_recent_share_forks_idx
+  ON threads (user_id, (share_provenance->>'shareId'), created_at DESC)
+  WHERE share_provenance IS NOT NULL;

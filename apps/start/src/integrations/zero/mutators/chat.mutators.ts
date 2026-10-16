@@ -48,6 +48,7 @@ const renameThreadArgs = z.object({
 
 const archiveThreadArgs = z.object({
   threadId: z.string(),
+  archived: z.boolean().optional(),
 })
 
 const deleteThreadArgs = z.object({
@@ -432,7 +433,7 @@ export const chatMutatorDefinitions = {
 
       await tx.mutate.thread.update({
         id: thread.id,
-        visibility: 'archived',
+        visibility: args.archived === false ? 'visible' : 'archived',
         updatedAt: Date.now(),
       })
     }),

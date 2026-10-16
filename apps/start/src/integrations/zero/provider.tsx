@@ -61,7 +61,7 @@ function useZeroAuth(): {
   }, [activeOrganizationId, isAnonymous, loading, user?.id])
 }
 
-export default function ZeroProvider({
+function AuthenticatedZeroProvider({
   children,
 }: {
   children: React.ReactNode
@@ -121,4 +121,11 @@ export default function ZeroProvider({
       {children}
     </ZeroProviderBase>
   )
+}
+
+/** Shared routes must render for visitors without provisioning a Zero identity. */
+export default function ZeroProvider({ children }: { children: React.ReactNode }) {
+  const location = useLocation()
+  if (location.pathname.startsWith('/share/')) return <>{children}</>
+  return <AuthenticatedZeroProvider>{children}</AuthenticatedZeroProvider>
 }

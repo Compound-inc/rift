@@ -1,6 +1,11 @@
 // Single chat message renderer (user/assistant).
+import { AssistantTextPart } from './message-parts/renderers/assistant-part-renderers'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { UIMessage } from 'ai'
+import { CheckIcon, CopyIcon } from '@rift/ui/icons/svg-icons'
+import { MessageActionButton } from './message-parts/actions/message-actions-primitives'
+import { useMessageCopyAction } from './message-parts/actions/use-message-copy-action'
+import { m } from '@/paraglide/messages.js'
 import { useDirection } from '@rift/ui/direction'
 import type { ChatMessageMetadata } from '@/lib/shared/chat-contracts/message-metadata'
 import type { ChatAttachment } from '@/lib/shared/chat-contracts/attachments'
@@ -31,6 +36,8 @@ function getEditMirrorText(text: string): string {
 
 type ChatMessageProps = {
   message: UIMessage
+  /** Shared pages expose copy only and receive sanitized text without metadata. */
+  readOnly?: boolean
   isAnimating?: boolean
   canRegenerate: boolean
   canEdit: boolean
@@ -86,6 +93,7 @@ const AssistantMessageFooter = memo(function AssistantMessageFooter({
 export function ChatMessage({
   message,
   isAnimating = false,
+  readOnly = false,
   canRegenerate,
   canEdit,
   onRegenerate,
@@ -100,7 +108,9 @@ export function ChatMessage({
   const isUser = message.role === 'user'
   const direction = useDirection()
   const metadata = message.metadata as ChatMessageMetadata | undefined
-  const attachmentManifest = (isUser ? metadata?.attachments ?? [] : []).filter(
+  const attachmentManifest = (
+    isUser && !readOnly ? metadata?.attachments ?? [] : []
+  ).filter(
     (attachment): attachment is ChatAttachment =>
       !!attachment &&
       typeof attachment === 'object' &&
@@ -202,7 +212,9 @@ export function ChatMessage({
             </div>
           )}
           <div className="w-full">
-            <UserMessageActions
+            {readOnly ? (
+              <div className="flex justify-end"><ReadOnlyCopy text={text} /></div>
+            ) : <UserMessageActions
               messageId={message.id}
               text={text}
               canRegenerate={canRegenerate}
@@ -235,7 +247,7 @@ export function ChatMessage({
                 })
               }}
               branchSelector={branchSelector}
-            />
+            />}
           </div>
         </div>
       </div>
@@ -253,15 +265,34 @@ export function ChatMessage({
         dir={direction}
         className="flex w-full flex-col gap-3 overflow-hidden rounded-2xl px-2 py-1 text-foreground-strong leading-[21px]"
       >
-        <AssistantMessageContent parts={message.parts} isAnimating={isAnimating} />
-        <AssistantMessageFooter
+        {readOnly ? (
+          <AssistantTextPart text={text} isMessageStreaming={false} readOnly />
+        ) : <AssistantMessageContent parts={message.parts} isAnimating={isAnimating} />}
+        {readOnly ? (
+          <ReadOnlyCopy text={text} />
+        ) : <AssistantMessageFooter
           messageId={message.id}
           text={text}
           modelName={modelName}
           canRegenerate={canRegenerate}
           onRegenerate={onRegenerate}
-        />
+        />}
       </div>
+    </div>
+  )
+}
+
+function ReadOnlyCopy({ text }: { text: string }) {
+  const { isCopied, copy } = useMessageCopyAction(text)
+  return (
+    <div className="flex self-start py-1">
+      <MessageActionButton
+        label={m.chat_message_action_copy_text()}
+        tooltip={m.chat_message_action_copy_text()}
+        onClick={() => void copy()}
+      >
+        {isCopied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
+      </MessageActionButton>
     </div>
   )
 }

@@ -10,12 +10,22 @@ import type {
 } from '../types'
 import { useStreamdownPlugins } from './use-streamdown-plugins'
 
-function AssistantTextPart({
+// Shared content must not trigger requests to author-controlled image hosts.
+const sharedMarkdownComponents = {
+  ...streamdownStaticComponents,
+  img: ({ alt }: { alt?: string }) => (
+    <span>{alt ? `[${alt}]` : '[Image blocked]'}</span>
+  ),
+}
+
+export function AssistantTextPart({
   isMessageStreaming,
   text,
+  readOnly = false,
 }: {
   isMessageStreaming: boolean
   text: string
+  readOnly?: boolean
 }) {
   const streamdownPlugins = useStreamdownPlugins()
 
@@ -27,9 +37,11 @@ function AssistantTextPart({
       mode={isMessageStreaming ? 'streaming' : 'static'}
       remarkPlugins={streamdownRemarkPlugins}
       components={
-        isMessageStreaming
-          ? streamdownStreamingComponents
-          : streamdownStaticComponents
+        readOnly
+          ? sharedMarkdownComponents
+          : isMessageStreaming
+            ? streamdownStreamingComponents
+            : streamdownStaticComponents
       }
       className="chat-streamdown min-w-0 max-w-full break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
     >
