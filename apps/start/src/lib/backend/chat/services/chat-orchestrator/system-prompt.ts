@@ -10,7 +10,8 @@ export type SystemPromptInput = {
   readonly turnSections?: readonly string[]
 }
 
-function userSection(
+/** Serialize one untrusted section for both prompt assembly and token accounting. */
+export function systemPromptUserSection(
   name: string,
   value: string | undefined,
 ): string | undefined {
@@ -47,9 +48,9 @@ export function assembleSystemPrompt(input: SystemPromptInput = {}): string {
   return [
     base,
     input.modePrompt?.trim(),
-    userSection('custom-instructions', input.customInstructions),
-    userSection('project-instruction', input.projectInstruction),
-    userSection('memory', input.memory),
+    systemPromptUserSection('custom-instructions', input.customInstructions),
+    systemPromptUserSection('project-instruction', input.projectInstruction),
+    systemPromptUserSection('memory', input.memory),
     ...(input.turnSections ?? []).map((section) => section.trim()),
   ]
     .filter(Boolean)

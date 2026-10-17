@@ -136,6 +136,14 @@ export const makePrepareRegenerationOperation = (dependencies: {
               })
 
               return {
+                // Reuse rows already authorized and loaded in this transaction.
+                // Model-facing history later expands this text with private context.
+                userText:
+                  threadMessages.find(
+                    (message) =>
+                      message.messageId === anchor.anchorMessageId &&
+                      message.role === 'user',
+                  )?.content ?? '',
                 anchorMessageId: anchor.anchorMessageId,
                 regenSourceMessageId: anchor.targetMessageId,
               }

@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { UIMessage } from 'ai'
 import { Effect } from 'effect'
-import type {
-  BuildTurnContextInput,
-  TurnContext,
-} from '@/lib/backend/rag'
+import type { BuildTurnContextInput, TurnContext } from '@/lib/backend/rag'
 import type { OrgAiPolicy } from '@/lib/shared/model-policy/types'
 import { makeLoadThreadMessagesOperation } from './load-thread-messages'
 
@@ -197,13 +194,21 @@ describe('makeLoadThreadMessagesOperation', () => {
         },
       })
       .mockResolvedValueOnce([
-        attachmentRow({ id: 'att-root', fileName: 'root.txt', messageId: 'user-root' }),
+        attachmentRow({
+          id: 'att-root',
+          fileName: 'root.txt',
+          messageId: 'user-root',
+        }),
         attachmentRow({
           id: 'att-canonical',
           fileName: 'canonical.txt',
           messageId: 'user-canonical',
         }),
-        attachmentRow({ id: 'att-branch', fileName: 'branch.txt', messageId: 'user-branch' }),
+        attachmentRow({
+          id: 'att-branch',
+          fileName: 'branch.txt',
+          messageId: 'user-branch',
+        }),
       ])
     const { loadThreadMessages, buildTurnContext } = makeOperation({ run })
 
@@ -262,7 +267,9 @@ describe('makeLoadThreadMessagesOperation', () => {
     )
 
     expect(messages.map((message) => message.id)).toEqual(['user-edited'])
-    expect(buildTurnContext.mock.calls[0][0].attachmentIds).toEqual(['att-report'])
+    expect(buildTurnContext.mock.calls[0][0].attachmentIds).toEqual([
+      'att-report',
+    ])
     expect(messages[0]?.metadata).toMatchObject({
       attachments: [{ id: 'att-report', name: 'report.pdf' }],
     })
@@ -292,7 +299,10 @@ describe('makeLoadThreadMessagesOperation', () => {
       ])
     const { loadThreadMessages, buildTurnContext } = makeOperation({
       run,
-      context: { libraryBlock: '<documents>pending</documents>', turnBlock: '' },
+      context: {
+        libraryBlock: '<documents>pending</documents>',
+        turnBlock: '',
+      },
     })
 
     const messages = await Effect.runPromise(
@@ -333,7 +343,10 @@ describe('makeLoadThreadMessagesOperation', () => {
           content: 'What should the launch brief mention?',
         }),
       ])
-      .mockResolvedValueOnce({ projectId: 'project-1', activeChildByParent: {} })
+      .mockResolvedValueOnce({
+        projectId: 'project-1',
+        activeChildByParent: {},
+      })
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce({
         id: 'project-1',
@@ -425,9 +438,9 @@ describe('makeLoadThreadMessagesOperation', () => {
     )
 
     expect(buildTurnContext.mock.calls[0][0].attachmentIds).toEqual(['att-pdf'])
-    expect(messages.at(-1)?.parts.filter((part) => part.type === 'file')).toEqual(
-      [],
-    )
+    expect(
+      messages.at(-1)?.parts.filter((part) => part.type === 'file'),
+    ).toEqual([])
   })
 
   it('expands skill slash tokens before building the retrieval query', async () => {
@@ -464,7 +477,9 @@ describe('makeLoadThreadMessagesOperation', () => {
     )
 
     const queryText = buildTurnContext.mock.calls[0][0].query.latestUserText
-    expect(queryText).toContain('Refactor the target code to maximise readability')
+    expect(queryText).toContain(
+      'Refactor the target code to maximise readability',
+    )
     expect(queryText).toContain('make the rate limiter faster')
     expect(textOf(messages.at(-1))).not.toMatch(/(^|\s)\/refactor(\s|$)/)
   })
@@ -552,4 +567,139 @@ it('previews regeneration through its user anchor and excludes the old answer', 
     branchTurn: { targetMessageId: 'answer' },
   }))
   expect(messages.map((message) => message.id)).toEqual(['original'])
+})
+for (const context of [
+  { libraryBlock: 'project files', turnBlock: '' },
+  { libraryBlock: '', turnBlock: 'org knowledge' },
+  { libraryBlock: '', turnBlock: '' },
+]) {
+  it(`reports private context use when RAG returns ${JSON.stringify(context)}`, async () => {
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce([userRow({ messageId: 'u', content: 'Question' })])
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce([])
+    const { loadThreadMessages } = makeOperation({ run, context })
+    const onPrivateContextUsed = vi.fn()
+    await Effect.runPromise(
+      loadThreadMessages({
+        threadId: 'thread-1',
+        model: 'openai/gpt-5-mini',
+        requestId: 'request',
+        onPrivateContextUsed,
+      }),
+    )
+    expect(onPrivateContextUsed).toHaveBeenCalledTimes(
+      context.libraryBlock || context.turnBlock ? 1 : 0,
+    )
+  })
+}
+
+it.each(['submit', 'edit', 'regenerate'] as const)(
+  'exposes raw %s user text before expansion/RAG without writing',
+  async (trigger) => {
+    const raw = userRow({ messageId: 'original', content: 'Raw question' })
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce([
+        raw,
+        assistantRow({
+          messageId: 'answer',
+          content: 'Old answer',
+          parentMessageId: 'original',
+          createdAt: 2,
+        }),
+      ])
+      .mockResolvedValueOnce({ activeChildByParent: { original: 'answer' } })
+      .mockResolvedValueOnce([])
+    const { loadThreadMessages, buildTurnContext } = makeOperation({
+      run,
+      context: { libraryBlock: 'Private documents', turnBlock: '' },
+    })
+    const onTurnUserText = vi.fn((text: string) =>
+      Effect.sync(() => {
+        expect(text).toBe(
+          trigger === 'edit'
+            ? 'Edited question'
+            : trigger === 'submit'
+              ? 'New question'
+              : 'Raw question',
+        )
+        expect(buildTurnContext).not.toHaveBeenCalled()
+      }),
+    )
+    const messages = await Effect.runPromise(
+      loadThreadMessages({
+        threadId: 'thread-1',
+        userId: 'user-1',
+        model: 'openai/gpt-5-mini',
+        requestId: 'preview',
+        onTurnUserText,
+        ...(trigger === 'submit'
+          ? {
+              pendingUserMessage: {
+                id: 'new',
+                role: 'user' as const,
+                parts: [{ type: 'text', text: 'New question' }],
+              },
+            }
+          : {
+              branchTurn: {
+                targetMessageId: trigger === 'edit' ? 'original' : 'answer',
+                ...(trigger === 'edit'
+                  ? { editedText: '  Edited question  ' }
+                  : {}),
+              },
+            }),
+      }),
+    )
+    expect(onTurnUserText).toHaveBeenCalledTimes(1)
+    expect(textOf(messages[0])).toContain('Private documents')
+    expect(raw.content).toBe('Raw question')
+  },
+)
+
+it('reports persisted tool activity in the selected history even with empty RAG and no new tools', async () => {
+  const run = vi
+    .fn()
+    .mockResolvedValueOnce([
+      userRow({ messageId: 'original', content: 'Old question' }),
+      {
+        ...assistantRow({
+          messageId: 'answer',
+          content: 'Tool-informed answer',
+          parentMessageId: 'original',
+          createdAt: 2,
+        }),
+        parts: [
+          {
+            type: 'dynamic-tool',
+            toolName: 'web_search',
+            toolCallId: 'previous',
+            state: 'output-available',
+            input: {},
+            output: {},
+          },
+        ],
+      },
+    ])
+    .mockResolvedValueOnce({ activeChildByParent: { original: 'answer' } })
+    .mockResolvedValueOnce([])
+  const { loadThreadMessages } = makeOperation({ run })
+  const onPrivateContextUsed = vi.fn()
+  await Effect.runPromise(
+    loadThreadMessages({
+      threadId: 'thread-1',
+      userId: 'user-1',
+      model: 'openai/gpt-5-mini',
+      requestId: 'tools',
+      onPrivateContextUsed,
+      pendingUserMessage: {
+        id: 'next',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Explain that' }],
+      },
+    }),
+  )
+  expect(onPrivateContextUsed).toHaveBeenCalledTimes(1)
 })

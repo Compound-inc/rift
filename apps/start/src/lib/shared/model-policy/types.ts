@@ -56,6 +56,7 @@ export type OrgAiPolicy = {
   readonly disabledModelIds: readonly string[]
   readonly complianceFlags: OrgComplianceFlags
   readonly toolPolicy: OrgToolPolicy
+  readonly memoryEnabled?: boolean
   readonly orgKnowledgeEnabled: boolean
   readonly enforcedModeId?: ChatModeId
   /**

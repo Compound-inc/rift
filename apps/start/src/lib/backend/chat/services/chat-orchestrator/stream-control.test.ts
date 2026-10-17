@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { resolveChatAccessPolicy } from '@/lib/backend/access-control'
 import { WorkspaceUsageQuotaService } from '@/lib/backend/billing/services/workspace-usage-quota.service'
 import { WorkspaceUsageSettlementService } from '@/lib/backend/billing/services/workspace-usage-settlement.service'
+import { PersonalizationTurnService } from '../personalization/personalize-turn'
 import { ChatOrchestratorService } from '../chat-orchestrator.service'
 import { FreeChatAllowanceService } from '../free-chat-allowance.service'
 import { MessageStoreService } from '../message-store.service'
@@ -40,6 +41,9 @@ function createHarness(
   const finalized: FinalizeInput[] = []
   const recorded: Parameters<
     WorkspaceUsageSettlementService['Service']['recordChatUsage']
+  >[0][] = []
+  const remembered: Parameters<
+    PersonalizationTurnService['Service']['rememberTurn']
   >[0][] = []
   const released: string[] = []
   let settlements = 0
@@ -209,6 +213,27 @@ function createHarness(
       }),
     ).pipe(Layer.provide(ThreadService.layerMemory)),
     messageStore,
+    Layer.succeed(PersonalizationTurnService, {
+      startRecall: () =>
+        Effect.succeed({
+          sections: Effect.succeed({
+            customInstructionsSection: '',
+            memorySection: '',
+          }),
+          preferences: Effect.succeed({
+            tokenBudget: 0,
+            scope: {
+              userId: 'user',
+              organizationId: 'org',
+              generation: 'initial',
+            },
+          }),
+        }),
+      rememberTurn: (input) =>
+        Effect.sync(() => {
+          remembered.push(input)
+        }),
+    }),
     RateLimitService.layerMemory,
     FreeChatAllowanceService.layerMemory,
     ModelPolicyService.layerMemory,
@@ -259,6 +284,7 @@ function createHarness(
     finalized,
     recorded,
     released,
+    remembered,
     settlements: () => settlements,
     localReleases: () => localReleases,
     finish: () => finish!(),
@@ -311,6 +337,7 @@ describe('stream control orchestration', () => {
           expect(harness.signal()?.reason).toBe('user-stop')
           yield* Effect.promise(harness.finish)
           expect(harness.finalized).toHaveLength(1)
+          expect(harness.remembered).toEqual([])
           expect(harness.finalized[0]).toMatchObject({
             ok: true,
             stopped: true,
@@ -362,6 +389,7 @@ describe('stream control orchestration', () => {
     )
     expect(response.status).toBe(204)
     expect(harness.signal()).toBeUndefined()
+    expect(harness.remembered).toEqual([])
     expect(harness.finalized[0]).toMatchObject({
       ok: true,
       stopped: true,
@@ -406,6 +434,7 @@ describe('stream control orchestration', () => {
       }).pipe(Effect.provide(harness.layer)),
     )
     expect(harness.signal()).toBeUndefined()
+    expect(harness.remembered).toEqual([])
     expect(harness.finalized[0]).toMatchObject({ ok: false, stopped: false })
     expect(harness.recorded).toEqual([])
     expect(harness.settlements()).toBe(0)
@@ -448,6 +477,7 @@ describe('stream control orchestration', () => {
           yield* Effect.promise(harness.finish)
         }).pipe(Effect.provide(harness.layer)),
       )
+      expect(harness.remembered).toEqual([])
       expect(harness.finalized[0]).toMatchObject({ ok: false })
       expect(harness.recorded).toHaveLength(billable ? 1 : 0)
       expect(harness.settlements()).toBe(billable ? 1 : 0)
@@ -517,6 +547,7 @@ describe('stream control orchestration', () => {
             requestId: 'replace',
           })
           yield* Effect.promise(harness.finish)
+          expect(harness.remembered).toEqual([])
           expect(harness.finalized[0]).toMatchObject({
             ok: false,
             stopped: false,
@@ -794,6 +825,7 @@ it('settles a cost-only exhausted reasoning turn exactly once without visible ou
     })
     yield* Effect.promise(harness.finish)
     expect(harness.finalized).toHaveLength(1)
+    expect(harness.remembered).toEqual([])
     expect(harness.finalized[0]).toMatchObject({ ok: false, finalContent: '', finishReason: 'length' })
     expect(harness.recorded).toHaveLength(1)
     expect(harness.recorded[0].actualCostUsd).toBe(0.04)

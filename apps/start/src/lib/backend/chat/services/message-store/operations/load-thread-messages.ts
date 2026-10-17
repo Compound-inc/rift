@@ -73,6 +73,7 @@ type MessagePromptRow = {
   readonly userId: string
   readonly attachmentsIds?: unknown
   readonly model?: string
+  readonly parts?: unknown
 }
 
 function uniqueAttachmentIds(
@@ -115,6 +116,8 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
       orgPolicy,
       untilMessageId,
       branchTurn,
+      onTurnUserText,
+      onPrivateContextUsed,
       pendingUserMessage,
       pendingAttachments,
       contextWindowTokens,
@@ -323,6 +326,25 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
         const userRows = canonicalRows.filter((row) => row.role === 'user')
         const firstUserMessageRow = userRows.at(0)
         const latestUserMessageRow = userRows.at(-1)
+        // The preview has resolved the branch and edited text without writing.
+        // Start recall here, while the slower skill and RAG work can still overlap it.
+        if (onTurnUserText)
+          yield* onTurnUserText(latestUserMessageRow?.content ?? '')
+        // Tool display parts are stored separately from content. Earlier tool-derived
+        // answers can inform this turn even when no new tool is called.
+        if (
+          canonicalRows.some(
+            (row) =>
+              Array.isArray(row.parts) &&
+              row.parts.some(
+                (part: { type?: unknown } | null) =>
+                  typeof part?.type === 'string' &&
+                  (part.type === 'dynamic-tool' ||
+                    part.type.startsWith('tool-')),
+              ),
+          )
+        )
+          onPrivateContextUsed?.()
         const previousUserMessageRow = userRows.at(-2)
         const activeProjectId =
           typeof threadRow?.projectId === 'string' && threadRow.projectId.trim()
@@ -468,6 +490,13 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
             contextWindowTokens ?? modelCatalogEntry?.contextWindow,
         })
 
+        if (
+          turnContext.turnBlock ||
+          turnContext.libraryBlock ||
+          fallbackAttachmentById.size > 0
+        )
+          onPrivateContextUsed?.()
+
         return canonicalRows.map((message) => {
           const attachmentIds = Array.isArray(message.attachmentsIds)
             ? message.attachmentsIds
@@ -498,6 +527,8 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
                     : false,
                 )
               : []
+
+          if (nativeAttachments.length > 0) onPrivateContextUsed?.()
 
           const expandedText =
             message.role === 'user'

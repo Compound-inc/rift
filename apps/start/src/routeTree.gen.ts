@@ -42,6 +42,7 @@ import { Route as appLayoutChatIndexRouteImport } from './routes/(app)/_layout/c
 import { Route as eeSingularityLayoutUsersRouteImport } from './routes/(ee)/singularity/_layout/users'
 import { Route as appLayoutChatSkillsRouteImport } from './routes/(app)/_layout/chat/skills'
 import { Route as appLayoutSettingsSecurityRouteRouteImport } from './routes/(app)/_layout/settings/security/route'
+import { Route as appLayoutSettingsPersonalizationRouteRouteImport } from './routes/(app)/_layout/settings/personalization/route'
 import { Route as appLayoutOrganizationSettingsRouteRouteImport } from './routes/(app)/_layout/organization/settings/route'
 import { Route as appLayoutChatThreadIdRouteRouteImport } from './routes/(app)/_layout/chat/$threadId/route'
 import { Route as appLayoutOrganizationSettingsIndexRouteImport } from './routes/(app)/_layout/organization/settings/index'
@@ -234,6 +235,12 @@ const appLayoutSettingsSecurityRouteRoute =
     path: '/security',
     getParentRoute: () => appLayoutSettingsRouteRoute,
   } as any)
+const appLayoutSettingsPersonalizationRouteRoute =
+  appLayoutSettingsPersonalizationRouteRouteImport.update({
+    id: '/personalization',
+    path: '/personalization',
+    getParentRoute: () => appLayoutSettingsRouteRoute,
+  } as any)
 const appLayoutOrganizationSettingsRouteRoute =
   appLayoutOrganizationSettingsRouteRouteImport.update({
     id: '/settings',
@@ -390,6 +397,7 @@ export interface FileRoutesByFullPath {
   '/': typeof appLayoutIndexRoute
   '/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
   '/organization/settings': typeof appLayoutOrganizationSettingsRouteRouteWithChildren
+  '/settings/personalization': typeof appLayoutSettingsPersonalizationRouteRoute
   '/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/chat/skills': typeof appLayoutChatSkillsRoute
   '/singularity/users': typeof eeSingularityLayoutUsersRoute
@@ -441,6 +449,7 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/': typeof appLayoutIndexRoute
   '/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
+  '/settings/personalization': typeof appLayoutSettingsPersonalizationRouteRoute
   '/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/chat/skills': typeof appLayoutChatSkillsRoute
   '/singularity/users': typeof eeSingularityLayoutUsersRoute
@@ -496,6 +505,7 @@ export interface FileRoutesById {
   '/(app)/_layout/': typeof appLayoutIndexRoute
   '/(app)/_layout/chat/$threadId': typeof appLayoutChatThreadIdRouteRoute
   '/(app)/_layout/organization/settings': typeof appLayoutOrganizationSettingsRouteRouteWithChildren
+  '/(app)/_layout/settings/personalization': typeof appLayoutSettingsPersonalizationRouteRoute
   '/(app)/_layout/settings/security': typeof appLayoutSettingsSecurityRouteRoute
   '/(app)/_layout/chat/skills': typeof appLayoutChatSkillsRoute
   '/(ee)/singularity/_layout/users': typeof eeSingularityLayoutUsersRoute
@@ -553,6 +563,7 @@ export interface FileRouteTypes {
     | '/'
     | '/chat/$threadId'
     | '/organization/settings'
+    | '/settings/personalization'
     | '/settings/security'
     | '/chat/skills'
     | '/singularity/users'
@@ -604,6 +615,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/'
     | '/chat/$threadId'
+    | '/settings/personalization'
     | '/settings/security'
     | '/chat/skills'
     | '/singularity/users'
@@ -658,6 +670,7 @@ export interface FileRouteTypes {
     | '/(app)/_layout/'
     | '/(app)/_layout/chat/$threadId'
     | '/(app)/_layout/organization/settings'
+    | '/(app)/_layout/settings/personalization'
     | '/(app)/_layout/settings/security'
     | '/(app)/_layout/chat/skills'
     | '/(ee)/singularity/_layout/users'
@@ -938,6 +951,13 @@ declare module '@tanstack/react-router' {
       path: '/security'
       fullPath: '/settings/security'
       preLoaderRoute: typeof appLayoutSettingsSecurityRouteRouteImport
+      parentRoute: typeof appLayoutSettingsRouteRoute
+    }
+    '/(app)/_layout/settings/personalization': {
+      id: '/(app)/_layout/settings/personalization'
+      path: '/personalization'
+      fullPath: '/settings/personalization'
+      preLoaderRoute: typeof appLayoutSettingsPersonalizationRouteRouteImport
       parentRoute: typeof appLayoutSettingsRouteRoute
     }
     '/(app)/_layout/organization/settings': {
@@ -1227,12 +1247,15 @@ const appLayoutOrganizationRouteRouteWithChildren =
   )
 
 interface appLayoutSettingsRouteRouteChildren {
+  appLayoutSettingsPersonalizationRouteRoute: typeof appLayoutSettingsPersonalizationRouteRoute
   appLayoutSettingsSecurityRouteRoute: typeof appLayoutSettingsSecurityRouteRoute
   appLayoutSettingsIndexRoute: typeof appLayoutSettingsIndexRoute
 }
 
 const appLayoutSettingsRouteRouteChildren: appLayoutSettingsRouteRouteChildren =
   {
+    appLayoutSettingsPersonalizationRouteRoute:
+      appLayoutSettingsPersonalizationRouteRoute,
     appLayoutSettingsSecurityRouteRoute: appLayoutSettingsSecurityRouteRoute,
     appLayoutSettingsIndexRoute: appLayoutSettingsIndexRoute,
   }
