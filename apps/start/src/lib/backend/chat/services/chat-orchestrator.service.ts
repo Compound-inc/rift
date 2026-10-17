@@ -1,4 +1,5 @@
 import { createStepAccounting } from './chat-orchestrator/step-accounting'
+import { observeStreamErrors } from './chat-orchestrator/stream-errors'
 import { estimateToolTokens } from './chat-orchestrator/output-limits'
 import {
   estimatePromptTokens,
@@ -840,6 +841,9 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             reservedNanoUsd: quotaReservation.estimatedNanoUsd,
           })
           let receivedProviderOutput = false
+          // Set by observeStreamErrors; see stream-errors.ts for why the SDK
+          // outcome alone can't mark provider failures.
+          let streamErrored = false
           let assistantFinalized = false
           let streamCleanedUp = false
           const assistantBuffer: AssistantDeltaBuffer = {
@@ -1234,7 +1238,11 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               })
             },
             stream: toUIMessageStream({
-              stream: result.stream,
+              stream: result.stream.pipeThrough(
+                observeStreamErrors(() => {
+                  streamErrored = true
+                }),
+              ),
               tools: toolRegistry.tools,
               sendSources: true,
               sendReasoning: true,
@@ -1313,6 +1321,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                   (!isAborted &&
                     !isCancelled &&
                     outcome.status !== 'failed' &&
+                    !streamErrored &&
                     !streamAbortController.signal.aborted &&
                     (assistantBuffer.text.length > 0 || Boolean(assistantBuffer.toolParts?.some((part) => part.state === 'output-available'))))
                 // v7 exposes all-step token totals and final-step provider accounting separately.
