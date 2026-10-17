@@ -6,12 +6,23 @@ import {
 } from './streamdown-components'
 import { useStreamdownPlugins } from './use-streamdown-plugins'
 
+// Shared content must not trigger requests to author-controlled image hosts.
+const sharedMarkdownComponents = {
+  ...streamdownStaticComponents,
+  img: ({ alt }: { alt?: string }) => (
+    <span>{alt ? `[${alt}]` : '[Image blocked]'}</span>
+  ),
+}
+
 export function AssistantTextPart({
   isMessageStreaming,
   text,
+  readOnly = false,
 }: {
   isMessageStreaming: boolean
   text: string
+  /** Shared (read-only) pages: images render as their alt text, never fetched. */
+  readOnly?: boolean
 }) {
   const streamdownPlugins = useStreamdownPlugins()
 
@@ -23,14 +34,15 @@ export function AssistantTextPart({
       mode={isMessageStreaming ? 'streaming' : 'static'}
       remarkPlugins={streamdownRemarkPlugins}
       components={
-        isMessageStreaming
-          ? streamdownStreamingComponents
-          : streamdownStaticComponents
+        readOnly
+          ? sharedMarkdownComponents
+          : isMessageStreaming
+            ? streamdownStreamingComponents
+            : streamdownStaticComponents
       }
       className="chat-streamdown min-w-0 max-w-full break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
     >
-      {text || '\u00a0'}
+      {text || ' '}
     </Streamdown>
   )
 }
-
