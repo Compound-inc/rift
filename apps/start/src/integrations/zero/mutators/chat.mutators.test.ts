@@ -7,7 +7,10 @@ vi.mock('../org-access', () => ({
 }))
 
 describe('permanent thread deletion', () => {
-  function fixture(override = {}) {
+  // Read order: thread, messages, attachments, then documents and their
+  // versions (client) or compaction checkpoints (server; documents are
+  // deleted with SQL there).
+  function fixture(override = {}, location: 'client' | 'server' = 'client') {
     const run = vi
       .fn()
       .mockResolvedValueOnce({
@@ -19,21 +22,27 @@ describe('permanent thread deletion', () => {
       })
       .mockResolvedValueOnce([{ id: 'message' }])
       .mockResolvedValueOnce([{ id: 'attachment', status: 'ready' }])
-      .mockResolvedValueOnce([
-        { id: 'doc' },
-        { id: 'soft-deleted-doc', deletedAt: 1 },
-      ])
-      .mockResolvedValueOnce([{ version: 1 }, { version: 2 }])
-      .mockResolvedValueOnce([{ version: 1 }])
+    if (location === 'client') {
+      run
+        .mockResolvedValueOnce([
+          { id: 'doc' },
+          { id: 'soft-deleted-doc', deletedAt: 1 },
+        ])
+        .mockResolvedValueOnce([{ version: 1 }, { version: 2 }])
+        .mockResolvedValueOnce([{ version: 1 }])
+    } else {
+      run.mockResolvedValueOnce([{ id: 'checkpoint' }])
+    }
     const mutate = {
       thread: { delete: vi.fn() },
       message: { delete: vi.fn() },
       attachment: { update: vi.fn() },
       document: { delete: vi.fn() },
       documentVersion: { delete: vi.fn() },
+      threadCompaction: { delete: vi.fn() },
     }
     return {
-      tx: { run, mutate, location: 'client', dbTransaction: { query: vi.fn() } },
+      tx: { run, mutate, location, dbTransaction: { query: vi.fn() } },
       ctx: { userID: 'owner', organizationId: 'org', isAnonymous: false },
       args: { threadId: 'thread' },
     }
@@ -56,10 +65,10 @@ describe('permanent thread deletion', () => {
     )
   })
   it('uses SQL and cascading deletion on the server without loading document bodies', async () => {
-    const f = fixture()
-    f.tx.location = 'server'
+    const f = fixture({}, 'server')
     await chatMutatorDefinitions.threads.delete.fn({ ...f, tx: f.tx as never })
-    expect(f.tx.run).toHaveBeenCalledTimes(3)
+    // thread, messages, attachments, compaction checkpoints; no document reads.
+    expect(f.tx.run).toHaveBeenCalledTimes(4)
     expect(f.tx.dbTransaction.query).toHaveBeenCalledWith(
       'DELETE FROM documents WHERE thread_id = $1 AND user_id = $2', ['thread', 'owner'],
     )
@@ -92,9 +101,14 @@ describe('thread deletion privacy', () => {
       .mockResolvedValueOnce({ id: 'thread-row', userId, ownerOrgId: 'org' })
       .mockResolvedValueOnce([{ id: 'message' }])
       .mockResolvedValueOnce([{ id: 'attachment', status: 'ready' }])
-      .mockResolvedValueOnce([{ id: 'summary-a' }, { id: 'summary-b' }])
+      // Server: compaction checkpoints (documents go through SQL).
+      // Client: the thread's documents, none here.
+      .mockResolvedValueOnce(
+        location === 'server' ? [{ id: 'summary-a' }, { id: 'summary-b' }] : [],
+      )
     const tx = {
       location, run,
+      dbTransaction: { query: vi.fn() },
       mutate: {
         message: { delete: vi.fn() },
         attachment: { update: vi.fn() },
