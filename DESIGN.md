@@ -1,6 +1,6 @@
 ---
 name: Rift
-description: High-performance AI chat infrastructure for teams, tuned for fast candidate screening.
+description: High-performance AI chat infrastructure for teams.
 colors:
   accent-primary: "#3673fc"
   ai-violet: "#ad46ff"
@@ -115,9 +115,9 @@ components:
 
 **Creative North Star: "The Quiet Workbench"**
 
-Rift is a workbench, not a showroom. HR users sit down to move through a stack of candidates and walk away with a shortlist they trust. The interface earns that trust by getting out of the way: a near-white neutral surface, a single confident blue that appears only where a decision lives, and motion that confirms the user just did something rather than performing for them. Speed is the felt quality. Every hover, selection, and transition resolves in well under a quarter-second so the product feels like it is keeping up with the user's thinking, not the other way around.
+Rift is a workbench, not a showroom. People sit down to get real work done with AI (drafting, research, analysis, code) and walk away with an answer or a finished piece of work they trust. The interface earns that trust by getting out of the way: a near-white neutral surface, a single confident blue that appears only where a decision lives, and motion that confirms the user just did something rather than performing for them. Speed is the felt quality. Every hover, selection, and transition resolves in well under a quarter-second so the product feels like it is keeping up with the user's thinking, not the other way around.
 
-Density is deliberate and local. The chrome (navigation, toolbars, settings) is calm and sparse; the data (candidate records, tables, threads) is allowed to be dense because that is where trust is built. The system borrows Attio's record/table rigor, Notion's low-friction flexible surfaces, and Linear's keyboard-fast snappiness, then strips anything decorative. Geist carries everything: headings, labels, body, and data, in one tuned family.
+Density is deliberate and local. The chrome (navigation, toolbars, settings) is calm and sparse; the data (conversation threads, sources, usage and admin tables) is allowed to be dense because that is where trust is built. The system borrows Attio's record/table rigor, Notion's low-friction flexible surfaces, and Linear's keyboard-fast snappiness, then strips anything decorative. Geist carries everything: headings, labels, body, and data, in one tuned family.
 
 This system explicitly rejects enterprise heaviness (Workday/SAP ceremony and clutter), hard-to-navigate density as a default, generic AI-chat skins (ChatGPT-clone gray bubble dumps), and anything that reads as AI-slop template output. If a screen feels heavy, slow, or busy at rest, it is wrong.
 
@@ -219,7 +219,7 @@ There is no `card` primitive in `@rift/ui`; the card pattern is composed from di
 - **Error / Disabled:** `aria-invalid` border `foreground-error` + ring; disabled is 50% opacity, `cursor-not-allowed`.
 
 ### Table / Data Table
-Unstyled-by-default, token-driven. Density is the point (this is where candidate trust is built), so the table carries more rows and less chrome than the rest of the UI.
+Unstyled-by-default, token-driven. Density is the point (data-heavy usage, member and admin views earn trust here), so the table carries more rows and less chrome than the rest of the UI.
 - **Container:** wraps in a horizontally-scrollable div; `text-sm` throughout.
 - **Header:** bottom `border-light` divider, `foreground-primary` medium-weight `th`, `h-10`, `px-2`, left-aligned.
 - **Row:** `border-light` bottom divider; hover tints `surface-inverse/5`; selected row uses `surface-overlay` (background, not color alone). Last row drops its border.
@@ -249,7 +249,7 @@ Streaming/thinking text uses a left-to-right gray shimmer (`shimmer-text`, 1.5s 
 - **Do** use Geist for everything and build hierarchy from weight (400/500/600) and size.
 - **Do** show full keyboard focus rings (`focus-visible`); this is a keyboard-first product.
 - **Do** communicate status with icon-or-label plus color, so it survives color blindness.
-- **Do** let candidate data and tables be dense; that local density is where trust is earned.
+- **Do** let data tables and lists (usage, members, sources) be dense; that local density is where trust is earned.
 - **Do** honor `prefers-reduced-motion` for the shimmer, pulse, and all transitions.
 
 ### Don't:
