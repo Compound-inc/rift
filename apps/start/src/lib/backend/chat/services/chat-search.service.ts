@@ -148,6 +148,13 @@ export class ChatSearchService extends ServiceMap.Service<
                   or exists (
                     select 1 from projects p
                     where p.id = t.project_id and p.deleted_at is null
+                      and (p.user_id = i.user_id or (
+                        p.visibility = 'org' and p.organization_id = i.organization_id
+                        and exists (select 1 from member owner_member
+                          where owner_member."organizationId" = p.organization_id and owner_member."userId" = p.user_id)
+                        and exists (select 1 from member pm
+                          where pm."organizationId" = p.organization_id and pm."userId" = i.user_id)
+                      ))
                   )
                 )
                 and (
@@ -212,6 +219,13 @@ export class ChatSearchService extends ServiceMap.Service<
                   or exists (
                     select 1 from projects p
                     where p.id = t.project_id and p.deleted_at is null
+                      and (p.user_id = i.user_id or (
+                        p.visibility = 'org' and p.organization_id = i.organization_id
+                        and exists (select 1 from member owner_member
+                          where owner_member."organizationId" = p.organization_id and owner_member."userId" = p.user_id)
+                        and exists (select 1 from member pm
+                          where pm."organizationId" = p.organization_id and pm."userId" = i.user_id)
+                      ))
                   )
                 )
                 and (

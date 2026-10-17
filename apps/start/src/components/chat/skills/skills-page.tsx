@@ -13,6 +13,7 @@ import Plus from 'lucide-react/dist/esm/icons/plus'
 
 import { ContentPage } from '@/components/layout'
 import { queries } from '@/integrations/zero'
+import { useProjectManagementAccess } from '@/lib/frontend/projects/use-project-management-access'
 import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 import { m } from '@/paraglide/messages.js'
 
@@ -41,6 +42,7 @@ export type SkillsPageScope =
 
 export function SkillsPage({ scope }: { scope: SkillsPageScope }) {
   const auth = useAppAuth()
+  const { canManage, isOrphan } = useProjectManagementAccess()
   const userId = auth.user?.id
 
   // Personal + Org-Shared are loaded on both surfaces — the global page
@@ -77,9 +79,9 @@ export function SkillsPage({ scope }: { scope: SkillsPageScope }) {
     [overrides],
   )
 
-  // Override mutations are owner-only server-side; hide the section
-  // entirely for non-owners so they never see UI that would 500.
-  const isProjectOwner = !!project && project.userId === userId
+  // Override mutations require a current owner-member for shared projects.
+  const isProjectOwner = canManage(project)
+  const ownerIsMember = !isOrphan(project)
 
   const canEditSkillFn = useMemo(() => {
     const context = {
@@ -87,6 +89,7 @@ export function SkillsPage({ scope }: { scope: SkillsPageScope }) {
       activeOrganizationId: auth.activeOrganizationId,
       activeOrganizationRole: auth.activeOrganizationRole,
       project,
+      ownerIsMember,
     }
     return (skill: SkillRow) => canEditSkill({ skill, context })
   }, [
@@ -94,6 +97,7 @@ export function SkillsPage({ scope }: { scope: SkillsPageScope }) {
     auth.activeOrganizationId,
     auth.activeOrganizationRole,
     project,
+    ownerIsMember,
   ])
 
   // Sharing is creator-only and not applicable to Project Skills (ADR-0005).
@@ -150,8 +154,13 @@ export function SkillsPage({ scope }: { scope: SkillsPageScope }) {
           : m.chat_skill_page_description_project()
       }
     >
+      {isOrphan(project) ? (
+        <p role="status" className="text-sm text-foreground-tertiary">
+          {m.project_orphan_read_only()}
+        </p>
+      ) : null}
       {/* Empty state has its own primary CTA, so suppress the top bar there. */}
-      {showGlobalEmptyState ? null : (
+      {showGlobalEmptyState || (scope.kind === 'project' && !isProjectOwner) ? null : (
         <div className="flex items-center justify-end">
           <Button onClick={() => setEditorState(EMPTY_EDITOR_STATE)}>
             <Plus className="size-4" />

@@ -14,6 +14,7 @@ import {
   ContextMenuSubTrigger,
 } from '@rift/ui/context-menu'
 import { toast } from 'sonner'
+import { awaitProjectMutation } from '@/lib/frontend/projects/await-project-mutation'
 import { mutators, queries } from '@/integrations/zero'
 import { m } from '@/paraglide/messages.js'
 
@@ -38,9 +39,11 @@ export function ThreadMoveToProjectSubmenu({
     async (nextProjectId: string | null) => {
       if (nextProjectId === currentProjectId) return
       try {
-        await z.mutate(
-          mutators.threads.setProject({ threadId, projectId: nextProjectId }),
-        ).client
+        await awaitProjectMutation(
+          z.mutate(
+            mutators.threads.setProject({ threadId, projectId: nextProjectId }),
+          ),
+        )
         toast.success(
           nextProjectId === null
             ? m.chat_sidebar_thread_removed_from_project()

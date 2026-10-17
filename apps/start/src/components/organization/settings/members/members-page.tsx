@@ -27,6 +27,7 @@ import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 import { MEMBERS_DIRECTORY_PAGE_SIZE } from '@/integrations/zero/queries/org-settings.queries'
 import { useMembersPageLogic  } from './members-page.logic'
 import type {MemberRow} from './members-page.logic';
+import { OrphanedProjects } from './orphaned-projects'
 import { InviteMembersDialog } from './invite-members-dialog'
 import { m } from '@/paraglide/messages.js'
 
@@ -365,6 +366,7 @@ export function MembersPage() {
         tableWrapperClassName="border-border-base bg-surface-base/95"
         toolbarActionsRight={<InviteMembersDialog />}
       />
+      <OrphanedProjects refreshKey={actionInProgressId} />
     </ContentPage>
   )
 }

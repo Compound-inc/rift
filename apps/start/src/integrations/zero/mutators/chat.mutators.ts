@@ -13,6 +13,7 @@ import {
 } from '@/lib/shared/model-policy/types'
 import type { OrgAiPolicy } from '@/lib/shared/model-policy/types'
 import { buildBootstrapThreadRecord } from '@/lib/shared/chat'
+import { projectMembershipQuery, projectOwnerIsMember } from '../project-access'
 import { zql } from '../zql'
 import { ROOT_BRANCH_PARENT_KEY } from '@/lib/shared/chat-branching/branch-resolver'
 import type { BranchSelection } from '@/lib/shared/chat-branching/branch-resolver'
@@ -333,7 +334,7 @@ export const chatMutatorDefinitions = {
         disabledToolKeys: args.disabledToolKeys,
       })
 
-      // Validate Project ownership before bootstrapping. We accept the
+      // Validate Project use access before bootstrapping. We accept the
       // mutator without `projectId` to keep the loose-thread path unchanged.
       // The org-context check is enforced because mismatched thread/project
       // orgs would create a thread that is invisible from one side or the
@@ -345,6 +346,13 @@ export const chatMutatorDefinitions = {
         )
         const access = checkProjectAccess(project, {
           userId: ctx.userID,
+          isAnonymous: ctx.isAnonymous,
+          action: 'use',
+          ownerIsMember: tx.location !== 'server' || await projectOwnerIsMember(tx, project),
+          memberOrganizationId:
+            ctx.organizationId && (tx.location !== 'server' || await tx.run(projectMembershipQuery(ctx.organizationId, ctx.userID)))
+              ? ctx.organizationId
+              : undefined,
           orgContext: {
             enforce: true,
             organizationId: ctx.organizationId,
@@ -742,6 +750,13 @@ export const chatMutatorDefinitions = {
           // supported operation, and the thread row is the authority.
           const access = checkProjectAccess(targetProject, {
             userId: ctx.userID,
+            isAnonymous: ctx.isAnonymous,
+            action: 'use',
+            ownerIsMember: tx.location !== 'server' || await projectOwnerIsMember(tx, targetProject),
+            memberOrganizationId:
+              ctx.organizationId && (tx.location !== 'server' || await tx.run(projectMembershipQuery(ctx.organizationId, ctx.userID)))
+                ? ctx.organizationId
+                : undefined,
             orgContext: {
               enforce: true,
               organizationId: thread.ownerOrgId ?? undefined,

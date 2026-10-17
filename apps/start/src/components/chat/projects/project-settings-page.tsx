@@ -19,6 +19,7 @@ import { Textarea } from '@rift/ui/textarea'
 import { ContentPage } from '@/components/layout'
 import { m } from '@/paraglide/messages.js'
 
+import { ProjectVisibilityControl } from './project-visibility-control'
 import { useProjectSettingsPageLogic } from './project-settings-page.logic'
 import type { ProjectFieldEditor } from './project-settings-page.logic'
 
@@ -77,6 +78,7 @@ export function ProjectSettingsPage({ projectId }: { projectId: string }) {
   const {
     project,
     canEdit,
+    isOrphan,
     nameEditor,
     descriptionEditor,
     instructionEditor,
@@ -95,6 +97,12 @@ export function ProjectSettingsPage({ projectId }: { projectId: string }) {
       title={m.chat_project_parameters_title()}
       description={m.chat_project_parameters_description()}
     >
+      {isOrphan ? (
+        <p role="status" className="text-sm text-foreground-tertiary">
+          {m.project_orphan_read_only()}
+        </p>
+      ) : null}
+      <ProjectVisibilityControl project={project} />
       <ProjectFieldFormSection
         editor={nameEditor}
         canEdit={canEdit}

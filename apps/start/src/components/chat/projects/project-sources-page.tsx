@@ -34,6 +34,7 @@ import Plus from 'lucide-react/dist/esm/icons/plus'
 import { toast } from 'sonner'
 
 import { ContentPage } from '@/components/layout'
+import { useProjectManagementAccess } from '@/lib/frontend/projects/use-project-management-access'
 import { queries } from '@/integrations/zero'
 import { useProjectSources } from '@/lib/frontend/project-sources/use-project-sources'
 import {
@@ -44,6 +45,8 @@ import {
   PROJECT_SOURCES_UPLOAD_POLICY,
   getUploadValidationError,
 } from '@/lib/shared/upload/upload-validation'
+import { getProjectSourceList } from '@/lib/frontend/projects/project-sources-summary.functions'
+import { useProjectHomeResource } from './use-project-home-resource'
 import { m } from '@/paraglide/messages.js'
 
 /** Row shape consumed by the DataTable. Keeps the page agnostic of the
@@ -128,16 +131,20 @@ function ProjectSourceRowActions({
 }
 
 export function ProjectSourcesPage({ projectId }: { projectId: string }) {
+  const { canManage, isOrphan } = useProjectManagementAccess()
+  const [project] = useQuery(queries.projects.byId({ projectId }))
+  const canEdit = canManage(project)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [files, fileResult] = useQuery(
     queries.projects.attachments({ projectId }),
   )
+  const sharedFiles = useProjectHomeResource(projectId, getProjectSourceList)
   const { pending, uploading, upload, remove, retryIndex } =
     useProjectSources(projectId)
 
   const rows = useMemo<readonly ProjectSourceRow[]>(
     () =>
-      files.map((file) => ({
+      (canEdit ? files : sharedFiles.data ?? []).map((file) => ({
         id: file.id,
         fileName: file.fileName,
         mimeType: file.mimeType,
@@ -145,15 +152,15 @@ export function ProjectSourcesPage({ projectId }: { projectId: string }) {
         embeddingStatus: file.embeddingStatus ?? undefined,
         vectorIndexedAt: file.vectorIndexedAt ?? undefined,
         vectorError:
-          typeof file.vectorError === 'string'
+          'vectorError' in file && typeof file.vectorError === 'string'
             ? summarizeProjectSourceIndexError(file.vectorError)
             : undefined,
         updatedAt: file.updatedAt,
       })),
-    [files],
+    [canEdit, files, sharedFiles.data],
   )
 
-  const loading = fileResult.type !== 'complete'
+  const loading = canEdit ? fileResult.type !== 'complete' : !sharedFiles.data && !sharedFiles.failed
   const handleFileSelection = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -242,7 +249,7 @@ export function ProjectSourcesPage({ projectId }: { projectId: string }) {
           headerClassName: 'w-10 whitespace-nowrap pr-2 text-right',
           cellClassName: 'w-10 whitespace-nowrap pr-2 text-right',
         },
-        cell: ({ row }) => (
+        cell: ({ row }) => canEdit ? (
           <div className="flex justify-end">
             <ProjectSourceRowActions
               item={row.original}
@@ -251,10 +258,10 @@ export function ProjectSourcesPage({ projectId }: { projectId: string }) {
               onRemove={remove}
             />
           </div>
-        ),
+        ) : null,
       },
     ],
-    [pending, remove, retryIndex],
+    [canEdit, pending, remove, retryIndex],
   )
 
   // Loading and populated states reuse the DataTable. Empty + not-loading
@@ -276,7 +283,12 @@ export function ProjectSourcesPage({ projectId }: { projectId: string }) {
           void handleFileSelection(event)
         }}
       />
-      {showEmptyState ? (
+      {!canEdit ? (
+        <p className="text-sm text-foreground-tertiary">
+          {isOrphan(project) ? m.project_orphan_read_only() : m.project_home_read_only()}
+        </p>
+      ) : null}
+      {showEmptyState && canEdit ? (
         <ProjectSourcesEmptyState
           uploading={uploading}
           onAddSource={() => fileInputRef.current?.click()}
@@ -294,7 +306,7 @@ export function ProjectSourcesPage({ projectId }: { projectId: string }) {
             loading: m.chat_project_sources_loading(),
           }}
           tableWrapperClassName="border-border-base bg-surface-base/95"
-          toolbarActionsRight={
+          toolbarActionsRight={canEdit ? (
             <Button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -305,7 +317,7 @@ export function ProjectSourcesPage({ projectId }: { projectId: string }) {
                 ? m.chat_project_sources_uploading()
                 : m.chat_project_sources_add_button()}
             </Button>
-          }
+          ) : undefined}
         />
       )}
     </ContentPage>

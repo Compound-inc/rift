@@ -2,6 +2,7 @@ import type { ExpressionBuilder } from '@rocicorp/zero'
 import { Effect } from 'effect'
 import { MessagePersistenceError } from '@/lib/backend/chat/domain/errors'
 import { zql } from '@/lib/backend/chat/infra/zero/db'
+import { projectVisibleToCaller } from '@/integrations/zero/project-access'
 import type { Schema } from '@/integrations/zero/schema'
 import type { ZeroDatabase } from '@/lib/backend/server-effect/services/zero-database.service'
 import {
@@ -33,13 +34,17 @@ function skillVisibleInContext(input: {
   readonly organizationId: string | undefined
 }) {
   return (eb: ExpressionBuilder<'skill', Schema>) => {
-    const { or, and, cmp } = eb
+    const { or, and, cmp, exists } = eb
     return or(
-      input.projectId ? cmp('projectId', input.projectId) : undefined,
+      input.projectId ? and(
+        cmp('projectId', input.projectId),
+        exists('project', (project) => project.where(projectVisibleToCaller({ userID: input.userId, organizationId: input.organizationId }))),
+      ) : undefined,
       input.organizationId
         ? and(
             cmp('organizationId', input.organizationId),
             cmp('projectId', 'IS', null),
+            exists('organization', (organization) => organization.whereExists('members', (members) => members.where('userId', input.userId))),
           )
         : undefined,
       and(
@@ -94,7 +99,8 @@ export const loadSkillBodiesForContext = Effect.fn(
     const overrideSkillIds = projectId
       ? yield* Effect.tryPromise({
           try: () =>
-            db.run(zql.skillProjectOverride.where('projectId', projectId)),
+            db.run(zql.skillProjectOverride.where('projectId', projectId)
+              .whereExists('project', (project) => project.where(projectVisibleToCaller({ userID: userId, organizationId })))),
           catch: (error) =>
             new MessagePersistenceError({
               message: 'Failed to load skill overrides',

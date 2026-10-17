@@ -5,9 +5,10 @@ import { MarkdownConversionService } from '@/lib/backend/file/services/markdown-
 import { makeRuntimeRunner } from '@/lib/backend/server-effect'
 import { UpstreamPostgresLayer } from '@/lib/backend/server-effect/services/upstream-postgres.service'
 import { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
+import { ProjectSourcesReadService } from '../services/project-sources-read.service'
 import { ProjectSourcesAdminService } from '../services/project-sources-admin.service'
 
-const layer = ProjectSourcesAdminService.layer.pipe(
+const layer = Layer.mergeAll(ProjectSourcesAdminService.layer, ProjectSourcesReadService.layer).pipe(
   Layer.provideMerge(AttachmentRecordService.layer),
   Layer.provideMerge(MarkdownConversionService.layer),
   Layer.provideMerge(RagIndexerService.layer),

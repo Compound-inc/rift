@@ -1,29 +1,9 @@
-/**
- * Project access predicates shared across Zero mutators and Effect-based
- * server services.
- *
- * The "is this project usable by this caller" rules live in one place here
- * so the four historical copies (project mutators, chat mutators
- * `createThread`/`setProject`, `ThreadService.assertThreadAccess`,
- * `ProjectSourcesAdminService.loadOwnedProject`) cannot drift on the
- * soft-delete / ownership / org-context predicates.
- *
- * The helper deliberately does not perform I/O. Each caller fetches the
- * project row through whatever channel it already has (`tx.run`,
- * `db.run`, …) and passes the row plus the caller's identity here.
- * `checkProjectAccess` returns a discriminated result; the caller maps
- * each failure variant to whichever error type its layer wants to raise.
- */
-
-/**
- * Minimal shape of a `projects` row needed to evaluate access. Every Zero /
- * SQL caller already has at least these columns, so callers can pass the
- * raw row without reshaping it.
- */
+/** Project policy shared by Zero writes, chat authorization and usage reads. */
 export type ProjectAccessSubject = {
   readonly id: string
   readonly userId: string
   readonly organizationId?: string | null
+  readonly visibility?: 'private' | 'org'
   readonly deletedAt?: number | null
 }
 
@@ -35,9 +15,8 @@ export type ProjectAccessSubject = {
  *   "no org" on both sides). Used whenever a thread is being attached to
  *   the project, since a thread's org context must agree with its
  *   project's.
- * - `{ enforce: false }`: skip the org check. Used by project-only
- *   mutators where org context was validated when the project was
- *   created, and is not meaningful for the operation at hand.
+ * - `{ enforce: false }`: skip active-org matching for project-only management.
+ *   This does not bypass the owner membership requirement on shared projects.
  */
 export type ProjectAccessOrgPolicy =
   | {
@@ -54,28 +33,41 @@ export type ProjectAccessResult<TProject extends ProjectAccessSubject> =
   | { readonly kind: 'org-mismatch' }
 
 /**
- * Returns `'ok'` only when:
- *   1. `project` is present (else `'not-found'`),
- *   2. `project.deletedAt` is null/undefined (else `'soft-deleted'`),
- *   3. `project.userId === userId` (else `'not-owned'`),
- *   4. when `orgContext.enforce` is true, the project's normalized
- *      organization id equals the caller's normalized organization id
- *      (else `'org-mismatch'`).
- *
- * Step 2 runs before step 3 so a soft-deleted project owned by the caller
- * still surfaces as `'soft-deleted'`, which is more useful for diagnostics
- * than misreporting it as missing.
+ * Management defaults to owner-only. Use access additionally accepts verified
+ * membership of an org-visible project whose owner is still a member. Callers must read membership from the
+ * database; an active organization ID alone is never proof of membership.
  */
 export function checkProjectAccess<TProject extends ProjectAccessSubject>(
   project: TProject | null | undefined,
   input: {
     readonly userId: string
+    readonly isAnonymous?: boolean
+    readonly action?: 'use' | 'manage'
+    readonly memberOrganizationId?: string
+    readonly ownerIsMember?: boolean
     readonly orgContext?: ProjectAccessOrgPolicy
   },
 ): ProjectAccessResult<TProject> {
   if (!project) return { kind: 'not-found' }
-  if (project.deletedAt) return { kind: 'soft-deleted' }
-  if (project.userId !== input.userId) return { kind: 'not-owned' }
+  if (project.deletedAt != null) return { kind: 'soft-deleted' }
+  if (!input.userId.trim() || input.isAnonymous) return { kind: 'not-owned' }
+  const sharedMember =
+    input.action === 'use' &&
+    project.visibility === 'org' &&
+    !!project.organizationId &&
+    project.organizationId === input.memberOrganizationId &&
+    input.ownerIsMember === true
+  if (project.userId !== input.userId && !sharedMember)
+    return { kind: 'not-owned' }
+  // Sharing cannot be managed by an owner who has left the project's org.
+  // Owner reads remain available, including their own historical usage.
+  if (
+    input.action !== 'use' &&
+    project.visibility === 'org' &&
+    !input.ownerIsMember
+  ) {
+    return { kind: 'not-owned' }
+  }
   if (input.orgContext?.enforce) {
     const projectOrgId = project.organizationId?.trim() || undefined
     const callerOrgId = input.orgContext.organizationId?.trim() || undefined
