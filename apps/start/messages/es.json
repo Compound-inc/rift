@@ -1077,7 +1077,6 @@
   "app_refresh_to_update": "Actualizar la aplicación",
   "chat_compaction_running": "Resumiendo los mensajes anteriores…",
   "chat_compaction_divider": "Se resumieron los mensajes anteriores",
-  "chat_compaction_view": "Ver resumen",
   "chat_compaction_omitted": "Se omitieron algunos mensajes anteriores",
   "chat_compaction_fallback": "Continuaremos con los mensajes recientes. Algunos detalles anteriores ya no forman parte del contexto."
 }

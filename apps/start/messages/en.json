@@ -1089,7 +1089,6 @@
   "app_refresh_to_update": "Refresh to update",
   "chat_compaction_running": "Summarizing earlier messages…",
   "chat_compaction_divider": "Earlier messages summarized",
-  "chat_compaction_view": "View summary",
   "chat_compaction_omitted": "Some earlier messages were omitted",
   "chat_compaction_fallback": "Continuing with recent messages. Some earlier details are no longer in context."
 }
