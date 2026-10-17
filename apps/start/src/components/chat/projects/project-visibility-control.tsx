@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useZero } from '@rocicorp/zero/react'
 import { LockKeyhole, Users } from 'lucide-react'
 import { toast } from 'sonner'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@rift/ui/select'
 import { mutators } from '@/integrations/zero'
 import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 import { useProjectManagementAccess } from '@/lib/frontend/projects/use-project-management-access'
@@ -70,21 +71,27 @@ export function ProjectVisibilityControl({
       <div className="flex flex-wrap items-center gap-2 text-sm text-foreground-tertiary">
         <Icon className="size-4 shrink-0" aria-hidden />
         {canEdit ? (
-          <select
-            aria-label={m.project_visibility_label()}
-            title={hint}
+          <Select
             value={project.visibility}
             disabled={pending}
-            onChange={(event) =>
-              void update(event.target.value as 'private' | 'org')
-            }
-            className="min-h-10 max-w-full rounded-md border border-border-base bg-surface-base px-2 text-sm text-foreground-primary outline-none focus-visible:ring-2 focus-visible:ring-border-strong disabled:opacity-50"
+            onValueChange={(value) => {
+              if (value) void update(value)
+            }}
           >
-            <option value="private">{m.project_visibility_private()}</option>
-            <option value="org" disabled={!canShare}>
-              {m.project_visibility_workspace()}
-            </option>
-          </select>
+            <SelectTrigger aria-label={m.project_visibility_label()} title={hint}>
+              <SelectValue>
+                {shared
+                  ? m.project_visibility_workspace()
+                  : m.project_visibility_private()}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="private">{m.project_visibility_private()}</SelectItem>
+              <SelectItem value="org" disabled={!canShare}>
+                {m.project_visibility_workspace()}
+              </SelectItem>
+            </SelectContent>
+          </Select>
         ) : (
           <span title={hint}>
             {shared
