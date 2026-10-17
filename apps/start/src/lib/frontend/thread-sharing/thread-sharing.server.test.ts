@@ -18,11 +18,17 @@ vi.mock('@/lib/backend/thread-sharing/runtime/thread-sharing-runtime', async () 
   return {
     ThreadSharingRuntime: {
       run: (program: Effect.Effect<unknown, unknown, InstanceType<typeof ThreadSharingService>>) =>
-        Effect.runPromise(program.pipe(Effect.provideService(ThreadSharingService, {
-          read: fail,
-          manage: fail,
-          fork: fail,
-        }))),
+        Effect.runPromise(
+          // The partial mock widens the leftover requirements to `any`; every
+          // requirement is provided here, so state that explicitly.
+          program.pipe(
+            Effect.provideService(ThreadSharingService, {
+              read: fail,
+              manage: fail,
+              fork: fail,
+            }),
+          ) as Effect.Effect<unknown, unknown, never>,
+        ),
     },
   }
 })

@@ -1,6 +1,6 @@
 'use client'
 
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { PanelLeftClose, PanelLeftOpen, Share } from 'lucide-react'
 import { Button } from '@rift/ui/button'
 import { useHotkey } from '@tanstack/react-hotkeys'
 import { useMediaQuery } from '@rift/ui/hooks/useMediaQuery'
@@ -84,11 +84,15 @@ export function ChatPageShell() {
           <ChatProjectChip />
           {activeThreadId && (
             <Button
+              type="button"
               className="pointer-events-auto ml-auto"
               variant="ghost"
+              size="iconSmall"
+              aria-label={m.share_title()}
+              title={m.share_title()}
               onClick={() => openThreadShare(activeThreadId)}
             >
-              {m.share_title()}
+              <Share className="size-4" aria-hidden />
             </Button>
           )}
         </div>
