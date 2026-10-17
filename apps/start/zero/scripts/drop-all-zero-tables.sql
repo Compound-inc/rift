@@ -4,6 +4,7 @@
 
 DROP PUBLICATION IF EXISTS zero_data;
 
+DROP TABLE IF EXISTS thread_compactions;
 DROP TABLE IF EXISTS attachments;
 DROP TABLE IF EXISTS message_analytics;
 DROP TABLE IF EXISTS messages;

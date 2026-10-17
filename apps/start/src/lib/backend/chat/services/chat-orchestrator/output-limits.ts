@@ -17,6 +17,7 @@ export const MIN_ANSWER_TOKENS = 4_096
 export function resolveOutputLimits(input: {
   readonly modelId: string
   readonly estimatedPromptTokens?: number
+  readonly maxOutputTokens?: number
   readonly providerOptions?: Record<string, unknown>
   readonly contextWindowTokens?: number
   readonly requestId?: string
@@ -36,7 +37,7 @@ export function resolveOutputLimits(input: {
       : Math.floor(
           maxContext - promptTokens - Math.max(1_024, promptTokens * 0.1),
         )
-  const totalRoom = Math.min(outputLimit, contextRoom)
+  const totalRoom = Math.min(outputLimit, contextRoom, input.maxOutputTokens ?? Infinity)
   const anthropic = input.providerOptions?.anthropic as
     | Record<string, unknown>
     | undefined

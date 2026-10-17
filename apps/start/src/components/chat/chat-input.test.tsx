@@ -25,6 +25,8 @@ const { embeddingFlagState } = vi.hoisted(() => ({
   },
 }))
 
+vi.mock('./use-thread-compaction', () => ({ useThreadCompaction: () => ({ view: undefined, progress: undefined }) }))
+
 vi.mock('./chat-context', () => ({
   useChatMessages: () => ({
     branchCost: 0,

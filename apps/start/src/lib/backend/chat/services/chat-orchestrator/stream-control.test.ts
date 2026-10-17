@@ -1,4 +1,5 @@
 import type { CompletedModelStep } from './step-accounting'
+import { CompactionService } from '../compaction.service'
 import type { LanguageModelUsage, TextStreamPart, ToolSet } from 'ai'
 import { Effect, Layer } from 'effect'
 import { describe, expect, it, vi } from 'vitest'
@@ -17,7 +18,7 @@ import { ThreadService } from '../thread.service'
 import { ToolPolicyService } from '../tool-policy.service'
 import { ToolRegistryService } from '../tool-registry.service'
 import { StopGenerationService } from '../stop-generation.service'
-import { StreamProtocolError } from '../../domain/errors'
+import { ModelProviderError, StreamProtocolError } from '../../domain/errors'
 
 type FinalizeInput = Parameters<
   MessageStoreService['Service']['finalizeAssistantMessage']
@@ -38,6 +39,7 @@ function createHarness(
     promptAbortReason?: 'replaced' | 'user-stop'
     toolOutput?: boolean
     promptText?: string
+    stopDuringCompaction?: boolean
   } = {},
 ) {
   const writes: string[] = []
@@ -298,10 +300,30 @@ function createHarness(
     quota,
     settlement,
   )
+  const compaction = Layer.effect(CompactionService, Effect.gen(function* () {
+    const service = yield* CompactionService
+    const streams = yield* StreamResumeService
+    return {
+      prepare: (input: Parameters<typeof service.prepare>[0]) => Effect.gen(function* () {
+        if (options.stopDuringCompaction) {
+          input.progress({ threadId: input.threadId, status: 'running' })
+          const streamId = yield* streams.getActiveStreamId(input)
+          yield* streams.stopStream({
+            streamId: streamId!, requestId: input.requestId,
+            reason: options.promptAbortReason ?? 'user-stop',
+          })
+          return yield* Effect.fail(new ModelProviderError({
+            message: 'Compaction request was aborted', requestId: input.requestId,
+          }))
+        }
+        return yield* service.prepare(input)
+      }),
+    }
+  })).pipe(Layer.provideMerge(CompactionService.layerMemory), Layer.provide(dependencies))
   const layer = Layer.mergeAll(
     ChatOrchestratorService.layer,
     StopGenerationService.layer,
-  ).pipe(Layer.provideMerge(dependencies))
+  ).pipe(Layer.provideMerge(Layer.mergeAll(dependencies, compaction)))
   return {
     layer,
     writes,
@@ -411,17 +433,16 @@ describe('stream control orchestration', () => {
         })
       }).pipe(Effect.provide(harness.layer)),
     )
-    expect(response.status).toBe(204)
+    await response.text()
+    expect(response.status).toBe(200)
     expect(harness.signal()).toBeUndefined()
     expect(harness.remembered).toEqual([])
-    expect(harness.finalized[0]).toMatchObject({
-      ok: true,
-      stopped: true,
-      finalContent: '',
-    })
+    expect(harness.finalized).toHaveLength(1)
+    expect(harness.finalized[0]).toMatchObject({ ok: true, stopped: true, parentMessageId: 'early-user-message', finalContent: '' })
+    expect(harness.writes).toEqual(['append'])
     expect(harness.recorded).toEqual([])
     expect(harness.settlements()).toBe(0)
-    expect(harness.released).toEqual(['early-request'])
+    expect(harness.released).toEqual([])
   })
 
   it('does not call or charge the provider when replaced during prompt preparation', async () => {
@@ -459,10 +480,11 @@ describe('stream control orchestration', () => {
     )
     expect(harness.signal()).toBeUndefined()
     expect(harness.remembered).toEqual([])
-    expect(harness.finalized[0]).toMatchObject({ ok: false, stopped: false })
+    expect(harness.finalized).toEqual([])
+    expect(harness.writes).toEqual([])
     expect(harness.recorded).toEqual([])
     expect(harness.settlements()).toBe(0)
-    expect(harness.released).toEqual(['pre-replaced'])
+    expect(harness.released).toEqual([])
   })
 
   it.each([
@@ -909,3 +931,61 @@ it('keeps a recovered SDK tool error out of stream failure and finalizes once', 
   expect(harness.recorded).toHaveLength(1)
   expect(harness.settlements()).toBe(1)
 })
+it.each(['submit-message', 'edit-message', 'regenerate-message'] as const)(
+  'preserves a stopped %s during preparation and skips its writes on replacement',
+  async (trigger) => {
+    for (const phase of ['prompt', 'compaction'] as const) {
+      for (const reason of ['user-stop', 'replaced'] as const) {
+        const harness = createHarness('', '', phase === 'prompt', {
+          stopDuringCompaction: phase === 'compaction', promptAbortReason: reason,
+        })
+        await Effect.runPromise(Effect.gen(function* () {
+          const orchestrator = yield* ChatOrchestratorService
+          const store = yield* MessageStoreService
+          const { threadId } = yield* orchestrator.createThread({
+            userId: 'preparation-owner', requestId: 'create', modelId: 'openai/gpt-5-mini',
+          })
+          yield* store.appendUserMessage({
+            threadDbId: threadId, threadId, userId: 'preparation-owner', model: 'openai/gpt-5-mini',
+            requestId: 'seed', expectedBranchVersion: 1,
+            message: { id: 'original', role: 'user', parts: [{ type: 'text', text: 'original question' }] },
+          })
+          harness.writes.length = 0
+          const response = yield* orchestrator.streamChat({
+            userId: 'preparation-owner', threadId, requestId: 'stopped-preparation',
+            route: '/api/chat', expectedBranchVersion: 1, trigger,
+            messageId: trigger === 'submit-message' ? undefined : 'original',
+            editedText: trigger === 'edit-message' ? 'edited question' : undefined,
+            message: trigger === 'submit-message'
+              ? { id: 'pending', role: 'user', parts: [{ type: 'text', text: 'new question' }] }
+              : undefined,
+            accessPolicy: resolveChatAccessPolicy({
+              userId: 'preparation-owner', organizationId: 'org', isAnonymous: false, planId: 'plus',
+            }),
+          })
+          yield* Effect.promise(() => response.text())
+          expect(harness.signal()).toBeUndefined()
+          expect(harness.recorded).toEqual([])
+          expect(harness.released).toEqual([])
+          expect(harness.settlements()).toBe(0)
+          if (reason === 'replaced') {
+            expect(harness.writes).toEqual([])
+            expect(harness.finalized).toEqual([])
+          } else {
+            expect(harness.writes).toEqual([trigger === 'submit-message' ? 'append' : trigger === 'edit-message' ? 'edit' : 'regenerate'])
+            expect(harness.finalized).toHaveLength(1)
+            const assistant = harness.finalized[0]
+            expect(assistant).toMatchObject({ ok: true, stopped: true, finalContent: '' })
+            expect(assistant.generationAnalytics).toBeUndefined()
+            const reloaded = yield* store.loadThreadMessages({ threadId, userId: 'preparation-owner', model: 'openai/gpt-5-mini', requestId: 'reload' })
+            const parent = reloaded.find((message) => message.id === assistant.parentMessageId)
+            expect(parent?.parts).toEqual([{ type: 'text', text: trigger === 'edit-message' ? 'edited question' : trigger === 'submit-message' ? 'new question' : 'original question' }])
+            // Retry resolves the persisted user anchor after a stopped preparation.
+            const retry = yield* store.prepareRegeneration({ threadDbId: threadId, threadId, userId: 'preparation-owner', targetMessageId: assistant.assistantMessageId, expectedBranchVersion: 1, requestId: 'retry' })
+            expect(retry.anchorMessageId).toBe(assistant.parentMessageId)
+          }
+        }).pipe(Effect.provide(harness.layer)))
+      }
+    }
+  },
+)

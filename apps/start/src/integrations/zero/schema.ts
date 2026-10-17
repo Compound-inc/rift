@@ -677,6 +677,25 @@ const skillProjectOverrideRelationships = relationships(
   }),
 )
 
+/** Read-only, user-scoped summaries used by the thread divider and meter. */
+const threadCompaction = table('threadCompaction')
+  .from('thread_compactions')
+  .columns({
+    id: string(),
+    threadId: string().from('thread_id'),
+    userId: string().from('user_id'),
+    coversThroughMessageId: string().from('covers_through_message_id'),
+    summary: string(),
+    summaryTokens: number().from('summary_tokens'),
+    promptTokens: number().from('prompt_tokens').optional(),
+    promptThroughMessageId: string().from('prompt_through_message_id').optional(),
+    sourceTokens: number().from('source_tokens'),
+    model: string(),
+    createdAt: number().from('created_at'),
+    kind: enumeration<'summary' | 'sliding-window'>(),
+  })
+  .primaryKey('id')
+
 // ---------------------------------------------------------------------------
 // Schema export and default types
 // ---------------------------------------------------------------------------
@@ -697,6 +716,7 @@ export const schema = createSchema({
     orgUserUsageSummary,
     thread,
     message,
+    threadCompaction,
     attachment,
     project,
     skill,
