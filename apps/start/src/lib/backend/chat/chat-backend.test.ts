@@ -32,17 +32,23 @@ import { ThreadService } from '@/lib/backend/chat/services/thread.service'
 import { ToolPolicyService } from '@/lib/backend/chat/services/tool-policy.service'
 import { ToolRegistryService } from '@/lib/backend/chat/services/tool-registry.service'
 
+let includeGenerationOutput = false
+let usageOnly = false
+const recordedUsageRequests: string[] = []
+
 let lastStreamRequest: {
   readonly messages?: readonly UIMessage[]
   readonly providerOptions?: Record<string, unknown>
+  readonly systemPrompt?: string
 } | null = null
 
 const TestModelGatewayLive = Layer.succeed(ModelGatewayService, {
-  streamResponse: ({ messages, providerOptions }) =>
+  streamResponse: ({ messages, providerOptions, systemPrompt }) =>
     Effect.sync<ModelStreamResult>(() => {
       lastStreamRequest = {
         messages,
         providerOptions,
+        systemPrompt,
       }
 
       const usage: LanguageModelUsage = {
@@ -61,11 +67,17 @@ const TestModelGatewayLive = Layer.succeed(ModelGatewayService, {
       }
       return {
         usage: Promise.resolve(usage),
-        finalStep: Promise.resolve({ providerMetadata: undefined }),
+        finalStep: Promise.resolve({ providerMetadata: includeGenerationOutput ? { gateway: { cost: '0.002' } } : undefined, finishReason: includeGenerationOutput ? 'length' : 'stop' }),
         stream: new ReadableStream<TextStreamPart<ToolSet>>({
           start(controller) {
             for (const chunk of [
               { type: 'start' },
+              ...(includeGenerationOutput ? [
+                { type: 'tool-call' as const, toolName: 'web_search', toolCallId: 'search-1', input: { query: 'Rift release' }, dynamic: true as const, providerExecuted: true },
+                { type: 'tool-result' as const, toolName: 'web_search', toolCallId: 'search-1', input: { query: 'Rift release' }, output: { results: [{ url: 'https://example.com/release', title: 'Release', content: 'Large page body' }] }, dynamic: true as const, providerExecuted: true },
+                { type: 'source' as const, sourceType: 'url' as const, id: 'source-1', url: 'https://example.com/release', title: 'Release' },
+                { type: 'source' as const, sourceType: 'document' as const, id: 'source-2', mediaType: 'application/pdf', title: 'Manual', filename: 'manual.pdf' },
+              ] : []),
               { type: 'reasoning-start', id: 'reasoning-1' },
               {
                 type: 'reasoning-delta',
@@ -82,11 +94,12 @@ const TestModelGatewayLive = Layer.succeed(ModelGatewayService, {
               { type: 'text-end', id: 'text-1' },
               {
                 type: 'finish',
-                finishReason: 'stop',
-                rawFinishReason: 'stop',
+                finishReason: includeGenerationOutput ? 'length' : 'stop',
+                rawFinishReason: includeGenerationOutput ? 'max_tokens' : 'stop',
                 totalUsage: usage,
               },
             ] satisfies TextStreamPart<ToolSet>[]) {
+              if (usageOnly && ['text-start', 'text-delta', 'text-end', 'reasoning-start', 'reasoning-delta', 'reasoning-end'].includes(chunk.type)) continue
               controller.enqueue(chunk)
             }
             controller.close()
@@ -126,7 +139,10 @@ const TestChatLayer = ChatOrchestratorService.layer.pipe(
   Layer.provideMerge(TestModelGatewayLive),
   Layer.provideMerge(StreamResumeService.layerMemory),
   Layer.provideMerge(WorkspaceUsageQuotaService.layerNoop),
-  Layer.provideMerge(WorkspaceUsageSettlementService.layerNoop),
+  Layer.provideMerge(Layer.succeed(WorkspaceUsageSettlementService, {
+    recordChatUsage: ({ requestId }) => Effect.sync(() => { recordedUsageRequests.push(requestId) }),
+    settleMonetizationEvent: () => Effect.void,
+  })),
 )
 
 beforeEach(() => {
@@ -137,6 +153,9 @@ beforeEach(() => {
   state.freeAllowances.clear()
   lastResolvedToolKeys = []
   lastStreamRequest = null
+  includeGenerationOutput = false
+  usageOnly = false
+  recordedUsageRequests.length = 0
 })
 
 const paidAccessPolicy = resolveChatAccessPolicy({
@@ -271,6 +290,31 @@ describe('chat-backend scaffold', () => {
     expect(sse).toContain('"type":"reasoning-delta"')
     expect(sse).toContain('"totalTokens":8')
     expect(result.response.headers.get('x-vercel-ai-ui-message-stream')).toBe('v1')
+  })
+
+  it('streams and keeps tool activity, URL/document sources, and length metadata through finalization', async () => {
+    includeGenerationOutput = true
+    const { response, threadId } = await Effect.runPromise(Effect.gen(function* () {
+      const orchestrator = yield* ChatOrchestratorService
+      const { threadId } = yield* orchestrator.createThread({ userId: 'output-user', requestId: 'output-create', modelId: 'openai/gpt-5-mini' })
+      const response = yield* orchestrator.streamChat({ userId: 'output-user', threadId, accessPolicy: paidAccessPolicy, requestId: 'output-stream', route: '/api/chat', expectedBranchVersion: 1, message: { id: 'output-user-1', role: 'user', parts: [{ type: 'text', text: 'Search for Rift' }] } })
+      return { response, threadId }
+    }).pipe(Effect.provide(TestChatLayer)))
+    const sse = await response.text()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(sse).toContain('"type":"source-url"')
+    expect(sse).toContain('"type":"source-document"')
+    expect(sse).toContain('"finishReason":"length"')
+    expect(sse).toContain('"type":"tool-input-available"')
+    expect(lastStreamRequest?.systemPrompt).toContain('You are Rift')
+    const persisted = getMemoryState().messages.get(threadId)?.at(-1)
+    expect(persisted?.metadata).toMatchObject({ finishReason: 'length' })
+    expect(persisted?.parts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'source-url', sourceId: 'source-1' }),
+      expect.objectContaining({ type: 'source-document', sourceId: 'source-2' }),
+      expect.objectContaining({ type: 'dynamic-tool', toolName: 'web_search', state: 'output-available', output: expect.objectContaining({ siteCount: 1 }) }),
+    ]))
+    expect(JSON.stringify(persisted)).not.toContain('Large page body')
   })
 
   it('applies disabled tool keys during the first create-if-missing turn', async () => {
@@ -773,4 +817,44 @@ describe('chat-backend scaffold', () => {
       expect(error.reasonCode).toBe('free_allowance_exhausted')
     }
   })
+})
+
+it('records provider usage for an empty answer instead of releasing its reservation', async () => {
+  usageOnly = true
+  const response = await Effect.runPromise(Effect.gen(function* () {
+    const orchestrator = yield* ChatOrchestratorService
+    const thread = yield* orchestrator.createThread({ userId: 'usage-only-user', requestId: 'create-usage-only', modelId: 'openai/gpt-5-mini' })
+    return yield* orchestrator.streamChat({
+      userId: 'usage-only-user', threadId: thread.threadId, accessPolicy: paidAccessPolicy,
+      requestId: 'usage-only', route: '/api/chat', expectedBranchVersion: 1,
+      message: { id: 'usage-only-prompt', role: 'user', parts: [{ type: 'text', text: 'Think' }] },
+    })
+  }).pipe(Effect.provide(TestChatLayer)))
+  await response.text()
+  expect(recordedUsageRequests).toContain('usage-only')
+})
+
+it.each(['regenerate-message', 'edit-message'] as const)('rejects exhausted context during %s before calling the provider', async (trigger) => {
+  const error = await Effect.runPromise(Effect.gen(function* () {
+    const orchestrator = yield* ChatOrchestratorService
+    const created = yield* orchestrator.createThread({ userId: 'context-user', requestId: 'create-context', modelId: 'openai/gpt-5-mini' })
+    const response = yield* orchestrator.streamChat({
+      userId: 'context-user', threadId: created.threadId, accessPolicy: paidAccessPolicy,
+      requestId: 'seed-context', route: '/api/chat', expectedBranchVersion: 1,
+      message: { id: 'context-prompt', role: 'user', parts: [{ type: 'text', text: 'Question' }] },
+    })
+    yield* Effect.promise(() => response.text())
+    const rows = getMemoryState().messages.get(created.threadId)!
+    const assistant = rows.find((message) => message.role === 'assistant')!
+    if (trigger === 'regenerate-message') rows[0].parts = [{ type: 'text', text: 'x'.repeat(1_600_000) }]
+    lastStreamRequest = null
+    return yield* orchestrator.streamChat({
+      userId: 'context-user', threadId: created.threadId, accessPolicy: paidAccessPolicy,
+      requestId: 'full-context', route: '/api/chat', expectedBranchVersion: 2,
+      trigger, messageId: trigger === 'edit-message' ? 'context-prompt' : assistant.id,
+      ...(trigger === 'edit-message' ? { editedText: 'x'.repeat(1_600_000) } : {}),
+    }).pipe(Effect.flip)
+  }).pipe(Effect.provide(TestChatLayer)))
+  expect(error._tag).toBe('ContextWindowExceededError')
+  expect(lastStreamRequest).toBeNull()
 })

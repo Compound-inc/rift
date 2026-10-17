@@ -208,3 +208,20 @@ describe('rendering', () => {
     expect(block).toContain('Opening text\n[…]')
   })
 })
+
+it('plans CJK full text using the same estimate as the orchestrator', () => {
+  const text = '中'.repeat(120_000)
+  const budget = resolveContextBudget(200_000)
+  const plan = planFullText([source('chinese', text.length)], budget.fullTextChars, new Map([['chinese', text]]))
+  expect(plan.fullText).toEqual([])
+  expect(plan.overflow.map((item) => item.id)).toEqual(['chinese'])
+})
+
+it('counts CJK excerpt tokens instead of treating each token as four characters', () => {
+  const selected = selectRetrievedChunks({
+    pinnedCandidates: [chunk('cjk', 0, 0.9, '中'.repeat(1000)), chunk('cjk', 1, 0.8, '文'.repeat(1000))],
+    ambientCandidates: [],
+    retrievalChars: 5_000,
+  })
+  expect(selected.map((item) => item.chunkIndex)).toEqual([0])
+})

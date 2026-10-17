@@ -12,14 +12,11 @@ import {
   toReadableErrorCause,
   toReadableErrorMessage,
 } from '../domain/error-formatting'
-import { ModelProviderError } from '../domain/errors'
+import { ContextWindowExceededError, ModelProviderError } from '../domain/errors'
+import { estimatePromptTokens, estimateTokensFromText } from '@/lib/shared/chat-contracts/prompt-usage'
 import { sanitizeMessagesForModel } from './model-prompt'
-
-/**
- * Model gateway encapsulates AI SDK provider calls so orchestrator/business
- * logic is provider-agnostic.
- */
-const SYSTEM_PROMPT = 'You are a helpful assistant.'
+import { estimateToolTokens, resolveOutputLimits } from './chat-orchestrator/output-limits'
+import { assembleSystemPrompt } from './chat-orchestrator/system-prompt'
 
 type ProviderApiKeyOverride = {
   readonly providerId: 'openai' | 'anthropic'
@@ -119,6 +116,7 @@ export type ModelStreamResult = {
   readonly usage: PromiseLike<LanguageModelUsage>
   readonly finalStep: PromiseLike<{
     readonly providerMetadata?: Record<string, unknown>
+    readonly finishReason?: string
   }>
   readonly stream: ReadableStream<TextStreamPart<ToolSet>>
 }
@@ -134,6 +132,7 @@ export type ModelGatewayServiceShape = {
      * for `openrouter/*` models and ignored for everything else.
      */
     readonly openrouterOptions?: OpenRouterRequestOptions
+    readonly contextWindowTokens?: number
     readonly systemPrompt?: string
     readonly requestId: string
     readonly tools: ToolSet
@@ -149,7 +148,7 @@ export type ModelGatewayServiceShape = {
       | 'max'
     readonly onChunk?: (chunk: unknown) => void
     readonly abortSignal?: AbortSignal
-  }) => Effect.Effect<ModelStreamResult, ModelProviderError>
+  }) => Effect.Effect<ModelStreamResult, ModelProviderError | ContextWindowExceededError>
 }
 
 /** Injectable model gateway token. */
@@ -166,11 +165,11 @@ export class ModelGatewayService extends ServiceMap.Service<
         providerApiKeyOverride,
         openrouterOptions,
         systemPrompt,
+        contextWindowTokens,
         requestId,
         tools,
         activeTools,
         providerOptions,
-        reasoningEffort,
         onChunk,
         abortSignal,
       }: {
@@ -178,6 +177,7 @@ export class ModelGatewayService extends ServiceMap.Service<
         readonly model: string
         readonly providerApiKeyOverride?: ProviderApiKeyOverride
         readonly openrouterOptions?: OpenRouterRequestOptions
+        readonly contextWindowTokens?: number
         readonly systemPrompt?: string
         readonly requestId: string
         readonly tools: ToolSet
@@ -204,6 +204,15 @@ export class ModelGatewayService extends ServiceMap.Service<
               openrouterOptions,
             })
 
+            const resolvedSystemPrompt = systemPrompt ?? assembleSystemPrompt({ modelId: model })
+            const outputLimits = resolveOutputLimits({
+              modelId: model,
+              providerOptions,
+              contextWindowTokens,
+              requestId,
+              estimatedPromptTokens: estimatePromptTokens(promptMessages) + estimateTokensFromText(resolvedSystemPrompt) + await estimateToolTokens(tools, activeTools),
+            })
+
             // Message conversion can await uploads. Recheck after that work so
             // a replacement during preparation never reaches the provider.
             abortSignal?.throwIfAborted()
@@ -212,7 +221,10 @@ export class ModelGatewayService extends ServiceMap.Service<
               // Legacy system rows come from server-loaded history. Keep them out
               // of v7's messages list while retaining the mode/project prompt.
               instructions: [
-                { role: 'system', content: systemPrompt ?? SYSTEM_PROMPT },
+                {
+                  role: 'system',
+                  content: resolvedSystemPrompt,
+                },
                 ...modelMessages.filter((message) => message.role === 'system'),
               ],
               messages: modelMessages.filter(
@@ -220,13 +232,8 @@ export class ModelGatewayService extends ServiceMap.Service<
               ),
               tools,
               activeTools: activeTools ? [...activeTools] : undefined,
-              providerOptions: providerOptions as any,
-              maxOutputTokens:
-                reasoningEffort === 'high' ||
-                reasoningEffort === 'xhigh' ||
-                reasoningEffort === 'max'
-                  ? 12_000
-                  : 8_000,
+              providerOptions: outputLimits.providerOptions as any,
+              maxOutputTokens: outputLimits.maxOutputTokens,
               abortSignal,
               experimental_transform: smoothStream({
                 delayInMs: 15,
@@ -243,6 +250,7 @@ export class ModelGatewayService extends ServiceMap.Service<
             })
           },
           catch: (error) => {
+            if (error instanceof ContextWindowExceededError) return error
             const message = toReadableErrorMessage(
               error,
               'Model provider failed to start stream',

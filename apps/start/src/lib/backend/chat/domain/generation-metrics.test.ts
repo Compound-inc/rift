@@ -3,9 +3,10 @@ import { buildPersistedGenerationAnalytics } from './generation-metrics'
 import { canExposeUserCost } from '@/utils/app-feature-flags'
 
 describe('buildPersistedGenerationAnalytics', () => {
-  it('extracts dedicated analytics columns and omits persisted metadata blobs', () => {
+  it('preserves provider and generation metadata alongside dedicated analytics columns', () => {
     const analytics = buildPersistedGenerationAnalytics({
       usedByok: false,
+      generationMetadata: { activeToolKeys: ['web_search'], finishReason: 'length', absent: undefined },
       usage: {
         inputTokens: 120,
         inputTokenDetails: {
@@ -53,8 +54,11 @@ describe('buildPersistedGenerationAnalytics', () => {
     expect(analytics.cacheWriteTokens).toBe(0)
     expect(analytics.noCacheTokens).toBe(100)
     expect(analytics.billableWebSearchCalls).toBe(0)
-    expect(analytics.providerMetadata).toBeUndefined()
-    expect(analytics.generationMetadata).toBeUndefined()
+    expect(analytics.providerMetadata).toMatchObject({
+      openai: { responseId: 'resp_123', serviceTier: 'default' },
+      gateway: { generationId: 'gen_local_only', cost: '0.0013025', routing: { provider: 'openai' } },
+    })
+    expect(analytics.generationMetadata).toEqual({ activeToolKeys: ['web_search'], finishReason: 'length' })
   })
 
   it('falls back to summed totals when totalTokens is absent', () => {
@@ -86,7 +90,7 @@ describe('buildPersistedGenerationAnalytics', () => {
     expect(analytics.usedByok).toBe(true)
     expect(analytics.totalTokens).toBe(275)
     expect(analytics.cacheWriteTokens).toBeUndefined()
-    expect(analytics.providerMetadata).toBeUndefined()
+    expect(analytics.providerMetadata).toEqual({ gateway: { cost: '0.0021' } })
     expect(analytics.generationMetadata).toBeUndefined()
   })
 
@@ -362,7 +366,7 @@ describe('buildPersistedGenerationAnalytics', () => {
 
       expect(analytics).toMatchObject(expected)
       expect(analytics.aiCost ?? analytics.publicCost).toBe(cost)
-      expect(analytics.providerMetadata).toBeUndefined()
+      expect(analytics.providerMetadata).toEqual(providerMetadata)
     },
   )
 

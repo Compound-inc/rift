@@ -21,6 +21,7 @@ export type ChatMessageMetadata = {
   readonly modelSource?: 'thread' | 'request'
   readonly startedAt?: number
   readonly completedAt?: number
+  readonly finishReason?: string
   readonly totalTokens?: number
   readonly attachments?: readonly ChatAttachment[]
 }

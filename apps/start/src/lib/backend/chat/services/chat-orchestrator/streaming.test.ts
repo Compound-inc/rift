@@ -92,7 +92,7 @@ describe('v7 streaming lifecycle', () => {
     expect(await response.text()).toBe(persistedSse)
     expect(persistedSse).toContain('"messageId":"assistant-1"')
     expect(persistedSse).toContain('"type":"reasoning-delta"')
-    expect(buffer).toEqual({ text: 'Answer', reasoning: 'Thinking' })
+    expect(buffer).toMatchObject({ text: 'Answer', reasoning: 'Thinking' })
     expect(chunkTypes).toEqual(
       expect.arrayContaining([
         'start',
@@ -169,6 +169,6 @@ describe('v7 streaming lifecycle', () => {
         }),
       }),
     )
-    expect(buffer).toEqual({ text: 'Answer', reasoning: 'Thinking' })
+    expect(buffer).toMatchObject({ text: 'Answer', reasoning: 'Thinking' })
   })
 })

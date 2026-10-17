@@ -97,6 +97,12 @@ import {
   resolveBranchSelectionPath,
   resolveCanonicalBranch,
 } from '@/lib/shared/chat-branching/branch-resolver'
+import {
+  storedMessageToUI,
+  messageDisplayFingerprint,
+  hasNewStoredDisplay,
+} from '@/lib/shared/chat-contracts/stored-message'
+import type { StoredChatMessage } from '@/lib/shared/chat-contracts/stored-message'
 import { buildLatestAssistantUsage } from './token-usage'
 
 type ChatUIMessage = UIMessage<ChatMessageMetadata>
@@ -129,6 +135,7 @@ type ChatActionsContextValue = Pick<
   canRetryLastMessage: boolean
   sendMessage: (input: {
     text: string
+    modelId?: string
     attachments?: readonly ChatAttachmentInput[]
     attachmentManifest?: readonly ChatAttachment[]
   }) => Promise<void>
@@ -361,73 +368,17 @@ function toOrgAiPolicy(row: unknown): OrgAiPolicy | undefined {
   }
 }
 
-/** Server error keys remain stable across locales and page reloads. */
-function resolveStoredChatError(serverError: unknown): string | undefined {
-  if (!serverError || typeof serverError !== 'object') return undefined
-  const key =
-    'i18nKey' in serverError && typeof serverError.i18nKey === 'string'
-      ? serverError.i18nKey
-      : 'error_chat_unknown'
-  return resolveChatErrorMessage(key as ChatErrorI18nKey)
-}
-
-function toUIMessageFromStoredMessage(message: {
-  readonly messageId: string
-  readonly role: 'user' | 'assistant' | 'system'
-  readonly serverError?: unknown
-  readonly content: string
-  readonly threadId?: string
-  readonly status?: ChatMessageMetadata['status']
-  readonly reasoning?: string | null
-  readonly model: string
-  readonly sources?:
-    | readonly { sourceId: string; url: string; title?: string }[]
-    | null
-}): ChatUIMessage {
-  const attachments = Array.isArray(message.sources)
-    ? message.sources
-        .filter(
-          (
-            source,
-          ): source is { sourceId: string; url: string; title?: string } =>
-            !!source &&
-            typeof source.sourceId === 'string' &&
-            typeof source.url === 'string',
-        )
-        .map((source) => ({
-          id: source.sourceId,
-          key: source.sourceId,
-          url: source.url,
-          name: source.title ?? 'Attachment',
-          size: 0,
-          contentType: 'application/octet-stream',
-        }))
-    : []
-  const parts: ChatUIMessage['parts'] = []
-  if (
-    message.role === 'assistant' &&
-    typeof message.reasoning === 'string' &&
-    message.reasoning.trim().length > 0
-  ) {
-    parts.push({ type: 'reasoning', text: message.reasoning, state: 'done' })
-  }
-  parts.push({ type: 'text', text: message.content })
-
+/** Resolve persisted error keys in the UI while sharing source/tool hydration. */
+function toUIMessageFromStoredMessage(message: StoredChatMessage): ChatUIMessage {
+  const hydrated = storedMessageToUI(message)
+  if (message.role !== 'assistant' || !message.serverError) return hydrated
+  const error = message.serverError
+  const key = typeof error === 'object' && 'i18nKey' in error && typeof error.i18nKey === 'string'
+    ? error.i18nKey
+    : 'error_chat_unknown'
   return {
-    id: message.messageId,
-    role: message.role,
-    parts,
-    metadata: {
-      threadId: message.threadId,
-      ...(message.role === 'assistant'
-        ? {
-            model: message.model,
-            status: message.status,
-            errorMessage: resolveStoredChatError(message.serverError),
-          }
-        : {}),
-      ...(attachments.length > 0 ? { attachments } : {}),
-    },
+    ...hydrated,
+    metadata: { ...hydrated.metadata, errorMessage: resolveChatErrorMessage(key as ChatErrorI18nKey) },
   }
 }
 
@@ -444,10 +395,7 @@ function textFromUIMessage(message: ChatUIMessage): string {
 
 function fingerprintMessages(messages: readonly ChatUIMessage[]): string {
   return messages
-    .map(
-      (message) =>
-        `${message.id}:${message.role}:${message.metadata?.status ?? ''}:${textFromUIMessage(message)}`,
-    )
+    .map(messageDisplayFingerprint)
     .join('\u0001')
 }
 
@@ -485,7 +433,11 @@ function mergeStoredMessagesWithLocal(
     // Preserve object identity when content is equivalent to avoid unnecessary row rerenders.
     if (localText === storedText) {
       // Stored payload carries authoritative attachment metadata after persistence.
-      if (storedAttachmentCount > localAttachmentCount) {
+      if (
+        storedAttachmentCount > localAttachmentCount ||
+        hasNewStoredDisplay(localMessage, storedMessage) ||
+        storedMessage.parts.length > localMessage.parts.length
+      ) {
         return storedMessage
       }
       return localMessage
@@ -505,19 +457,11 @@ function mergeStoredMessagesWithLocal(
 }
 
 function buildCanonicalUIMessageSnapshot(input: {
-  readonly storedMessages: readonly {
-    readonly messageId: string
-    readonly role: 'user' | 'assistant' | 'system'
+  readonly storedMessages: readonly (StoredChatMessage & {
     readonly parentMessageId?: string | null
     readonly branchIndex: number
     readonly created_at: number
-    readonly content: string
-    readonly reasoning?: string | null
-    readonly model: string
-    readonly sources?:
-      | readonly { sourceId: string; url: string; title?: string }[]
-      | null
-  }[]
+  })[]
   readonly activeChildByParent: Record<string, string>
 }): ChatUIMessage[] {
   const messageById = new Map(
@@ -1675,12 +1619,15 @@ export function ChatProvider({
   ])
 
   const sendMessage = useCallback<ChatActionsContextValue['sendMessage']>(
-    async ({ text, attachments, attachmentManifest }) => {
+    async ({ text, attachments, attachmentManifest, modelId }) => {
+      const sendModelId = modelId && selectableModels.some((model) => model.id === modelId)
+        ? modelId
+        : selectedModelIdRef.current
       clearThreadStopRequest(threadIdRef.current)
       clearError()
       setLocalError(null)
       const selectedModel = visibleModels.find(
-        (model) => model.id === selectedModelIdRef.current,
+        (model) => model.id === sendModelId,
       )
       if (selectedModel?.locked) {
         const message = selectedModel.minimumPlanId
@@ -1827,10 +1774,10 @@ export function ChatProvider({
           text,
           metadata: {
             threadId: resolvedThreadId,
-            model: selectedModelIdRef.current,
+            model: sendModelId,
             attachments: attachmentManifest,
           },
-        })
+        }, modelId ? { body: { modelId: sendModelId } } : undefined)
         createIfMissingRef.current = false
         createIfMissingProjectIdRef.current = undefined
         if (creatingThread) {
@@ -1864,6 +1811,7 @@ export function ChatProvider({
     [
       clearError,
       accessContext,
+      selectableModels,
       activeContextWindow,
       draftDisabledToolKeys,
       draftModeId,

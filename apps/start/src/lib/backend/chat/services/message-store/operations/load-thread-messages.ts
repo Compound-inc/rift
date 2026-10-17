@@ -5,7 +5,11 @@ import type {
   ChatAttachment,
   ChatAttachmentInput,
 } from '@/lib/shared/chat-contracts/attachments'
-import { MessagePersistenceError } from '@/lib/backend/chat/domain/errors'
+import {
+  InvalidEditTargetError,
+  InvalidRequestError,
+  MessagePersistenceError,
+} from '@/lib/backend/chat/domain/errors'
 import { getUserMessageText } from '@/lib/backend/chat/domain/schemas'
 import { zql } from '@/lib/backend/chat/infra/zero/db'
 import type { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
@@ -14,7 +18,12 @@ import {
   expandUserMessageText,
   loadSkillBodiesForContext,
 } from '@/lib/backend/skills/skill-resolver'
-import { resolveCanonicalBranch } from '@/lib/shared/chat-branching/branch-resolver'
+import {
+  resolveCanonicalBranch,
+  resolveRegenerationAnchor,
+  resolveEditableUserTarget,
+  resolveBranchSelectionPath,
+} from '@/lib/shared/chat-branching/branch-resolver'
 import { DEFAULT_THREAD_TITLE } from '@/lib/shared/chat/thread-bootstrap'
 import { requireMessagePersistenceDb } from '../../message-persistence-db'
 import { normalizeThreadActiveChildMap } from '../helpers'
@@ -105,6 +114,7 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
       organizationId,
       orgPolicy,
       untilMessageId,
+      branchTurn,
       pendingUserMessage,
       pendingAttachments,
       contextWindowTokens,
@@ -207,17 +217,50 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
         const persistedMessageRows = (
           messageRows as readonly MessagePromptRow[]
         ).filter((message) => !userId || message.userId === userId)
-        const { canonicalMessages: canonicalMessageRows } =
-          resolveCanonicalBranch(
-            persistedMessageRows.map((message) => ({
-              messageId: message.messageId,
-              role: message.role,
-              parentMessageId: message.parentMessageId,
-              branchIndex: message.branchIndex,
-              createdAt: message.created_at,
-            })),
-            normalizeThreadActiveChildMap(threadRow?.activeChildByParent),
-          )
+        const branchRows = persistedMessageRows.map((message) => ({
+          messageId: message.messageId,
+          role: message.role,
+          parentMessageId: message.parentMessageId,
+          branchIndex: message.branchIndex,
+          createdAt: message.created_at,
+        }))
+        const activeChildByParent = normalizeThreadActiveChildMap(
+          threadRow?.activeChildByParent,
+        )
+        let throughMessageId = untilMessageId
+        if (branchTurn) {
+          if (branchTurn.editedText !== undefined) {
+            const editable = resolveEditableUserTarget(
+              branchRows, activeChildByParent, branchTurn.targetMessageId,
+            )
+            if (!editable) {
+              return yield* Effect.fail(new InvalidEditTargetError({
+                message: 'Invalid edit target',
+                requestId,
+                threadId,
+                targetMessageId: branchTurn.targetMessageId,
+                issue: 'target message must be a canonical-path user message',
+              }))
+            }
+            throughMessageId = editable.targetMessageId
+          } else {
+            const anchor = resolveRegenerationAnchor(branchRows, branchTurn.targetMessageId)
+            if (!anchor) {
+              return yield* Effect.fail(new InvalidRequestError({
+                message: 'Invalid regenerate target',
+                requestId,
+                issue: 'target message is not regeneratable',
+              }))
+            }
+            throughMessageId = anchor.anchorMessageId
+            for (const selection of resolveBranchSelectionPath(branchRows, activeChildByParent, throughMessageId) ?? []) {
+              activeChildByParent[selection.parentMessageId] = selection.childMessageId
+            }
+          }
+        }
+        const { canonicalMessages: canonicalMessageRows } = resolveCanonicalBranch(
+          branchRows, activeChildByParent,
+        )
 
         const messageById = new Map(
           persistedMessageRows.map((message) => [message.messageId, message]),
@@ -229,10 +272,10 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
           )
 
         const persistedCanonicalRows =
-          untilMessageId && untilMessageId.trim().length > 0
+          throughMessageId && throughMessageId.trim().length > 0
             ? (() => {
                 const endIndex = canonicalOrderedRows.findIndex(
-                  (row) => row.messageId === untilMessageId,
+                  (row) => row.messageId === throughMessageId,
                 )
                 return endIndex >= 0
                   ? canonicalOrderedRows.slice(0, endIndex + 1)
@@ -240,13 +283,24 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
               })()
             : canonicalOrderedRows
 
+        // Replace only the proposed text before skills/RAG run. The target row
+        // keeps its attachment IDs so edits measure the same files they retain.
+        const editedText = branchTurn?.editedText?.trim()
+        const previewRows = editedText !== undefined
+          ? persistedCanonicalRows.map((row) =>
+              row.messageId === branchTurn?.targetMessageId
+                ? { ...row, content: editedText }
+                : row,
+            )
+          : persistedCanonicalRows
+
         const pendingMessageRow: MessagePromptRow | undefined =
           pendingUserMessage
             ? {
                 messageId: pendingUserMessage.id,
                 role: 'user',
                 parentMessageId:
-                  persistedCanonicalRows.at(-1)?.messageId ?? null,
+                  previewRows.at(-1)?.messageId ?? null,
                 branchIndex: 1,
                 created_at: Date.now(),
                 content: getUserMessageText(pendingUserMessage),
@@ -257,8 +311,8 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
             : undefined
 
         const canonicalRows = pendingMessageRow
-          ? [...persistedCanonicalRows, pendingMessageRow]
-          : persistedCanonicalRows
+          ? [...previewRows, pendingMessageRow]
+          : previewRows
 
         const canonicalRowIdSet = new Set(
           canonicalRows.map((row) => row.messageId),

@@ -1,3 +1,4 @@
+import { httpSourceUrl } from '@/lib/shared/chat-contracts/generation-parts'
 import { isValidElement, memo } from 'react'
 import type { HTMLAttributes, ReactNode } from 'react'
 import { defaultRemarkPlugins } from 'streamdown'
@@ -163,10 +164,11 @@ const Link: NonNullable<Components['a']> = ({
   const citationNumber = parseInlineCitationLabel(linkText)
   const isSourceCitation = isInlineCitationSourceLabel(linkText)
 
-  if (href && (citationNumber || isSourceCitation)) {
+  const citationUrl = httpSourceUrl(href)
+  if (citationUrl && (citationNumber || isSourceCitation)) {
     return (
       <ChatInlineCitation
-        href={href}
+        href={citationUrl}
         label={citationNumber ? `[${citationNumber}]` : linkText}
       />
     )

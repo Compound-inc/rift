@@ -1,6 +1,8 @@
 import { ZeroProvider as ZeroProviderBase } from '@rocicorp/zero/react'
 import { useEffect, useMemo, useRef } from 'react'
 import { useLocation } from '@tanstack/react-router'
+import { toast } from 'sonner'
+import { m } from '@/paraglide/messages'
 import { schema } from './schema'
 import { mutators } from './mutators'
 import type { ZeroContext } from './schema'
@@ -108,6 +110,8 @@ export default function ZeroProvider({
     ? `${userID}:${context.organizationId ?? 'personal'}:${zeroToken.token ?? 'missing'}`
     : `${userID}:${context.organizationId ?? 'personal'}:cookie`
 
+  // Keep drafts on screen when a deployment requires a new client bundle.
+  // A stable toast ID avoids repeated prompts during reconnects.
   return (
     <ZeroProviderBase
       key={zeroProviderKey}
@@ -117,6 +121,16 @@ export default function ZeroProvider({
       {...(isSelfHosted ? { auth: zeroToken.token } : {})}
       schema={schema}
       mutators={mutators}
+      onUpdateNeeded={() => {
+        toast(m.app_update_available(), {
+          id: 'zero-update-needed',
+          duration: Infinity,
+          action: {
+            label: m.app_refresh_to_update(),
+            onClick: () => window.location.reload(),
+          },
+        })
+      }}
     >
       {children}
     </ZeroProviderBase>
