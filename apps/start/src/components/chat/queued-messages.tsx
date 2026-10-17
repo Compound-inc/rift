@@ -32,7 +32,9 @@ export function QueuedMessages({
   if (!threadId || !queue.items.length) return null
   return (
     <div
-      className="mb-1.5 flex max-h-48 flex-col gap-1.5 overflow-y-auto"
+      // A long queue still scrolls, but no scrollbar gutter may make items
+      // narrower than the input below.
+      className="scrollbar-hide mb-1.5 flex max-h-48 flex-col gap-1.5 overflow-y-auto"
       role="region"
       aria-label={m.chat_queue_label()}
     >

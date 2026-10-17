@@ -161,6 +161,16 @@ code {
     transparent;
 }
 
+/*
+ * .scrollbar-hide must beat the default app scrollbar above, which has higher
+ * specificity and reserves a stable gutter. Without this, hidden-scrollbar
+ * areas (queued messages, right sidebar) still lose ~10px of width.
+ */
+.scrollbar-app .scrollbar-hide {
+  scrollbar-width: none;
+  scrollbar-gutter: auto;
+}
+
 .scrollbar-app .overflow-y-auto::-webkit-scrollbar,
 .scrollbar-app .overflow-auto::-webkit-scrollbar,
 .scrollbar-sidebar::-webkit-scrollbar {
