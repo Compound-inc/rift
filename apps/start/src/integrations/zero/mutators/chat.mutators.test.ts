@@ -82,6 +82,8 @@ describe('permanent thread deletion', () => {
       expect(f.tx.dbTransaction.query).not.toHaveBeenCalled()
     },
   )
+})
+
 describe('thread deletion privacy', () => {
   function harness(location = 'server', userId = 'owner') {
     const removeCheckpoint = vi.fn()
@@ -131,7 +133,11 @@ describe('thread deletion privacy', () => {
     expect(h.removeCheckpoint).not.toHaveBeenCalled()
     expect(h.removeThread).not.toHaveBeenCalled()
     expect(h.run).toHaveBeenCalledOnce()
+  })
+})
+
 const ctx = { userID: 'owner', organizationId: 'org', isAnonymous: false }
+
 describe('archive mutation', () => {
   it.each([undefined, true, false])(
     'sets archive visibility atomically for archived=%s',

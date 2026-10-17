@@ -76,7 +76,6 @@ type MessagePromptRow = {
   readonly userId: string
   readonly attachmentsIds?: unknown
   readonly model?: string
-  readonly parts?: unknown
 }
 
 function uniqueAttachmentIds(
