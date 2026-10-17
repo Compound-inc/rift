@@ -58,6 +58,18 @@ describe('resolveOutputLimits', () => {
     ).toMatchObject({ anthropic: { thinking: { budgetTokens: 1_024 } } })
   })
 
+  it('keeps Anthropic thinking and useful answer room inside the compaction output allowance', () => {
+    const resolved = resolveOutputLimits({
+      modelId: 'anthropic/claude-sonnet-4',
+      maxOutputTokens: 6_400,
+      contextWindowTokens: 32_000,
+      estimatedPromptTokens: 12_000,
+      providerOptions: { anthropic: { thinking: { type: 'enabled', budgetTokens: 24_000 } } },
+    })
+    expect(resolved.maxOutputTokens).toBe(4_096)
+    expect(resolved.providerOptions).toMatchObject({ anthropic: { thinking: { budgetTokens: 2_304 } } })
+  })
+
   it('rejects exhausted context with the domain error instead of sending tiny requests', () => {
     expect(() =>
       resolveOutputLimits({

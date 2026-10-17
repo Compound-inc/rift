@@ -69,7 +69,7 @@ export const Context = ({
 const ContextIcon = () => {
   const { usedTokens, maxTokens } = useContextValue()
   const circumference = 2 * Math.PI * ICON_RADIUS
-  const usedPercent = usedTokens != null ? usedTokens / maxTokens : 0
+  const usedPercent = usedTokens != null ? Math.min(1, Math.max(0, usedTokens / maxTokens)) : 0
   const dashOffset = circumference * (1 - usedPercent)
 
   return (
@@ -158,7 +158,7 @@ export const ContextContentHeader = ({
   ...props
 }: ContextContentHeaderProps) => {
   const { usedTokens, maxTokens } = useContextValue()
-  const usedPercent = usedTokens != null ? usedTokens / maxTokens : 0
+  const usedPercent = usedTokens != null ? Math.min(1, Math.max(0, usedTokens / maxTokens)) : 0
   const displayPct =
     usedTokens == null
       ? '--'

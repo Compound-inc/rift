@@ -244,7 +244,7 @@ export function selectSeatSlotCandidate(input: {
   return previouslyUsedVacant[0] ?? null
 }
 
-function applyTierCost(input: {
+export function applyTierCost(input: {
   readonly tokens: number
   readonly baseCost?: string
   readonly tiers?: readonly { cost: string; min: number; max?: number }[]

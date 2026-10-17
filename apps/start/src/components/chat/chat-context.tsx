@@ -70,7 +70,8 @@ import type {
   ChatAttachment,
   ChatAttachmentInput,
 } from '@/lib/shared/chat-contracts/attachments'
-import { estimatePromptTokens } from '@/lib/shared/chat-contracts'
+import { clearCompactionProgress, setCompactionProgress } from './compaction-progress'
+import type { CompactionProgress } from '@/lib/shared/chat-contracts/compaction'
 import type { ChatErrorI18nKey } from '@/lib/shared/chat-contracts/error-i18n'
 import type { ChatMessageMetadata } from '@/lib/shared/chat-contracts/message-metadata'
 import { resolveChatErrorMessage } from './chat-error-i18n'
@@ -1135,7 +1136,11 @@ export function ChatProvider({
   } = useAIChat<ChatUIMessage>({
     id: activeThreadId ? `chat-ui:${activeThreadId}` : 'chat-ui:composer',
     transport,
+    onData: (part) => {
+      if (part.type === 'data-compaction') setCompactionProgress(part.data as CompactionProgress)
+    },
     onError: (chatError) => {
+      clearCompactionProgress(threadIdRef.current)
       generationErrorRef.current = chatError
       if (!isThreadStopRequested(activeThreadId)) setLocalError(chatError)
     },
@@ -1647,28 +1652,7 @@ export function ChatProvider({
         setLocalError(new Error(message))
         throw new Error(message)
       }
-      const optimisticPromptTokens = estimatePromptTokens([
-        ...messagesRef.current,
-        {
-          id: 'pending-user-message',
-          role: 'user',
-          parts: [{ type: 'text', text }],
-        } satisfies ChatUIMessage,
-      ])
-      if (optimisticPromptTokens >= activeContextWindow) {
-        const message =
-          effectiveContextWindowResolution.supportsDistinctMaxMode &&
-          effectiveSelectedContextWindowMode === 'standard'
-            ? resolveChatErrorMessage(
-                'error_chat_context_window_exceeded_max_available',
-                { maxTokens: activeContextWindow },
-              )
-            : resolveChatErrorMessage('error_chat_context_window_exceeded', {
-                maxTokens: activeContextWindow,
-              })
-        setLocalError(new Error(message))
-        throw new Error(message)
-      }
+      clearCompactionProgress(threadIdRef.current)
       // Follow-up sends should not permit branch-snapshot shrink handling.
       allowShrinkOnNextBranchVersionRef.current = false
       let resolvedThreadId = threadIdRef.current
@@ -1815,8 +1799,6 @@ export function ChatProvider({
       activeContextWindow,
       draftDisabledToolKeys,
       draftModeId,
-      effectiveContextWindowResolution.supportsDistinctMaxMode,
-      effectiveSelectedContextWindowMode,
       navigate,
       uploadPermission.minimumPlanId,
       visibleModels,

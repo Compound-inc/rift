@@ -20,6 +20,7 @@ import { toReadableErrorMessage } from '@/lib/backend/chat/domain/error-formatti
 import { getMemoryState } from '@/lib/backend/chat/infra/memory/state'
 import { toErrorResponse } from '@/lib/backend/chat/http/error-response'
 import { ChatErrorI18nKey } from '@/lib/shared/chat-contracts/error-i18n'
+import { CompactionService } from '@/lib/backend/chat/services/compaction.service'
 import { ChatOrchestratorService } from '@/lib/backend/chat/services/chat-orchestrator.service'
 import { FreeChatAllowanceService } from '@/lib/backend/chat/services/free-chat-allowance.service'
 import { MessageStoreService } from '@/lib/backend/chat/services/message-store.service'
@@ -129,6 +130,7 @@ const RecordingToolRegistryLayer = Layer.succeed(ToolRegistryService, {
 })
 
 const TestChatLayer = ChatOrchestratorService.layer.pipe(
+  Layer.provideMerge(CompactionService.layerMemory),
   Layer.provideMerge(ThreadService.layerMemory),
   Layer.provideMerge(MessageStoreService.layerMemory),
   Layer.provideMerge(RateLimitService.layerMemory),
@@ -290,6 +292,29 @@ describe('chat-backend scaffold', () => {
     expect(sse).toContain('"type":"reasoning-delta"')
     expect(sse).toContain('"totalTokens":8')
     expect(result.response.headers.get('x-vercel-ai-ui-message-stream')).toBe('v1')
+  })
+
+  it('compacts a long thread before streaming while preserving the visible original history', async () => {
+    const result = await Effect.runPromise(Effect.gen(function* () {
+      const orchestrator = yield* ChatOrchestratorService
+      const { threadId } = yield* orchestrator.createThread({ userId: 'compact-user', requestId: 'compact-create', modelId: 'openai/gpt-5-mini' })
+      getMemoryState().messages.set(threadId, Array.from({ length: 20 }, (_, index) => ({
+        id: `old-${index}`, role: index % 2 ? 'assistant' as const : 'user' as const,
+        parts: [{ type: 'text' as const, text: 'Earlier work '.repeat(6_000) }],
+      })))
+      const response = yield* orchestrator.streamChat({
+        userId: 'compact-user', threadId, accessPolicy: paidAccessPolicy, requestId: 'compact-turn', route: '/api/chat', expectedBranchVersion: 1,
+        message: { id: 'compact-latest', role: 'user', parts: [{ type: 'text', text: 'Continue the work' }] },
+      })
+      return { response, threadId }
+    }).pipe(Effect.provide(TestChatLayer)))
+    const sse = await result.response.text()
+    expect(sse).toContain('"status":"running"')
+    expect(sse.indexOf('"status":"done"')).toBeLessThan(sse.indexOf('"type":"text-delta"'))
+    expect(lastStreamRequest?.systemPrompt).toContain('<earlier-thread-context')
+    expect(lastStreamRequest?.messages?.length).toBeLessThan(21)
+    expect(lastStreamRequest?.messages?.at(-1)?.id).toBe('compact-latest')
+    expect(getMemoryState().messages.get(result.threadId)?.length).toBe(22)
   })
 
   it('streams and keeps tool activity, URL/document sources, and length metadata through finalization', async () => {
@@ -471,6 +496,7 @@ describe('chat-backend scaffold', () => {
     })
 
     const testLayer = ChatOrchestratorService.layer.pipe(
+  Layer.provideMerge(CompactionService.layerMemory),
       Layer.provideMerge(ThreadService.layerMemory),
       Layer.provideMerge(MessageStoreService.layerMemory),
       Layer.provideMerge(RateLimitService.layerMemory),

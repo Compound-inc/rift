@@ -1,5 +1,5 @@
-import { estimateToolTokens, resolveOutputLimits } from './chat-orchestrator/output-limits'
-import { estimateTokensFromText } from '@/lib/shared/chat-contracts/prompt-usage'
+import { estimateToolTokens } from './chat-orchestrator/output-limits'
+import { estimatePromptTokens } from '@/lib/shared/chat-contracts/prompt-usage'
 import { hasProviderWork } from './chat-orchestrator/provider-work'
 import { createUIMessageStreamResponse, toUIMessageStream } from 'ai'
 import type { ReadonlyJSONValue } from '@rocicorp/zero'
@@ -12,14 +12,14 @@ import {
 } from '@/lib/shared/ai-catalog'
 import type { AiContextWindowMode } from '@/lib/shared/ai-catalog'
 import {
+  ContextWindowExceededError,
   InvalidRequestError,
   MessagePersistenceError,
   ModelProviderError,
   QuotaExceededError,
-  ContextWindowExceededError,
 } from '../domain/errors'
 import { chatErrorCodeFromTag } from '../domain/error-codes'
-import { classifyUnknownChatError } from '../domain/error-classification'
+import { classifyChatError, classifyUnknownChatError } from '../domain/error-classification'
 import { toReadableErrorMessage } from '../domain/error-formatting'
 import type { IncomingAttachment, IncomingUserMessage } from '../domain/schemas'
 import { getUserMessageText } from '../domain/schemas'
@@ -75,7 +75,9 @@ import { buildPersistedGenerationAnalytics } from '../domain/generation-metrics'
 import { nanoUsdToUsd } from '@/lib/backend/billing/services/workspace-usage/shared'
 import { writeFreeOrgUserUsageSummaryRecord } from '@/lib/backend/billing/services/workspace-usage/usage-summary-store'
 import { assembleSystemPrompt } from './chat-orchestrator/system-prompt'
-import { estimatePromptTokens } from '@/lib/shared/chat-contracts'
+import { CompactionService } from './compaction.service'
+import { validateCompactionPrompt } from './compaction/prompt'
+import { withCompactionProgress } from './compaction/progress-stream'
 import { ChatErrorCode } from '@/lib/shared/chat-contracts/error-codes'
 import { ChatErrorI18nKey } from '@/lib/shared/chat-contracts/error-i18n'
 
@@ -147,6 +149,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
       const streamResume = yield* StreamResumeService
       const toolPolicy = yield* ToolPolicyService
       const tools = yield* ToolRegistryService
+      const compaction = yield* CompactionService
       const usageQuota = yield* WorkspaceUsageQuotaService
       const usageSettlement = yield* WorkspaceUsageSettlementService
 
@@ -586,21 +589,87 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               cause: String(error),
             }),
           })
-          yield* Effect.try({
-            try: () => resolveOutputLimits({
-              modelId: modelResolution.modelId,
-              estimatedPromptTokens:
-                estimatePromptTokens(messages) +
-                estimateTokensFromText(assembledSystemPrompt) +
-                toolTokens,
-              providerOptions,
-              contextWindowTokens: activeContextWindow,
-              requestId,
-              threadId,
-              contextWindowMode: effectiveContextWindowMode,
+          const compactionInput = {
+            messages, threadId, userId, organizationId, requestId,
+            current: modelResolution, orgPolicy, accessContext: accessPolicy.context,
+            skipProviderKeyResolution,
+            contextWindow: activeContextWindow,
+            contextWindowMode: effectiveContextWindowMode,
+            systemPrompt: assembledSystemPrompt,
+            toolTokens,
+            providerOptions,
+            abortSignal: streamAbortController.signal,
+            progress: () => {},
+            onFallback: (cause: unknown) => emitWideErrorEvent({
+              eventName: 'chat.compaction.fallback', route, requestId, userId, threadId,
+              model: modelResolution.modelId, errorTag: 'CompactionFallback',
+              message: 'Compaction used recovery for this turn', cause: String(cause),
             }),
-            catch: (error) => error as ContextWindowExceededError,
+          }
+          yield* Effect.try({
+            try: () => validateCompactionPrompt(compactionInput),
+            catch: (error) => error as ContextWindowExceededError | InvalidRequestError,
           })
+
+          const cleanupPreparation = Effect.gen(function* () {
+            yield* releaseQuotaReservation('request_aborted').pipe(Effect.catch(() => Effect.void))
+            yield* streamResume.clearActiveStream({ userId, threadId, requestId, expectedStreamId: streamId }).pipe(Effect.catch(() => Effect.void))
+            yield* streamResume.releaseLocalStream({ streamId, requestId }).pipe(Effect.catch(() => Effect.void))
+          })
+          // Replacement owns a newer turn. A user Stop still persists this turn
+          // and reaches the shared pre-provider finalizer below.
+          if (streamAbortController.signal.aborted && !isUserStopped(streamAbortController.signal)) {
+            yield* cleanupPreparation
+            return new Response(null, { status: 204 })
+          }
+
+          // Return the stream before the inline summary call starts. All normal
+          // answer persistence and provider callbacks below keep their lifecycle.
+          return withCompactionProgress({
+            onError: (error: ChatDomainError) => Effect.gen(function* () {
+              if (streamAbortController.signal.aborted) {
+                yield* cleanupPreparation
+                return undefined
+              }
+              yield* threads.markThreadGenerationFailed({ userId, threadId, requestId }).pipe(Effect.catch(() => Effect.void))
+              yield* releaseQuotaReservation('request_failed').pipe(Effect.catch(() => Effect.void))
+              yield* streamResume.clearActiveStream({ userId, threadId, requestId, expectedStreamId: streamId }).pipe(Effect.catch(() => Effect.void))
+              yield* streamResume.releaseLocalStream({ streamId, requestId }).pipe(Effect.catch(() => Effect.void))
+              const classification = classifyChatError(error)
+              if (wideEvent) {
+                finalizeWideEventFailure(wideEvent, { ...classification, level: classification.severity, errorTag: error._tag, message: error.message })
+                yield* drainWideEvent(wideEvent)
+              }
+              return JSON.stringify(buildChatApiErrorEnvelope({ requestId, ...classification, tag: error._tag, detailsMessage: error.message, threadId }))
+            }),
+            run: (progress) => Effect.gen(function* () {
+              // Compaction can fail on cancellation before any turn was written.
+              // User Stop keeps the proposed branch and creates a stopped answer;
+              // replacement exits before changing the newer request's branch.
+              const compacted = yield* (
+                streamAbortController.signal.aborted
+                  ? Effect.succeed(undefined)
+                  : compaction.prepare({ ...compactionInput, progress }).pipe(
+                      Effect.catch((error) =>
+                        isUserStopped(streamAbortController.signal)
+                          ? Effect.succeed(undefined)
+                          : Effect.fail(error),
+                      ),
+                    )
+              )
+              if (streamAbortController.signal.aborted && !isUserStopped(streamAbortController.signal)) {
+                yield* cleanupPreparation
+                return new Response(null, { status: 204 })
+              }
+              messages = compacted?.messages ?? messages
+              if (wideEvent && compacted) {
+                setWideEventContext(wideEvent, { usage: { promptTokens: compacted.promptTokens } })
+                addWideEventBreadcrumb(wideEvent, { name: 'chat.compaction.prepared', detail: {
+                  checkpointId: compacted.checkpoint?.id,
+                  kind: compacted.checkpoint?.kind,
+                  promptTokens: compacted.promptTokens,
+                } })
+              }
 
           if (requestTrigger === 'regenerate-message') {
             const regeneration = yield* messageStore.prepareRegeneration({
@@ -663,7 +732,9 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             assistantParentMessageId = command.message!.id
           }
 
-          quotaReservation = yield* usageQuota
+          quotaReservation = streamAbortController.signal.aborted
+            ? { bypassed: true }
+            : yield* usageQuota
             .reserveChatQuota({
               organizationId,
               userId,
@@ -941,6 +1012,15 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             return yield* finalizePreProviderAbort
           }
 
+          // A checkpoint must leave the user turn being answered in the prompt.
+          // Validate again at the provider boundary after branch IDs are prepared.
+          if (!compacted || messages.length === 0) {
+            return yield* Effect.fail(new InvalidRequestError({
+              message: 'Cannot generate a response without a user turn',
+              requestId,
+              issue: 'empty_generation_prompt',
+            }))
+          }
           const streamStart = yield* modelGateway.streamResponse({
             messages,
             model: modelResolution.modelId,
@@ -949,7 +1029,8 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               modelId: modelResolution.modelId,
               orgPolicy,
             }),
-            systemPrompt: assembledSystemPrompt,
+            systemPrompt: compacted.systemPrompt,
+            maxOutputTokens: compacted.reservedOutputTokens,
             requestId,
             tools: toolRegistry.tools,
             activeTools: toolRegistry.activeTools,
@@ -1257,6 +1338,8 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                 })
                 cleanupActiveStream()
               },
+            }),
+          })
             }),
           })
         }).pipe(

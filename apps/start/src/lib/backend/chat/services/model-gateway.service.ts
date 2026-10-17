@@ -70,7 +70,7 @@ function createOpenRouterRuntimeModel(input: {
   })
 }
 
-function resolveRuntimeModel(input: {
+export function resolveRuntimeModel(input: {
   readonly modelId: string
   readonly providerApiKeyOverride?: ProviderApiKeyOverride
   readonly openrouterOptions?: OpenRouterRequestOptions
@@ -134,6 +134,7 @@ export type ModelGatewayServiceShape = {
     readonly openrouterOptions?: OpenRouterRequestOptions
     readonly contextWindowTokens?: number
     readonly systemPrompt?: string
+    readonly maxOutputTokens?: number
     readonly requestId: string
     readonly tools: ToolSet
     readonly activeTools?: readonly string[]
@@ -166,6 +167,7 @@ export class ModelGatewayService extends ServiceMap.Service<
         openrouterOptions,
         systemPrompt,
         contextWindowTokens,
+        maxOutputTokens,
         requestId,
         tools,
         activeTools,
@@ -179,6 +181,7 @@ export class ModelGatewayService extends ServiceMap.Service<
         readonly openrouterOptions?: OpenRouterRequestOptions
         readonly contextWindowTokens?: number
         readonly systemPrompt?: string
+        readonly maxOutputTokens?: number
         readonly requestId: string
         readonly tools: ToolSet
         readonly activeTools?: readonly string[]
@@ -207,6 +210,7 @@ export class ModelGatewayService extends ServiceMap.Service<
             const resolvedSystemPrompt = systemPrompt ?? assembleSystemPrompt({ modelId: model })
             const outputLimits = resolveOutputLimits({
               modelId: model,
+              maxOutputTokens,
               providerOptions,
               contextWindowTokens,
               requestId,
