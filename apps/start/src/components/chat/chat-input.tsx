@@ -163,7 +163,12 @@ export function ChatInput() {
     !(
       latestMessage?.role === 'assistant' &&
       latestMessage.metadata?.status === 'error' &&
-      latestMessage.id === errorMessageId
+      // Zero can supply the failed row without a matching SDK finish ID. Match
+      // the text rendered by MessageGenerationStatus too, while keeping later
+      // validation errors with different messages visible in the composer.
+      (latestMessage.id === errorMessageId ||
+        (latestMessage.metadata.errorMessage ?? m.error_chat_unknown()) ===
+          chatErrorMessage)
     )
   const showUploadError = !!uploadErrorMessage && !uploadErrorDismissed
   const activeErrorMessage = showChatError

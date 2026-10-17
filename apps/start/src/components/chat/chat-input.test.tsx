@@ -3,6 +3,8 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import type { FormEventHandler, ReactNode, TextareaHTMLAttributes } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChatInput } from './chat-input'
+import { MessageGenerationStatus } from './message-generation-status'
+import { m } from '@/paraglide/messages.js'
 import {
   clearComposerDraft,
   getComposerDraftValue,
@@ -15,10 +17,12 @@ import type { ChatMessageMetadata } from '@/lib/shared/chat-contracts/message-me
 
 const sendMessageMock = vi.fn(async () => undefined)
 const addFilesMock = vi.fn()
+const retryLastMessageMock = vi.fn(async () => undefined)
 let composerStatus = 'ready'
 let composerError: Error | null = null
 let errorMessageId: string | undefined
 let composerMessages: UIMessage<ChatMessageMetadata>[] = []
+let uploadError: string | undefined
 const { embeddingFlagState } = vi.hoisted(() => ({
   embeddingFlagState: {
     enabled: true,
@@ -36,7 +40,8 @@ vi.mock('./chat-context', () => ({
     sendMessage: sendMessageMock,
     status: composerStatus,
     stopGeneration: vi.fn(async () => undefined),
-    retryLastMessage: vi.fn(async () => undefined),
+    retryLastMessage: retryLastMessageMock,
+    canRetryLastMessage: true,
     error: composerError,
     errorMessageId,
     visibleModels: [],
@@ -119,8 +124,17 @@ vi.mock('./prompt-input', () => ({
   PromptInputToolbar: ({ middle }: { middle?: ReactNode }) => (
     <div>{middle}</div>
   ),
-  PromptInputError: ({ error }: { error: string }) => (
-    <div role="alert">{error}</div>
+  PromptInputError: ({
+    error,
+    onRetry,
+  }: {
+    error: string
+    onRetry?: () => void
+  }) => (
+    <div role="alert">
+      {error}
+      {onRetry && <button onClick={onRetry}>Retry</button>}
+    </div>
   ),
   PromptInputAttachments: () => null,
   PromptInputDropHint: () => null,
@@ -128,7 +142,7 @@ vi.mock('./prompt-input', () => ({
 
 vi.mock('../../hooks/chat/upload/use-file-attachments', () => ({
   useFileAttachments: () => ({
-    files: [],
+    files: uploadError ? [{ id: 'upload-1', uploadError }] : [],
     addFiles: addFilesMock,
     handleFileSelect: vi.fn(),
     handleFilesDrop: vi.fn(),
@@ -149,11 +163,94 @@ describe('ChatInput paste-to-attachment behavior', () => {
     errorMessageId = undefined
     composerMessages = []
     sendMessageMock.mockClear()
+    retryLastMessageMock.mockClear()
+    uploadError = undefined
     generationQueue.clear('thread-1')
   })
 
   afterEach(() => {
     clearComposerDraft()
+  })
+
+  it.each([undefined, 'sdk-answer', 'failed-answer'])(
+    'keeps only the inline failure when the transport message ID is %s',
+    (transportMessageId) => {
+      const failureMessage = m.error_chat_unknown()
+      composerMessages = [
+        {
+          id: 'failed-answer',
+          role: 'assistant',
+          metadata: { status: 'error', errorMessage: failureMessage },
+          parts: [],
+        },
+      ]
+      composerError = new Error(failureMessage)
+      errorMessageId = transportMessageId
+      const regenerateMessage = vi.fn()
+      const view = render(
+        <>
+          <MessageGenerationStatus
+            messageId="failed-answer"
+            status="error"
+            errorMessage={failureMessage}
+            canRetry
+            onRetry={regenerateMessage}
+          />
+          <ChatInput />
+        </>,
+      )
+      expect(view.getAllByRole('alert')).toHaveLength(1)
+      fireEvent.click(view.getByRole('button', { name: 'Retry' }))
+      expect(regenerateMessage).toHaveBeenCalledExactlyOnceWith('failed-answer')
+      expect(retryLastMessageMock).not.toHaveBeenCalled()
+    },
+  )
+
+  it('suppresses the matching default inline error without error metadata', () => {
+    composerMessages = [
+      {
+        id: 'failed-answer',
+        role: 'assistant',
+        metadata: { status: 'error' },
+        parts: [],
+      },
+    ]
+    composerError = new Error(m.error_chat_unknown())
+    expect(render(<ChatInput />).queryByRole('alert')).toBeNull()
+  })
+
+  it.each([
+    { messages: [] },
+    { messages: [{ id: 'user-turn', role: 'user' as const, parts: [] }] },
+  ])(
+    'shows a failure and retries the same turn without an assistant message: %j',
+    ({ messages }) => {
+      composerMessages = messages
+      composerError = new Error('Provider request rejected')
+      const view = render(<ChatInput />)
+      expect(view.getByRole('alert').textContent).toContain(
+        'Provider request rejected',
+      )
+      fireEvent.click(view.getByRole('button', { name: 'Retry' }))
+      expect(retryLastMessageMock).toHaveBeenCalledOnce()
+    },
+  )
+
+  it('keeps upload errors visible alongside an inline generation failure', () => {
+    composerMessages = [
+      {
+        id: 'failed-answer',
+        role: 'assistant',
+        metadata: { status: 'error' },
+        parts: [],
+      },
+    ]
+    composerError = new Error(m.error_chat_unknown())
+    errorMessageId = 'failed-answer'
+    uploadError = 'Upload failed'
+    const view = render(<ChatInput />)
+    expect(view.getByRole('alert').textContent).toBe('Upload failed')
+    expect(view.queryByRole('button', { name: 'Retry' })).toBeNull()
   })
 
   it('shows a new pre-send error after a failed assistant response', () => {
@@ -167,7 +264,7 @@ describe('ChatInput paste-to-attachment behavior', () => {
     ]
     composerError = new Error('The selected model is locked')
     const view = render(<ChatInput />)
-    expect(view.getByRole('alert').textContent).toBe(
+    expect(view.getByRole('alert').textContent).toContain(
       'The selected model is locked',
     )
   })
@@ -187,7 +284,9 @@ describe('ChatInput paste-to-attachment behavior', () => {
     composerError = new Error('Uploads are disabled')
     errorMessageId = undefined
     view.rerender(<ChatInput />)
-    expect(view.getByRole('alert').textContent).toBe('Uploads are disabled')
+    expect(view.getByRole('alert').textContent).toContain(
+      'Uploads are disabled',
+    )
   })
   it('queues Enter submissions during generation without sending another turn', () => {
     composerStatus = 'streaming'
