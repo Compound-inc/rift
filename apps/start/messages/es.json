@@ -1091,6 +1091,7 @@
   "document_saving": "Guardando…",
   "document_cancel": "Cancelar",
   "document_restore": "Restaurar esta versión",
+  "document_toolbar": "Herramientas del documento",
   "document_history": "Historial de versiones",
   "document_ask": "Preguntar a Rift",
   "document_write_failed": "No se pudo escribir el documento",

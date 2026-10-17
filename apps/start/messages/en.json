@@ -1103,6 +1103,7 @@
   "document_saving": "Saving…",
   "document_cancel": "Cancel",
   "document_restore": "Restore this version",
+  "document_toolbar": "Document tools",
   "document_history": "Version history",
   "document_ask": "Ask Rift",
   "document_write_failed": "Could not write document",

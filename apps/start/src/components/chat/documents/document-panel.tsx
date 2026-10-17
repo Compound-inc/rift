@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery, useZero } from '@rocicorp/zero/react'
 import { Button } from '@rift/ui/button'
 import {
+  Check,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -10,6 +11,7 @@ import {
   Printer,
   X,
 } from 'lucide-react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { queries, mutators } from '@/integrations/zero'
 import { useRightSidebar } from '@/components/layout/right-sidebar-context'
 import { AssistantTextPart } from '../message-parts/renderers/assistant-text-part'
@@ -22,6 +24,11 @@ import {
 import { documentContentSchema } from '@/lib/shared/documents/contracts'
 import { m } from '@/paraglide/messages.js'
 import { useDocumentPreview } from './document-preview-store'
+import {
+  DocumentToolbar,
+  DocumentToolbarButton,
+  DocumentToolbarDivider,
+} from './document-toolbar'
 import {
   buildDocumentReference,
   documentFilename,
@@ -148,6 +155,7 @@ export function DocumentPanel({
     try {
       await navigator.clipboard.writeText(editor?.content ?? content)
       setCopied(true)
+      window.setTimeout(() => setCopied(false), 1600)
     } catch {
       setError(m.document_action_failed())
     }
@@ -244,89 +252,72 @@ export function DocumentPanel({
             <X className="size-4" />
           </Button>
         </div>
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <div
-            className="-ml-1.5 flex items-center"
-            role="group"
-            aria-label={m.document_history()}
-          >
-            <Button
-              size="icon"
-              variant="ghost"
-              aria-label={m.document_previous_version()}
-              disabled={!!editor || writing || version <= 1}
-              onClick={() => {
-                setSelectedVersion(version - 1)
-                setCopied(false)
-                setPassage('')
-              }}
+        <div className="mt-3">
+          <DocumentToolbar label={m.document_toolbar()}>
+            <div
+              className="flex items-center"
+              role="group"
+              aria-label={m.document_history()}
             >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <span className="min-w-16 text-center text-xs text-foreground-tertiary tabular-nums">
-              {m.document_version({ version })}
-            </span>
-            <Button
-              size="icon"
-              variant="ghost"
-              aria-label={m.document_next_version()}
-              disabled={!!editor || writing || version >= latestVersion}
-              onClick={() => {
-                const next = version + 1
-                setSelectedVersion(next === latestVersion ? null : next)
-                setCopied(false)
-                setPassage('')
-              }}
-            >
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
-          <div className="-mr-1.5 flex items-center">
-            <Button
-              size="icon"
-              variant="ghost"
-              aria-label={copied ? m.document_copied() : m.document_copy()}
-              title={copied ? m.document_copied() : m.document_copy()}
-              disabled={!available}
-              onClick={copy}
-            >
-              <Copy className="size-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              aria-label={m.document_export()}
-              title={m.document_export()}
-              disabled={!available}
-              onClick={download}
-            >
-              <Download className="size-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              aria-label={m.document_print()}
-              title={m.document_print()}
-              disabled={!available || !!editor}
-              onClick={() => window.print()}
-            >
-              <Printer className="size-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              aria-label={m.document_edit()}
-              title={m.document_edit()}
+              <DocumentToolbarButton
+                label={m.document_previous_version()}
+                icon={<ChevronLeft className="size-4" />}
+                disabled={!!editor || writing || version <= 1}
+                onClick={() => {
+                  setSelectedVersion(version - 1)
+                  setCopied(false)
+                  setPassage('')
+                }}
+              />
+              <span className="min-w-[4.75rem] px-1 text-center text-xs text-foreground-tertiary tabular-nums">
+                {m.document_version({ version })}
+              </span>
+              <DocumentToolbarButton
+                label={m.document_next_version()}
+                icon={<ChevronRight className="size-4" />}
+                disabled={!!editor || writing || version >= latestVersion}
+                onClick={() => {
+                  const next = version + 1
+                  setSelectedVersion(next === latestVersion ? null : next)
+                  setCopied(false)
+                  setPassage('')
+                }}
+              />
+            </div>
+            <DocumentToolbarDivider />
+            <DocumentToolbarButton
+              label={m.document_edit()}
+              icon={<Pencil className="size-3.5" />}
+              showLabel
               disabled={!canEdit || version !== latestVersion || !!editor}
               onClick={() => {
                 setEditor({ content, baseVersion: latestVersion })
                 setError('')
                 window.setTimeout(() => textareaRef.current?.focus(), 0)
               }}
-            >
-              <Pencil className="size-4" />
-            </Button>
-          </div>
+            />
+            <DocumentToolbarDivider />
+            <div className="flex items-center" role="group">
+              <DocumentToolbarButton
+                label={copied ? m.document_copied() : m.document_copy()}
+                icon={<CopyIcon copied={copied} />}
+                disabled={!available}
+                onClick={copy}
+              />
+              <DocumentToolbarButton
+                label={m.document_export()}
+                icon={<Download className="size-4" />}
+                disabled={!available}
+                onClick={download}
+              />
+              <DocumentToolbarButton
+                label={m.document_print()}
+                icon={<Printer className="size-4" />}
+                disabled={!available || !!editor}
+                onClick={() => window.print()}
+              />
+            </div>
+          </DocumentToolbar>
         </div>
         {selectedVersion !== null && selectedVersion !== latestVersion && (
           <div className="mt-3">
@@ -416,5 +407,30 @@ export function DocumentPanel({
         )}
       </div>
     </section>
+  )
+}
+
+/** Copy morphs into a check for a moment after copying (skipped for reduced motion). */
+function CopyIcon({ copied }: { readonly copied: boolean }) {
+  const reducedMotion = useReducedMotion()
+  const hidden = reducedMotion
+    ? { opacity: 0 }
+    : { opacity: 0, scale: 0.25, filter: 'blur(4px)' }
+  const shown = reducedMotion
+    ? { opacity: 1 }
+    : { opacity: 1, scale: 1, filter: 'blur(0px)' }
+  return (
+    <AnimatePresence mode="popLayout" initial={false}>
+      <motion.span
+        key={copied ? 'check' : 'copy'}
+        className="inline-flex"
+        initial={hidden}
+        animate={shown}
+        exit={hidden}
+        transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+      >
+        {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+      </motion.span>
+    </AnimatePresence>
   )
 }
