@@ -204,6 +204,9 @@ export class ModelGatewayService extends ServiceMap.Service<
               openrouterOptions,
             })
 
+            // Message conversion can await uploads. Recheck after that work so
+            // a replacement during preparation never reaches the provider.
+            abortSignal?.throwIfAborted()
             return streamText({
               model: runtimeModel,
               // Legacy system rows come from server-loaded history. Keep them out

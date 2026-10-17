@@ -5,6 +5,7 @@ import { useDirection } from '@rift/ui/direction'
 import type { ChatMessageMetadata } from '@/lib/shared/chat-contracts/message-metadata'
 import type { ChatAttachment } from '@/lib/shared/chat-contracts/attachments'
 import { getCatalogModel } from '@/lib/shared/ai-catalog'
+import { MessageGenerationStatus } from './message-generation-status'
 import { AttachmentPreviewPill } from './attachment-preview-pill'
 import {
   AssistantMessageParts,
@@ -100,7 +101,9 @@ export function ChatMessage({
   const isUser = message.role === 'user'
   const direction = useDirection()
   const metadata = message.metadata as ChatMessageMetadata | undefined
-  const attachmentManifest = (isUser ? metadata?.attachments ?? [] : []).filter(
+  const attachmentManifest = (
+    isUser ? (metadata?.attachments ?? []) : []
+  ).filter(
     (attachment): attachment is ChatAttachment =>
       !!attachment &&
       typeof attachment === 'object' &&
@@ -253,7 +256,17 @@ export function ChatMessage({
         dir={direction}
         className="flex w-full flex-col gap-3 overflow-hidden rounded-2xl px-2 py-1 text-foreground-strong leading-[21px]"
       >
-        <AssistantMessageContent parts={message.parts} isAnimating={isAnimating} />
+        <AssistantMessageContent
+          parts={message.parts}
+          isAnimating={isAnimating}
+        />
+        <MessageGenerationStatus
+          messageId={message.id}
+          status={metadata?.status}
+          errorMessage={metadata?.errorMessage}
+          canRetry={canRegenerate}
+          onRetry={onRegenerate}
+        />
         <AssistantMessageFooter
           messageId={message.id}
           text={text}

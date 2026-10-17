@@ -1,3 +1,4 @@
+import { shouldReplaceFailedResponse } from '@/lib/shared/chat-generation/retry'
 import { Effect } from 'effect'
 import {
   BranchVersionConflictError,
@@ -84,6 +85,39 @@ export const makePrepareRegenerationOperation = (dependencies: {
                   issue: 'target message is not regeneratable',
                 })
               }
+
+              const target = threadMessages.find(
+                (message) => message.messageId === targetMessageId,
+              )
+              let replaceFailure =
+                target?.role === 'assistant' &&
+                shouldReplaceFailedResponse(
+                  target,
+                  threadMessages.some(
+                    (message) => message.parentMessageId === targetMessageId,
+                  ),
+                )
+              if (replaceFailure && target) {
+                // Usage events keep the public message ID for the billing audit.
+                // Private cost also protects the row while settlement is in flight.
+                const { rows } =
+                  await tx.dbTransaction.wrappedTransaction.query<{
+                    billed: boolean
+                  }>(
+                    `select exists (
+                    select 1 from org_usage_event where assistant_message_id = $1
+                  ) or exists (
+                    select 1 from messages where id = $2 and ai_cost > 0
+                  ) as billed`,
+                    [target.messageId, target.id],
+                  )
+                replaceFailure = !rows[0].billed
+              }
+              // Empty, unbilled failures have no branch history to preserve.
+              // Allocate a fresh response ID so delayed Zero snapshots cannot
+              // overwrite the retry or pause its queued follow-ups.
+              if (replaceFailure && target)
+                await tx.mutate.message.delete({ id: target.id })
 
               await tx.mutate.thread.update({
                 id: threadDbId,

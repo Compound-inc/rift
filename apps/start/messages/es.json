@@ -1043,5 +1043,17 @@
   "chat_skill_slash_will_expand": "se expandirá",
   "chat_skill_slash_no_match_chip": "sin coincidencia",
   "chat_project_tab_skills": "Skills",
-  "chat_sidebar_skills": "Skills"
+  "chat_sidebar_skills": "Skills",
+  "chat_stopped": "Detenido",
+  "chat_retry": "Reintentar",
+  "chat_response_failed": "No se pudo completar la respuesta.",
+  "chat_stop_failed": "No se pudo detener la respuesta. Vuelve a intentarlo.",
+  "chat_queue_label": "Mensajes en espera",
+  "chat_queue_paused": "Cola en pausa",
+  "chat_queue_send_now": "Enviar ahora",
+  "chat_queue_edit": "Editar mensaje en espera",
+  "chat_queue_remove": "Quitar mensaje en espera",
+  "chat_queue_attachments_one": "1 archivo adjunto",
+  "chat_queue_attachments_other": "{count} archivos adjuntos",
+  "chat_queue_add": "Poner en espera"
 }

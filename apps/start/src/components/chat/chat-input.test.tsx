@@ -1,18 +1,24 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from '@testing-library/react'
-import type {
-  FormEventHandler,
-  ReactNode,
-  TextareaHTMLAttributes,
-} from 'react'
+import type { FormEventHandler, ReactNode, TextareaHTMLAttributes } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChatInput } from './chat-input'
 import {
   clearComposerDraft,
   getComposerDraftValue,
+  setComposerDraft,
 } from './composer-draft-store'
 
+import { generationQueue } from './generation-queue-store'
+import type { UIMessage } from 'ai'
+import type { ChatMessageMetadata } from '@/lib/shared/chat-contracts/message-metadata'
+
+const sendMessageMock = vi.fn(async () => undefined)
 const addFilesMock = vi.fn()
+let composerStatus = 'ready'
+let composerError: Error | null = null
+let errorMessageId: string | undefined
+let composerMessages: UIMessage<ChatMessageMetadata>[] = []
 const { embeddingFlagState } = vi.hoisted(() => ({
   embeddingFlagState: {
     enabled: true,
@@ -23,13 +29,16 @@ vi.mock('./chat-context', () => ({
   useChatMessages: () => ({
     branchCost: 0,
     latestAssistantUsage: undefined,
-    messages: [],
+    messages: composerMessages,
     showBranchCost: false,
   }),
   useChatComposer: () => ({
-    sendMessage: vi.fn(),
-    status: 'ready',
-    error: null,
+    sendMessage: sendMessageMock,
+    status: composerStatus,
+    stopGeneration: vi.fn(async () => undefined),
+    retryLastMessage: vi.fn(async () => undefined),
+    error: composerError,
+    errorMessageId,
     visibleModels: [],
     selectedModelId: 'test-model',
     selectedReasoningEffort: undefined,
@@ -61,16 +70,14 @@ vi.mock('@/utils/app-feature-flags', () => ({
   },
 }))
 
-vi.mock('./chat-error-messages', () => ({
-  parseChatApiError: () => null,
-}))
-
 vi.mock('./composer-bar', () => ({
   ModelSelectorPanel: () => null,
   ReasoningSelectorPanel: () => null,
   Context: ({ children }: { children?: ReactNode }) => <>{children}</>,
   ContextContent: ({ children }: { children?: ReactNode }) => <>{children}</>,
-  ContextContentBody: ({ children }: { children?: ReactNode }) => <>{children}</>,
+  ContextContentBody: ({ children }: { children?: ReactNode }) => (
+    <>{children}</>
+  ),
   ContextContentFooter: () => null,
   ContextContentHeader: () => null,
   ContextInputUsage: () => null,
@@ -84,32 +91,37 @@ vi.mock('./prompt-input', () => ({
   PromptInputRoot: ({
     children,
     onSubmit,
+    slots,
   }: {
     children: ReactNode
     onSubmit?: FormEventHandler<HTMLFormElement>
-  }) => <form onSubmit={onSubmit}>{children}</form>,
+    slots?: { top?: ReactNode; bottom?: ReactNode }
+  }) => (
+    <form onSubmit={onSubmit}>
+      {slots?.top}
+      {children}
+      {slots?.bottom}
+    </form>
+  ),
   PromptInputTextarea: ({
     value,
     onChange,
     onPaste,
     inputRef: _inputRef,
+    onEscape: _onEscape,
     ...props
   }: TextareaHTMLAttributes<HTMLTextAreaElement> & {
     inputRef?: unknown
+    onEscape?: () => void
   }) => (
-    <textarea
-      value={value}
-      onChange={onChange}
-      onPaste={onPaste}
-      {...props}
-    />
+    <textarea value={value} onChange={onChange} onPaste={onPaste} {...props} />
   ),
-  PromptInputToolbar: ({
-    middle,
-  }: {
-    middle?: ReactNode
-  }) => <div>{middle}</div>,
-  PromptInputError: () => null,
+  PromptInputToolbar: ({ middle }: { middle?: ReactNode }) => (
+    <div>{middle}</div>
+  ),
+  PromptInputError: ({ error }: { error: string }) => (
+    <div role="alert">{error}</div>
+  ),
   PromptInputAttachments: () => null,
   PromptInputDropHint: () => null,
 }))
@@ -132,10 +144,61 @@ describe('ChatInput paste-to-attachment behavior', () => {
     addFilesMock.mockReset()
     embeddingFlagState.enabled = true
     clearComposerDraft()
+    composerStatus = 'ready'
+    composerError = null
+    errorMessageId = undefined
+    composerMessages = []
+    sendMessageMock.mockClear()
+    generationQueue.clear('thread-1')
   })
 
   afterEach(() => {
     clearComposerDraft()
+  })
+
+  it('shows a new pre-send error after a failed assistant response', () => {
+    composerMessages = [
+      {
+        id: 'failed-answer',
+        role: 'assistant',
+        metadata: { status: 'error' },
+        parts: [],
+      },
+    ]
+    composerError = new Error('The selected model is locked')
+    const view = render(<ChatInput />)
+    expect(view.getByRole('alert').textContent).toBe(
+      'The selected model is locked',
+    )
+  })
+  it('suppresses only the error associated with the failed message row', () => {
+    composerMessages = [
+      {
+        id: 'failed-answer',
+        role: 'assistant',
+        metadata: { status: 'error' },
+        parts: [],
+      },
+    ]
+    composerError = new Error('Provider failed')
+    errorMessageId = 'failed-answer'
+    const view = render(<ChatInput />)
+    expect(view.queryByRole('alert')).toBeNull()
+    composerError = new Error('Uploads are disabled')
+    errorMessageId = undefined
+    view.rerender(<ChatInput />)
+    expect(view.getByRole('alert').textContent).toBe('Uploads are disabled')
+  })
+  it('queues Enter submissions during generation without sending another turn', () => {
+    composerStatus = 'streaming'
+    setComposerDraft('send after this response')
+    const view = render(<ChatInput />)
+    fireEvent.submit(view.container.querySelector('form')!)
+    expect(generationQueue.get('thread-1').items[0]?.text).toBe(
+      'send after this response',
+    )
+    expect(sendMessageMock).not.toHaveBeenCalled()
+    expect(getComposerDraftValue()).toBe('')
   })
 
   it('converts long plain-text paste into a synthetic txt file', () => {

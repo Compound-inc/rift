@@ -107,6 +107,7 @@ export type MessageStoreServiceShape = {
     readonly branchAnchorMessageId?: string
     readonly regenSourceMessageId?: string
     readonly ok: boolean
+    readonly stopped?: boolean
     readonly finalContent: string
     readonly reasoning?: string
     readonly errorMessage?: string

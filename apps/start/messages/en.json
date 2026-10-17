@@ -1055,5 +1055,17 @@
   "chat_skill_slash_will_expand": "will expand",
   "chat_skill_slash_no_match_chip": "no match",
   "chat_project_tab_skills": "Skills",
-  "chat_sidebar_skills": "Skills"
+  "chat_sidebar_skills": "Skills",
+  "chat_stopped": "Stopped",
+  "chat_retry": "Retry",
+  "chat_response_failed": "The response could not be completed.",
+  "chat_stop_failed": "Could not stop the response. Try Stop again.",
+  "chat_queue_label": "Queued messages",
+  "chat_queue_paused": "Queue paused",
+  "chat_queue_send_now": "Send now",
+  "chat_queue_edit": "Edit queued message",
+  "chat_queue_remove": "Remove queued message",
+  "chat_queue_attachments_one": "1 attachment",
+  "chat_queue_attachments_other": "{count} attachments",
+  "chat_queue_add": "Queue message"
 }

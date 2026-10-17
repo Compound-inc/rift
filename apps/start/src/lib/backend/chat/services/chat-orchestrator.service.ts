@@ -1,7 +1,7 @@
 import { createUIMessageStreamResponse, toUIMessageStream } from 'ai'
 import type { UIMessage } from 'ai'
 import type { ReadonlyJSONValue } from '@rocicorp/zero'
-import { Duration, Effect, Layer, ServiceMap } from 'effect'
+import { Duration, Effect, Exit, Layer, ServiceMap } from 'effect'
 import type { ChatDomainError } from '../domain/errors'
 import {
   DEFAULT_CONTEXT_WINDOW_MODE,
@@ -52,6 +52,8 @@ import { StreamResumeService } from './stream-resume.service'
 import { ThreadService } from './thread.service'
 import { ToolPolicyService } from './tool-policy.service'
 import { ToolRegistryService } from './tool-registry.service'
+import { isUserStopped } from './chat-orchestrator/stream-stop'
+import { resolveStoppedUsage } from './chat-orchestrator/stopped-usage'
 import type { AssistantDeltaBuffer } from './chat-orchestrator/assistant-buffer'
 import {
   applyAssistantChunkDelta,
@@ -105,6 +107,7 @@ export type ChatOrchestratorServiceShape = {
     readonly accessPolicy: ResolvedChatAccessPolicy
     readonly orgPolicy?: OrgAiPolicy
     readonly skipProviderKeyResolution?: boolean
+    readonly generationRequestId?: string
     readonly requestId: string
     readonly trigger?: 'submit-message' | 'regenerate-message' | 'edit-message'
     readonly messageId?: string
@@ -161,6 +164,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
         accessPolicy,
         orgPolicy,
         skipProviderKeyResolution,
+        generationRequestId,
         requestId,
         trigger,
         messageId,
@@ -180,6 +184,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
       }) => {
         const startedAt = Date.now()
         let currentStreamId: string | undefined
+        let rejectedActiveBranch = false
         let quotaReservationReleased = false
         let quotaReservation: {
           readonly bypassed: boolean
@@ -476,6 +481,36 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             threadId,
             requestId,
           })
+          if (
+            (requestTrigger === 'regenerate-message' ||
+              requestTrigger === 'edit-message') &&
+            existingStreamId
+          ) {
+            rejectedActiveBranch = true
+            return yield* Effect.fail(
+              new InvalidRequestError({
+                message: 'Cannot branch while stream is active',
+                requestId,
+                issue: 'thread is currently generating',
+              }),
+            )
+          }
+
+          // Redis owns stream liveness. A crashed instance can leave Zero's
+          // status generating after its lease expires; recover before branching.
+          if (
+            requestTrigger !== 'submit-message' &&
+            !existingStreamId &&
+            (threadAccess.generationStatus === 'pending' ||
+              threadAccess.generationStatus === 'generation')
+          ) {
+            yield* threads.markThreadGenerationFailed({
+              userId,
+              threadId,
+              requestId,
+            })
+          }
+
           if (existingStreamId) {
             yield* streamResume.stopStream({
               streamId: existingStreamId,
@@ -503,22 +538,9 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             requestId,
             streamId,
             abortController: streamAbortController,
+            generationRequestId,
+            startedAt,
           })
-
-          if (
-            (requestTrigger === 'regenerate-message' ||
-              requestTrigger === 'edit-message') &&
-            (threadAccess.generationStatus === 'pending' ||
-              threadAccess.generationStatus === 'generation')
-          ) {
-            return yield* Effect.fail(
-              new InvalidRequestError({
-                message: 'Cannot branch while stream is active',
-                requestId,
-                issue: 'thread is currently generating',
-              }),
-            )
-          }
 
           let assistantParentMessageId: string | undefined
           let regenSourceMessageId: string | undefined
@@ -687,6 +709,8 @@ export class ChatOrchestratorService extends ServiceMap.Service<
           // This ID is generated server-side so start/finalize writes are deterministic
           // and idempotent even when transport retries happen.
           const assistantMessageId = crypto.randomUUID()
+          let receivedProviderOutput = false
+          let reportedProviderUsage = false
           let assistantFinalized = false
           let streamCleanedUp = false
           const assistantBuffer: AssistantDeltaBuffer = {
@@ -709,11 +733,12 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                   requestId,
                   expectedStreamId: streamId,
                 })
-                yield* streamResume.releaseLocalStream({
-                  streamId,
-                  requestId,
-                })
               }).pipe(
+                Effect.ensuring(
+                  streamResume
+                    .releaseLocalStream({ streamId, requestId })
+                    .pipe(Effect.catch(() => Effect.void)),
+                ),
                 Effect.catch((error) =>
                   emitWideErrorEvent({
                     eventName: 'chat.stream.cleanup.failed',
@@ -746,6 +771,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
 
           const finalizeAssistant = async (input: {
             ok: boolean
+            stopped?: boolean
             errorMessage?: string
             errorCode?: ChatErrorCode
             errorI18nKey?: ChatErrorI18nKey
@@ -759,50 +785,60 @@ export class ChatOrchestratorService extends ServiceMap.Service<
 
             await Effect.runPromise(
               Effect.gen(function* () {
-                yield* messageStore.finalizeAssistantMessage({
-                  threadDbId: threadAccess.dbId,
-                  threadModel: modelResolution.modelId,
-                  threadId,
-                  userId,
-                  assistantMessageId,
-                  parentMessageId: assistantParentMessageId,
-                  branchAnchorMessageId: assistantParentMessageId,
-                  regenSourceMessageId,
-                  ok: input.ok,
-                  finalContent: assistantBuffer.text,
-                  reasoning:
-                    assistantBuffer.reasoning.trim().length > 0
-                      ? assistantBuffer.reasoning
-                      : undefined,
-                  errorMessage: input.errorMessage,
-                  errorCode: input.errorCode,
-                  errorI18nKey: input.errorI18nKey,
-                  modelParams: {
-                    reasoningEffort: modelResolution.reasoningEffort,
-                  },
-                  providerMetadata: input.providerMetadata,
-                  generationAnalytics: input.generationAnalytics,
-                  requestId,
-                })
+                const persisted = yield* messageStore
+                  .finalizeAssistantMessage({
+                    threadDbId: threadAccess.dbId,
+                    threadModel: modelResolution.modelId,
+                    threadId,
+                    userId,
+                    assistantMessageId,
+                    parentMessageId: assistantParentMessageId,
+                    branchAnchorMessageId: assistantParentMessageId,
+                    regenSourceMessageId,
+                    ok: input.ok,
+                    stopped: input.stopped,
+                    finalContent: assistantBuffer.text,
+                    reasoning:
+                      assistantBuffer.reasoning.trim().length > 0
+                        ? assistantBuffer.reasoning
+                        : undefined,
+                    errorMessage: input.errorMessage,
+                    errorCode: input.errorCode,
+                    errorI18nKey: input.errorI18nKey,
+                    modelParams: {
+                      reasoningEffort: modelResolution.reasoningEffort,
+                    },
+                    providerMetadata: input.providerMetadata,
+                    generationAnalytics: input.generationAnalytics,
+                    requestId,
+                  })
+                  .pipe(Effect.exit)
 
-                if (!input.ok) {
-                  yield* releaseQuotaReservation('request_failed')
-                  return
+                // Starting a request is not evidence of billable work. Providers
+                // can reject a large prompt before generating or reporting usage.
+                if (!receivedProviderOutput && !reportedProviderUsage) {
+                  yield* releaseQuotaReservation('no_provider_work')
+                } else {
+                  yield* usageSettlement.recordChatUsage({
+                    organizationId,
+                    userId,
+                    requestId,
+                    assistantMessageId,
+                    modelId: modelResolution.modelId,
+                    actualCostUsd:
+                      input.generationAnalytics?.aiCost ??
+                      input.generationAnalytics?.publicCost,
+                    estimatedCostNanoUsd: quotaReservation.estimatedNanoUsd,
+                    usedByok: input.generationAnalytics?.usedByok ?? false,
+                  })
+                  yield* usageSettlement.settleMonetizationEvent({
+                    requestId,
+                  })
                 }
-
-                yield* usageSettlement.recordChatUsage({
-                  organizationId,
-                  userId,
-                  requestId,
-                  assistantMessageId,
-                  modelId: modelResolution.modelId,
-                  actualCostUsd:
-                    input.generationAnalytics?.aiCost ??
-                    input.generationAnalytics?.publicCost,
-                  estimatedCostNanoUsd: quotaReservation.estimatedNanoUsd,
-                  usedByok: input.generationAnalytics?.usedByok ?? false,
-                })
-                yield* usageSettlement.settleMonetizationEvent({ requestId })
+                // A failed write must still settle provider work before surfacing
+                // its persistence error through the usual telemetry path.
+                if (Exit.isFailure(persisted))
+                  return yield* Effect.failCause(persisted.cause)
               }).pipe(
                 Effect.catch((error) =>
                   Effect.flatMap(
@@ -861,9 +897,52 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                 ),
               ),
             ).catch(() => undefined)
+            // Settlement consumes the reservation; release is idempotent for a
+            // settled row and also covers persistence/settlement failure paths.
+            await Effect.runPromise(
+              releaseQuotaReservation('generation_finalized'),
+            ).catch(() => undefined)
           }
 
-          const result = yield* modelGateway.streamResponse({
+          // A submitted request can be stopped during prompt preparation. No
+          // provider call occurred, so finalize without charging estimated input.
+          const finalizePreProviderAbort = Effect.gen(function* () {
+            const stopped = isUserStopped(streamAbortController.signal)
+            yield* Effect.promise(() =>
+              finalizeAssistant({
+                ok: stopped,
+                stopped,
+                errorMessage: stopped
+                  ? undefined
+                  : GENERIC_ASSISTANT_FAILURE_MESSAGE,
+                generationAnalytics: {
+                  usedByok: Boolean(modelResolution.providerApiKeyOverride),
+                  aiCost: 0,
+                  inputTokens: 0,
+                  outputTokens: 0,
+                  totalTokens: 0,
+                },
+              }),
+            )
+            cleanupActiveStream()
+            return new Response(null, { status: 204 })
+          })
+          if (
+            yield* streamResume.hasStopIntent({
+              userId,
+              threadId,
+              requestId,
+              targetRequestId: generationRequestId,
+              streamId,
+            })
+          ) {
+            streamAbortController.abort('user-stop')
+          }
+          if (streamAbortController.signal.aborted) {
+            return yield* finalizePreProviderAbort
+          }
+
+          const streamStart = yield* modelGateway.streamResponse({
             messages,
             model: modelResolution.modelId,
             providerApiKeyOverride: modelResolution.providerApiKeyOverride,
@@ -893,10 +972,31 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             reasoningEffort: modelResolution.reasoningEffort,
             abortSignal: streamAbortController.signal,
             onChunk: (chunk: unknown) => {
-              // Persisted assistant content is reconstructed from deltas as they arrive.
+              // Lifecycle/error parts do not prove provider work. Text, reasoning
+              // and tool input do, including tools with no visible assistant text.
+              const type = (chunk as { type?: string } | null)?.type
+              if (
+                type &&
+                /^(text-|reasoning-|tool-input-|tool-call$)/.test(type)
+              )
+                receivedProviderOutput = true
               applyAssistantChunkDelta(assistantBuffer, chunk)
             },
-          })
+          }).pipe(
+            // A Stop that lands while attachments are still being converted makes
+            // the gateway's pre-call abort check throw. That is still a user stop
+            // before any provider work, not a generation failure.
+            Effect.map((result) => ({ result })),
+            Effect.catch((error) =>
+              isUserStopped(streamAbortController.signal)
+                ? Effect.succeed({ result: undefined })
+                : Effect.fail(error),
+            ),
+          )
+          if (!streamStart.result) {
+            return yield* finalizePreProviderAbort
+          }
+          const result = streamStart.result
 
           return createUIMessageStreamResponse({
             headers: {
@@ -979,6 +1079,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               originalMessages: messages,
               generateMessageId: () => assistantMessageId,
               onError: (error: unknown) => {
+                if (isUserStopped(streamAbortController.signal)) return ''
                 // The AI SDK can invoke stream error hooks more than once for the same
                 // transport failure. We only persist/log once per request.
                 if (transportErrorHandled) {
@@ -1007,13 +1108,6 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                     () => undefined,
                   )
                 }
-                void finalizeAssistant({
-                  ok: false,
-                  errorMessage: GENERIC_ASSISTANT_FAILURE_MESSAGE,
-                  errorCode: ChatErrorCode.Unknown,
-                  errorI18nKey: ChatErrorI18nKey.Unknown,
-                })
-                cleanupActiveStream()
 
                 return JSON.stringify(
                   buildChatApiErrorEnvelope({
@@ -1033,7 +1127,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                 if (part.type === 'start') {
                   return {
                     threadId,
-                    requestId,
+                    requestId: generationRequestId ?? requestId,
                     model: modelResolution.modelId,
                     modelSource: modelResolution.source,
                     startedAt,
@@ -1042,7 +1136,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                 if (part.type === 'finish') {
                   return {
                     threadId,
-                    requestId,
+                    requestId: generationRequestId ?? requestId,
                     model: modelResolution.modelId,
                     modelSource: modelResolution.source,
                     completedAt: Date.now(),
@@ -1054,9 +1148,8 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               onEnd: async ({
                 isAborted,
                 responseMessage,
-              }: {
-                isAborted: boolean
-                responseMessage: UIMessage
+                outcome,
+                isCancelled,
               }) => {
                 // If chunk-level callbacks missed content, hydrate from final payload.
                 hydrateAssistantBufferFromResponse(
@@ -1064,16 +1157,25 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                   responseMessage,
                 )
 
-                const ok = assistantBuffer.text.length > 0
-                // v7 exposes all-step token totals and final-step provider accounting separately.
-                const persistedGeneration = await Promise.all([
-                  result.usage,
-                  result.finalStep,
+                const stopped = isUserStopped(streamAbortController.signal)
+                const ok =
+                  stopped ||
+                  (!isAborted &&
+                    !isCancelled &&
+                    outcome.status !== 'failed' &&
+                    !streamAbortController.signal.aborted &&
+                    !transportErrorHandled &&
+                    assistantBuffer.text.length > 0)
+                let persistedGeneration = await Promise.all([
+                  Promise.resolve(result.usage).catch(() => undefined),
+                  Promise.resolve(result.finalStep)
+                    .then((step) => step.providerMetadata)
+                    .catch(() => undefined),
                 ])
-                  .then(([usage, finalStep]) =>
+                  .then(([totalUsage, providerMetadata]) =>
                     buildPersistedGenerationAnalytics({
-                      usage,
-                      providerMetadata: finalStep.providerMetadata,
+                      usage: totalUsage,
+                      providerMetadata,
                       usedByok: Boolean(modelResolution.providerApiKeyOverride),
                       generationMetadata: {
                         activeToolKeys: resolvedToolPolicy.activeToolKeys,
@@ -1091,6 +1193,36 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                     }),
                   )
                   .catch(() => undefined)
+                reportedProviderUsage = [
+                  persistedGeneration?.inputTokens,
+                  persistedGeneration?.outputTokens,
+                  persistedGeneration?.totalTokens,
+                  persistedGeneration?.reasoningTokens,
+                  persistedGeneration?.textTokens,
+                  persistedGeneration?.cacheReadTokens,
+                  persistedGeneration?.cacheWriteTokens,
+                  persistedGeneration?.noCacheTokens,
+                  persistedGeneration?.billableWebSearchCalls,
+                  persistedGeneration?.aiCost,
+                  persistedGeneration?.publicCost,
+                ].some((value) => value !== undefined)
+                if (
+                  (receivedProviderOutput || reportedProviderUsage) &&
+                  (isAborted ||
+                    isCancelled ||
+                    outcome.status === 'failed' ||
+                    streamAbortController.signal.aborted)
+                ) {
+                  persistedGeneration = resolveStoppedUsage({
+                    analytics: persistedGeneration,
+                    modelId: modelResolution.modelId,
+                    messages,
+                    text: assistantBuffer.text,
+                    reasoning: assistantBuffer.reasoning,
+                    usedByok: Boolean(modelResolution.providerApiKeyOverride),
+                    reservedNanoUsd: quotaReservation.estimatedNanoUsd,
+                  })
+                }
 
                 if (wideEvent) {
                   setWideEventContext(wideEvent, {
@@ -1104,7 +1236,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                     },
                     stream: { aborted: isAborted, activePhase: 'finished' },
                   })
-                  if (ok && !isAborted) {
+                  if (ok) {
                     finalizeWideEventSuccess(wideEvent, { status: 200 })
                   } else if (!wideEvent.outcome) {
                     const classification = classifyUnknownChatError()
@@ -1128,13 +1260,15 @@ export class ChatOrchestratorService extends ServiceMap.Service<
 
                 await finalizeAssistant({
                   ok,
+                  stopped,
                   providerMetadata: persistedGeneration?.providerMetadata,
                   generationAnalytics: persistedGeneration,
-                  errorMessage: isAborted
-                    ? GENERIC_ASSISTANT_FAILURE_MESSAGE
-                    : ok
-                      ? undefined
-                      : GENERIC_ASSISTANT_FAILURE_MESSAGE,
+                  errorMessage:
+                    isAborted && !stopped
+                      ? GENERIC_ASSISTANT_FAILURE_MESSAGE
+                      : ok
+                        ? undefined
+                        : GENERIC_ASSISTANT_FAILURE_MESSAGE,
                   errorCode: ok ? undefined : ChatErrorCode.Unknown,
                   errorI18nKey: ok ? undefined : ChatErrorI18nKey.Unknown,
                 })
@@ -1189,15 +1323,16 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                   issue: editError.issue,
                 })
               }
-              // Ensures threads do not stay in "pending/generation" after early
-              // failures (e.g. model policy denied before stream initialization).
-              yield* threads
-                .markThreadGenerationFailed({
-                  userId,
-                  threadId,
-                  requestId,
-                })
-                .pipe(Effect.catch(() => Effect.void))
+              // Only a request that owns a stream may fail its thread. A rejected
+              // branch request must leave the existing generation resumable.
+              if (!rejectedActiveBranch)
+                yield* threads
+                  .markThreadGenerationFailed({
+                    userId,
+                    threadId,
+                    requestId,
+                  })
+                  .pipe(Effect.catch(() => Effect.void))
               yield* releaseQuotaReservation('request_failed').pipe(
                 Effect.catch(() => Effect.void),
               )
@@ -1213,16 +1348,23 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               }
               const failedStreamId = currentStreamId
 
-              yield* streamResume.clearActiveStream({
-                userId,
-                threadId,
-                requestId,
-                expectedStreamId: failedStreamId,
-              })
-              yield* streamResume.releaseLocalStream({
-                streamId: failedStreamId,
-                requestId,
-              })
+              yield* streamResume
+                .clearActiveStream({
+                  userId,
+                  threadId,
+                  requestId,
+                  expectedStreamId: failedStreamId,
+                })
+                .pipe(
+                  Effect.ensuring(
+                    streamResume
+                      .releaseLocalStream({
+                        streamId: failedStreamId,
+                        requestId,
+                      })
+                      .pipe(Effect.catch(() => Effect.void)),
+                  ),
+                )
             }),
           ),
         )

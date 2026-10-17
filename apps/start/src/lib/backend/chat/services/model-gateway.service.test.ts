@@ -27,6 +27,26 @@ function streamResponse(
 }
 
 describe('ModelGatewayService v7 request boundary', () => {
+  it('does not call the provider with an already-aborted signal', async () => {
+    const controller = new AbortController()
+    controller.abort('replaced')
+    await expect(
+      streamResponse({
+        messages: [
+          {
+            id: 'user',
+            role: 'user',
+            parts: [{ type: 'text', text: 'hello' }],
+          },
+        ],
+        model: 'openai/gpt-5-mini',
+        requestId: 'aborted',
+        tools: {},
+        abortSignal: controller.signal,
+      }),
+    ).rejects.toThrow()
+    expect(streamTextMock).not.toHaveBeenCalled()
+  })
   it('moves legacy system rows into instructions and converts image/PDF attachments to files', async () => {
     const messages: UIMessage[] = [
       {

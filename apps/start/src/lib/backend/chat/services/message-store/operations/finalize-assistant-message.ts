@@ -52,6 +52,7 @@ export const makeFinalizeAssistantMessageOperation = ({
       branchAnchorMessageId,
       regenSourceMessageId,
       ok,
+      stopped,
       finalContent,
       reasoning,
       errorMessage,
@@ -101,9 +102,10 @@ export const makeFinalizeAssistantMessageOperation = ({
               yield* sql`
                   update messages
                   set
+                    model = ${threadModel},
                     content = ${finalContent},
                     reasoning = ${reasoning ?? null},
-                    status = ${ok ? 'done' : 'error'},
+                    status = ${stopped ? 'cancelled' : ok ? 'done' : 'error'},
                     updated_at = ${now},
                     model_params = ${serializeJson(modelParams)}::jsonb,
                     provider_metadata = ${serializeJson(providerMetadata)}::jsonb,
@@ -186,7 +188,7 @@ export const makeFinalizeAssistantMessageOperation = ({
                     ${userId},
                     ${finalContent},
                     ${reasoning ?? null},
-                    ${ok ? 'done' : 'error'},
+                    ${stopped ? 'cancelled' : ok ? 'done' : 'error'},
                     ${parentMessageId ?? null},
                     ${branchIndex},
                     ${branchAnchorMessageId ?? null},

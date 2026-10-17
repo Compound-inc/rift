@@ -1,7 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { UI_MESSAGE_STREAM_HEADERS } from 'ai'
 import { Effect, Schema } from 'effect'
-import { resolveAccessContext, resolveChatAccessPolicy } from '@/lib/backend/access-control'
+import {
+  resolveAccessContext,
+  resolveChatAccessPolicy,
+} from '@/lib/backend/access-control'
 import {
   getServerAuthContextFromHeaders,
   requireAppUserAuth,
@@ -17,6 +20,7 @@ import {
   ThreadService,
   UnauthorizedError,
 } from '@/lib/backend/chat'
+import { stopGenerationRequest } from '@/lib/backend/chat/http/stop-generation'
 import { handleRouteFailure } from '@/lib/backend/chat/http/route-failure'
 import {
   createChatWideEvent,
@@ -103,8 +107,14 @@ export const Route = createFileRoute('/api/chat')({
 
         try {
           const response = await ChatRuntime.run(program)
-          if (wideEvent.outcome && !wideEvent._drained && wideEvent.outcome.level !== 'info') {
-            await Effect.runPromise(drainWideEvent(wideEvent)).catch(() => undefined)
+          if (
+            wideEvent.outcome &&
+            !wideEvent._drained &&
+            wideEvent.outcome.level !== 'info'
+          ) {
+            await Effect.runPromise(drainWideEvent(wideEvent)).catch(
+              () => undefined,
+            )
           }
           return response
         } catch (error) {
@@ -124,8 +134,31 @@ export const Route = createFileRoute('/api/chat')({
           })
         }
       },
+      DELETE: async ({ request }) => {
+        const requestId = crypto.randomUUID()
+        const program = stopGenerationRequest(request, requestId)
+        try {
+          return await ChatRuntime.run(program)
+        } catch (error) {
+          return handleRouteFailure({
+            error,
+            requestId,
+            route: '/api/chat',
+            eventName: 'chat.stop.failed',
+            defaultMessage: 'Failed to stop generation',
+          })
+        }
+      },
       POST: async ({ request }) => {
         const requestId = crypto.randomUUID()
+        // Client correlation is only for cancellation. Billing retains a fresh
+        // server request ID so reusing a header cannot reuse a settled charge.
+        const requestedGenerationId = request.headers.get('x-generation-id')
+        const generationRequestId =
+          requestedGenerationId &&
+          /^[0-9a-f-]{36}$/i.test(requestedGenerationId)
+            ? requestedGenerationId
+            : undefined
         const wideEvent = createChatWideEvent({
           eventName: 'chat.request',
           requestId,
@@ -186,11 +219,12 @@ export const Route = createFileRoute('/api/chat')({
           })
 
           const accessContext = yield* Effect.tryPromise({
-            try: () => resolveAccessContext({
-              userId: authContext.userId,
-              isAnonymous: authContext.isAnonymous,
-              organizationId: authContext.organizationId,
-            }),
+            try: () =>
+              resolveAccessContext({
+                userId: authContext.userId,
+                isAnonymous: authContext.isAnonymous,
+                organizationId: authContext.organizationId,
+              }),
             catch: (error) =>
               new InvalidRequestError({
                 message: 'Failed to resolve access policy',
@@ -225,6 +259,7 @@ export const Route = createFileRoute('/api/chat')({
             orgPolicy,
             skipProviderKeyResolution,
             requestId,
+            generationRequestId,
             trigger: body.trigger,
             messageId: body.messageId,
             editedText: body.editedText,
@@ -246,8 +281,14 @@ export const Route = createFileRoute('/api/chat')({
 
         try {
           const response = await ChatRuntime.run(program)
-          if (wideEvent.outcome && !wideEvent._drained && wideEvent.outcome.level !== 'info') {
-            await Effect.runPromise(drainWideEvent(wideEvent)).catch(() => undefined)
+          if (
+            wideEvent.outcome &&
+            !wideEvent._drained &&
+            wideEvent.outcome.level !== 'info'
+          ) {
+            await Effect.runPromise(drainWideEvent(wideEvent)).catch(
+              () => undefined,
+            )
           }
           return response
         } catch (error) {

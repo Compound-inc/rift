@@ -3,7 +3,12 @@
 
 import type { ClipboardEvent as ReactClipboardEvent } from 'react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BookOpen } from 'lucide-react'
+import { Button } from '@rift/ui/button'
+import { BookOpen, X } from 'lucide-react'
+import { QueuedMessages } from './queued-messages'
+import { generationQueue } from './generation-queue-store'
+import type { QueuedMessage } from './generation-queue-store'
+import type { PromptInputTextareaRef } from './prompt-input'
 import { useChatComposer, useChatMessages } from './chat-context'
 import {
   PromptInputRoot,
@@ -79,15 +84,16 @@ function buildPastedTextFileName(now = new Date()): string {
 }
 
 export function ChatInput() {
-  const {
-    branchCost,
-    latestAssistantUsage,
-    showBranchCost,
-  } = useChatMessages()
+  const { messages, branchCost, latestAssistantUsage, showBranchCost } =
+    useChatMessages()
   const {
     sendMessage,
+    stopGeneration,
+    retryLastMessage,
+    canRetryLastMessage,
     status,
     error,
+    errorMessageId,
     visibleModels,
     selectedModelId,
     selectedReasoningEffort,
@@ -109,6 +115,8 @@ export function ChatInput() {
   } = useChatComposer()
   const isInThread = !!activeThreadId
 
+  const [queuedAttachments, setQueuedAttachments] =
+    useState<Pick<QueuedMessage, 'attachments' | 'attachmentManifest'>>()
   const [errorDismissed, setErrorDismissed] = useState(false)
   const [uploadErrorDismissed, setUploadErrorDismissed] = useState(false)
 
@@ -121,12 +129,14 @@ export function ChatInput() {
     handleRemoveFile,
     clearFiles,
     canAddMore,
-  } =
-    useFileAttachments({
-      maxFiles: 10,
-      enabled: canUploadFiles,
-      disabledMessage: uploadUpgradeCallout,
-    })
+  } = useFileAttachments({
+    maxFiles: 10,
+    enabled: canUploadFiles,
+    disabledMessage: uploadUpgradeCallout,
+  })
+
+  const composerTextareaRef = useRef<PromptInputTextareaRef>(null)
+  const latestMessage = messages.at(-1)
 
   const [isDraggingFiles, setIsDraggingFiles] = useState(false)
   const dragDepthRef = useRef(0)
@@ -141,14 +151,20 @@ export function ChatInput() {
       ? 'This conversation has reached the standard context limit. Switch to Max to continue with the larger window.'
       : 'This conversation has reached its current context limit. Start a new chat to continue.'
     : null
-  const isSendBlocked = isBusy || hasPendingUploads || isContextLimitReached
+  const isSendBlocked = hasPendingUploads || isContextLimitReached
   const parsedChatError = parseChatApiError(error)
   const chatErrorMessage = parsedChatError?.message ?? null
   const chatErrorTraceId = parsedChatError?.traceId ?? null
   const uploadErrorMessage =
-    files.find((file) => !!file.uploadError)?.uploadError ??
-    null
-  const showChatError = !!chatErrorMessage && !errorDismissed
+    files.find((file) => !!file.uploadError)?.uploadError ?? null
+  const showChatError =
+    !!chatErrorMessage &&
+    !errorDismissed &&
+    !(
+      latestMessage?.role === 'assistant' &&
+      latestMessage.metadata?.status === 'error' &&
+      latestMessage.id === errorMessageId
+    )
   const showUploadError = !!uploadErrorMessage && !uploadErrorDismissed
   const activeErrorMessage = showChatError
     ? chatErrorMessage
@@ -156,7 +172,7 @@ export function ChatInput() {
       ? uploadErrorMessage
       : contextLimitMessage
         ? contextLimitMessage
-      : null
+        : null
 
   useEffect(() => {
     if (error) setErrorDismissed(false)
@@ -235,11 +251,8 @@ export function ChatInput() {
     const uploadedFiles = files
       .map((file) => file.uploaded)
       .filter(
-        (uploaded): uploaded is NonNullable<typeof uploaded> =>
-          !!uploaded,
+        (uploaded): uploaded is NonNullable<typeof uploaded> => !!uploaded,
       )
-
-    if (uploadedFiles.length === 0) return undefined
 
     const attachments = uploadedFiles
       .map((file): ChatAttachmentInput | null => {
@@ -253,7 +266,13 @@ export function ChatInput() {
 
     const attachmentManifest = uploadedFiles
       .map((file): ChatAttachment | null => {
-        if (!file.id || !file.key || !file.url || !file.name || !file.contentType) {
+        if (
+          !file.id ||
+          !file.key ||
+          !file.url ||
+          !file.name ||
+          !file.contentType
+        ) {
           return null
         }
         return {
@@ -268,22 +287,37 @@ export function ChatInput() {
       .filter((attachment): attachment is ChatAttachment => !!attachment)
 
     return {
-      attachments: attachments.length > 0 ? attachments : undefined,
-      attachmentManifest:
-        attachmentManifest.length > 0 ? attachmentManifest : undefined,
+      attachments: [...(queuedAttachments?.attachments ?? []), ...attachments],
+      attachmentManifest: [
+        ...(queuedAttachments?.attachmentManifest ?? []),
+        ...attachmentManifest,
+      ],
     }
-  }, [files])
+  }, [files, queuedAttachments])
 
   const handleSubmit = useCallback(
     async (e: React.SyntheticEvent<HTMLFormElement>) => {
       e.preventDefault()
       const text = getComposerDraftValue().trim()
       if (!text || isSendBlocked) return
+      const payload = buildAttachmentPayload()
+      if (isBusy) {
+        if (!activeThreadId) return
+        generationQueue.add(activeThreadId, {
+          id: crypto.randomUUID(),
+          text,
+          ...payload,
+        })
+        clearComposerDraft()
+        clearFiles()
+        setQueuedAttachments(undefined)
+        return
+      }
       clearComposerDraft()
 
       try {
-        const payload = buildAttachmentPayload()
         clearFiles()
+        setQueuedAttachments(undefined)
         await sendMessage({
           text,
           attachments: payload?.attachments,
@@ -291,9 +325,67 @@ export function ChatInput() {
         })
       } catch (error) {
         setComposerDraft(text)
+        setQueuedAttachments(payload)
       }
     },
-    [isSendBlocked, sendMessage, buildAttachmentPayload, clearFiles],
+    [
+      isSendBlocked,
+      isBusy,
+      activeThreadId,
+      sendMessage,
+      buildAttachmentPayload,
+      clearFiles,
+    ],
+  )
+
+  const editQueuedMessage = useCallback(
+    (item: QueuedMessage) => {
+      if (!activeThreadId || hasPendingUploads) return
+      const draft = getComposerDraftValue().trim()
+      // Editing a queued item must not discard a newer draft or its uploads.
+      const draftAttachments = buildAttachmentPayload()
+      if (draft) {
+        generationQueue.add(activeThreadId, {
+          id: crypto.randomUUID(),
+          text: draft,
+          ...draftAttachments,
+        })
+      }
+      generationQueue.remove(activeThreadId, item.id)
+      setComposerDraft(item.text)
+      clearFiles()
+      setQueuedAttachments(
+        draft
+          ? item
+          : {
+              attachments: [
+                ...(item.attachments ?? []),
+                ...draftAttachments.attachments,
+              ],
+              attachmentManifest: [
+                ...(item.attachmentManifest ?? []),
+                ...draftAttachments.attachmentManifest,
+              ],
+            },
+      )
+      requestAnimationFrame(() => {
+        composerTextareaRef.current?.focus()
+      })
+    },
+    [activeThreadId, hasPendingUploads, buildAttachmentPayload, clearFiles],
+  )
+
+  const sendQueuedMessage = useCallback(
+    (id: string) => {
+      if (!activeThreadId || isBusy) return
+      const item = generationQueue.claim(activeThreadId, id)
+      if (item)
+        void sendMessage(item).catch(() => {
+          generationQueue.restore(activeThreadId, item)
+          generationQueue.pause(activeThreadId)
+        })
+    },
+    [activeThreadId, isBusy, sendMessage],
   )
 
   /**
@@ -332,8 +424,9 @@ export function ChatInput() {
   const reasoningOptions = selectedModel?.reasoningEfforts ?? []
 
   const hasReasoningOptions = !isStudyModeEnabled && reasoningOptions.length > 0
-  const effectiveModelId =
-    isStudyModeEnabled ? studyModeDefinition.fixedModelId : selectedModelId
+  const effectiveModelId = isStudyModeEnabled
+    ? studyModeDefinition.fixedModelId
+    : selectedModelId
   const selectorTriggerClassName =
     'h-8 rounded-full border border-transparent bg-transparent px-3 ltr:pr-7 rtl:pl-7 text-sm leading-[21px] font-medium text-foreground-strong transition-colors hover:bg-surface-inverse/5 active:bg-surface-inverse/10 focus-visible:border-border-strong focus-visible:ring-2 focus-visible:ring-border-strong/40'
 
@@ -344,7 +437,9 @@ export function ChatInput() {
           className={`${selectorTriggerClassName} inline-flex items-center gap-1.5 ltr:pr-3 rtl:pl-3`}
         >
           <BookOpen className="size-4 text-blue-500" aria-hidden />
-          <span className="pointer-events-none">{m.chat_mode_study_label()}</span>
+          <span className="pointer-events-none">
+            {m.chat_mode_study_label()}
+          </span>
         </div>
       ) : (
         <ModelSelectorPanel
@@ -403,6 +498,41 @@ export function ChatInput() {
 
   const topSlot = (
     <>
+      <QueuedMessages
+        threadId={activeThreadId}
+        busy={isBusy}
+        editBlocked={hasPendingUploads}
+        onEdit={editQueuedMessage}
+        onSend={sendQueuedMessage}
+      />
+      {queuedAttachments?.attachmentManifest?.map((attachment) => (
+        <div
+          key={attachment.id}
+          className="flex items-center justify-between px-2 py-1 text-xs text-foreground-secondary"
+        >
+          <span>{attachment.name}</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={m.chat_prompt_attachment_remove_aria_label({
+              fileName: attachment.name,
+            })}
+            onClick={() =>
+              setQueuedAttachments((current) => ({
+                attachments: current?.attachments?.filter(
+                  (item) => item.id !== attachment.id,
+                ),
+                attachmentManifest: current?.attachmentManifest?.filter(
+                  (item) => item.id !== attachment.id,
+                ),
+              }))
+            }
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
+      ))}
       {isDraggingFiles ? (
         <PromptInputDropHint
           canUploadFiles={canUploadFiles}
@@ -414,6 +544,14 @@ export function ChatInput() {
       {activeErrorMessage ? (
         <PromptInputError
           error={activeErrorMessage}
+          onRetry={
+            showChatError && canRetryLastMessage
+              ? () => {
+                  void retryLastMessage()
+                }
+              : undefined
+          }
+          retryDisabled={isBusy}
           traceId={showChatError ? chatErrorTraceId : undefined}
           onDismiss={
             showChatError ? handleDismissError : handleDismissUploadError
@@ -438,6 +576,9 @@ export function ChatInput() {
         uploadUpgradeCallout={uploadUpgradeCallout}
         onFileSelect={handleFileSelect}
         status={status}
+        onStop={() => {
+          void stopGeneration()
+        }}
         isBusy={isSendBlocked}
         isStudyModeEnabled={isStudyModeEnabled}
         isModeEnforced={isModeEnforced}
@@ -449,6 +590,7 @@ export function ChatInput() {
         setSelectedContextWindowMode={setSelectedContextWindowMode}
         contextWindowSupportsMaxMode={contextWindowSupportsMaxMode}
         onPaste={handleComposerPaste}
+        composerTextareaRef={composerTextareaRef}
       />
     </PromptInputRoot>
   )
@@ -456,8 +598,10 @@ export function ChatInput() {
 
 const ComposerTextarea = memo(function ComposerTextarea({
   onPaste,
+  composerTextareaRef,
 }: {
   onPaste: (event: ReactClipboardEvent<HTMLTextAreaElement>) => void
+  composerTextareaRef: React.RefObject<PromptInputTextareaRef | null>
 }) {
   const composerInput = useComposerDraftValue()
   // Read the active project from chat context so the slash menu uses the
@@ -465,6 +609,7 @@ const ComposerTextarea = memo(function ComposerTextarea({
   // also needs the live DOM ref to track cursor position and splice
   // selections back into the draft.
   const { activeProjectId } = useChatMessages()
+  const { status, stopGeneration } = useChatComposer()
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const projectId = useMemo(
     () => activeProjectId ?? undefined,
@@ -479,10 +624,18 @@ const ComposerTextarea = memo(function ComposerTextarea({
       projectId={projectId}
     >
       <PromptInputTextarea
+        ref={composerTextareaRef}
         inputRef={textareaRef}
         value={composerInput}
         onChange={(e) => setComposerDraft(e.target.value)}
         onPaste={onPaste}
+        onEscape={
+          status === 'streaming' || status === 'submitted'
+            ? () => {
+                void stopGeneration()
+              }
+            : undefined
+        }
         aria-label={m.chat_input_message_aria_label()}
         placeholder={m.chat_prompt_placeholder()}
         // The slash-skill overlay (rendered by `SkillSlashHost`) sits
@@ -500,11 +653,13 @@ const ComposerTextarea = memo(function ComposerTextarea({
 })
 
 const ComposerToolbar = memo(function ComposerToolbar({
+  composerTextareaRef,
   canAddMore,
   canUploadFiles,
   uploadUpgradeCallout,
   onFileSelect,
   status,
+  onStop,
   isBusy,
   isStudyModeEnabled,
   isModeEnforced,
@@ -522,16 +677,26 @@ const ComposerToolbar = memo(function ComposerToolbar({
   uploadUpgradeCallout?: string
   onFileSelect: (event: React.ChangeEvent<HTMLInputElement>) => void
   status: ReturnType<typeof useChatComposer>['status']
+  onStop: () => void
   isBusy: boolean
+  composerTextareaRef: React.RefObject<PromptInputTextareaRef | null>
   isStudyModeEnabled: boolean
   isModeEnforced: boolean
   setSelectedModeId: ReturnType<typeof useChatComposer>['setSelectedModeId']
   visibleTools: ReturnType<typeof useChatComposer>['visibleTools']
   disabledToolKeys: ReturnType<typeof useChatComposer>['disabledToolKeys']
-  setThreadDisabledToolKeys: ReturnType<typeof useChatComposer>['setThreadDisabledToolKeys']
-  selectedContextWindowMode: ReturnType<typeof useChatComposer>['selectedContextWindowMode']
-  setSelectedContextWindowMode: ReturnType<typeof useChatComposer>['setSelectedContextWindowMode']
-  contextWindowSupportsMaxMode: ReturnType<typeof useChatComposer>['contextWindowSupportsMaxMode']
+  setThreadDisabledToolKeys: ReturnType<
+    typeof useChatComposer
+  >['setThreadDisabledToolKeys']
+  selectedContextWindowMode: ReturnType<
+    typeof useChatComposer
+  >['selectedContextWindowMode']
+  setSelectedContextWindowMode: ReturnType<
+    typeof useChatComposer
+  >['setSelectedContextWindowMode']
+  contextWindowSupportsMaxMode: ReturnType<
+    typeof useChatComposer
+  >['contextWindowSupportsMaxMode']
   onPaste: (event: ReactClipboardEvent<HTMLTextAreaElement>) => void
 }) {
   const composerInput = useComposerDraftValue()
@@ -544,12 +709,14 @@ const ComposerToolbar = memo(function ComposerToolbar({
       uploadUpgradeCallout={uploadUpgradeCallout}
       onFileSelect={onFileSelect}
       status={status}
+      onStop={onStop}
       isEmpty={isEmpty}
       isBusy={isBusy}
       isStudyModeEnabled={isStudyModeEnabled}
       isModeEnforced={isModeEnforced}
       onToggleStudyMode={() =>
-        void setSelectedModeId(isStudyModeEnabled ? undefined : 'study')}
+        void setSelectedModeId(isStudyModeEnabled ? undefined : 'study')
+      }
       visibleTools={visibleTools}
       disabledToolKeys={disabledToolKeys}
       onToolDisabledKeysChange={(nextDisabledToolKeys) =>
@@ -560,7 +727,12 @@ const ComposerToolbar = memo(function ComposerToolbar({
       onMaxContextChange={(enabled) =>
         void setSelectedContextWindowMode(enabled ? 'max' : 'standard')
       }
-      middle={<ComposerTextarea onPaste={onPaste} />}
+      middle={
+        <ComposerTextarea
+          onPaste={onPaste}
+          composerTextareaRef={composerTextareaRef}
+        />
+      }
     />
   )
 })

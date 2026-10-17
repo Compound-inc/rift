@@ -11,6 +11,8 @@ import { m } from '@/paraglide/messages.js'
 export type PromptInputErrorProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   error?: string | null
   onDismiss?: () => void
+  onRetry?: () => void
+  retryDisabled?: boolean
   message?: string | null
   children?: React.ReactNode
   /** Trace ID for debugging */
@@ -22,6 +24,8 @@ export function PromptInputError({
   error: errorProp,
   message,
   onDismiss,
+  onRetry,
+  retryDisabled,
   children,
   traceId,
   ...props
@@ -74,6 +78,7 @@ export function PromptInputError({
             </span>
           )}
         </div>
+        {onRetry ? <Button type="button" variant="dangerLight" size="default" disabled={retryDisabled} onClick={onRetry}>{m.chat_retry()}</Button> : null}
         {onDismiss && (
           <Button
             variant="dangerLight"

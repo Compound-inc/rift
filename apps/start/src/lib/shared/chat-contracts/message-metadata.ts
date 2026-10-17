@@ -5,6 +5,16 @@ import type { ChatAttachment } from './attachments'
  * This type is intentionally client-safe (no backend runtime imports).
  */
 export type ChatMessageMetadata = {
+  readonly status?:
+    | 'thinking'
+    | 'waiting'
+    | 'streaming'
+    | 'done'
+    | 'error'
+    | 'error.rejected'
+    | 'cancelled'
+    | 'deleted'
+  readonly errorMessage?: string
   readonly threadId?: string
   readonly requestId?: string
   readonly model?: string
