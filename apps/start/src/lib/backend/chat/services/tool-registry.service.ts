@@ -1,11 +1,9 @@
+import { createDocumentTools } from '@/lib/backend/documents/tools'
 import type { ToolSet } from 'ai'
 import { Effect, Layer, ServiceMap } from 'effect'
 import { AI_CATALOG_BY_ID } from '@/lib/shared/ai-catalog'
-import {
-  resolveAnthropicRuntimeToolIds
-  
-} from '@/lib/shared/ai-catalog/provider-tools/anthropic'
-import type {AnthropicProviderToolId} from '@/lib/shared/ai-catalog/provider-tools/anthropic';
+import { resolveAnthropicRuntimeToolIds } from '@/lib/shared/ai-catalog/provider-tools/anthropic'
+import type { AnthropicProviderToolId } from '@/lib/shared/ai-catalog/provider-tools/anthropic'
 import { TOOL_CATALOG_BY_KEY } from '@/lib/shared/ai-catalog/tool-catalog'
 import type { AiReasoningEffort } from '@/lib/shared/ai-catalog/types'
 import { resolveProviderToolSet } from '../provider-tools'
@@ -91,7 +89,7 @@ export class ToolRegistryService extends ServiceMap.Service<
           providerId: model.providerId,
           providerToolIds: enabledProviderTools,
         }) as (typeof model.providerToolIds)[number][]
-        const tools =
+        const tools: ToolSet =
           runtimeProviderToolIds.length > 0
             ? resolveProviderToolSet({
                 providerId: model.providerId,
@@ -99,6 +97,26 @@ export class ToolRegistryService extends ServiceMap.Service<
                 context: { modelId: model.id },
               })
             : {}
+        // Older Gemini drops function tools when native tools are present.
+        // Preserve the requested native tools and omit documents (and their prompt).
+        // Match the SDK's legacy-model exclusion: Gemini 4 and future Gemini
+        // generations inherit mixed-tool support rather than losing documents.
+        const usesModernGeminiTools =
+          model.id.startsWith('google/gemini-') &&
+          !/^google\/gemini-(?:[12](?:[.-]|$)|pro(?:-vision)?$|robotics-er-1\.5(?:[.-]|$))/i.test(
+            model.id,
+          )
+        const dropsFunctionTools =
+          model.providerId === 'google' &&
+          !usesModernGeminiTools &&
+          Object.keys(tools).length > 0
+        if (
+          model.capabilities.supportsTools &&
+          !dropsFunctionTools &&
+          resolvedToolKeys.includes('rift.documents')
+        ) {
+          Object.assign(tools, createDocumentTools())
+        }
         const activeTools = Object.keys(tools)
 
         return Effect.succeed({

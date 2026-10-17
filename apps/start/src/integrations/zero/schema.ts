@@ -1,3 +1,7 @@
+import type {
+  PersistedSource,
+  PersistedToolPart,
+} from '@/lib/shared/chat-contracts/generation-parts'
 import {
   createSchema,
   table,
@@ -277,8 +281,10 @@ const message = table('message')
     model: string(),
     attachmentsIds: json<readonly string[]>().from('attachments_ids'),
     sources: json<
-      readonly { sourceId: string; url: string; title?: string }[]
+      readonly (PersistedSource | { sourceId: string; url: string; title?: string })[]
     >().optional(),
+    parts: json<readonly PersistedToolPart[]>().optional(),
+    finishReason: string().from('finish_reason').optional(),
     modelParams: json<{
       temperature?: number
       topP?: number
@@ -295,8 +301,8 @@ const message = table('message')
     }>()
       .from('model_params')
       .optional(),
-    providerMetadata: json().from('provider_metadata').optional(),
-    generationMetadata: json().from('generation_metadata').optional(),
+    // Raw provider accounting/routing metadata stays in Postgres. Only public
+    // counters and finishReason are synced to clients.
     publicCost: number().from('public_cost').optional(),
     inputTokens: number().from('input_tokens').optional(),
     outputTokens: number().from('output_tokens').optional(),
@@ -406,6 +412,51 @@ const skillProjectOverride = table('skillProjectOverride')
     createdAt: number().from('created_at'),
   })
   .primaryKey('id')
+
+/** Version content is separate so thread lists only sync document metadata. */
+const document = table('document')
+  .from('documents')
+  .columns({
+    id: string(),
+    userId: string().from('user_id'),
+    organizationId: string().from('organization_id').optional(),
+    threadId: string().from('thread_id'),
+    projectId: string().from('project_id').optional(),
+    title: string(),
+    kind: enumeration<'markdown' | 'code'>(),
+    language: string().optional(),
+    currentVersion: number().from('current_version'),
+    createdAt: number().from('created_at'),
+    updatedAt: number().from('updated_at'),
+    deletedAt: number().from('deleted_at').optional(),
+  })
+  .primaryKey('id')
+
+const documentVersion = table('documentVersion')
+  .from('document_versions')
+  .columns({
+    documentId: string().from('document_id'),
+    version: number(),
+    content: string(),
+    createdBy: enumeration<'assistant' | 'user'>().from('created_by'),
+    sourceMessageId: string().from('source_message_id').optional(),
+    createdAt: number().from('created_at'),
+  })
+  .primaryKey('documentId', 'version')
+
+const documentRelationships = relationships(document, ({ one, many }) => ({
+  thread: one({
+    sourceField: ['threadId'], destField: ['threadId'], destSchema: thread,
+  }),
+  versions: many({
+    sourceField: ['id'], destField: ['documentId'], destSchema: documentVersion,
+  }),
+}))
+const documentVersionRelationships = relationships(documentVersion, ({ one }) => ({
+  document: one({
+    sourceField: ['documentId'], destField: ['id'], destSchema: document,
+  }),
+}))
 
 // ---------------------------------------------------------------------------
 // Relationships (optional; use for .related() in ZQL)
@@ -623,6 +674,8 @@ export const schema = createSchema({
     project,
     skill,
     skillProjectOverride,
+    document,
+    documentVersion,
   ],
   relationships: [
     organizationRelationships,
@@ -636,6 +689,8 @@ export const schema = createSchema({
     threadProjectRelationship,
     skillRelationships,
     skillProjectOverrideRelationships,
+    documentRelationships,
+    documentVersionRelationships,
   ],
 })
 

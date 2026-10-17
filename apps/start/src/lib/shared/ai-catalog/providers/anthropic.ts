@@ -792,7 +792,7 @@ export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
       high: anthropicEffortAndThinkingOptions('high', { budgetTokens: 20000 }),
     },
     defaultProviderOptions: anthropicDefaultProviderOptions(),
-    defaultMaxOutputTokens: 128000,
+    defaultMaxOutputTokens: 64000,
     pricing: {
       inputPerToken: '0.000005',
       outputPerToken: '0.000025',

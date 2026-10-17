@@ -1,6 +1,9 @@
 import { Effect, Layer, ServiceMap } from 'effect'
 import { createResumableStreamContext } from 'resumable-stream'
 import { createClient } from 'redis'
+import { parseStreamStopReason } from './chat-orchestrator/stream-stop'
+import type { StreamStopReason } from './chat-orchestrator/stream-stop'
+import { maintainActiveStreamLease } from './stream-resume/active-stream-lease'
 import { StreamProtocolError } from '../domain/errors'
 
 /** Redis payload stored for "active stream per user/thread" tracking. */
@@ -35,6 +38,12 @@ type LocalLiveStream = {
 }
 
 const ACTIVE_STREAM_TTL_SECONDS = 5 * 60
+const STOP_INTENT_TTL_SECONDS = 60
+const getStopIntentKey = (
+  userId: string,
+  threadId: string,
+  targetRequestId = '',
+) => `chat:stop-intent:v1:${userId}:${threadId}:${targetRequestId}`
 const STOP_CHANNEL_PREFIX = 'chat:stop:v1'
 const ACTIVE_KEY_PREFIX = 'chat:active:v1'
 const RESUMABLE_KEY_PREFIX = 'chat:resume:v1'
@@ -290,6 +299,11 @@ class StreamResumeRuntimeService extends ServiceMap.Service<
            * close error is reduced to the release boundary and then dropped.
            */
           try: async () => {
+            await Promise.allSettled(
+              [...runtime.localHandles.values()].map((handle) =>
+                handle.unsubscribe(),
+              ),
+            )
             runtime.localHandles.clear()
             for (const local of runtime.localStreams.values()) {
               closeLocalLiveStream(local)
@@ -311,11 +325,26 @@ class StreamResumeRuntimeService extends ServiceMap.Service<
 }
 
 /** Service contract for stream resume/stop lifecycle management. */
+type StopIntentInput = {
+  readonly userId: string
+  readonly threadId: string
+  readonly requestId: string
+  readonly targetRequestId?: string
+}
+
 export type StreamResumeServiceShape = {
+  /** Retain targeted stops before registration and return the captured active stream. */
+  readonly recordStopIntent: (
+    input: StopIntentInput,
+  ) => Effect.Effect<string | null, StreamProtocolError>
+  readonly hasStopIntent: (
+    input: StopIntentInput & { readonly streamId: string },
+  ) => Effect.Effect<boolean, StreamProtocolError>
   readonly getActiveStreamId: (input: {
     readonly userId: string
     readonly threadId: string
     readonly requestId: string
+    readonly targetRequestId?: string
   }) => Effect.Effect<string | null, StreamProtocolError>
   readonly registerActiveStream: (input: {
     readonly userId: string
@@ -323,6 +352,8 @@ export type StreamResumeServiceShape = {
     readonly requestId: string
     readonly streamId: string
     readonly abortController: AbortController
+    readonly generationRequestId?: string
+    readonly startedAt?: number
   }) => Effect.Effect<void, StreamProtocolError>
   readonly persistSseStream: (input: {
     readonly streamId: string
@@ -336,6 +367,7 @@ export type StreamResumeServiceShape = {
     readonly requestId: string
   }) => Effect.Effect<ReadableStream<string> | null, StreamProtocolError>
   readonly stopStream: (input: {
+    readonly reason?: StreamStopReason
     readonly streamId: string
     readonly requestId: string
   }) => Effect.Effect<void, StreamProtocolError>
@@ -362,6 +394,85 @@ export class StreamResumeService extends ServiceMap.Service<
     Effect.gen(function* () {
       const runtime = yield* StreamResumeRuntimeService
 
+      const recordStopIntent = Effect.fn(
+        'StreamResumeService.recordStopIntent',
+      )((input: StopIntentInput) =>
+        Effect.tryPromise({
+          try: async () => {
+            // Capture the active generation atomically. A late thread-wide
+            // DELETE must never leave an intent that cancels the next request.
+            return (await runtime.publisher.eval(
+              `
+                local raw = redis.call('GET', KEYS[1])
+                -- resumeStream blanks the key for a second when the stream is
+                -- gone; a blank or corrupt record means "no active stream".
+                local active = nil
+                if raw and raw ~= '' then
+                  local ok, record = pcall(cjson.decode, raw)
+                  if ok and type(record) == 'table' then active = record end
+                end
+                if ARGV[1] ~= '' then
+                  redis.call('SET', KEYS[2], ARGV[1], 'EX', ARGV[2])
+                  if active and active.requestId == ARGV[1] then
+                    return active.streamId
+                  end
+                elseif active then
+                  redis.call('SET', KEYS[2], active.streamId, 'EX', ARGV[2])
+                  return active.streamId
+                end
+                return nil
+              `,
+              {
+                keys: [
+                  getActiveKey(input.userId, input.threadId),
+                  getStopIntentKey(
+                    input.userId,
+                    input.threadId,
+                    input.targetRequestId,
+                  ),
+                ],
+                arguments: [
+                  input.targetRequestId ?? '',
+                  String(STOP_INTENT_TTL_SECONDS),
+                ],
+              },
+            )) as string | null
+          },
+          catch: (error) =>
+            toProtocolError({
+              requestId: input.requestId,
+              message: 'Failed to record stop intent',
+              error,
+            }),
+        }),
+      )
+      const hasStopIntent = Effect.fn('StreamResumeService.hasStopIntent')(
+        (input: StopIntentInput & { readonly streamId: string }) =>
+          Effect.tryPromise({
+            try: async () => {
+              const [targeted, intent] = await Promise.all([
+                runtime.publisher.get(
+                  getStopIntentKey(
+                    input.userId,
+                    input.threadId,
+                    input.targetRequestId ?? input.requestId,
+                  ),
+                ),
+                runtime.publisher.get(
+                  getStopIntentKey(input.userId, input.threadId),
+                ),
+              ])
+              return targeted !== null || intent === input.streamId
+            },
+            catch: (error) =>
+              toProtocolError({
+                requestId: input.requestId,
+                message: 'Failed to read stop intent',
+                error,
+              }),
+          }),
+      )
+
       const getActiveStreamId = Effect.fn(
         'StreamResumeService.getActiveStreamId',
       )(
@@ -369,17 +480,22 @@ export class StreamResumeService extends ServiceMap.Service<
           userId,
           threadId,
           requestId,
+          targetRequestId,
         }: {
           readonly userId: string
           readonly threadId: string
           readonly requestId: string
+          readonly targetRequestId?: string
         }) =>
           Effect.tryPromise({
             try: async () => {
               const record = parseActiveStreamRecord(
                 await runtime.publisher.get(getActiveKey(userId, threadId)),
               )
-              return record?.streamId ?? null
+              return record &&
+                (!targetRequestId || record.requestId === targetRequestId)
+                ? record.streamId
+                : null
             },
             catch: (error) =>
               toProtocolError({
@@ -399,23 +515,28 @@ export class StreamResumeService extends ServiceMap.Service<
           requestId,
           streamId,
           abortController,
+          generationRequestId,
         }: {
           readonly userId: string
           readonly threadId: string
           readonly requestId: string
           readonly streamId: string
           readonly abortController: AbortController
+          readonly generationRequestId?: string
+          readonly startedAt?: number
         }) =>
           Effect.tryPromise({
             try: async () => {
               const channel = getStopChannel(streamId)
 
+              let releaseLease = () => {}
               const unsubscribe = async () => {
+                releaseLease()
                 await runtime.subscriber.unsubscribe(channel)
               }
 
-              await runtime.subscriber.subscribe(channel, () => {
-                abortController.abort()
+              await runtime.subscriber.subscribe(channel, (payload) => {
+                abortController.abort(parseStreamStopReason(payload))
               })
 
               runtime.localHandles.set(streamId, {
@@ -445,15 +566,48 @@ export class StreamResumeService extends ServiceMap.Service<
                 { once: true },
               )
 
-              await runtime.publisher.set(
-                getActiveKey(userId, threadId),
-                JSON.stringify({
-                  streamId,
-                  requestId,
-                  startedAt: Date.now(),
-                } satisfies ActiveStreamRecord),
-                { EX: ACTIVE_STREAM_TTL_SECONDS },
-              )
+              const key = getActiveKey(userId, threadId)
+              const record = JSON.stringify({
+                streamId,
+                requestId: generationRequestId ?? requestId,
+                startedAt: Date.now(),
+              } satisfies ActiveStreamRecord)
+              await runtime.publisher.set(key, record, {
+                EX: ACTIVE_STREAM_TTL_SECONDS,
+              })
+              releaseLease = maintainActiveStreamLease({
+                signal: abortController.signal,
+                intervalMs: (ACTIVE_STREAM_TTL_SECONDS * 1000) / 3,
+                refresh: () =>
+                  runtime.publisher.eval(
+                    `
+                  if redis.call('GET', KEYS[1]) == ARGV[1] then
+                    return redis.call('EXPIRE', KEYS[1], ARGV[2])
+                  end
+                  return 0
+                `,
+                    {
+                      keys: [key],
+                      arguments: [record, String(ACTIVE_STREAM_TTL_SECONDS)],
+                    },
+                  ),
+              })
+              // Subscribe before checking the durable intent so a stop cannot fall
+              // between the Redis read and pub/sub registration. Thread-wide
+              // intents apply only to the stream captured by the stop request.
+              const [targetedIntent, threadIntent] = await Promise.all([
+                runtime.publisher.get(
+                  getStopIntentKey(
+                    userId,
+                    threadId,
+                    generationRequestId ?? requestId,
+                  ),
+                ),
+                runtime.publisher.get(getStopIntentKey(userId, threadId)),
+              ])
+              if (targetedIntent !== null || threadIntent === streamId) {
+                abortController.abort('user-stop')
+              }
             },
             catch: (error) =>
               toProtocolError({
@@ -631,15 +785,17 @@ export class StreamResumeService extends ServiceMap.Service<
         ({
           streamId,
           requestId,
+          reason = 'replaced',
         }: {
           readonly streamId: string
           readonly requestId: string
+          readonly reason?: StreamStopReason
         }) =>
           Effect.tryPromise({
             try: async () => {
               const local = runtime.localHandles.get(streamId)
-              local?.abortController.abort()
-              await runtime.publisher.publish(getStopChannel(streamId), 'stop')
+              local?.abortController.abort(reason)
+              await runtime.publisher.publish(getStopChannel(streamId), reason)
             },
             catch: (error) =>
               toProtocolError({
@@ -666,14 +822,23 @@ export class StreamResumeService extends ServiceMap.Service<
         }) =>
           Effect.tryPromise({
             try: async () => {
-              const key = getActiveKey(userId, threadId)
-              const current = parseActiveStreamRecord(
-                await runtime.publisher.get(key),
+              // Compare and delete atomically: a new POST can replace the key
+              // while a cross-instance stop is being published.
+              await runtime.publisher.eval(
+                `
+                local raw = redis.call('GET', KEYS[1])
+                if not raw or raw == '' then return 0 end
+                if ARGV[1] ~= '' then
+                  local ok, record = pcall(cjson.decode, raw)
+                  if not ok or record.streamId ~= ARGV[1] then return 0 end
+                end
+                return redis.call('DEL', KEYS[1])
+              `,
+                {
+                  keys: [getActiveKey(userId, threadId)],
+                  arguments: [expectedStreamId ?? ''],
+                },
               )
-              if (!current) return
-              if (expectedStreamId && current.streamId !== expectedStreamId)
-                return
-              await runtime.publisher.set(key, '', { EX: 1 })
             },
             catch: (error) =>
               toProtocolError({
@@ -698,14 +863,12 @@ export class StreamResumeService extends ServiceMap.Service<
             try: async () => {
               const handle = runtime.localHandles.get(streamId)
               runtime.localHandles.delete(streamId)
-              if (handle) {
-                await handle.unsubscribe()
-              }
               const local = runtime.localStreams.get(streamId)
               if (local) {
                 closeLocalLiveStream(local)
                 runtime.localStreams.delete(streamId)
               }
+              await handle?.unsubscribe()
             },
             catch: (error) =>
               toProtocolError({
@@ -717,6 +880,8 @@ export class StreamResumeService extends ServiceMap.Service<
       )
 
       return {
+        recordStopIntent,
+        hasStopIntent,
         getActiveStreamId,
         registerActiveStream,
         persistSseStream,
@@ -730,17 +895,74 @@ export class StreamResumeService extends ServiceMap.Service<
 
   /** Test adapter for non-networked unit tests. */
   static readonly layerMemory = Layer.succeed(this, {
+    recordStopIntent: Effect.fn('StreamResumeService.recordStopIntentMemory')(
+      (input: StopIntentInput) =>
+        Effect.sync(() => {
+          const streamId = memoryActiveStreams.get(
+            memoryKey(input.userId, input.threadId),
+          )
+          const matchingStream =
+            streamId &&
+            (!input.targetRequestId ||
+              memoryRequestIds.get(streamId) === input.targetRequestId)
+              ? streamId
+              : null
+          if (input.targetRequestId || matchingStream) {
+            memoryStopIntents.set(
+              getStopIntentKey(
+                input.userId,
+                input.threadId,
+                input.targetRequestId,
+              ),
+              {
+                value: input.targetRequestId ?? matchingStream!,
+                expiresAt: Date.now() + STOP_INTENT_TTL_SECONDS * 1000,
+              },
+            )
+          }
+          return matchingStream
+        }),
+    ),
+    hasStopIntent: Effect.fn('StreamResumeService.hasStopIntentMemory')(
+      (input: StopIntentInput & { readonly streamId: string }) =>
+        Effect.sync(() => {
+          const threadIntent = memoryStopIntents.get(
+            getStopIntentKey(input.userId, input.threadId),
+          )
+          const targeted = memoryStopIntents.get(
+            getStopIntentKey(
+              input.userId,
+              input.threadId,
+              input.targetRequestId ?? input.requestId,
+            ),
+          )
+          if (targeted !== undefined && Date.now() < targeted.expiresAt)
+            return true
+          return (
+            threadIntent !== undefined &&
+            Date.now() < threadIntent.expiresAt &&
+            threadIntent.value === input.streamId
+          )
+        }),
+    ),
     getActiveStreamId: Effect.fn('StreamResumeService.getActiveStreamIdMemory')(
       ({
         userId,
         threadId,
+        targetRequestId,
       }: {
         readonly userId: string
         readonly threadId: string
+        readonly targetRequestId?: string
       }) =>
-        Effect.succeed(
-          memoryActiveStreams.get(memoryKey(userId, threadId)) ?? null,
-        ),
+        Effect.sync(() => {
+          const streamId = memoryActiveStreams.get(memoryKey(userId, threadId))
+          return streamId &&
+            (!targetRequestId ||
+              memoryRequestIds.get(streamId) === targetRequestId)
+            ? streamId
+            : null
+        }),
     ),
     registerActiveStream: Effect.fn(
       'StreamResumeService.registerActiveStreamMemory',
@@ -749,13 +971,40 @@ export class StreamResumeService extends ServiceMap.Service<
         userId,
         threadId,
         streamId,
+        abortController,
+        requestId,
+        generationRequestId,
       }: {
         readonly userId: string
         readonly threadId: string
         readonly streamId: string
+        readonly abortController: AbortController
+        readonly requestId: string
+        readonly generationRequestId?: string
+        readonly startedAt?: number
       }) =>
         Effect.sync(() => {
+          memoryHandles.set(streamId, abortController)
+          memoryRequestIds.set(streamId, generationRequestId ?? requestId)
           memoryActiveStreams.set(memoryKey(userId, threadId), streamId)
+          const threadIntent = memoryStopIntents.get(
+            getStopIntentKey(userId, threadId),
+          )
+          const targeted = memoryStopIntents.get(
+            getStopIntentKey(
+              userId,
+              threadId,
+              generationRequestId ?? requestId,
+            ),
+          )
+          if (
+            (targeted !== undefined && Date.now() < targeted.expiresAt) ||
+            (threadIntent !== undefined &&
+              Date.now() < threadIntent.expiresAt &&
+              threadIntent.value === streamId)
+          ) {
+            abortController.abort('user-stop')
+          }
         }),
     ),
     persistSseStream: Effect.fn('StreamResumeService.persistSseStreamMemory')(
@@ -765,7 +1014,16 @@ export class StreamResumeService extends ServiceMap.Service<
       Effect.succeed(null),
     ),
     stopStream: Effect.fn('StreamResumeService.stopStreamMemory')(
-      () => Effect.void,
+      ({
+        streamId,
+        reason = 'replaced',
+      }: {
+        readonly streamId: string
+        readonly reason?: StreamStopReason
+      }) =>
+        Effect.sync(() => {
+          memoryHandles.get(streamId)?.abort(reason)
+        }),
     ),
     clearActiveStream: Effect.fn('StreamResumeService.clearActiveStreamMemory')(
       ({
@@ -787,35 +1045,18 @@ export class StreamResumeService extends ServiceMap.Service<
     ),
     releaseLocalStream: Effect.fn(
       'StreamResumeService.releaseLocalStreamMemory',
-    )(() => Effect.void),
+    )(({ streamId }: { readonly streamId: string }) =>
+      Effect.sync(() => {
+        memoryHandles.delete(streamId)
+        memoryRequestIds.delete(streamId)
+      }),
+    ),
   })
 
   /**
    * Redis-disabled/self-hosted adapter.
    */
-  static readonly layerDisabled = Layer.succeed(this, {
-    getActiveStreamId: Effect.fn(
-      'StreamResumeService.getActiveStreamIdDisabled',
-    )(() => Effect.succeed(null)),
-    registerActiveStream: Effect.fn(
-      'StreamResumeService.registerActiveStreamDisabled',
-    )(() => Effect.void),
-    persistSseStream: Effect.fn('StreamResumeService.persistSseStreamDisabled')(
-      () => Effect.void,
-    ),
-    resumeStream: Effect.fn('StreamResumeService.resumeStreamDisabled')(() =>
-      Effect.succeed(null),
-    ),
-    stopStream: Effect.fn('StreamResumeService.stopStreamDisabled')(
-      () => Effect.void,
-    ),
-    clearActiveStream: Effect.fn(
-      'StreamResumeService.clearActiveStreamDisabled',
-    )(() => Effect.void),
-    releaseLocalStream: Effect.fn(
-      'StreamResumeService.releaseLocalStreamDisabled',
-    )(() => Effect.void),
-  })
+  static readonly layerDisabled = this.layerMemory
 }
 
 const memoryActiveStreams = new Map<string, string>()
@@ -823,3 +1064,12 @@ const memoryActiveStreams = new Map<string, string>()
 function memoryKey(userId: string, threadId: string): string {
   return `${userId}:${threadId}`
 }
+
+const memoryHandles = new Map<string, AbortController>()
+
+const memoryStopIntents = new Map<
+  string,
+  { value: string; expiresAt: number }
+>()
+
+const memoryRequestIds = new Map<string, string>()

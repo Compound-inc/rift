@@ -118,3 +118,11 @@ _Avoid_: Knowledge base (in user-facing copy when ambiguous).
   is the user-authored text that contributes to the assembled system
   prompt, alongside model-mode prompts and tool descriptions. They are
   not interchangeable.
+
+**Document**:
+A self-contained markdown or code deliverable created in a Thread and shown
+in the right panel. The Thread owner can edit it; Rift can revise it through
+tools. Every save appends an immutable version. A Document keeps its originating
+Thread and a copy of that Thread's Project id at creation. It is distinct from
+Project Files and Org Knowledge, which supply input context through RAG.
+_Avoid_: Artifact, Canvas, Project File.

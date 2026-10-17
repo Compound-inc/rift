@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Effect } from 'effect'
 import { ChatOrchestratorService } from '@/lib/backend/chat/services/chat-orchestrator.service'
 import { MessageStoreService } from '@/lib/backend/chat/services/message-store.service'
+import { StopGenerationService } from '../services/stop-generation.service'
 import { ChatRuntime } from './chat-runtime'
 
 /**
@@ -20,6 +21,13 @@ describe('ChatRuntime', () => {
     )
 
     expect(result).toBe('function')
+  })
+
+  it('resolves the stop service from the production runtime graph', async () => {
+    expect(await ChatRuntime.run(Effect.gen(function* () {
+      const service = yield* StopGenerationService
+      return typeof service.stop
+    }))).toBe('function')
   })
 
   it('resolves the chat orchestrator from the production runtime graph', async () => {

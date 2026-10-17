@@ -53,6 +53,7 @@ export function isToolAllowedByMode(input: {
   readonly entry: ToolCatalogEntry
   readonly mode?: ResolvedChatMode
 }): boolean {
+  if (input.entry.source === 'built-in') return true
   const allowlist =
     input.mode?.definition.providerToolAllowlistByProvider?.[input.entry.providerId]
   if (!allowlist) return true
@@ -87,6 +88,7 @@ export function resolveToolPolicy(input: {
 
     const reasons: ToolAvailabilityReason[] = []
     const requiresZdr =
+      entry.source !== 'built-in' &&
       Boolean(input.orgPolicy?.complianceFlags.require_zdr) &&
       !hasActiveOrgProviderKey({
         providerId: entry.providerId,

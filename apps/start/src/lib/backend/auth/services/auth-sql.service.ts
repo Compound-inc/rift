@@ -147,6 +147,12 @@ export const reassignAnonymousAppDataEffect = Effect.fn(
         where user_id = ${input.fromUserId}
       `
       yield* sql`
+        update documents
+        set user_id = ${input.toUserId},
+            organization_id = coalesce(organization_id, ${input.targetOrganizationId})
+        where user_id = ${input.fromUserId}
+      `
+      yield* sql`
         update messages
         set user_id = ${input.toUserId}
         where user_id = ${input.fromUserId}

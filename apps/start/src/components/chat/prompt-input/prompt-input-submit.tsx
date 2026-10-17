@@ -1,7 +1,7 @@
 'use client'
 
 import { Button } from '@rift/ui/button'
-import { SentIcon, LoadingIcon, StopIcon } from '@rift/ui/icons/svg-icons'
+import { SentIcon, StopIcon } from '@rift/ui/icons/svg-icons'
 import { cn } from '@rift/utils'
 import type { ChatStatus } from 'ai'
 import { AlertTriangle } from 'lucide-react'
@@ -24,7 +24,7 @@ function getStatusConfig(): Record<
 > {
   return {
     ready: { icon: SentIcon, label: m.chat_prompt_submit_send_label(), shouldSpin: false },
-    submitted: { icon: LoadingIcon, label: m.chat_prompt_submit_sending_label(), shouldSpin: true },
+    submitted: { icon: StopIcon, label: m.chat_prompt_submit_stop_label(), shouldSpin: false },
     streaming: { icon: StopIcon, label: m.chat_prompt_submit_stop_label(), shouldSpin: false },
     error: { icon: AlertTriangle, label: m.chat_prompt_submit_error_label(), shouldSpin: false },
   }

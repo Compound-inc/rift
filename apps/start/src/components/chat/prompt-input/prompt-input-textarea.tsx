@@ -15,6 +15,7 @@ export type PromptInputTextareaProps = ComponentProps<typeof Textarea> & {
    * and Enter-to-submit; this just exposes the live DOM ref.
    */
   inputRef?: React.RefObject<HTMLTextAreaElement | null>
+  onEscape?: () => void
 }
 
 export type PromptInputTextareaRef = { focus: () => void }
@@ -33,7 +34,7 @@ export const PromptInputTextarea = forwardRef<
   PromptInputTextareaRef,
   PromptInputTextareaProps
 >(function PromptInputTextarea(
-  { onChange, className, placeholder = 'Ask anything', style, inputRef, ...props },
+  { onChange, className, placeholder = 'Ask anything', style, inputRef, onEscape, ...props },
   ref
 ) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -76,6 +77,13 @@ export const PromptInputTextarea = forwardRef<
   }, [adjustHeight, props.value])
 
   const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
+    if (e.defaultPrevented || e.nativeEvent.isComposing) return
+    if (e.key === 'Escape' && onEscape) {
+      e.preventDefault()
+      e.stopPropagation()
+      onEscape()
+      return
+    }
     if (e.key !== 'Enter') return
     if (e.nativeEvent.isComposing) return
 

@@ -1,3 +1,4 @@
+import { documentReferenceText, documentReferencesFromParts } from '@/lib/shared/documents/message-references'
 import type { UIMessage } from 'ai'
 import { Effect } from 'effect'
 import { getCatalogModel } from '@/lib/shared/ai-catalog'
@@ -5,7 +6,11 @@ import type {
   ChatAttachment,
   ChatAttachmentInput,
 } from '@/lib/shared/chat-contracts/attachments'
-import { MessagePersistenceError } from '@/lib/backend/chat/domain/errors'
+import {
+  InvalidEditTargetError,
+  InvalidRequestError,
+  MessagePersistenceError,
+} from '@/lib/backend/chat/domain/errors'
 import { getUserMessageText } from '@/lib/backend/chat/domain/schemas'
 import { zql } from '@/lib/backend/chat/infra/zero/db'
 import type { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
@@ -14,7 +19,12 @@ import {
   expandUserMessageText,
   loadSkillBodiesForContext,
 } from '@/lib/backend/skills/skill-resolver'
-import { resolveCanonicalBranch } from '@/lib/shared/chat-branching/branch-resolver'
+import {
+  resolveCanonicalBranch,
+  resolveRegenerationAnchor,
+  resolveEditableUserTarget,
+  resolveBranchSelectionPath,
+} from '@/lib/shared/chat-branching/branch-resolver'
 import { DEFAULT_THREAD_TITLE } from '@/lib/shared/chat/thread-bootstrap'
 import { requireMessagePersistenceDb } from '../../message-persistence-db'
 import { normalizeThreadActiveChildMap } from '../helpers'
@@ -56,6 +66,7 @@ type AttachmentPromptRow = {
 
 type MessagePromptRow = {
   readonly messageId: string
+  readonly parts?: unknown
   readonly role: UIMessage['role']
   readonly parentMessageId?: string | null
   readonly branchIndex: number
@@ -105,6 +116,7 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
       organizationId,
       orgPolicy,
       untilMessageId,
+      branchTurn,
       pendingUserMessage,
       pendingAttachments,
       contextWindowTokens,
@@ -207,17 +219,50 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
         const persistedMessageRows = (
           messageRows as readonly MessagePromptRow[]
         ).filter((message) => !userId || message.userId === userId)
-        const { canonicalMessages: canonicalMessageRows } =
-          resolveCanonicalBranch(
-            persistedMessageRows.map((message) => ({
-              messageId: message.messageId,
-              role: message.role,
-              parentMessageId: message.parentMessageId,
-              branchIndex: message.branchIndex,
-              createdAt: message.created_at,
-            })),
-            normalizeThreadActiveChildMap(threadRow?.activeChildByParent),
-          )
+        const branchRows = persistedMessageRows.map((message) => ({
+          messageId: message.messageId,
+          role: message.role,
+          parentMessageId: message.parentMessageId,
+          branchIndex: message.branchIndex,
+          createdAt: message.created_at,
+        }))
+        const activeChildByParent = normalizeThreadActiveChildMap(
+          threadRow?.activeChildByParent,
+        )
+        let throughMessageId = untilMessageId
+        if (branchTurn) {
+          if (branchTurn.editedText !== undefined) {
+            const editable = resolveEditableUserTarget(
+              branchRows, activeChildByParent, branchTurn.targetMessageId,
+            )
+            if (!editable) {
+              return yield* Effect.fail(new InvalidEditTargetError({
+                message: 'Invalid edit target',
+                requestId,
+                threadId,
+                targetMessageId: branchTurn.targetMessageId,
+                issue: 'target message must be a canonical-path user message',
+              }))
+            }
+            throughMessageId = editable.targetMessageId
+          } else {
+            const anchor = resolveRegenerationAnchor(branchRows, branchTurn.targetMessageId)
+            if (!anchor) {
+              return yield* Effect.fail(new InvalidRequestError({
+                message: 'Invalid regenerate target',
+                requestId,
+                issue: 'target message is not regeneratable',
+              }))
+            }
+            throughMessageId = anchor.anchorMessageId
+            for (const selection of resolveBranchSelectionPath(branchRows, activeChildByParent, throughMessageId) ?? []) {
+              activeChildByParent[selection.parentMessageId] = selection.childMessageId
+            }
+          }
+        }
+        const { canonicalMessages: canonicalMessageRows } = resolveCanonicalBranch(
+          branchRows, activeChildByParent,
+        )
 
         const messageById = new Map(
           persistedMessageRows.map((message) => [message.messageId, message]),
@@ -229,10 +274,10 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
           )
 
         const persistedCanonicalRows =
-          untilMessageId && untilMessageId.trim().length > 0
+          throughMessageId && throughMessageId.trim().length > 0
             ? (() => {
                 const endIndex = canonicalOrderedRows.findIndex(
-                  (row) => row.messageId === untilMessageId,
+                  (row) => row.messageId === throughMessageId,
                 )
                 return endIndex >= 0
                   ? canonicalOrderedRows.slice(0, endIndex + 1)
@@ -240,13 +285,24 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
               })()
             : canonicalOrderedRows
 
+        // Replace only the proposed text before skills/RAG run. The target row
+        // keeps its attachment IDs so edits measure the same files they retain.
+        const editedText = branchTurn?.editedText?.trim()
+        const previewRows = editedText !== undefined
+          ? persistedCanonicalRows.map((row) =>
+              row.messageId === branchTurn?.targetMessageId
+                ? { ...row, content: editedText }
+                : row,
+            )
+          : persistedCanonicalRows
+
         const pendingMessageRow: MessagePromptRow | undefined =
           pendingUserMessage
             ? {
                 messageId: pendingUserMessage.id,
                 role: 'user',
                 parentMessageId:
-                  persistedCanonicalRows.at(-1)?.messageId ?? null,
+                  previewRows.at(-1)?.messageId ?? null,
                 branchIndex: 1,
                 created_at: Date.now(),
                 content: getUserMessageText(pendingUserMessage),
@@ -257,8 +313,8 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
             : undefined
 
         const canonicalRows = pendingMessageRow
-          ? [...persistedCanonicalRows, pendingMessageRow]
-          : persistedCanonicalRows
+          ? [...previewRows, pendingMessageRow]
+          : previewRows
 
         const canonicalRowIdSet = new Set(
           canonicalRows.map((row) => row.messageId),
@@ -414,6 +470,22 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
             contextWindowTokens ?? modelCatalogEntry?.contextWindow,
         })
 
+        const documentRows = canonicalRows.some((row) => documentReferencesFromParts(row.parts).length > 0) ? yield* Effect.tryPromise({
+          try: () => db.run(zql.document.where('threadId', threadId).where('userId', userId ?? '').where('deletedAt', 'IS', null)
+            .where('organizationId', organizationId ? '=' : 'IS', organizationId ?? null)),
+          catch: (error) => new MessagePersistenceError({ message: 'Failed to load document references', requestId, threadId, cause: String(error) }),
+        }) : []
+        // Live versions belong at the end of the current prompt. Historical
+        // tool references retain the version they produced for prefix caching.
+        const referencedIds = new Set(canonicalRows.flatMap((row) =>
+          documentReferencesFromParts(row.parts).map((reference) => reference.documentId)))
+        const currentDocuments = documentRows.filter((row) => referencedIds.has(row.id)).slice(0, 64)
+        const currentDocumentsBlock = currentDocuments.length > 0
+          ? '<current_document_versions>\n' + currentDocuments.map((row) =>
+              `Document ${JSON.stringify(row.title)} [${row.id}], latest version ${row.currentVersion}. Use read_document for current content.`,
+            ).join('\n') + '\n</current_document_versions>'
+          : ''
+        const latestMessageId = canonicalRows.at(-1)?.messageId
         return canonicalRows.map((message) => {
           const attachmentIds = Array.isArray(message.attachmentsIds)
             ? message.attachmentsIds
@@ -456,12 +528,17 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
           // Full-text documents ride on the first user message so the prompt
           // prefix is identical from turn to turn (provider prompt caching);
           // question-specific excerpts ride on the latest user message.
-          let modelText = expandedText
+          const references = documentReferencesFromParts(message.parts).map(documentReferenceText)
+          let modelText = [expandedText, ...references].filter(Boolean).join('\n\n')
           if (message.messageId === latestUserMessageRow?.messageId) {
             modelText = withContextPrefix(turnContext.turnBlock, modelText)
           }
           if (message.messageId === firstUserMessageRow?.messageId) {
             modelText = withContextPrefix(turnContext.libraryBlock, modelText)
+          }
+
+          if (message.messageId === latestMessageId && currentDocumentsBlock) {
+            modelText = [modelText, currentDocumentsBlock].filter(Boolean).join('\n\n')
           }
 
           const messageParts: UIMessage['parts'] = [

@@ -454,8 +454,8 @@ export const chatMutatorDefinitions = {
     }),
 
     /**
-     * Permanently delete thread and all its messages. The thread's
-     * attachments are marked deleted in the same transaction; their vectors
+     * Permanently delete thread, messages, documents and document versions.
+     * Attachments are marked deleted in the same transaction; their vectors
      * are removed after commit by the `/api/zero/mutate` route (server only,
      * see `purgeDeletedThreadDocuments`).
      */
@@ -496,6 +496,31 @@ export const chatMutatorDefinitions = {
           status: 'deleted',
           updatedAt: now,
         })
+      }
+      if (tx.location === 'server') {
+        // Postgres cascades to document_versions. Avoid hydrating version bodies
+        // in the server mutator, including bodies of soft-deleted documents.
+        await tx.dbTransaction.query(
+          'DELETE FROM documents WHERE thread_id = $1 AND user_id = $2',
+          [args.threadId, ctx.userID],
+        )
+      } else {
+        const documents = await tx.run(
+          zql.document.where('threadId', args.threadId).where('userId', ctx.userID),
+        )
+        for (const document of documents) {
+          // Delete versions explicitly from Zero's optimistic client cache.
+          const versions = await tx.run(
+            zql.documentVersion.where('documentId', document.id),
+          )
+          for (const version of versions) {
+            await tx.mutate.documentVersion.delete({
+              documentId: document.id,
+              version: version.version,
+            })
+          }
+          await tx.mutate.document.delete({ id: document.id })
+        }
       }
       await tx.mutate.thread.delete({ id: thread.id })
     }),

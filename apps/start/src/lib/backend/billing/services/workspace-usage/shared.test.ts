@@ -166,3 +166,15 @@ describe('estimateReservedCostNanoUsd', () => {
     )
   })
 })
+
+it('reserves the same spend for equivalent Latin and CJK token footprints', () => {
+  const usagePolicy = resolveUsagePolicySnapshot('pro', resolveDefaultUsagePolicyTemplate('pro'))
+  const reserve = (text: string) => estimateReservedCostNanoUsd({
+    modelId: 'openai/gpt-5-mini',
+    messages: [{ id: 'u', role: 'user', parts: [{ type: 'text', text }] }],
+    usagePolicy,
+  })
+  // 120K CJK characters and 576K Latin characters both estimate 144K tokens.
+  expect(reserve('中'.repeat(120_000))).toBe(reserve('a'.repeat(576_000)))
+  expect(reserve('中'.repeat(120_000))).toBeGreaterThan(usagePolicy.minReserveNanoUsd)
+})

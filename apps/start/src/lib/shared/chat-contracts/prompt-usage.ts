@@ -1,12 +1,8 @@
 import type { UIMessage } from 'ai'
 
-/**
- * Uses a lightweight character heuristic so UI and backend quota estimation can
- * reason about prompt growth without a provider-specific tokenizer.
- */
-export function estimateTokensFromText(text: string): number {
-  return Math.max(1, Math.ceil(text.length / 4))
-}
+import { estimateTokensFromText } from './token-estimate'
+
+export { estimateTokensFromText } from './token-estimate'
 
 /**
  * Extracts only resendable text content from a UI message. We intentionally
@@ -17,7 +13,8 @@ export function textFromMessage(message: UIMessage): string {
   return message.parts
     .filter(
       (part): part is { type: 'text'; text: string } =>
-        part.type === 'text' && typeof (part as { text?: unknown }).text === 'string',
+        part.type === 'text' &&
+        typeof (part as { text?: unknown }).text === 'string',
     )
     .map((part) => part.text)
     .join('')
@@ -29,7 +26,29 @@ export function textFromMessage(message: UIMessage): string {
  * it before prompt conversion and it should never count against future turns.
  */
 export function estimatePromptTokensForMessage(message: UIMessage): number {
-  return estimateTokensFromText(textFromMessage(message))
+  const metadata = message.metadata as
+    | { attachments?: readonly { url: string; size: number }[] }
+    | undefined
+  let tokens = estimateTokensFromText(textFromMessage(message))
+  for (const part of message.parts) {
+    if (part.type !== 'file') continue
+    const attachment = metadata?.attachments?.find(
+      (item) => item.url === part.url,
+    )
+    const size =
+      attachment?.size ??
+      (part.url.startsWith('data:') ? part.url.length * 0.75 : 0)
+    // Native PDFs include page images as well as extracted text. Approximate a
+    // page per 4KB, at 3K tokens/page. Unknown PDFs reserve twenty pages; images
+    // reserve 4K tokens. This is deliberately cautious without fetching files.
+    tokens +=
+      part.mediaType === 'application/pdf'
+        ? Math.max(3_000, Math.ceil((size || 80_000) / 4_096) * 3_000)
+        : part.mediaType.startsWith('image/')
+          ? 4_096
+          : Math.max(4_096, Math.ceil(size / 2))
+  }
+  return tokens
 }
 
 /** Estimates the resendable prompt footprint for a whole message list. */

@@ -1,3 +1,4 @@
+import { documentMutatorDefinitions } from './mutators/documents.mutators'
 import { defineMutatorsWithType } from '@rocicorp/zero'
 import type { Schema } from './schema'
 import { chatMutatorDefinitions } from './mutators/chat.mutators'
@@ -10,6 +11,7 @@ import { skillMutatorDefinitions } from './mutators/skills.mutators'
  * Keep this file as a registry so domains can evolve independently.
  */
 export const mutators = defineMutatorsWithType<Schema>()({
+  ...documentMutatorDefinitions,
   ...chatMutatorDefinitions,
   ...orgPolicyMutatorDefinitions,
   ...projectMutatorDefinitions,

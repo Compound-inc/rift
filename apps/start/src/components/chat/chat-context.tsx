@@ -1,6 +1,21 @@
 // Client-side chat state and transport wiring. Keeps server concerns out of React.
 'use client'
 
+import { generationQueue } from './generation-queue-store'
+import { useQueuedGeneration } from './use-queued-generation'
+import {
+  clearThreadStopRequest,
+  isThreadStopRequested,
+  useStreamControl,
+} from './use-stream-control'
+import {
+  resolveRetryTarget,
+  shouldReplaceFailedResponse,
+} from '@/lib/shared/chat-generation/retry'
+import {
+  documentReferenceFingerprint,
+} from '@/lib/shared/documents/message-references'
+
 import {
   createContext,
   useCallback,
@@ -14,9 +29,12 @@ import {
 import type { ReactNode } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useChat as useAIChat } from '@ai-sdk/react'
-import type { LanguageModelUsage, UIMessage  } from 'ai'
-import { useQuery, useZero  } from '@rocicorp/zero/react'
-import { DefaultChatTransport } from 'ai'
+import type { LanguageModelUsage, UIMessage } from 'ai'
+import { useQuery, useZero } from '@rocicorp/zero/react'
+import {
+  ResumeAwareChatTransport,
+  resumeActiveStream,
+} from './resume-aware-transport'
 import { flushSync } from 'react-dom'
 import { mutators, queries } from '@/integrations/zero'
 import { CACHE_CHAT_NAV } from '@/integrations/zero/query-cache-policy'
@@ -30,32 +48,28 @@ import {
   coerceWorkspacePlanId,
   getFeatureAccessState,
   getModelAccess,
-  hasFeatureAccess
-  
-  
+  hasFeatureAccess,
 } from '@/lib/shared/access-control'
-import type {AccessContext, PaidWorkspacePlanId} from '@/lib/shared/access-control';
+import type {
+  AccessContext,
+  PaidWorkspacePlanId,
+} from '@/lib/shared/access-control'
 import { getLocalizedFeatureAccessGateMessage } from '@/lib/frontend/access-control'
 import {
   getLocalizedToolCopy,
   getToolDisplayLabel,
 } from '@/lib/shared/ai-catalog/tool-ui'
 import { canUseReasoningControls } from '@/utils/app-feature-flags'
-import {
-  isChatModeId,
-  resolveEffectiveChatMode
-  
-} from '@/lib/shared/chat-modes'
-import type {ChatModeId} from '@/lib/shared/chat-modes';
+import { isChatModeId, resolveEffectiveChatMode } from '@/lib/shared/chat-modes'
+import type { ChatModeId } from '@/lib/shared/chat-modes'
 import { resolveToolPolicy } from '@/lib/shared/chat/tool-policy'
 import { evaluateModelAvailability } from '@/lib/shared/model-policy/policy-engine'
 import { hasActiveOrgProviderKeyForModel } from '@/lib/shared/model-policy/provider-keys'
 import {
   DEFAULT_ORG_TOOL_POLICY,
-  EMPTY_ORG_PROVIDER_KEY_STATUS
-  
+  EMPTY_ORG_PROVIDER_KEY_STATUS,
 } from '@/lib/shared/model-policy/types'
-import type {OrgAiPolicy} from '@/lib/shared/model-policy/types';
+import type { OrgAiPolicy } from '@/lib/shared/model-policy/types'
 import type {
   ChatAttachment,
   ChatAttachmentInput,
@@ -87,6 +101,12 @@ import {
   resolveBranchSelectionPath,
   resolveCanonicalBranch,
 } from '@/lib/shared/chat-branching/branch-resolver'
+import {
+  storedMessageToUI,
+  messageDisplayFingerprint,
+  hasNewStoredDisplay,
+} from '@/lib/shared/chat-contracts/stored-message'
+import type { StoredChatMessage } from '@/lib/shared/chat-contracts/stored-message'
 import { buildLatestAssistantUsage } from './token-usage'
 
 type ChatUIMessage = UIMessage<ChatMessageMetadata>
@@ -113,8 +133,13 @@ type ChatActionsContextValue = Pick<
   ReturnType<typeof useAIChat<ChatUIMessage>>,
   'status' | 'error' | 'setMessages' | 'resumeStream' | 'regenerate'
 > & {
+  errorMessageId?: string
+  stopGeneration: () => Promise<void>
+  retryLastMessage: () => Promise<void>
+  canRetryLastMessage: boolean
   sendMessage: (input: {
     text: string
+    modelId?: string
     attachments?: readonly ChatAttachmentInput[]
     attachmentManifest?: readonly ChatAttachment[]
   }) => Promise<void>
@@ -126,7 +151,9 @@ type ChatActionsContextValue = Pick<
   visibleModels: readonly ChatModelOption[]
   setSelectedModelId: (modelId: string) => void
   setSelectedReasoningEffort: (reasoningEffort?: AiReasoningEffort) => void
-  setSelectedContextWindowMode: (contextWindowMode: AiContextWindowMode) => Promise<void>
+  setSelectedContextWindowMode: (
+    contextWindowMode: AiContextWindowMode,
+  ) => Promise<void>
   selectedModeId?: ChatModeId
   isModeEnforced: boolean
   setSelectedModeId: (modeId?: ChatModeId) => Promise<void>
@@ -139,7 +166,7 @@ type ChatActionsContextValue = Pick<
   contextWindowSupportsMaxMode: boolean
   canUploadFiles: boolean
   uploadUpgradeCallout?: string
-  regenerateMessage: (messageId: string) => Promise<void>
+  regenerateMessage: (messageId: string, retryModelId?: string) => Promise<void>
   editMessage: (input: {
     messageId: string
     editedText: string
@@ -156,7 +183,11 @@ type ChatComposerContextValue = Pick<
   ChatActionsContextValue,
   | 'status'
   | 'error'
+  | 'errorMessageId'
   | 'sendMessage'
+  | 'stopGeneration'
+  | 'retryLastMessage'
+  | 'canRetryLastMessage'
   | 'activeThreadId'
   | 'selectedModelId'
   | 'selectedReasoningEffort'
@@ -302,7 +333,8 @@ function toOrgAiPolicy(row: unknown): OrgAiPolicy | undefined {
           : DEFAULT_ORG_TOOL_POLICY.disabledToolKeys,
     },
     orgKnowledgeEnabled:
-      'orgKnowledgeEnabled' in row && typeof row.orgKnowledgeEnabled === 'boolean'
+      'orgKnowledgeEnabled' in row &&
+      typeof row.orgKnowledgeEnabled === 'boolean'
         ? row.orgKnowledgeEnabled
         : false,
     providerKeyStatus:
@@ -340,53 +372,17 @@ function toOrgAiPolicy(row: unknown): OrgAiPolicy | undefined {
   }
 }
 
-function toUIMessageFromStoredMessage(message: {
-  readonly messageId: string
-  readonly role: 'user' | 'assistant' | 'system'
-  readonly content: string
-  readonly reasoning?: string | null
-  readonly model: string
-  readonly sources?:
-    | readonly { sourceId: string; url: string; title?: string }[]
-    | null
-}): ChatUIMessage {
-  const attachments = Array.isArray(message.sources)
-    ? message.sources
-        .filter(
-          (
-            source,
-          ): source is { sourceId: string; url: string; title?: string } =>
-            !!source &&
-            typeof source.sourceId === 'string' &&
-            typeof source.url === 'string',
-        )
-        .map((source) => ({
-          id: source.sourceId,
-          key: source.sourceId,
-          url: source.url,
-          name: source.title ?? 'Attachment',
-          size: 0,
-          contentType: 'application/octet-stream',
-        }))
-    : []
-  const parts: ChatUIMessage['parts'] = []
-  if (
-    message.role === 'assistant' &&
-    typeof message.reasoning === 'string' &&
-    message.reasoning.trim().length > 0
-  ) {
-    parts.push({ type: 'reasoning', text: message.reasoning, state: 'done' })
-  }
-  parts.push({ type: 'text', text: message.content })
-
+/** Resolve persisted error keys in the UI while sharing source/tool hydration. */
+function toUIMessageFromStoredMessage(message: StoredChatMessage): ChatUIMessage {
+  const hydrated = storedMessageToUI(message)
+  if (message.role !== 'assistant' || !message.serverError) return hydrated
+  const error = message.serverError
+  const key = typeof error === 'object' && 'i18nKey' in error && typeof error.i18nKey === 'string'
+    ? error.i18nKey
+    : 'error_chat_unknown'
   return {
-    id: message.messageId,
-    role: message.role,
-    parts,
-    metadata: {
-      ...(message.role === 'assistant' ? { model: message.model } : {}),
-      ...(attachments.length > 0 ? { attachments } : {}),
-    },
+    ...hydrated,
+    metadata: { ...hydrated.metadata, errorMessage: resolveChatErrorMessage(key as ChatErrorI18nKey) },
   }
 }
 
@@ -403,10 +399,7 @@ function textFromUIMessage(message: ChatUIMessage): string {
 
 function fingerprintMessages(messages: readonly ChatUIMessage[]): string {
   return messages
-    .map(
-      (message) =>
-        `${message.id}:${message.role}:${textFromUIMessage(message)}`,
-    )
+    .map(messageDisplayFingerprint)
     .join('\u0001')
 }
 
@@ -422,6 +415,11 @@ function mergeStoredMessagesWithLocal(
     const localMessage = localById.get(storedMessage.id)
     if (!localMessage) return storedMessage
     if (localMessage.role !== storedMessage.role) return storedMessage
+    // A stop can change status without changing text. Keep the persisted
+    // terminal state so a locally streamed object cannot hide cancellation.
+    if (storedMessage.metadata?.status !== localMessage.metadata?.status) {
+      return storedMessage
+    }
 
     const storedText = textFromUIMessage(storedMessage)
     const localText = textFromUIMessage(localMessage)
@@ -436,10 +434,20 @@ function mergeStoredMessagesWithLocal(
       ? localMessage.metadata.attachments.length
       : 0
 
+    const storedDocumentRefs = documentReferenceFingerprint(storedMessage.parts)
+    if (
+      storedDocumentRefs !== '[]' &&
+      storedDocumentRefs !== documentReferenceFingerprint(localMessage.parts)
+    ) return storedMessage
+
     // Preserve object identity when content is equivalent to avoid unnecessary row rerenders.
     if (localText === storedText) {
       // Stored payload carries authoritative attachment metadata after persistence.
-      if (storedAttachmentCount > localAttachmentCount) {
+      if (
+        storedAttachmentCount > localAttachmentCount ||
+        hasNewStoredDisplay(localMessage, storedMessage) ||
+        storedMessage.parts.length > localMessage.parts.length
+      ) {
         return storedMessage
       }
       return localMessage
@@ -459,19 +467,11 @@ function mergeStoredMessagesWithLocal(
 }
 
 function buildCanonicalUIMessageSnapshot(input: {
-  readonly storedMessages: readonly {
-    readonly messageId: string
-    readonly role: 'user' | 'assistant' | 'system'
+  readonly storedMessages: readonly (StoredChatMessage & {
     readonly parentMessageId?: string | null
     readonly branchIndex: number
     readonly created_at: number
-    readonly content: string
-    readonly reasoning?: string | null
-    readonly model: string
-    readonly sources?:
-      | readonly { sourceId: string; url: string; title?: string }[]
-      | null
-  }[]
+  })[]
   readonly activeChildByParent: Record<string, string>
 }): ChatUIMessage[] {
   const messageById = new Map(
@@ -623,13 +623,20 @@ export function ChatProvider({
     string | undefined
   >(undefined)
   const [localError, setLocalError] = useState<Error | null>(null)
+  const generationErrorRef = useRef<Error | undefined>(undefined)
+  // Associate a transport error with the response row that displays it. Later
+  // validation errors have a different identity and still belong in the composer.
+  const [failedResponseError, setFailedResponseError] = useState<{
+    error: Error
+    messageId: string
+  } | null>(null)
   const [pendingBranchSelector, setPendingBranchSelector] =
     useState<PendingBranchSelectorState | null>(null)
   const [optimisticBranchStateByThreadId, setOptimisticBranchStateByThreadId] =
     useState<Record<string, OptimisticThreadBranchState>>({})
   const activeThreadId = threadId ?? provisionalThreadId
   const [orgPolicyRow] = useQuery(queries.orgPolicy.current())
-  const [threadRow] = useQuery(
+  const [threadRow, threadResult] = useQuery(
     queries.threads.byId({
       threadId: activeThreadId ?? '',
       organizationId: activeOrganizationId?.trim() || undefined,
@@ -824,9 +831,7 @@ export function ChatProvider({
       return {
         id: model.id,
         name: model.name,
-        reasoningEfforts: canUseReasoningControls
-          ? model.reasoningEfforts
-          : [],
+        reasoningEfforts: canUseReasoningControls ? model.reasoningEfforts : [],
         defaultReasoningEffort: canUseReasoningControls
           ? model.defaultReasoningEffort
           : undefined,
@@ -874,18 +879,16 @@ export function ChatProvider({
   const [selectedReasoningEffort, setSelectedReasoningEffort] = useState<
     AiReasoningEffort | undefined
   >(undefined)
-  const [selectedContextWindowMode, setSelectedContextWindowMode] = useState<
-    AiContextWindowMode
-  >(DEFAULT_CONTEXT_WINDOW_MODE)
+  const [selectedContextWindowMode, setSelectedContextWindowMode] =
+    useState<AiContextWindowMode>(DEFAULT_CONTEXT_WINDOW_MODE)
   const [threadDisabledToolKeysById, setThreadDisabledToolKeysById] = useState<
     Record<string, readonly string[]>
   >({})
   const [draftDisabledToolKeys, setDraftDisabledToolKeys] = useState<
     readonly string[]
   >([])
-  const [threadContextWindowModeById, setThreadContextWindowModeById] = useState<
-    Record<string, AiContextWindowMode>
-  >({})
+  const [threadContextWindowModeById, setThreadContextWindowModeById] =
+    useState<Record<string, AiContextWindowMode>>({})
   const hydratedModelSelectionThreadIdRef = useRef<string | undefined>(
     undefined,
   )
@@ -1045,25 +1048,36 @@ export function ChatProvider({
   )
   const transport = useMemo(
     () =>
-      new DefaultChatTransport({
+      new ResumeAwareChatTransport<ChatUIMessage>({
         api: '/api/chat',
         credentials: 'include',
-        prepareReconnectToStreamRequest: () => ({
-          api: threadIdRef.current
-            ? `/api/chat?threadId=${encodeURIComponent(threadIdRef.current)}`
-            : '/api/chat',
-          credentials: 'include',
-        }),
+        prepareReconnectToStreamRequest: () => {
+          generationErrorRef.current = undefined
+          if (threadIdRef.current)
+            generationQueue.clearRequestId(threadIdRef.current)
+          return {
+            api: threadIdRef.current
+              ? `/api/chat?threadId=${encodeURIComponent(threadIdRef.current)}`
+              : '/api/chat',
+            credentials: 'include',
+          }
+        },
         prepareSendMessagesRequest: ({
           messages,
           trigger,
           messageId,
           body,
         }) => {
+          generationErrorRef.current = undefined
           const attachments = pendingAttachmentsRef.current
           // Consume once to avoid leaking metadata into later turns.
           pendingAttachmentsRef.current = undefined
           const currentThreadId = threadIdRef.current
+          const requestId = crypto.randomUUID()
+          if (currentThreadId) {
+            generationQueue.start(currentThreadId, requestId)
+            clearThreadStopRequest(currentThreadId)
+          }
           const branchVersion = currentThreadId
             ? (branchVersionByThreadIdRef.current[currentThreadId] ?? 1)
             : 1
@@ -1086,6 +1100,7 @@ export function ChatProvider({
               : undefined
 
           return {
+            headers: { 'x-generation-id': requestId },
             body: {
               threadId: threadIdRef.current,
               trigger: requestTrigger,
@@ -1099,11 +1114,13 @@ export function ChatProvider({
               attachments:
                 requestTrigger === 'submit-message' ? attachments : undefined,
               createIfMissing: createIfMissingRef.current,
-              projectId:
-                createIfMissingRef.current
-                  ? createIfMissingProjectIdRef.current
-                  : undefined,
-              modelId: selectedModelIdRef.current,
+              projectId: createIfMissingRef.current
+                ? createIfMissingProjectIdRef.current
+                : undefined,
+              modelId:
+                typeof bodyObject.modelId === 'string'
+                  ? bodyObject.modelId
+                  : selectedModelIdRef.current,
               modeId: selectedModeIdRef.current,
               reasoningEffort: selectedReasoningEffortRef.current,
               contextWindowMode: selectedContextWindowModeRef.current,
@@ -1123,12 +1140,56 @@ export function ChatProvider({
     regenerate,
     setMessages,
     resumeStream,
+    stop,
+    clearError,
   } = useAIChat<ChatUIMessage>({
     id: activeThreadId ? `chat-ui:${activeThreadId}` : 'chat-ui:composer',
     transport,
     onError: (chatError) => {
-      setLocalError(chatError)
+      generationErrorRef.current = chatError
+      if (!isThreadStopRequested(activeThreadId)) setLocalError(chatError)
     },
+    onFinish: ({
+      message,
+      messages: finishedMessages,
+      isAbort,
+      isDisconnect,
+      isError,
+    }) => {
+      if (isError && generationErrorRef.current) {
+        setFailedResponseError({
+          error: generationErrorRef.current,
+          messageId: message.id,
+        })
+      }
+      // AI SDK callbacks use the latest React closure, even for an older chat
+      // instance. Route completion using the request's metadata after navigation.
+      const ownerThreadId =
+        message.metadata?.threadId ??
+        [...finishedMessages].reverse().find((item) => item.role === 'user')
+          ?.metadata?.threadId ??
+        activeThreadId
+      if (ownerThreadId) {
+        generationQueue.finish(
+          ownerThreadId,
+          message.id,
+          !isAbort &&
+            !isDisconnect &&
+            !isError &&
+            !isThreadStopRequested(ownerThreadId),
+        )
+      }
+    },
+  })
+  const stopGeneration = useStreamControl({
+    threadId: activeThreadId,
+    status,
+    attachedRequestId:
+      status === 'streaming' ? messages.at(-1)?.metadata?.requestId : undefined,
+    stop,
+    clearError,
+    onError: setLocalError,
+    onStopped: () => setLocalError(null),
   })
   const sendAIMessageRef = useRef(sendAIMessage)
   sendAIMessageRef.current = sendAIMessage
@@ -1374,7 +1435,11 @@ export function ChatProvider({
     // same window can race the POST before the thread exists server-side and
     // surface a false "thread not found" error while generation continues.
     if (bootstrapSendInFlightRef.current) return
-    if (resumeAttemptedThreadIdRef.current === activeThreadId) return
+    if (
+      resumeAttemptedThreadIdRef.current === activeThreadId ||
+      isThreadStopRequested(activeThreadId)
+    )
+      return
 
     const generationStatus = getThreadGenerationStatus(activeThreadId)
     if (!generationStatus) return
@@ -1442,6 +1507,19 @@ export function ChatProvider({
     if (storedMessagesResult.type !== 'complete') return
     // Never clobber messages while a new answer is actively streaming.
     if (status === 'submitted' || status === 'streaming') return
+
+    // A retry has a fresh ID. Wait for that response's Zero row before a
+    // same-length snapshot containing its deleted predecessor can replace it.
+    const awaitingMessageId =
+      generationQueue.get(activeThreadId).awaitingMessageId
+    if (
+      awaitingMessageId &&
+      messages.some((message) => message.id === awaitingMessageId) &&
+      !canonicalStoredMessages.some(
+        (message) => message.messageId === awaitingMessageId,
+      )
+    )
+      return
 
     const nextMessages = mergeStoredMessagesWithLocal(
       messages,
@@ -1519,9 +1597,7 @@ export function ChatProvider({
       latestAssistantFailure.serverError !== null &&
       'i18nKey' in latestAssistantFailure.serverError &&
       typeof latestAssistantFailure.serverError.i18nKey === 'string'
-        ? resolveChatErrorMessage(
-            latestAssistantFailure.serverError.i18nKey,
-          )
+        ? resolveChatErrorMessage(latestAssistantFailure.serverError.i18nKey)
         : undefined
 
     const fallbackErrorMessage =
@@ -1553,9 +1629,15 @@ export function ChatProvider({
   ])
 
   const sendMessage = useCallback<ChatActionsContextValue['sendMessage']>(
-    async ({ text, attachments, attachmentManifest }) => {
+    async ({ text, attachments, attachmentManifest, modelId }) => {
+      const sendModelId = modelId && selectableModels.some((model) => model.id === modelId)
+        ? modelId
+        : selectedModelIdRef.current
+      clearThreadStopRequest(threadIdRef.current)
+      clearError()
+      setLocalError(null)
       const selectedModel = visibleModels.find(
-        (model) => model.id === selectedModelIdRef.current,
+        (model) => model.id === sendModelId,
       )
       if (selectedModel?.locked) {
         const message = selectedModel.minimumPlanId
@@ -1624,7 +1706,10 @@ export function ChatProvider({
               void write.server
                 .then((serverRes) => {
                   if (serverRes.type === 'error') {
-                    console.error('Failed to reconcile bootstrap thread:', serverRes)
+                    console.error(
+                      'Failed to reconcile bootstrap thread:',
+                      serverRes,
+                    )
                   }
                 })
                 .catch((error) => {
@@ -1695,7 +1780,14 @@ export function ChatProvider({
         }
 
         pendingAttachmentsRef.current = attachments
-        await sendAIMessageRef.current({ text })
+        await sendAIMessageRef.current({
+          text,
+          metadata: {
+            threadId: resolvedThreadId,
+            model: sendModelId,
+            attachments: attachmentManifest,
+          },
+        }, modelId ? { body: { modelId: sendModelId } } : undefined)
         createIfMissingRef.current = false
         createIfMissingProjectIdRef.current = undefined
         if (creatingThread) {
@@ -1727,7 +1819,9 @@ export function ChatProvider({
       }
     },
     [
+      clearError,
       accessContext,
+      selectableModels,
       activeContextWindow,
       draftDisabledToolKeys,
       draftModeId,
@@ -1740,109 +1834,203 @@ export function ChatProvider({
     ],
   )
 
-  const regenerateMessage = useCallback<
-    ChatActionsContextValue['regenerateMessage']
-  >(async (messageId) => {
-    const currentStatus = statusRef.current
-    const currentThreadId = activeThreadIdRef.current
-    const currentMessages = messagesRef.current
-    const currentStoredMessages = storedMessagesRef.current
-    const currentStoredBranchSelectors = storedBranchSelectorsRef.current
-    const currentThreadRow = threadRowRef.current
+  const regenerateMessage = useCallback(
+    async (messageId: string, retryModelId?: string, resumeChecked = false) => {
+      const currentStatus = statusRef.current
+      const currentThreadId = activeThreadIdRef.current
+      const currentMessages = messagesRef.current
+      const currentStoredMessages = storedMessagesRef.current
+      const currentStoredBranchSelectors = storedBranchSelectorsRef.current
+      const currentThreadRow = threadRowRef.current
 
+      if (
+        !messageId ||
+        currentStatus === 'submitted' ||
+        currentStatus === 'streaming'
+      ) {
+        return
+      }
+      if (!currentThreadId) return
+      if (
+        !resumeChecked &&
+        (threadRowRef.current?.generationStatus === 'pending' ||
+          threadRowRef.current?.generationStatus === 'generation') &&
+        (await resumeActiveStream(resumeStream))
+      )
+        return
+      if (activeThreadIdRef.current !== currentThreadId) return
+      const anchorMessageId = findRegenerationAnchorMessageId({
+        messages: currentMessages,
+        targetMessageId: messageId,
+      })
+      if (!anchorMessageId) return
+
+      const targetMessage = currentMessages.find(
+        (message) => message.id === messageId,
+      )
+      const storedTarget = currentStoredMessages.find(
+        (message) => message.messageId === messageId,
+      )
+      const replaceFailure =
+        storedTarget &&
+        shouldReplaceFailedResponse(
+          storedTarget,
+          currentStoredMessages.some(
+            (message) => message.parentMessageId === messageId,
+          ),
+        )
+      const retryModel =
+        retryModelId ??
+        (storedTarget?.status === 'error' ? storedTarget.model : undefined)
+      const existingSelector = currentStoredBranchSelectors[anchorMessageId]
+      const currentAssistantId = findCurrentAssistantForAnchor({
+        messages: currentMessages,
+        anchorMessageId,
+      })
+      const selectedStoredAssistantId =
+        currentThreadRow &&
+        currentThreadRow.activeChildByParent &&
+        typeof currentThreadRow.activeChildByParent === 'object' &&
+        typeof currentThreadRow.activeChildByParent[anchorMessageId] ===
+          'string'
+          ? currentThreadRow.activeChildByParent[anchorMessageId]
+          : undefined
+      const storedAssistantChildren = currentStoredMessages
+        .filter(
+          (message) =>
+            message.role === 'assistant' &&
+            message.parentMessageId === anchorMessageId,
+        )
+        .slice()
+        .sort((left, right) => {
+          const leftBranch = left.branchIndex
+          const rightBranch = right.branchIndex
+          if (leftBranch !== rightBranch) return leftBranch - rightBranch
+          return left.messageId.localeCompare(right.messageId)
+        })
+        .map((message) => message.messageId)
+      const baseOptionIds = uniqueMessageIds([
+        ...(existingSelector?.optionMessageIds ?? []),
+        ...storedAssistantChildren,
+        ...(selectedStoredAssistantId ? [selectedStoredAssistantId] : []),
+        ...(targetMessage?.role === 'assistant' ? [targetMessage.id] : []),
+        ...(currentAssistantId ? [currentAssistantId] : []),
+      ])
+      const placeholderMessageId = `${PENDING_REGEN_BRANCH_PREFIX}${anchorMessageId}:${Date.now()}`
+      const pendingOptionIds = uniqueMessageIds([
+        ...baseOptionIds,
+        placeholderMessageId,
+      ])
+
+      const anchorIndex = currentMessages.findIndex(
+        (message) => message.id === anchorMessageId,
+      )
+      const targetIndex = currentMessages.findIndex(
+        (message) => message.id === messageId,
+      )
+      const truncateInclusiveIndex =
+        targetMessage?.role === 'assistant' && targetIndex >= 0
+          ? targetIndex
+          : anchorIndex
+      if (truncateInclusiveIndex >= 0) {
+        // Regeneration forks from the anchor user, but the target message must
+        // remain present for AI SDK regenerate(messageId) lookup. Keep the
+        // target row (assistant/user) and prune only descendants.
+        setMessagesRef.current(
+          currentMessages.slice(0, truncateInclusiveIndex + 1),
+        )
+      }
+
+      setPendingBranchSelector(
+        replaceFailure
+          ? null
+          : {
+              anchorMessageId,
+              parentMessageId: anchorMessageId,
+              placeholderMessageId,
+              optionMessageIds: pendingOptionIds,
+              expectedOptionCount: pendingOptionIds.length,
+            },
+      )
+      // Regeneration now performs local deterministic truncation above, so we
+      // do not need snapshot-shrink exceptions for this flow.
+      allowShrinkOnNextBranchVersionRef.current = false
+      setLocalError(null)
+      try {
+        clearThreadStopRequest(currentThreadId)
+        await regenerateRef.current({
+          messageId,
+          body: retryModel ? { modelId: retryModel } : undefined,
+        })
+      } catch (regenerateError) {
+        setPendingBranchSelector(null)
+        throw regenerateError
+      }
+    },
+    [resumeStream],
+  )
+
+  const retryLastMessage = useCallback(async () => {
+    const retryThreadId = activeThreadIdRef.current
+    if (statusRef.current === 'submitted' || statusRef.current === 'streaming')
+      return
     if (
-      !messageId ||
-      currentStatus === 'submitted' ||
-      currentStatus === 'streaming'
+      (threadRowRef.current?.generationStatus === 'pending' ||
+        threadRowRef.current?.generationStatus === 'generation') &&
+      (await resumeActiveStream(resumeStream))
+    )
+      return
+    if (activeThreadIdRef.current !== retryThreadId) return
+    const visibleIds = new Set(messagesRef.current.map((message) => message.id))
+    const target = resolveRetryTarget(
+      storedMessagesRef.current.filter((message) =>
+        visibleIds.has(message.messageId),
+      ),
+    )
+    const lastLocalUser = [...messagesRef.current]
+      .reverse()
+      .find((message) => message.role === 'user')
+    // A failed POST still leaves the optimistic user message in the AI SDK.
+    // Replace that same row when resending, preserving its text and attachments.
+    if (
+      lastLocalUser &&
+      (!target ||
+        !storedMessagesRef.current.some(
+          (message) => message.messageId === lastLocalUser.id,
+        ))
     ) {
+      setLocalError(null)
+      clearThreadStopRequest(activeThreadIdRef.current)
+      pendingAttachmentsRef.current = lastLocalUser.metadata?.attachments?.map(
+        (attachment) => ({ id: attachment.id }),
+      )
+      await sendAIMessageRef.current(
+        {
+          text: textFromUIMessage(lastLocalUser),
+          messageId: lastLocalUser.id,
+          metadata: lastLocalUser.metadata,
+        },
+        {
+          body: {
+            modelId:
+              lastLocalUser.metadata?.model ?? selectedModelIdRef.current,
+          },
+        },
+      )
       return
     }
-    if (!currentThreadId) return
-    const anchorMessageId = findRegenerationAnchorMessageId({
-      messages: currentMessages,
-      targetMessageId: messageId,
-    })
-    if (!anchorMessageId) return
+    if (target) await regenerateMessage(target.messageId, target.model, true)
+  }, [regenerateMessage, resumeStream])
 
-    const targetMessage = currentMessages.find(
-      (message) => message.id === messageId,
-    )
-    const existingSelector = currentStoredBranchSelectors[anchorMessageId]
-    const currentAssistantId = findCurrentAssistantForAnchor({
-      messages: currentMessages,
-      anchorMessageId,
-    })
-    const selectedStoredAssistantId =
-      currentThreadRow &&
-      currentThreadRow.activeChildByParent &&
-      typeof currentThreadRow.activeChildByParent === 'object' &&
-      typeof currentThreadRow.activeChildByParent[anchorMessageId] === 'string'
-        ? currentThreadRow.activeChildByParent[anchorMessageId]
-        : undefined
-    const storedAssistantChildren = currentStoredMessages
-      .filter(
-        (message) =>
-          message.role === 'assistant' &&
-          message.parentMessageId === anchorMessageId,
-      )
-      .slice()
-      .sort((left, right) => {
-        const leftBranch = left.branchIndex
-        const rightBranch = right.branchIndex
-        if (leftBranch !== rightBranch) return leftBranch - rightBranch
-        return left.messageId.localeCompare(right.messageId)
-      })
-      .map((message) => message.messageId)
-    const baseOptionIds = uniqueMessageIds([
-      ...(existingSelector?.optionMessageIds ?? []),
-      ...storedAssistantChildren,
-      ...(selectedStoredAssistantId ? [selectedStoredAssistantId] : []),
-      ...(targetMessage?.role === 'assistant' ? [targetMessage.id] : []),
-      ...(currentAssistantId ? [currentAssistantId] : []),
-    ])
-    const placeholderMessageId = `${PENDING_REGEN_BRANCH_PREFIX}${anchorMessageId}:${Date.now()}`
-    const pendingOptionIds = uniqueMessageIds([
-      ...baseOptionIds,
-      placeholderMessageId,
-    ])
-
-    const anchorIndex = currentMessages.findIndex(
-      (message) => message.id === anchorMessageId,
-    )
-    const targetIndex = currentMessages.findIndex(
-      (message) => message.id === messageId,
-    )
-    const truncateInclusiveIndex =
-      targetMessage?.role === 'assistant' && targetIndex >= 0
-        ? targetIndex
-        : anchorIndex
-    if (truncateInclusiveIndex >= 0) {
-      // Regeneration forks from the anchor user, but the target message must
-      // remain present for AI SDK regenerate(messageId) lookup. Keep the
-      // target row (assistant/user) and prune only descendants.
-      setMessagesRef.current(
-        currentMessages.slice(0, truncateInclusiveIndex + 1),
-      )
-    }
-
-    setPendingBranchSelector({
-      anchorMessageId,
-      parentMessageId: anchorMessageId,
-      placeholderMessageId,
-      optionMessageIds: pendingOptionIds,
-      expectedOptionCount: pendingOptionIds.length,
-    })
-    // Regeneration now performs local deterministic truncation above, so we
-    // do not need snapshot-shrink exceptions for this flow.
-    allowShrinkOnNextBranchVersionRef.current = false
-    setLocalError(null)
-    try {
-      await regenerateRef.current({ messageId })
-    } catch (regenerateError) {
-      setPendingBranchSelector(null)
-      throw regenerateError
-    }
-  }, [])
+  useQueuedGeneration({
+    threadId: activeThreadId,
+    status,
+    generationStatus: threadRow?.generationStatus,
+    threadExists: !!activeThreadId && threadRow?.threadId === activeThreadId,
+    threadQueryComplete: threadResult.type === 'complete',
+    messages: canonicalStoredMessages,
+    sendMessage,
+  })
 
   const editMessage = useCallback<ChatActionsContextValue['editMessage']>(
     async ({ messageId, editedText }) => {
@@ -1932,6 +2120,7 @@ export function ChatProvider({
       allowShrinkOnNextBranchVersionRef.current = false
       setLocalError(null)
       try {
+        clearThreadStopRequest(currentThreadId)
         await regenerateRef.current({
           messageId,
           body: {
@@ -2273,43 +2462,51 @@ export function ChatProvider({
     [activeThreadId, z],
   )
 
-  const messagesValue = useMemo<ChatMessagesContextValue>(
-    () => {
-      const isWelcomeState =
-        activeThreadId == null && messages.length === 0
-      const isProjectLandingState = isWelcomeState && projectId != null
-      return {
-        messages,
-        status,
-        activeThreadId,
-        activeProjectId: projectId,
-        isProjectLandingState,
-        isWelcomeState,
-        hasHydratedActiveThread,
-        branchSelectorsByAnchorMessageId,
-        latestAssistantUsage,
-        branchCost,
-        showBranchCost,
-      }
-    },
-    [
+  const messagesValue = useMemo<ChatMessagesContextValue>(() => {
+    const isWelcomeState = activeThreadId == null && messages.length === 0
+    const isProjectLandingState = isWelcomeState && projectId != null
+    return {
       messages,
       status,
       activeThreadId,
-      projectId,
+      activeProjectId: projectId,
+      isProjectLandingState,
+      isWelcomeState,
       hasHydratedActiveThread,
       branchSelectorsByAnchorMessageId,
       latestAssistantUsage,
       branchCost,
       showBranchCost,
-    ],
-  )
+    }
+  }, [
+    messages,
+    status,
+    activeThreadId,
+    projectId,
+    hasHydratedActiveThread,
+    branchSelectorsByAnchorMessageId,
+    latestAssistantUsage,
+    branchCost,
+    showBranchCost,
+  ])
 
   const composerValue = useMemo<ChatComposerContextValue>(
     () => ({
       status,
-      error: localError ?? error,
+      error:
+        localError ??
+        (isThreadStopRequested(activeThreadId) ? undefined : error),
+      errorMessageId:
+        failedResponseError?.error === (localError ?? error)
+          ? failedResponseError?.messageId
+          : undefined,
       sendMessage,
+      stopGeneration,
+      retryLastMessage,
+      canRetryLastMessage:
+        threadRow?.generationStatus !== 'pending' &&
+        threadRow?.generationStatus !== 'generation' &&
+        (status === 'error' || threadRow?.generationStatus === 'failed'),
       activeThreadId,
       selectedModelId,
       selectedReasoningEffort,
@@ -2337,7 +2534,11 @@ export function ChatProvider({
       status,
       error,
       localError,
+      failedResponseError,
       sendMessage,
+      stopGeneration,
+      retryLastMessage,
+      threadRow?.generationStatus,
       activeThreadId,
       selectedModelId,
       selectedReasoningEffort,

@@ -1,3 +1,4 @@
+import type { PersistedSource } from '@/lib/shared/chat-contracts/generation-parts'
 import type { UIMessage } from 'ai'
 import type { ReactNode } from 'react'
 
@@ -14,6 +15,7 @@ export type AssistantPart = UIMessage['parts'][number]
 export type AssistantPartRenderContext = {
   part: AssistantPart
   index: number
+  sources: readonly PersistedSource[]
   isMessageStreaming: boolean
 }
 

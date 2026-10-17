@@ -18,6 +18,7 @@ import { ModelGatewayService } from '../services/model-gateway.service'
 import { ModelPolicyService } from '../services/model-policy.service'
 import { RateLimitService } from '../services/rate-limit.service'
 import { StreamResumeService } from '../services/stream-resume.service'
+import { StopGenerationService } from '../services/stop-generation.service'
 import { ThreadService } from '../services/thread.service'
 import { ToolRegistryService } from '../services/tool-registry.service'
 import { ToolPolicyService } from '../services/tool-policy.service'
@@ -57,7 +58,7 @@ const dependencyLayer = Layer.mergeAll(
   Layer.provideMerge(ZeroDatabaseService.layer),
 )
 
-const layer = ChatOrchestratorService.layer.pipe(
+const layer = Layer.mergeAll(ChatOrchestratorService.layer, StopGenerationService.layer).pipe(
   // Expose orchestrator plus operational dependencies used directly by routes.
   Layer.provideMerge(dependencyLayer),
 )

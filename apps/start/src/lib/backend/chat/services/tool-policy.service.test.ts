@@ -75,9 +75,9 @@ describe('ToolPolicyService', () => {
       }).pipe(Effect.provide(ToolPolicyService.layer)),
     )
 
-    expect(result.activeToolKeys).toHaveLength(0)
+    expect(result.activeToolKeys).toEqual(['rift.documents'])
     expect(
-      result.toolEntries.every((entry) =>
+      result.toolEntries.filter((entry) => entry.entry.source === 'provider-native').every((entry) =>
         entry.reasons.includes('blocked_by_org_master_switch'),
       ),
     ).toBe(true)

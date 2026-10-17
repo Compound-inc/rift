@@ -17,6 +17,7 @@
  */
 'use client'
 
+import { generationQueue } from './generation-queue-store'
 import type { ReactNode } from 'react'
 import { useCallback } from 'react'
 import { useNavigate } from '@tanstack/react-router'
@@ -99,6 +100,7 @@ export function useThreadRowActions(input: {
       try {
         const write = z.mutate(mutators.threads.delete({ threadId }))
         await write.client
+        generationQueue.clear(threadId)
         input.onAfterDelete?.()
         toast.success(m.chat_sidebar_thread_deleted())
         if (input.activeThreadId === threadId) {

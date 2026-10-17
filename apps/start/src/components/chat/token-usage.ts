@@ -59,8 +59,6 @@ function toLanguageModelUsage(
       reasoningTokens: message.reasoningTokens ?? undefined,
     },
     totalTokens: resolveMessageTotalTokens(message),
-    reasoningTokens: message.reasoningTokens ?? undefined,
-    cachedInputTokens: message.cacheReadTokens ?? undefined,
   }
 }
 
@@ -71,8 +69,7 @@ function resolveAssistantTextTokens(
     return usage.outputTokenDetails.textTokens
   }
 
-  const reasoningTokens =
-    usage.outputTokenDetails?.reasoningTokens ?? usage.reasoningTokens
+  const reasoningTokens = usage.outputTokenDetails?.reasoningTokens
 
   if (usage.outputTokens != null && reasoningTokens != null) {
     return Math.max(0, usage.outputTokens - reasoningTokens)

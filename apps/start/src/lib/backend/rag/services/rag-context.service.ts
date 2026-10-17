@@ -1,3 +1,7 @@
+import {
+  LATIN_CHARS_PER_TOKEN,
+  textWithinTokenBudget,
+} from '@/lib/shared/chat-contracts/token-estimate'
 import { PgClient } from '@effect/sql-pg'
 import { Effect, Layer, ServiceMap } from 'effect'
 import { RAG_CONFIG } from '../domain/config'
@@ -70,11 +74,10 @@ const describeError = (error: unknown) =>
  * knowledge scope:
  *
  *   1. List candidate sources (metadata only) from all scopes in parallel.
- *   2. Plan: pinned sources that fit the full-text budget are read in full;
- *      the rest overflow to retrieval together with org knowledge.
- *   3. In parallel: load full-text bodies, and — only when something needs
- *      retrieval — embed the query once and run every scoped search in a
- *      single Qdrant batch request.
+ *   2. Load pinned bodies that could fit the full-text budget. Measure them
+ *      with the shared token estimator; the rest overflow to retrieval.
+ *   3. When something needs retrieval, embed the query once and run all
+ *      scoped searches in a single Qdrant batch request.
  *   4. Select excerpts under the retrieval budget; overflow files with no
  *      usable vectors fall back to their beginning.
  *   5. Render the stable library block and the per-turn excerpt block.
@@ -145,15 +148,18 @@ export class RagContextService extends ServiceMap.Service<
           const pinned = [...conversation, ...project]
           if (pinned.length === 0 && org.length === 0) return EMPTY_CONTEXT
 
-          // 2. Plan.
+          // Only load bodies that could fit even at the Latin rate, then make
+          // the final choice using their actual script-aware token estimates.
           const budget = resolveContextBudget(input.contextWindowTokens)
-          const plan = planFullText(pinned, budget.fullTextChars)
-          const retrievalSources = [...plan.overflow, ...org]
-
-          // 3. Full-text bodies and retrieval, concurrently.
-          const loadFullText = withPg(
-            loadSourceContents({ ids: plan.fullText.map((source) => source.id) }),
+          const fullTextContents = yield* withPg(
+            loadSourceContents({
+              ids: pinned
+                .filter((source) => source.contentChars > 0 && source.contentChars <= budget.fullTextChars)
+                .map((source) => source.id),
+            }),
           ).pipe(orEmpty(new Map<string, string>(), 'rag_full_text_load_failed'))
+          const plan = planFullText(pinned, budget.fullTextChars, fullTextContents)
+          const retrievalSources = [...plan.overflow, ...org]
 
           // `searched` is true only when the query was embedded and the vector
           // search answered; it separates "nothing relevant" from "could not
@@ -188,10 +194,7 @@ export class RagContextService extends ServiceMap.Service<
               )
             : Effect.succeed(notSearched)
 
-          const [fullTextContents, retrieval] = yield* Effect.all(
-            [loadFullText, retrieve],
-            { concurrency: 'unbounded' },
-          )
+          const retrieval = yield* retrieve
 
           // 4. Select excerpts.
           const sourceById = new Map(
@@ -261,7 +264,10 @@ export class RagContextService extends ServiceMap.Service<
               }),
             ),
             ...unrepresented.flatMap((source): TurnDocument[] => {
-              const content = beginnings.get(source.id)
+              const beginning = beginnings.get(source.id)
+              const content = beginning
+                ? textWithinTokenBudget(beginning, Math.floor(beginningChars / LATIN_CHARS_PER_TOKEN))
+                : ''
               return content ? [{ kind: 'beginning', source, content }] : []
             }),
             ...plan.overflow

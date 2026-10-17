@@ -1,5 +1,7 @@
 'use client'
 
+import { Button } from '@rift/ui/button'
+import { m } from '@/paraglide/messages.js'
 import { ChevronDown } from 'lucide-react'
 // Toolbar controls: file picker, voice placeholder, and submit state.
 import type { ChatStatus } from 'ai'
@@ -71,6 +73,7 @@ export type PromptInputToolbarProps = HTMLAttributes<HTMLDivElement> & {
   status: ChatStatus
   isEmpty: boolean
   isBusy: boolean
+  onStop?: () => void
   isStudyModeEnabled: boolean
   isModeEnforced: boolean
   onToggleStudyMode: () => void
@@ -97,6 +100,7 @@ export function PromptInputToolbar({
   status,
   isEmpty,
   isBusy,
+  onStop,
   isStudyModeEnabled,
   isModeEnforced,
   onToggleStudyMode,
@@ -111,7 +115,8 @@ export function PromptInputToolbar({
   ...props
 }: PromptInputToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const submitDisabled = isEmpty || isBusy
+  const generating = status === 'submitted' || status === 'streaming'
+  const submitDisabled = !generating && (isEmpty || isBusy)
 
   const handleOpenFilePicker = () => {
     if (!fileInputRef.current) return
@@ -161,8 +166,13 @@ export function PromptInputToolbar({
 
       <div className="ltr:ml-auto rtl:mr-auto flex items-center self-end gap-1.5">
         {afterAttach}
+        {generating && !isEmpty ? (
+          <Button type="submit" variant="ghost" disabled={isBusy}>{m.chat_queue_add()}</Button>
+        ) : null}
         <PromptInputSubmit
           status={status}
+          type={generating ? 'button' : 'submit'}
+          onClick={generating ? onStop : undefined}
           disabled={submitDisabled}
           data-active={!submitDisabled}
           variant="ghost"

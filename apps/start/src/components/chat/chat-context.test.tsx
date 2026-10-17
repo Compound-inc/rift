@@ -4,6 +4,7 @@ import { act, fireEvent, render } from '@testing-library/react'
 import { JSDOM } from 'jsdom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChatProvider, useChat } from './chat-context'
+import { generationQueue } from './generation-queue-store'
 
 type UseAIChatResult = {
   messages: unknown[]
@@ -13,6 +14,8 @@ type UseAIChatResult = {
   regenerate: ReturnType<typeof vi.fn>
   setMessages: ReturnType<typeof vi.fn>
   resumeStream: ReturnType<typeof vi.fn>
+  stop: ReturnType<typeof vi.fn>
+  clearError: ReturnType<typeof vi.fn>
 }
 
 const navigateMock = vi.fn()
@@ -27,7 +30,8 @@ const threadGenerationStatuses = new Map<
 >()
 let threadStatusesVersion = 0
 const sessions = new Map<string, UseAIChatResult>()
-let defaultSendMessageImplementation: () => Promise<void> = async () => undefined
+let defaultSendMessageImplementation: () => Promise<void> = async () =>
+  undefined
 const queryState = {
   orgPolicyRow: undefined as unknown,
   threadRow: undefined as
@@ -39,7 +43,12 @@ const queryState = {
         createdAt: number
         updatedAt: number
         lastMessageAt: number
-        generationStatus: 'idle' | 'pending' | 'generation' | 'failed'
+        generationStatus:
+          | 'idle'
+          | 'pending'
+          | 'generation'
+          | 'failed'
+          | 'completed'
         model: string
         pinned: boolean
         activeChildByParent?: Record<string, string>
@@ -58,6 +67,7 @@ const queryState = {
     created_at: number
     content: string
     reasoning?: string | null
+    status?: string
     model: string
   }>,
 }
@@ -69,6 +79,8 @@ const useAIChatMock = vi.fn((input: { id: string }) => {
     messages: [],
     status: 'ready',
     error: null,
+    stop: vi.fn(async () => undefined),
+    clearError: vi.fn(),
     sendMessage: vi.fn(() => defaultSendMessageImplementation()),
     regenerate: vi.fn(async () => undefined),
     setMessages: vi.fn(),
@@ -98,7 +110,7 @@ vi.mock('./thread-status-store', () => ({
   subscribeThreadStatuses: () => () => undefined,
   getThreadStatusesVersion: () => threadStatusesVersion,
   getThreadGenerationStatus: (threadId: string | undefined) =>
-    (threadId ? threadGenerationStatuses.get(threadId) : undefined),
+    threadId ? threadGenerationStatuses.get(threadId) : undefined,
   setThreadGenerationStatus: vi.fn(),
 }))
 
@@ -122,6 +134,8 @@ vi.mock('@/lib/frontend/auth/auth-client', () => ({
     useSession: () => ({
       data: null,
       error: null,
+      stop: vi.fn(async () => undefined),
+      clearError: vi.fn(),
       isPending: false,
     }),
   },
@@ -210,6 +224,21 @@ function RegenerateConsumer({ messageId }: { messageId: string }) {
       }}
     >
       regen
+    </button>
+  )
+}
+
+function RetryConsumer() {
+  const { retryLastMessage, canRetryLastMessage } = useChat()
+  return (
+    <button
+      type="button"
+      data-can-retry={canRetryLastMessage}
+      onClick={() => {
+        void retryLastMessage()
+      }}
+    >
+      retry
     </button>
   )
 }
@@ -398,7 +427,9 @@ describe('ChatProvider', () => {
     })
 
     expect(navigateMock).not.toHaveBeenCalled()
-    expect(sessions.get(`chat-ui:${mockedThreadId}`)?.sendMessage).toBeUndefined()
+    expect(
+      sessions.get(`chat-ui:${mockedThreadId}`)?.sendMessage,
+    ).toBeUndefined()
   })
 
   it('does not auto-resume a newly bootstrapped thread while the first send is in flight', async () => {
@@ -483,9 +514,188 @@ describe('ChatProvider', () => {
       await Promise.resolve()
     })
 
-    expect(sessions.get(`chat-ui:${threadId}`)?.resumeStream).toHaveBeenCalledTimes(
-      1,
+    expect(
+      sessions.get(`chat-ui:${threadId}`)?.resumeStream,
+    ).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['pending', 'generation'] as const)(
+    'resumes a disconnected %s generation instead of retrying its POST',
+    async (generationStatus) => {
+      const threadId = 'thread-reconnect'
+      queryState.threadRow = {
+        id: threadId,
+        threadId,
+        userId: 'user',
+        title: 'Thread',
+        createdAt: 1,
+        updatedAt: 1,
+        lastMessageAt: 1,
+        generationStatus,
+        model: 'openai/gpt-5-mini',
+        pinned: false,
+        branchVersion: 1,
+        ownerOrgId: '__missing_org__',
+      }
+      const view = render(
+        <ChatProvider threadId={threadId}>
+          <RetryConsumer />
+        </ChatProvider>,
+      )
+      const session = sessions.get(`chat-ui:${threadId}`)!
+      session.status = 'error'
+      view.rerender(
+        <ChatProvider threadId={threadId}>
+          <RetryConsumer />
+        </ChatProvider>,
+      )
+      expect(
+        view
+          .getByRole('button', { name: 'retry' })
+          .getAttribute('data-can-retry'),
+      ).toBe('false')
+      await act(async () => {
+        fireEvent.click(view.getByRole('button', { name: 'retry' }))
+      })
+      expect(session.resumeStream).toHaveBeenCalledOnce()
+      expect(session.regenerate).not.toHaveBeenCalled()
+      expect(session.sendMessage).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each(['retry', 'regenerate'] as const)(
+    'falls back to %s when a stale generation status resumes with no stream',
+    async (action) => {
+      const threadId = 'stale-generation'
+      queryState.threadRow = {
+        id: threadId,
+        threadId,
+        userId: 'user',
+        title: 'Thread',
+        createdAt: 1,
+        updatedAt: 1,
+        lastMessageAt: 1,
+        generationStatus: 'generation',
+        model: 'openai/gpt-5-mini',
+        pinned: false,
+        branchVersion: 1,
+        ownerOrgId: '__missing_org__',
+      }
+      queryState.storedMessages = [
+        {
+          messageId: 'user',
+          role: 'user',
+          content: 'question',
+          branchIndex: 1,
+          created_at: 1,
+          model: 'openai/gpt-5-mini',
+        },
+        {
+          messageId: 'failed',
+          role: 'assistant',
+          content: '',
+          status: 'error',
+          parentMessageId: 'user',
+          branchIndex: 1,
+          created_at: 2,
+          model: 'openai/gpt-5-mini',
+        },
+      ]
+      const consumer =
+        action === 'retry' ? (
+          <RetryConsumer />
+        ) : (
+          <RegenerateConsumer messageId="failed" />
+        )
+      const view = render(
+        <ChatProvider threadId={threadId}>{consumer}</ChatProvider>,
+      )
+      const session = sessions.get(`chat-ui:${threadId}`)!
+      session.messages = [
+        {
+          id: 'user',
+          role: 'user',
+          parts: [{ type: 'text', text: 'question' }],
+        },
+        { id: 'failed', role: 'assistant', parts: [] },
+      ]
+      session.status = 'error'
+      session.resumeStream.mockImplementation(async (options) => {
+        options.metadata.onReconnect(false)
+      })
+      view.rerender(<ChatProvider threadId={threadId}>{consumer}</ChatProvider>)
+      await act(async () => {
+        fireEvent.click(
+          view.getByRole('button', {
+            name: action === 'regenerate' ? 'regen' : action,
+          }),
+        )
+      })
+      expect(session.resumeStream).toHaveBeenCalledOnce()
+      expect(session.regenerate).toHaveBeenCalledOnce()
+      expect(session.sendMessage).not.toHaveBeenCalled()
+    },
+  )
+
+  it('keeps the completed retry until its fresh row reaches Zero', () => {
+    const threadId = 'thread-retry-sync'
+    queryState.threadRow = {
+      id: threadId,
+      threadId,
+      userId: 'user',
+      title: 'Thread',
+      createdAt: 1,
+      updatedAt: 1,
+      lastMessageAt: 1,
+      generationStatus: 'completed',
+      model: 'openai/gpt-5-mini',
+      pinned: false,
+      branchVersion: 1,
+      ownerOrgId: '__missing_org__',
+    }
+    queryState.storedMessages = [
+      {
+        messageId: 'user',
+        role: 'user',
+        content: 'question',
+        branchIndex: 1,
+        created_at: 1,
+        model: 'openai/gpt-5-mini',
+      },
+      {
+        messageId: 'failed',
+        role: 'assistant',
+        content: '',
+        status: 'error',
+        parentMessageId: 'user',
+        branchIndex: 1,
+        created_at: 2,
+        model: 'openai/gpt-5-mini',
+      },
+    ]
+    const view = render(
+      <ChatProvider threadId={threadId}>
+        <RetryConsumer />
+      </ChatProvider>,
     )
+    const session = sessions.get(`chat-ui:${threadId}`)!
+    session.setMessages.mockClear()
+    session.messages = [
+      { id: 'user', role: 'user', parts: [{ type: 'text', text: 'question' }] },
+      {
+        id: 'fresh-retry',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'fresh answer' }],
+      },
+    ]
+    act(() => generationQueue.finish(threadId, 'fresh-retry', true))
+    view.rerender(
+      <ChatProvider threadId={threadId}>
+        <RetryConsumer />
+      </ChatProvider>,
+    )
+    expect(session.setMessages).not.toHaveBeenCalled()
+    act(() => generationQueue.clear(threadId))
   })
 
   it('keeps chat sessions isolated per thread when route threadId changes', async () => {
@@ -531,6 +741,8 @@ describe('ChatProvider', () => {
       ],
       status: 'ready',
       error: null,
+      stop: vi.fn(async () => undefined),
+      clearError: vi.fn(),
       sendMessage: vi.fn(async () => undefined),
       regenerate: vi.fn(async () => undefined),
       setMessages: vi.fn(),
@@ -564,6 +776,8 @@ describe('ChatProvider', () => {
       messages: [],
       status: 'streaming',
       error: null,
+      stop: vi.fn(async () => undefined),
+      clearError: vi.fn(),
       sendMessage: vi.fn(async () => undefined),
       regenerate: vi.fn(async () => undefined),
       setMessages: vi.fn(),
@@ -597,6 +811,8 @@ describe('ChatProvider', () => {
       ],
       status: 'ready',
       error: null,
+      stop: vi.fn(async () => undefined),
+      clearError: vi.fn(),
       sendMessage: vi.fn(async () => undefined),
       regenerate: vi.fn(async () => undefined),
       setMessages: vi.fn(),
@@ -745,6 +961,8 @@ describe('ChatProvider', () => {
       ],
       status: 'ready',
       error: null,
+      stop: vi.fn(async () => undefined),
+      clearError: vi.fn(),
       sendMessage: vi.fn(async () => undefined),
       regenerate: vi.fn(async () => undefined),
       setMessages: vi.fn(),
@@ -834,5 +1052,4 @@ describe('ChatProvider', () => {
       },
     })
   })
-
 })

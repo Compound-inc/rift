@@ -84,7 +84,7 @@ export function ProviderToolsSection({
     () =>
       groupedTools.map(([providerId, tools]) => {
         const ProviderIcon = getProviderIcon(providerId as CatalogProviderId)
-        const providerName = PROVIDER_NAMES[providerId] ?? providerId
+        const providerName = PROVIDER_NAMES[providerId] ?? (providerId === 'rift' ? 'Rift' : providerId)
         return {
           title: providerName,
           titleIcon: ProviderIcon ? (
@@ -97,7 +97,7 @@ export function ProviderToolsSection({
             const toggleDisabled = toolGroup.tools.every(
               (tool) =>
                 !(
-                  tool.source === 'provider-native'
+                  tool.source === 'built-in' ? true : tool.source === 'provider-native'
                     ? payload.policy.toolPolicy.providerNativeToolsEnabled
                     : payload.policy.toolPolicy.externalToolsEnabled
                 ),

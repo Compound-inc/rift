@@ -1,3 +1,5 @@
+import { LATIN_CHARS_PER_TOKEN } from '@/lib/shared/chat-contracts/token-estimate'
+
 /**
  * The single RAG configuration for every knowledge scope.
  *
@@ -16,10 +18,10 @@ export const RAG_CONFIG = Object.freeze({
   embeddingModel: 'openai/text-embedding-3-small',
 
   /**
-   * Same heuristic as `estimateTokensFromText` in the shared chat contracts,
-   * so budgets line up with the orchestrator's context-window check.
+   * Character allowances are Latin-equivalent units. The planner measures
+   * loaded text with the shared estimator, including the higher CJK rate.
    */
-  charsPerToken: 4,
+  charsPerToken: LATIN_CHARS_PER_TOKEN,
 
   chunking: {
     /**

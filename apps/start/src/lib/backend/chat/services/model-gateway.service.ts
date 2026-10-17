@@ -1,5 +1,14 @@
-import { convertToModelMessages, smoothStream, streamText } from 'ai'
-import type { IdGenerator, LanguageModelUsage, ToolSet, UIMessage } from 'ai'
+import type { CompletedModelStep } from './chat-orchestrator/step-accounting'
+import type { createDocumentTools } from '@/lib/backend/documents/tools'
+import type { DocumentScope } from '@/lib/shared/documents/contracts'
+import { convertToModelMessages, isStepCount, smoothStream, streamText } from 'ai'
+import type {
+  LanguageModelUsage,
+  ModelMessage,
+  TextStreamPart,
+  ToolSet,
+  UIMessage,
+} from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
@@ -12,14 +21,23 @@ import {
   toReadableErrorCause,
   toReadableErrorMessage,
 } from '../domain/error-formatting'
-import { ModelProviderError } from '../domain/errors'
+import { ContextWindowExceededError, ModelProviderError } from '../domain/errors'
+import { estimatePromptTokens, estimateTokensFromText } from '@/lib/shared/chat-contracts/prompt-usage'
 import { sanitizeMessagesForModel } from './model-prompt'
+import { estimateToolTokens } from './chat-orchestrator/output-limits'
+import {
+  createDocumentTurnState,
+  planDocumentTurnStep,
+} from './chat-orchestrator/document-turn-budget'
+import { assembleSystemPrompt } from './chat-orchestrator/system-prompt'
 
 /**
  * Model gateway encapsulates AI SDK provider calls so orchestrator/business
  * logic is provider-agnostic.
  */
-const SYSTEM_PROMPT = 'You are a helpful assistant.'
+type ContextualToolSet = ToolSet & ReturnType<typeof createDocumentTools>
+type DocumentToolsContext = Record<keyof ReturnType<typeof createDocumentTools>, DocumentScope>
+
 
 type ProviderApiKeyOverride = {
   readonly providerId: 'openai' | 'anthropic'
@@ -116,24 +134,16 @@ function resolveRuntimeModel(input: {
 
 /** Minimal stream contract consumed by chat orchestration. */
 export type ModelStreamResult = {
-  readonly totalUsage: PromiseLike<LanguageModelUsage>
-  readonly providerMetadata: PromiseLike<Record<string, unknown> | undefined>
-  readonly toUIMessageStreamResponse: (options?: {
-    readonly originalMessages?: UIMessage[]
-    readonly generateMessageId?: IdGenerator
-    readonly headers?: HeadersInit
-    readonly onError?: (error: unknown) => string
-    readonly consumeSseStream?: (options: {
-      readonly stream: ReadableStream<string>
-    }) => PromiseLike<void> | void
-    readonly messageMetadata?: (options: { part: unknown }) => unknown
-    readonly onFinish?: (event: {
-      readonly messages: UIMessage[]
-      readonly isAborted: boolean
-      readonly responseMessage: UIMessage
-      readonly isContinuation: boolean
-    }) => Promise<void> | void
-  }) => Response
+  readonly usage: PromiseLike<LanguageModelUsage>
+  readonly steps?: PromiseLike<readonly {
+    readonly providerMetadata?: Record<string, unknown>
+    readonly finishReason?: string
+  }[]>
+  readonly finalStep: PromiseLike<{
+    readonly providerMetadata?: Record<string, unknown>
+    readonly finishReason?: string
+  }>
+  readonly stream: ReadableStream<TextStreamPart<ToolSet>>
 }
 
 /** Service contract for starting model streams. */
@@ -147,8 +157,10 @@ export type ModelGatewayServiceShape = {
      * for `openrouter/*` models and ignored for everything else.
      */
     readonly openrouterOptions?: OpenRouterRequestOptions
+    readonly contextWindowTokens?: number
     readonly systemPrompt?: string
     readonly requestId: string
+    readonly toolsContext?: Record<string, unknown>
     readonly tools: ToolSet
     readonly activeTools?: readonly string[]
     readonly providerOptions?: Record<string, unknown>
@@ -160,9 +172,11 @@ export type ModelGatewayServiceShape = {
       | 'high'
       | 'xhigh'
       | 'max'
+    readonly onStepEnd?: (step: CompletedModelStep) => void
+    readonly onStepStart?: (promptTokens: number) => void
     readonly onChunk?: (chunk: unknown) => void
     readonly abortSignal?: AbortSignal
-  }) => Effect.Effect<ModelStreamResult, ModelProviderError>
+  }) => Effect.Effect<ModelStreamResult, ModelProviderError | ContextWindowExceededError>
 }
 
 /** Injectable model gateway token. */
@@ -179,20 +193,25 @@ export class ModelGatewayService extends ServiceMap.Service<
         providerApiKeyOverride,
         openrouterOptions,
         systemPrompt,
+        contextWindowTokens,
         requestId,
         tools,
         activeTools,
+        toolsContext,
         providerOptions,
-        reasoningEffort,
         onChunk,
+        onStepEnd,
+        onStepStart,
         abortSignal,
       }: {
         readonly messages: UIMessage[]
         readonly model: string
         readonly providerApiKeyOverride?: ProviderApiKeyOverride
         readonly openrouterOptions?: OpenRouterRequestOptions
+        readonly contextWindowTokens?: number
         readonly systemPrompt?: string
         readonly requestId: string
+        readonly toolsContext?: Record<string, unknown>
         readonly tools: ToolSet
         readonly activeTools?: readonly string[]
         readonly providerOptions?: Record<string, unknown>
@@ -204,6 +223,8 @@ export class ModelGatewayService extends ServiceMap.Service<
           | 'high'
           | 'xhigh'
           | 'max'
+        readonly onStepEnd?: (step: CompletedModelStep) => void
+        readonly onStepStart?: (promptTokens: number) => void
         readonly onChunk?: (chunk: unknown) => void
         readonly abortSignal?: AbortSignal
       }) =>
@@ -217,24 +238,97 @@ export class ModelGatewayService extends ServiceMap.Service<
               openrouterOptions,
             })
 
+            const resolvedSystemPrompt = systemPrompt ?? assembleSystemPrompt({ modelId: model, activeTools })
+            const toolTokens = await estimateToolTokens(tools, activeTools)
+            const estimatedPromptTokens = estimatePromptTokens(promptMessages) + estimateTokensFromText(resolvedSystemPrompt) + toolTokens
+            const documentTurnState = createDocumentTurnState()
+            const planStep = (promptTokens: number) => planDocumentTurnStep({
+              modelId: model,
+              providerOptions,
+              contextWindowTokens,
+              requestId,
+              estimatedPromptTokens: promptTokens,
+              toolsContext,
+            }, documentTurnState)
+            const outputLimits = planStep(estimatedPromptTokens)
+            const planFollowingStep = (responseMessages: ModelMessage[]) => {
+              // Keep image/PDF estimates from the original prompt. Only replayed
+              // responses add text, generated tool inputs, and tool results.
+              const responseTokens = responseMessages.length > 0
+                ? estimateTokensFromText(JSON.stringify(responseMessages)) : 0
+              try {
+                const plan = planStep(estimatedPromptTokens + responseTokens)
+                return plan.canContinue ? plan : undefined
+              } catch (error) {
+                if (error instanceof ContextWindowExceededError) return undefined
+                throw error
+              }
+            }
+
+            // Message conversion can await uploads. Recheck after that work so
+            // a replacement during preparation never reaches the provider.
+            abortSignal?.throwIfAborted()
             return streamText({
               model: runtimeModel,
-              system: systemPrompt ?? SYSTEM_PROMPT,
-              messages: modelMessages,
-              tools,
+              // Legacy system rows come from server-loaded history. Keep them out
+              // of v7's messages list while retaining the mode/project prompt.
+              instructions: [
+                {
+                  role: 'system',
+                  content: resolvedSystemPrompt,
+                },
+                ...modelMessages.filter((message) => message.role === 'system'),
+              ],
+              messages: modelMessages.filter(
+                (message) => message.role !== 'system',
+              ),
+              // The dynamic registry erases context generics. Restore the known
+              // document context type here; contextSchema validates it at execution.
+              tools: tools as ContextualToolSet,
+              toolsContext: outputLimits.toolsContext as DocumentToolsContext,
+              prepareStep: ({ responseMessages }) => {
+                const plan = planFollowingStep(responseMessages)
+                // stopWhen normally prevents this branch. Keep preparation total
+                // even if invoked after a successful tool has exhausted context.
+                if (!plan) {
+                  // Keep gateway/OpenRouter routing, compliance and caching
+                  // options; only switch Anthropic thinking off for this step.
+                  const base = (outputLimits.providerOptions ?? {}) as Record<
+                    string,
+                    Record<string, unknown> | undefined
+                  >
+                  return {
+                    activeTools: [],
+                    maxOutputTokens: 1,
+                    providerOptions: {
+                      ...base,
+                      anthropic: {
+                        ...base.anthropic,
+                        thinking: { type: 'disabled' },
+                      },
+                    } as any,
+                  }
+                }
+                return {
+                  maxOutputTokens: plan.maxOutputTokens,
+                  providerOptions: plan.providerOptions as any,
+                  toolsContext: plan.toolsContext as DocumentToolsContext,
+                }
+              },
+              stopWhen: ({ steps }) =>
+                isStepCount(4)({ steps }) ||
+                !planFollowingStep(steps.flatMap((step) => step.response.messages)),
+              toolCallConcurrency: 1,
               activeTools: activeTools ? [...activeTools] : undefined,
-              providerOptions: providerOptions as any,
-              maxOutputTokens:
-                reasoningEffort === 'high' ||
-                reasoningEffort === 'xhigh' ||
-                reasoningEffort === 'max'
-                  ? 12_000
-                  : 8_000,
+              providerOptions: outputLimits.providerOptions as any,
+              maxOutputTokens: outputLimits.maxOutputTokens,
               abortSignal,
               experimental_transform: smoothStream({
                 delayInMs: 15,
                 chunking: 'word',
               }),
+              onStepStart: (event) => onStepStart?.(estimateTokensFromText(JSON.stringify(event.messages)) + estimateTokensFromText(resolvedSystemPrompt) + toolTokens),
+              onStepEnd,
               onChunk: onChunk
                 ? ({ chunk }) => {
                     onChunk(chunk)
@@ -243,9 +337,10 @@ export class ModelGatewayService extends ServiceMap.Service<
               // AI SDK defaults to `console.error` for stream errors; we disable that
               // because chat-orchestrator emits structured, normalized wide events.
               onError: () => {},
-            }) as unknown as ModelStreamResult
+            })
           },
           catch: (error) => {
+            if (error instanceof ContextWindowExceededError) return error
             const message = toReadableErrorMessage(
               error,
               'Model provider failed to start stream',

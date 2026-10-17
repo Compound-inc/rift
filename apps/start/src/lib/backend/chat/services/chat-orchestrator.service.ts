@@ -1,17 +1,23 @@
-import type { UIMessage } from 'ai'
+import { createStepAccounting } from './chat-orchestrator/step-accounting'
+import { estimateToolTokens, resolveOutputLimits } from './chat-orchestrator/output-limits'
+import { estimateTokensFromText } from '@/lib/shared/chat-contracts/prompt-usage'
+import { hasProviderWork } from './chat-orchestrator/provider-work'
+import { documentToolsContext } from '@/lib/shared/documents/contracts'
+import { aggregateStepAccounting } from '../domain/multi-step-accounting'
+import { createUIMessageStreamResponse, toUIMessageStream } from 'ai'
 import type { ReadonlyJSONValue } from '@rocicorp/zero'
-import { Duration, Effect, Layer, ServiceMap } from 'effect'
+import { Duration, Effect, Exit, Layer, ServiceMap } from 'effect'
 import type { ChatDomainError } from '../domain/errors'
 import {
   DEFAULT_CONTEXT_WINDOW_MODE,
   getCatalogModel,
   resolveContextWindowForMode,
-  resolveModelContextWindow,
 } from '@/lib/shared/ai-catalog'
 import type { AiContextWindowMode } from '@/lib/shared/ai-catalog'
 import {
   InvalidRequestError,
   MessagePersistenceError,
+  ModelProviderError,
   QuotaExceededError,
   ContextWindowExceededError,
 } from '../domain/errors'
@@ -51,9 +57,12 @@ import { StreamResumeService } from './stream-resume.service'
 import { ThreadService } from './thread.service'
 import { ToolPolicyService } from './tool-policy.service'
 import { ToolRegistryService } from './tool-registry.service'
+import { isUserStopped } from './chat-orchestrator/stream-stop'
+import { resolveStoppedUsage } from './chat-orchestrator/stopped-usage'
 import type { AssistantDeltaBuffer } from './chat-orchestrator/assistant-buffer'
 import {
   applyAssistantChunkDelta,
+  markAssistantStepBoundary,
   hydrateAssistantBufferFromResponse,
 } from './chat-orchestrator/assistant-buffer'
 import {
@@ -69,6 +78,7 @@ import { normalizeStreamCommand } from './chat-orchestrator/command'
 import { buildPersistedGenerationAnalytics } from '../domain/generation-metrics'
 import { nanoUsdToUsd } from '@/lib/backend/billing/services/workspace-usage/shared'
 import { writeFreeOrgUserUsageSummaryRecord } from '@/lib/backend/billing/services/workspace-usage/usage-summary-store'
+import { assembleSystemPrompt } from './chat-orchestrator/system-prompt'
 import { estimatePromptTokens } from '@/lib/shared/chat-contracts'
 import { ChatErrorCode } from '@/lib/shared/chat-contracts/error-codes'
 import { ChatErrorI18nKey } from '@/lib/shared/chat-contracts/error-i18n'
@@ -104,6 +114,7 @@ export type ChatOrchestratorServiceShape = {
     readonly accessPolicy: ResolvedChatAccessPolicy
     readonly orgPolicy?: OrgAiPolicy
     readonly skipProviderKeyResolution?: boolean
+    readonly generationRequestId?: string
     readonly requestId: string
     readonly trigger?: 'submit-message' | 'regenerate-message' | 'edit-message'
     readonly messageId?: string
@@ -160,6 +171,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
         accessPolicy,
         orgPolicy,
         skipProviderKeyResolution,
+        generationRequestId,
         requestId,
         trigger,
         messageId,
@@ -179,6 +191,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
       }) => {
         const startedAt = Date.now()
         let currentStreamId: string | undefined
+        let rejectedActiveBranch = false
         let quotaReservationReleased = false
         let quotaReservation: {
           readonly bypassed: boolean
@@ -274,19 +287,6 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             requestModeId: modeId,
             threadModeId: threadAccess.modeId,
           })
-
-          /**
-           * If the Thread belongs to a Project, concatenate the Project's
-           * `custom_instruction` after the mode's system prompt so it can
-           * extend (not be overridden by) the mode's tone/role guidance.
-           * The instruction is resolved as part of `assertThreadAccess` so
-           * we don't pay a second project query per turn.
-           */
-          const baseSystemPrompt = effectiveMode?.definition.systemPrompt
-          const assembledSystemPrompt =
-            baseSystemPrompt && threadAccess.projectInstruction
-              ? `${baseSystemPrompt}\n\n${threadAccess.projectInstruction}`
-              : (threadAccess.projectInstruction ?? baseSystemPrompt)
 
           if (
             attachments &&
@@ -445,8 +445,6 @@ export class ChatOrchestratorService extends ServiceMap.Service<
           const resolvedCatalogModel = getResolvedCatalogModel(
             modelResolution.modelId,
           )
-          const contextWindowResolution =
-            resolveModelContextWindow(resolvedCatalogModel)
           const effectiveContextWindowMode = contextWindowMode
             ? contextWindowMode
             : (threadAccess.contextWindowMode ?? DEFAULT_CONTEXT_WINDOW_MODE)
@@ -475,6 +473,36 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             threadId,
             requestId,
           })
+          if (
+            (requestTrigger === 'regenerate-message' ||
+              requestTrigger === 'edit-message') &&
+            existingStreamId
+          ) {
+            rejectedActiveBranch = true
+            return yield* Effect.fail(
+              new InvalidRequestError({
+                message: 'Cannot branch while stream is active',
+                requestId,
+                issue: 'thread is currently generating',
+              }),
+            )
+          }
+
+          // Redis owns stream liveness. A crashed instance can leave Zero's
+          // status generating after its lease expires; recover before branching.
+          if (
+            requestTrigger !== 'submit-message' &&
+            !existingStreamId &&
+            (threadAccess.generationStatus === 'pending' ||
+              threadAccess.generationStatus === 'generation')
+          ) {
+            yield* threads.markThreadGenerationFailed({
+              userId,
+              threadId,
+              requestId,
+            })
+          }
+
           if (existingStreamId) {
             yield* streamResume.stopStream({
               streamId: existingStreamId,
@@ -502,26 +530,82 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             requestId,
             streamId,
             abortController: streamAbortController,
+            generationRequestId,
+            startedAt,
           })
-
-          if (
-            (requestTrigger === 'regenerate-message' ||
-              requestTrigger === 'edit-message') &&
-            (threadAccess.generationStatus === 'pending' ||
-              threadAccess.generationStatus === 'generation')
-          ) {
-            return yield* Effect.fail(
-              new InvalidRequestError({
-                message: 'Cannot branch while stream is active',
-                requestId,
-                issue: 'thread is currently generating',
-              }),
-            )
-          }
 
           let assistantParentMessageId: string | undefined
           let regenSourceMessageId: string | undefined
-          let messages: UIMessage[]
+          // Build the exact proposed prompt, including skill expansion, retained
+          // attachments and RAG, without creating a user row or changing branches.
+          let messages = yield* messageStore.loadThreadMessages({
+            threadId,
+            model: modelResolution.modelId,
+            userId,
+            organizationId,
+            orgPolicy,
+            branchTurn: requestTrigger === 'submit-message'
+              ? undefined
+              : {
+                  targetMessageId: command.messageId!,
+                  editedText: requestTrigger === 'edit-message'
+                    ? command.editedText!
+                    : undefined,
+                },
+            pendingUserMessage: requestTrigger === 'submit-message' ? command.message! : undefined,
+            pendingAttachments: requestTrigger === 'submit-message' ? attachments : undefined,
+            contextWindowTokens: activeContextWindow,
+            requestId,
+          })
+          const assembledSystemPrompt = assembleSystemPrompt({
+            modelId: modelResolution.modelId,
+            modePrompt: effectiveMode?.definition.systemPrompt,
+            activeTools: toolRegistry.activeTools,
+            projectInstruction: threadAccess.projectInstruction,
+          })
+
+          const providerOptions = withDirectProviderPromptCaching({
+            providerOptions: withGatewayComplianceProviderOptions({
+              providerOptions: modelResolution.reasoningEffort
+                ? toolRegistry.providerOptionsByReasoning[modelResolution.reasoningEffort]
+                : toolRegistry.defaultProviderOptions,
+              orgPolicy,
+              hasProviderKeyOverride: Boolean(modelResolution.providerApiKeyOverride),
+            }),
+            providerKeyOverrideProviderId: modelResolution.providerApiKeyOverride?.providerId,
+          })
+
+          if (wideEvent) {
+            setWideEventContext(wideEvent, {
+              usage: { promptTokens: estimatePromptTokens(messages) },
+            })
+          }
+
+          // Every turn path checks the full prompt. The gateway repeats this at
+          // its boundary for callers outside chat, before contacting a provider.
+          const toolTokens = yield* Effect.tryPromise({
+            try: () => estimateToolTokens(toolRegistry.tools, toolRegistry.activeTools),
+            catch: (error) => new ModelProviderError({
+              message: 'Failed to prepare tool schemas',
+              requestId,
+              cause: String(error),
+            }),
+          })
+          const outputLimits = yield* Effect.try({
+            try: () => resolveOutputLimits({
+              modelId: modelResolution.modelId,
+              estimatedPromptTokens:
+                estimatePromptTokens(messages) +
+                estimateTokensFromText(assembledSystemPrompt) +
+                toolTokens,
+              providerOptions,
+              contextWindowTokens: activeContextWindow,
+              requestId,
+              threadId,
+              contextWindowMode: effectiveContextWindowMode,
+            }),
+            catch: (error) => error as ContextWindowExceededError,
+          })
 
           if (requestTrigger === 'regenerate-message') {
             const regeneration = yield* messageStore.prepareRegeneration({
@@ -534,17 +618,6 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             })
             assistantParentMessageId = regeneration.anchorMessageId
             regenSourceMessageId = regeneration.regenSourceMessageId
-
-            messages = yield* messageStore.loadThreadMessages({
-              threadId,
-              model: modelResolution.modelId,
-              userId,
-              organizationId,
-              orgPolicy,
-              untilMessageId: regeneration.anchorMessageId,
-              contextWindowTokens: activeContextWindow,
-              requestId,
-            })
           } else if (requestTrigger === 'edit-message') {
             yield* Effect.annotateLogs(Effect.logInfo('chat_edit_requested'), {
               request_id: requestId,
@@ -565,16 +638,11 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             })
             assistantParentMessageId = edited.editedMessageId
             regenSourceMessageId = edited.regenSourceMessageId
-            messages = yield* messageStore.loadThreadMessages({
-              threadId,
-              model: modelResolution.modelId,
-              userId,
-              organizationId,
-              orgPolicy,
-              untilMessageId: edited.editedMessageId,
-              contextWindowTokens: activeContextWindow,
-              requestId,
-            })
+            messages = messages.map((message) =>
+              message.id === command.messageId
+                ? { ...message, id: edited.editedMessageId }
+                : message,
+            )
             yield* Effect.annotateLogs(Effect.logInfo('chat_edit_prepared'), {
               request_id: requestId,
               user_id: userId,
@@ -582,41 +650,6 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               edited_message_id: edited.editedMessageId,
             })
           } else {
-            const preparedMessages = yield* messageStore.loadThreadMessages({
-              threadId,
-              model: modelResolution.modelId,
-              userId,
-              organizationId,
-              orgPolicy,
-              pendingUserMessage: command.message!,
-              pendingAttachments: attachments,
-              contextWindowTokens: activeContextWindow,
-              requestId,
-            })
-            const usedTokens = estimatePromptTokens(preparedMessages)
-            if (wideEvent) {
-              setWideEventContext(wideEvent, {
-                usage: { promptTokens: usedTokens },
-              })
-            }
-            if (usedTokens >= activeContextWindow) {
-              return yield* Effect.fail(
-                new ContextWindowExceededError({
-                  message:
-                    contextWindowResolution.supportsDistinctMaxMode &&
-                    effectiveContextWindowMode === 'standard'
-                      ? 'This conversation has reached the standard context limit. Switch to Max to continue with the larger window.'
-                      : 'This conversation has reached the current context limit.',
-                  requestId,
-                  threadId,
-                  modelId: modelResolution.modelId,
-                  contextWindowMode: effectiveContextWindowMode,
-                  usedTokens,
-                  maxTokens: activeContextWindow,
-                }),
-              )
-            }
-
             yield* messageStore.appendUserMessage({
               threadDbId: threadAccess.dbId,
               threadId,
@@ -632,7 +665,6 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               requestId,
             })
 
-            messages = preparedMessages
             assistantParentMessageId = command.message!.id
           }
 
@@ -686,13 +718,18 @@ export class ChatOrchestratorService extends ServiceMap.Service<
           // This ID is generated server-side so start/finalize writes are deterministic
           // and idempotent even when transport retries happen.
           const assistantMessageId = crypto.randomUUID()
+          const stepAccounting = createStepAccounting({
+            modelId: modelResolution.modelId,
+            usedByok: Boolean(modelResolution.providerApiKeyOverride),
+            reservedNanoUsd: quotaReservation.estimatedNanoUsd,
+          })
+          let receivedProviderOutput = false
           let assistantFinalized = false
           let streamCleanedUp = false
           const assistantBuffer: AssistantDeltaBuffer = {
             text: '',
             reasoning: '',
           }
-          let transportErrorHandled = false
           const defaultStreamFailureMessage =
             'The assistant response failed while streaming. Please retry.'
 
@@ -708,11 +745,12 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                   requestId,
                   expectedStreamId: streamId,
                 })
-                yield* streamResume.releaseLocalStream({
-                  streamId,
-                  requestId,
-                })
               }).pipe(
+                Effect.ensuring(
+                  streamResume
+                    .releaseLocalStream({ streamId, requestId })
+                    .pipe(Effect.catch(() => Effect.void)),
+                ),
                 Effect.catch((error) =>
                   emitWideErrorEvent({
                     eventName: 'chat.stream.cleanup.failed',
@@ -745,6 +783,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
 
           const finalizeAssistant = async (input: {
             ok: boolean
+            stopped?: boolean
             errorMessage?: string
             errorCode?: ChatErrorCode
             errorI18nKey?: ChatErrorI18nKey
@@ -758,50 +797,63 @@ export class ChatOrchestratorService extends ServiceMap.Service<
 
             await Effect.runPromise(
               Effect.gen(function* () {
-                yield* messageStore.finalizeAssistantMessage({
-                  threadDbId: threadAccess.dbId,
-                  threadModel: modelResolution.modelId,
-                  threadId,
-                  userId,
-                  assistantMessageId,
-                  parentMessageId: assistantParentMessageId,
-                  branchAnchorMessageId: assistantParentMessageId,
-                  regenSourceMessageId,
-                  ok: input.ok,
-                  finalContent: assistantBuffer.text,
-                  reasoning:
-                    assistantBuffer.reasoning.trim().length > 0
-                      ? assistantBuffer.reasoning
-                      : undefined,
-                  errorMessage: input.errorMessage,
-                  errorCode: input.errorCode,
-                  errorI18nKey: input.errorI18nKey,
-                  modelParams: {
-                    reasoningEffort: modelResolution.reasoningEffort,
-                  },
-                  providerMetadata: input.providerMetadata,
-                  generationAnalytics: input.generationAnalytics,
-                  requestId,
-                })
+                const persisted = yield* messageStore
+                  .finalizeAssistantMessage({
+                    threadDbId: threadAccess.dbId,
+                    threadModel: modelResolution.modelId,
+                    threadId,
+                    userId,
+                    assistantMessageId,
+                    parentMessageId: assistantParentMessageId,
+                    branchAnchorMessageId: assistantParentMessageId,
+                    regenSourceMessageId,
+                    ok: input.ok,
+                    stopped: input.stopped,
+                    finalContent: assistantBuffer.text,
+                    reasoning:
+                      assistantBuffer.reasoning.trim().length > 0
+                        ? assistantBuffer.reasoning
+                        : undefined,
+                    sources: assistantBuffer.sources,
+                    parts: assistantBuffer.toolParts,
+                    finishReason: assistantBuffer.finishReason,
+                    errorMessage: input.errorMessage,
+                    errorCode: input.errorCode,
+                    errorI18nKey: input.errorI18nKey,
+                    modelParams: {
+                      reasoningEffort: modelResolution.reasoningEffort,
+                    },
+                    providerMetadata: input.providerMetadata,
+                    generationAnalytics: input.generationAnalytics,
+                    requestId,
+                  })
+                  .pipe(Effect.exit)
 
-                if (!input.ok) {
-                  yield* releaseQuotaReservation('request_failed')
-                  return
+                // Starting a request is not evidence of billable work. Providers
+                // can reject a large prompt before generating or reporting usage.
+                if (!hasProviderWork({ analytics: input.generationAnalytics, hasOutput: receivedProviderOutput })) {
+                  yield* releaseQuotaReservation('no_provider_work')
+                } else {
+                  yield* usageSettlement.recordChatUsage({
+                    organizationId,
+                    userId,
+                    requestId,
+                    assistantMessageId,
+                    modelId: modelResolution.modelId,
+                    actualCostUsd:
+                      input.generationAnalytics?.aiCost ??
+                      input.generationAnalytics?.publicCost,
+                    estimatedCostNanoUsd: quotaReservation.estimatedNanoUsd,
+                    usedByok: input.generationAnalytics?.usedByok ?? false,
+                  })
+                  yield* usageSettlement.settleMonetizationEvent({
+                    requestId,
+                  })
                 }
-
-                yield* usageSettlement.recordChatUsage({
-                  organizationId,
-                  userId,
-                  requestId,
-                  assistantMessageId,
-                  modelId: modelResolution.modelId,
-                  actualCostUsd:
-                    input.generationAnalytics?.aiCost ??
-                    input.generationAnalytics?.publicCost,
-                  estimatedCostNanoUsd: quotaReservation.estimatedNanoUsd,
-                  usedByok: input.generationAnalytics?.usedByok ?? false,
-                })
-                yield* usageSettlement.settleMonetizationEvent({ requestId })
+                // A failed write must still settle provider work before surfacing
+                // its persistence error through the usual telemetry path.
+                if (Exit.isFailure(persisted))
+                  return yield* Effect.failCause(persisted.cause)
               }).pipe(
                 Effect.catch((error) =>
                   Effect.flatMap(
@@ -860,9 +912,45 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                 ),
               ),
             ).catch(() => undefined)
+            // Settlement consumes the reservation; release is idempotent for a
+            // settled row and also covers persistence/settlement failure paths.
+            await Effect.runPromise(
+              releaseQuotaReservation('generation_finalized'),
+            ).catch(() => undefined)
           }
 
-          const result = yield* modelGateway.streamResponse({
+          // A submitted request can be stopped during prompt preparation. No
+          // provider call occurred, so finalize without charging estimated input.
+          const finalizePreProviderAbort = Effect.gen(function* () {
+            const stopped = isUserStopped(streamAbortController.signal)
+            yield* Effect.promise(() =>
+              finalizeAssistant({
+                ok: stopped,
+                stopped,
+                errorMessage: stopped
+                  ? undefined
+                  : GENERIC_ASSISTANT_FAILURE_MESSAGE,
+              }),
+            )
+            cleanupActiveStream()
+            return new Response(null, { status: 204 })
+          })
+          if (
+            yield* streamResume.hasStopIntent({
+              userId,
+              threadId,
+              requestId,
+              targetRequestId: generationRequestId,
+              streamId,
+            })
+          ) {
+            streamAbortController.abort('user-stop')
+          }
+          if (streamAbortController.signal.aborted) {
+            return yield* finalizePreProviderAbort
+          }
+
+          const streamStart = yield* modelGateway.streamResponse({
             messages,
             model: modelResolution.modelId,
             providerApiKeyOverride: modelResolution.providerApiKeyOverride,
@@ -873,33 +961,46 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             systemPrompt: assembledSystemPrompt,
             requestId,
             tools: toolRegistry.tools,
+            toolsContext: documentToolsContext({ userId, threadId, organizationId, sourceMessageId: assistantMessageId, maxOutputTokens: outputLimits.maxOutputTokens }, toolRegistry.activeTools),
             activeTools: toolRegistry.activeTools,
-            providerOptions: withDirectProviderPromptCaching({
-              providerOptions: withGatewayComplianceProviderOptions({
-                providerOptions: modelResolution.reasoningEffort
-                  ? toolRegistry.providerOptionsByReasoning[
-                      modelResolution.reasoningEffort
-                    ]
-                  : toolRegistry.defaultProviderOptions,
-                orgPolicy,
-                hasProviderKeyOverride: Boolean(
-                  modelResolution.providerApiKeyOverride,
-                ),
-              }),
-              providerKeyOverrideProviderId:
-                modelResolution.providerApiKeyOverride?.providerId,
-            }),
+            providerOptions,
+            contextWindowTokens: activeContextWindow,
             reasoningEffort: modelResolution.reasoningEffort,
             abortSignal: streamAbortController.signal,
+            onStepStart: (promptTokens) => stepAccounting.startStep(promptTokens),
+            onStepEnd: (step) => {
+              stepAccounting.finishStep(step)
+              markAssistantStepBoundary(assistantBuffer)
+            },
             onChunk: (chunk: unknown) => {
-              // Persisted assistant content is reconstructed from deltas as they arrive.
+              // Lifecycle/error parts do not prove provider work. Text, reasoning
+              // and tool input do, including tools with no visible assistant text.
+              const type = (chunk as { type?: string } | null)?.type
+              if (
+                type &&
+                /^(text-|reasoning-|tool-input-|tool-call$|tool-result$|tool-error$)/.test(type)
+              )
+                receivedProviderOutput = true
+              stepAccounting.observe(chunk)
               applyAssistantChunkDelta(assistantBuffer, chunk)
             },
-          })
+          }).pipe(
+            // A Stop that lands while attachments are still being converted makes
+            // the gateway's pre-call abort check throw. That is still a user stop
+            // before any provider work, not a generation failure.
+            Effect.map((result) => ({ result })),
+            Effect.catch((error) =>
+              isUserStopped(streamAbortController.signal)
+                ? Effect.succeed({ result: undefined })
+                : Effect.fail(error),
+            ),
+          )
+          if (!streamStart.result) {
+            return yield* finalizePreProviderAbort
+          }
+          const result = streamStart.result
 
-          return result.toUIMessageStreamResponse({
-            originalMessages: messages,
-            generateMessageId: () => assistantMessageId,
+          return createUIMessageStreamResponse({
             headers: {
               'Content-Encoding': 'none',
               'Cache-Control': 'no-cache, no-transform',
@@ -974,167 +1075,187 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                   }),
               })
             },
-            onError: (error: unknown) => {
-              // The AI SDK can invoke stream error hooks more than once for the same
-              // transport failure. We only persist/log once per request.
-              if (transportErrorHandled) {
-                return defaultStreamFailureMessage
-              }
-              transportErrorHandled = true
-
-              const readableMessage = toReadableErrorMessage(
-                error,
-                defaultStreamFailureMessage,
-              )
-              const classification = classifyUnknownChatError()
-              if (wideEvent) {
-                finalizeWideEventFailure(wideEvent, {
-                  status: classification.status,
-                  level: classification.severity,
-                  captureMode: classification.captureMode,
-                  retryable: true,
-                  errorTag: getErrorTag(error),
-                  message: readableMessage,
-                  errorCode: chatErrorCodeFromTag(getErrorTag(error)),
-                  i18nKey: classification.i18nKey,
-                  cause: error instanceof Error ? error.message : undefined,
-                })
-                void Effect.runPromise(drainWideEvent(wideEvent)).catch(
-                  () => undefined,
+            stream: toUIMessageStream({
+              stream: result.stream,
+              tools: toolRegistry.tools,
+              sendSources: true,
+              sendReasoning: true,
+              originalMessages: messages,
+              generateMessageId: () => assistantMessageId,
+              onError: (error: unknown) => {
+                if (isUserStopped(streamAbortController.signal)) return ''
+                // v7 also calls this formatter for local tool errors. Only onEnd's
+                // outcome classifies the transport and owns persistence/settlement.
+                const readableMessage = toReadableErrorMessage(
+                  error,
+                  defaultStreamFailureMessage,
                 )
-              }
-              void finalizeAssistant({
-                ok: false,
-                errorMessage: GENERIC_ASSISTANT_FAILURE_MESSAGE,
-                errorCode: ChatErrorCode.Unknown,
-                errorI18nKey: ChatErrorI18nKey.Unknown,
-              })
-              cleanupActiveStream()
-
-              return JSON.stringify(
-                buildChatApiErrorEnvelope({
-                  requestId,
-                  code: classification.code,
-                  i18nKey: classification.i18nKey,
-                  i18nParams: classification.i18nParams,
-                  retryable: classification.retryable,
-                  tag: getErrorTag(error),
-                  detailsMessage: readableMessage,
-                  threadId,
-                }),
-              )
-            },
-            messageMetadata: ({ part }: { part: any }) => {
-              // Metadata is attached only for lifecycle events consumed by the client.
-              if (part.type === 'start') {
-                return {
-                  threadId,
-                  requestId,
-                  model: modelResolution.modelId,
-                  modelSource: modelResolution.source,
-                  startedAt,
-                }
-              }
-              if (part.type === 'finish') {
-                return {
-                  threadId,
-                  requestId,
-                  model: modelResolution.modelId,
-                  modelSource: modelResolution.source,
-                  completedAt: Date.now(),
-                  totalTokens: part.totalUsage.totalTokens,
-                }
-              }
-              return undefined
-            },
-            onFinish: async ({
-              isAborted,
-              responseMessage,
-            }: {
-              isAborted: boolean
-              responseMessage: UIMessage
-            }) => {
-              // If chunk-level callbacks missed content, hydrate from final payload.
-              hydrateAssistantBufferFromResponse(
-                assistantBuffer,
-                responseMessage,
-              )
-
-              const ok = assistantBuffer.text.length > 0
-              const persistedGeneration = await Promise.all([
-                result.totalUsage,
-                result.providerMetadata,
-              ])
-                .then(([totalUsage, providerMetadata]) =>
-                  buildPersistedGenerationAnalytics({
-                    usage: totalUsage,
-                    providerMetadata,
-                    usedByok: Boolean(modelResolution.providerApiKeyOverride),
-                    generationMetadata: {
-                      activeToolKeys: resolvedToolPolicy.activeToolKeys,
-                      deniedToolKeysByReason: resolvedToolPolicy.toolEntries
-                        .filter((entry) => entry.reasons.length > 0)
-                        .map((entry) => ({
-                          key: entry.key,
-                          reasons: [...entry.reasons],
-                        })),
-                      orgProviderNativeToolsEnabled:
-                        orgPolicy?.toolPolicy.providerNativeToolsEnabled ??
-                        true,
-                      threadDisabledToolKeys: sanitizedDisabledToolKeys,
-                    },
+                const classification = classifyUnknownChatError()
+                return JSON.stringify(
+                  buildChatApiErrorEnvelope({
+                    requestId,
+                    code: classification.code,
+                    i18nKey: classification.i18nKey,
+                    i18nParams: classification.i18nParams,
+                    retryable: classification.retryable,
+                    tag: getErrorTag(error),
+                    detailsMessage: readableMessage,
+                    threadId,
                   }),
                 )
-                .catch(() => undefined)
+              },
+              messageMetadata: ({ part }) => {
+                // Metadata is attached only for lifecycle events consumed by the client.
+                if (part.type === 'start') {
+                  return {
+                    threadId,
+                    requestId: generationRequestId ?? requestId,
+                    model: modelResolution.modelId,
+                    modelSource: modelResolution.source,
+                    startedAt,
+                  }
+                }
+                if (part.type === 'finish') {
+                  return {
+                    threadId,
+                    requestId: generationRequestId ?? requestId,
+                    model: modelResolution.modelId,
+                    modelSource: modelResolution.source,
+                    completedAt: Date.now(),
+                    totalTokens: part.totalUsage.totalTokens,
+                    finishReason: part.finishReason,
+                  }
+                }
+                return undefined
+              },
+              onEnd: async ({
+                isAborted,
+                responseMessage,
+                outcome,
+                isCancelled,
+                finishReason,
+              }) => {
+                // If chunk-level callbacks missed content, hydrate from final payload.
+                hydrateAssistantBufferFromResponse(
+                  assistantBuffer,
+                  responseMessage,
+                )
 
-              if (wideEvent) {
-                setWideEventContext(wideEvent, {
-                  usage: {
-                    totalTokens: persistedGeneration?.totalTokens,
-                    outputTokens: persistedGeneration?.outputTokens,
-                    actualCostUsd:
-                      persistedGeneration?.aiCost ??
-                      persistedGeneration?.publicCost,
-                    usedByok: persistedGeneration?.usedByok,
-                  },
-                  stream: { aborted: isAborted, activePhase: 'finished' },
-                })
-                if (ok && !isAborted) {
-                  finalizeWideEventSuccess(wideEvent, { status: 200 })
-                } else if (!wideEvent.outcome) {
-                  const classification = classifyUnknownChatError()
-                  finalizeWideEventFailure(wideEvent, {
-                    status: 502,
-                    level: classification.severity,
-                    captureMode: classification.captureMode,
-                    retryable: true,
-                    errorTag: 'StreamFailed',
-                    errorCode: classification.code,
-                    message: isAborted
-                      ? 'Stream aborted before completion'
-                      : 'No assistant content generated',
-                    i18nKey: classification.i18nKey,
+                receivedProviderOutput ||= Boolean(
+                  assistantBuffer.text || assistantBuffer.reasoning || assistantBuffer.toolParts?.length,
+                )
+                assistantBuffer.finishReason = finishReason ?? assistantBuffer.finishReason
+                const stopped = isUserStopped(streamAbortController.signal)
+                const ok =
+                  stopped ||
+                  (!isAborted &&
+                    !isCancelled &&
+                    outcome.status !== 'failed' &&
+                    !streamAbortController.signal.aborted &&
+                    (assistantBuffer.text.length > 0 || Boolean(assistantBuffer.toolParts?.some((part) => part.state === 'output-available'))))
+                // v7 exposes all-step token totals and final-step provider accounting separately.
+                let persistedGeneration = await Promise.all([
+                  Promise.resolve(result.usage).catch(() => undefined),
+                  Promise.resolve(result.steps ?? Promise.resolve(result.finalStep).then((step) => [step])).catch(() => undefined),
+                ])
+                  .then(([usage, steps]) => {
+                    const finalStep = steps?.at(-1)
+                    assistantBuffer.finishReason =
+                      finalStep?.finishReason ?? assistantBuffer.finishReason
+                    return buildPersistedGenerationAnalytics({
+                      usage,
+                      providerMetadata: aggregateStepAccounting(steps ?? []),
+                      usedByok: Boolean(modelResolution.providerApiKeyOverride),
+                      generationMetadata: {
+                        finishReason: assistantBuffer.finishReason,
+                        activeToolKeys: resolvedToolPolicy.activeToolKeys,
+                        deniedToolKeysByReason: resolvedToolPolicy.toolEntries
+                          .filter((entry) => entry.reasons.length > 0)
+                          .map((entry) => ({
+                            key: entry.key,
+                            reasons: [...entry.reasons],
+                          })),
+                        orgProviderNativeToolsEnabled:
+                          orgPolicy?.toolPolicy.providerNativeToolsEnabled ??
+                          true,
+                        threadDisabledToolKeys: sanitizedDisabledToolKeys,
+                      },
+                    })
+                  })
+                  .catch(() => undefined)
+                const interrupted = stepAccounting.interrupted()
+                if (
+                  hasProviderWork({ analytics: interrupted ?? persistedGeneration, hasOutput: receivedProviderOutput }) &&
+                  (isAborted ||
+                    isCancelled ||
+                    outcome.status === 'failed' ||
+                    streamAbortController.signal.aborted)
+                ) {
+                  persistedGeneration = interrupted ? {
+                    ...interrupted,
+                    generationMetadata: persistedGeneration?.generationMetadata,
+                  } : resolveStoppedUsage({
+                    analytics: persistedGeneration,
+                    modelId: modelResolution.modelId,
+                    messages,
+                    text: assistantBuffer.text,
+                    reasoning: assistantBuffer.reasoning,
+                    usedByok: Boolean(modelResolution.providerApiKeyOverride),
+                    reservedNanoUsd: quotaReservation.estimatedNanoUsd,
                   })
                 }
-                await Effect.runPromise(drainWideEvent(wideEvent)).catch(
-                  () => undefined,
-                )
-              }
 
-              await finalizeAssistant({
-                ok,
-                providerMetadata: persistedGeneration?.providerMetadata,
-                generationAnalytics: persistedGeneration,
-                errorMessage: isAborted
-                  ? GENERIC_ASSISTANT_FAILURE_MESSAGE
-                  : ok
-                    ? undefined
-                    : GENERIC_ASSISTANT_FAILURE_MESSAGE,
-                errorCode: ok ? undefined : ChatErrorCode.Unknown,
-                errorI18nKey: ok ? undefined : ChatErrorI18nKey.Unknown,
-              })
-              cleanupActiveStream()
-            },
+                if (wideEvent) {
+                  setWideEventContext(wideEvent, {
+                    usage: {
+                      totalTokens: persistedGeneration?.totalTokens,
+                      outputTokens: persistedGeneration?.outputTokens,
+                      actualCostUsd:
+                        persistedGeneration?.aiCost ??
+                        persistedGeneration?.publicCost,
+                      usedByok: persistedGeneration?.usedByok,
+                    },
+                    stream: { aborted: isAborted, activePhase: 'finished' },
+                  })
+                  if (ok) {
+                    finalizeWideEventSuccess(wideEvent, { status: 200 })
+                  } else if (!wideEvent.outcome) {
+                    const classification = classifyUnknownChatError()
+                    finalizeWideEventFailure(wideEvent, {
+                      status: 502,
+                      level: classification.severity,
+                      captureMode: classification.captureMode,
+                      retryable: true,
+                      errorTag: 'StreamFailed',
+                      errorCode: classification.code,
+                      message: isAborted
+                        ? 'Stream aborted before completion'
+                        : 'No assistant content generated',
+                      i18nKey: classification.i18nKey,
+                    })
+                  }
+                  await Effect.runPromise(drainWideEvent(wideEvent)).catch(
+                    () => undefined,
+                  )
+                }
+
+                await finalizeAssistant({
+                  ok,
+                  stopped,
+                  providerMetadata: persistedGeneration?.providerMetadata,
+                  generationAnalytics: persistedGeneration,
+                  errorMessage:
+                    isAborted && !stopped
+                      ? GENERIC_ASSISTANT_FAILURE_MESSAGE
+                      : ok
+                        ? undefined
+                        : GENERIC_ASSISTANT_FAILURE_MESSAGE,
+                  errorCode: ok ? undefined : ChatErrorCode.Unknown,
+                  errorI18nKey: ok ? undefined : ChatErrorI18nKey.Unknown,
+                })
+                cleanupActiveStream()
+              },
+            }),
           })
         }).pipe(
           Effect.tapError((error) =>
@@ -1183,15 +1304,16 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                   issue: editError.issue,
                 })
               }
-              // Ensures threads do not stay in "pending/generation" after early
-              // failures (e.g. model policy denied before stream initialization).
-              yield* threads
-                .markThreadGenerationFailed({
-                  userId,
-                  threadId,
-                  requestId,
-                })
-                .pipe(Effect.catch(() => Effect.void))
+              // Only a request that owns a stream may fail its thread. A rejected
+              // branch request must leave the existing generation resumable.
+              if (!rejectedActiveBranch)
+                yield* threads
+                  .markThreadGenerationFailed({
+                    userId,
+                    threadId,
+                    requestId,
+                  })
+                  .pipe(Effect.catch(() => Effect.void))
               yield* releaseQuotaReservation('request_failed').pipe(
                 Effect.catch(() => Effect.void),
               )
@@ -1207,16 +1329,23 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               }
               const failedStreamId = currentStreamId
 
-              yield* streamResume.clearActiveStream({
-                userId,
-                threadId,
-                requestId,
-                expectedStreamId: failedStreamId,
-              })
-              yield* streamResume.releaseLocalStream({
-                streamId: failedStreamId,
-                requestId,
-              })
+              yield* streamResume
+                .clearActiveStream({
+                  userId,
+                  threadId,
+                  requestId,
+                  expectedStreamId: failedStreamId,
+                })
+                .pipe(
+                  Effect.ensuring(
+                    streamResume
+                      .releaseLocalStream({
+                        streamId: failedStreamId,
+                        requestId,
+                      })
+                      .pipe(Effect.catch(() => Effect.void)),
+                  ),
+                )
             }),
           ),
         )
