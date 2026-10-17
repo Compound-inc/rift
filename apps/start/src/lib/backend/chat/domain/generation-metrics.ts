@@ -1,5 +1,6 @@
 import type { LanguageModelUsage } from 'ai'
 import type { ReadonlyJSONValue } from '@rocicorp/zero'
+import { boundedJson } from '@/lib/shared/chat-contracts/bounded-json'
 import { canExposeUserCost } from '@/utils/app-feature-flags'
 
 type UnknownRecord = Record<string, unknown>
@@ -27,13 +28,13 @@ export function buildPersistedGenerationAnalytics(input: {
   readonly usedByok: boolean
   readonly generationMetadata?: Record<string, ReadonlyJSONValue | undefined>
 }): PersistedGenerationAnalytics {
-  const providerMetadata = undefined
+  const providerMetadata = boundedJson(input.providerMetadata, 32_768)
   const root = asRecord(input.providerMetadata)
   const gateway = asRecord(root?.gateway)
   const openrouter = asRecord(root?.openrouter)
   const openrouterUsage = asRecord(openrouter?.usage)
   const usage = normalizeUsage(input.usage, { openrouterUsage })
-  const generationMetadata = undefined
+  const generationMetadata = boundedJson(input.generationMetadata, 16_384)
 
   // Cost extraction priority order:
   //  1. AI Gateway: `providerMetadata.gateway.cost` is the canonical field.

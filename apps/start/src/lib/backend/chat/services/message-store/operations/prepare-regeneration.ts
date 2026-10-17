@@ -107,7 +107,7 @@ export const makePrepareRegenerationOperation = (dependencies: {
                     `select exists (
                     select 1 from org_usage_event where assistant_message_id = $1
                   ) or exists (
-                    select 1 from messages where id = $2 and ai_cost > 0
+                    select 1 from message_analytics where message_id = $2 and ai_cost > 0
                   ) as billed`,
                     [target.messageId, target.id],
                   )

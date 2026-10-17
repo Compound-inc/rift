@@ -1,3 +1,5 @@
+import { isToolUIPart } from 'ai'
+import { ToolCallPart } from '../components/tool-call-part'
 import { Streamdown } from 'streamdown'
 import {
   streamdownRemarkPlugins,
@@ -18,6 +20,8 @@ function AssistantTextPart({
   text: string
 }) {
   const streamdownPlugins = useStreamdownPlugins()
+  // Explicit [[n]](url) links carry their own destination. A shared static
+  // plugin list avoids both global processor-cache collisions and block reparsing.
 
   return (
     <Streamdown
@@ -69,6 +73,13 @@ function renderStepBoundary({ part, index }: AssistantPartRenderContext) {
  * fallbacks as this registry grows.
  */
 export const assistantPartRenderers: readonly AssistantPartRenderer[] = [
+  {
+    id: 'tool',
+    match: isToolUIPart,
+    render: ({ part, isMessageStreaming }) => (
+      <ToolCallPart part={part} isMessageStreaming={isMessageStreaming} />
+    ),
+  },
   {
     id: 'step-boundary',
     match: (part) => part.type === 'step-start',

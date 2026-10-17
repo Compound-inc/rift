@@ -1,3 +1,4 @@
+import { safeText } from '@/lib/shared/chat-contracts/safe-text'
 import { PgClient } from '@effect/sql-pg'
 import { Effect } from 'effect'
 import type { ReadonlyJSONValue } from '@rocicorp/zero'
@@ -27,7 +28,11 @@ type JsonInput =
   | undefined
 
 function serializeJson(input: JsonInput): string | null {
-  return input === undefined ? null : JSON.stringify(input)
+  return input === undefined
+    ? null
+    : JSON.stringify(input, (_key, value: unknown) =>
+        typeof value === 'string' ? safeText(value) : value,
+      )
 }
 
 export const makeFinalizeAssistantMessageOperation = ({
@@ -37,9 +42,9 @@ export const makeFinalizeAssistantMessageOperation = ({
 }): MessageStoreServiceShape['finalizeAssistantMessage'] => {
   /**
    * Assistant finalization writes both public and private analytics fields.
-   * Those private columns are intentionally absent from the client Zero
-   * schema, so this operation writes directly to upstream Postgres rather
-   * than going through Zero mutators.
+   * Private accounting goes into the unpublished message_analytics table in the
+   * same upstream transaction. Removing client schema fields alone cannot stop
+   * Zero replication of columns on a published table.
    */
   return Effect.fn('MessageStoreService.finalizeAssistantMessage')(
     ({
@@ -55,6 +60,9 @@ export const makeFinalizeAssistantMessageOperation = ({
       stopped,
       finalContent,
       reasoning,
+      sources,
+      parts,
+      finishReason,
       errorMessage,
       errorCode,
       errorI18nKey,
@@ -65,6 +73,14 @@ export const makeFinalizeAssistantMessageOperation = ({
     }) =>
       Effect.gen(function* () {
         const now = Date.now()
+        // Tool display data is optional. A cyclic/malformed part must never
+        // discard the completed answer or prevent usage settlement.
+        let serializedParts: string | null = null
+        try {
+          serializedParts = serializeJson(parts)
+        } catch {
+          serializedParts = null
+        }
         const serverError = !ok
           ? {
               type: 'stream_error',
@@ -103,16 +119,14 @@ export const makeFinalizeAssistantMessageOperation = ({
                   update messages
                   set
                     model = ${threadModel},
-                    content = ${finalContent},
-                    reasoning = ${reasoning ?? null},
+                    content = ${safeText(finalContent)},
+                    reasoning = ${reasoning === undefined ? null : safeText(reasoning)},
+                    sources = ${serializeJson(sources)}::jsonb,
+                    parts = ${serializedParts}::jsonb,
+                    finish_reason = ${finishReason ?? null},
                     status = ${stopped ? 'cancelled' : ok ? 'done' : 'error'},
                     updated_at = ${now},
                     model_params = ${serializeJson(modelParams)}::jsonb,
-                    provider_metadata = ${serializeJson(providerMetadata)}::jsonb,
-                    generation_metadata = ${serializeJson(
-                      generationAnalytics?.generationMetadata,
-                    )}::jsonb,
-                    ai_cost = ${generationAnalytics?.aiCost ?? null},
                     public_cost = ${generationAnalytics?.publicCost ?? null},
                     used_byok = ${generationAnalytics?.usedByok ?? null},
                     input_tokens = ${generationAnalytics?.inputTokens ?? null},
@@ -155,6 +169,9 @@ export const makeFinalizeAssistantMessageOperation = ({
                     user_id,
                     content,
                     reasoning,
+                    sources,
+                    parts,
+                    finish_reason,
                     status,
                     parent_message_id,
                     branch_index,
@@ -166,9 +183,6 @@ export const makeFinalizeAssistantMessageOperation = ({
                     model,
                     attachments_ids,
                     model_params,
-                    provider_metadata,
-                    generation_metadata,
-                    ai_cost,
                     public_cost,
                     used_byok,
                     input_tokens,
@@ -186,8 +200,11 @@ export const makeFinalizeAssistantMessageOperation = ({
                     ${assistantMessageId},
                     ${threadId},
                     ${userId},
-                    ${finalContent},
-                    ${reasoning ?? null},
+                    ${safeText(finalContent)},
+                    ${reasoning === undefined ? null : safeText(reasoning)},
+                    ${serializeJson(sources)}::jsonb,
+                    ${serializedParts}::jsonb,
+                    ${finishReason ?? null},
                     ${stopped ? 'cancelled' : ok ? 'done' : 'error'},
                     ${parentMessageId ?? null},
                     ${branchIndex},
@@ -199,9 +216,6 @@ export const makeFinalizeAssistantMessageOperation = ({
                     ${threadModel},
                     ${sqlJson(sql, [])},
                     ${serializeJson(modelParams)}::jsonb,
-                    ${serializeJson(providerMetadata)}::jsonb,
-                    ${serializeJson(generationAnalytics?.generationMetadata)}::jsonb,
-                    ${generationAnalytics?.aiCost ?? null},
                     ${generationAnalytics?.publicCost ?? null},
                     ${generationAnalytics?.usedByok ?? null},
                     ${generationAnalytics?.inputTokens ?? null},
@@ -217,6 +231,21 @@ export const makeFinalizeAssistantMessageOperation = ({
                   )
                 `
             }
+
+            yield* sql`
+              insert into message_analytics (
+                message_id, provider_metadata, generation_metadata, ai_cost
+              ) values (
+                ${assistantMessageId},
+                ${serializeJson(providerMetadata)}::jsonb,
+                ${serializeJson(generationAnalytics?.generationMetadata)}::jsonb,
+                ${generationAnalytics?.aiCost ?? null}
+              )
+              on conflict (message_id) do update set
+                provider_metadata = excluded.provider_metadata,
+                generation_metadata = excluded.generation_metadata,
+                ai_cost = excluded.ai_cost
+            `
 
             const activeChildByParent = normalizeThreadActiveChildMap(
               thread.active_child_by_parent,

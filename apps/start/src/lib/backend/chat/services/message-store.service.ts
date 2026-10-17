@@ -1,3 +1,7 @@
+import type {
+  PersistedSource,
+  PersistedToolPart,
+} from '@/lib/shared/chat-contracts/generation-parts'
 import { PgClient } from '@effect/sql-pg'
 import type { UIMessage } from 'ai'
 import type { ReadonlyJSONValue } from '@rocicorp/zero'
@@ -37,6 +41,11 @@ export type MessageStoreServiceShape = {
     readonly organizationId?: string
     readonly orgPolicy?: OrgAiPolicy
     readonly untilMessageId?: string
+    /** Read-only view of a proposed regeneration/edit, before branch writes. */
+    readonly branchTurn?: {
+      readonly targetMessageId: string
+      readonly editedText?: string
+    }
     readonly pendingUserMessage?: IncomingUserMessage
     readonly pendingAttachments?: readonly ChatAttachmentInput[]
     /**
@@ -45,7 +54,7 @@ export type MessageStoreServiceShape = {
      */
     readonly contextWindowTokens?: number
     readonly requestId: string
-  }) => Effect.Effect<UIMessage[], MessagePersistenceError>
+  }) => Effect.Effect<UIMessage[], MessagePersistenceError | InvalidRequestError | InvalidEditTargetError>
   readonly appendUserMessage: (input: {
     readonly threadDbId: string
     readonly threadId: string
@@ -108,6 +117,9 @@ export type MessageStoreServiceShape = {
     readonly regenSourceMessageId?: string
     readonly ok: boolean
     readonly stopped?: boolean
+    readonly sources?: readonly PersistedSource[]
+    readonly parts?: readonly PersistedToolPart[]
+    readonly finishReason?: string
     readonly finalContent: string
     readonly reasoning?: string
     readonly errorMessage?: string
@@ -157,6 +169,7 @@ export class MessageStoreService extends ServiceMap.Service<
       threadId,
       model: _model,
       untilMessageId,
+      branchTurn,
       pendingUserMessage,
       requestId,
     }) =>
@@ -164,6 +177,17 @@ export class MessageStoreService extends ServiceMap.Service<
         const existing = getMemoryState().messages.get(threadId)
         if (!existing) {
           throw new Error('missing thread message store')
+        }
+        if (branchTurn) {
+          let targetIndex = existing.findIndex((message) => message.id === branchTurn.targetMessageId)
+          if (targetIndex < 0) throw new Error('target message not found')
+          if (branchTurn.editedText === undefined && existing[targetIndex].role === 'assistant') targetIndex -= 1
+          const preview = existing.slice(0, targetIndex + 1)
+          if (branchTurn.editedText !== undefined) {
+            const target = preview[targetIndex]
+            preview[targetIndex] = { ...target, parts: target.parts.map((part) => part.type === 'text' ? { ...part, text: branchTurn.editedText!.trim() } : part) }
+          }
+          return preview
         }
         const loaded = (() => {
           if (!untilMessageId) return existing.slice()
@@ -310,6 +334,9 @@ export class MessageStoreService extends ServiceMap.Service<
       assistantMessageId,
       finalContent,
       reasoning,
+      sources,
+      parts: toolParts,
+      finishReason,
       requestId,
     }) =>
       Effect.sync(() => {
@@ -325,11 +352,16 @@ export class MessageStoreService extends ServiceMap.Service<
           if (reasoning && reasoning.trim().length > 0) {
             parts.push({ type: 'reasoning', text: reasoning, state: 'done' })
           }
-          parts.push({ type: 'text', text: finalContent })
+          parts.push(
+            ...(toolParts ?? []),
+            { type: 'text', text: finalContent },
+            ...(sources ?? []),
+          )
           existing.push({
             id: assistantMessageId,
             role: 'assistant',
             parts,
+            metadata: { finishReason },
           })
           return
         }
@@ -338,8 +370,13 @@ export class MessageStoreService extends ServiceMap.Service<
         if (reasoning && reasoning.trim().length > 0) {
           parts.push({ type: 'reasoning', text: reasoning, state: 'done' })
         }
-        parts.push({ type: 'text', text: finalContent })
+        parts.push(
+          ...(toolParts ?? []),
+          { type: 'text', text: finalContent },
+          ...(sources ?? []),
+        )
         target.parts = parts
+        target.metadata = { finishReason }
       }).pipe(
         Effect.catch((error) =>
           Effect.fail(

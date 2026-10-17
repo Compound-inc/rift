@@ -1,3 +1,7 @@
+import {
+  estimateTokensFromText,
+  LATIN_CHARS_PER_TOKEN,
+} from '@/lib/shared/chat-contracts/token-estimate'
 import { RAG_CONFIG } from '../domain/config'
 import type { RagScope, RagSource, RetrievedChunk } from '../domain/types'
 
@@ -22,6 +26,7 @@ import type { RagScope, RagSource, RetrievedChunk } from '../domain/types'
  */
 
 export type ContextBudget = {
+  /** Latin-equivalent units; actual text is measured with the shared estimator. */
   readonly fullTextChars: number
   readonly retrievalChars: number
 }
@@ -85,13 +90,27 @@ export type FullTextPlan = {
 export function planFullText(
   pinned: readonly RagSource[],
   fullTextChars: number,
+  contents?: ReadonlyMap<string, string>,
 ): FullTextPlan {
+  // Cache once per body; sorting must not rescan long documents per comparison.
+  const footprints = new Map(
+    pinned.map((source) => {
+      const content = contents?.get(source.id)
+      return [
+        source.id,
+        content === undefined
+          ? source.contentChars
+          : estimateTokensFromText(content) * LATIN_CHARS_PER_TOKEN,
+      ] as const
+    }),
+  )
+  const footprint = (source: RagSource) => footprints.get(source.id)!
   const candidates = pinned
     .filter((source) => source.contentChars > 0)
     .sort(
       (a, b) =>
         PINNED_TIER[a.scope] - PINNED_TIER[b.scope] ||
-        a.contentChars - b.contentChars ||
+        footprint(a) - footprint(b) ||
         compareSourcesForDisplay(a, b),
     )
 
@@ -99,9 +118,9 @@ export function planFullText(
   const fullText: RagSource[] = []
   const overflow: RagSource[] = []
   for (const source of candidates) {
-    if (source.contentChars <= remaining) {
+    if (footprint(source) <= remaining) {
       fullText.push(source)
-      remaining -= source.contentChars
+      remaining -= footprint(source)
     } else {
       overflow.push(source)
     }
@@ -164,10 +183,11 @@ export function selectRetrievedChunks(input: {
   const tryAccept = (chunk: RetrievedChunk) => {
     if (accepted.has(key(chunk))) return
     if ((perSource.get(chunk.sourceId) ?? 0) >= perSourceCap) return
-    if (usedChars + chunk.content.length > input.retrievalChars) return
+    const footprint = estimateTokensFromText(chunk.content) * LATIN_CHARS_PER_TOKEN
+    if (usedChars + footprint > input.retrievalChars) return
     accepted.set(key(chunk), chunk)
     perSource.set(chunk.sourceId, (perSource.get(chunk.sourceId) ?? 0) + 1)
-    usedChars += chunk.content.length
+    usedChars += footprint
   }
 
   for (const chunk of pinned) {

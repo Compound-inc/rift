@@ -29,11 +29,14 @@ function createHarness(
   options: {
     cleanupFails?: boolean
     reportedUsage?: LanguageModelUsage
+    reportedCost?: number
     providerFailure?: boolean
     promptAbortReason?: 'replaced' | 'user-stop'
     toolOutput?: boolean
+    promptText?: string
   } = {},
 ) {
+  const writes: string[] = []
   const finalized: FinalizeInput[] = []
   const recorded: Parameters<
     WorkspaceUsageSettlementService['Service']['recordChatUsage']
@@ -69,8 +72,20 @@ function createHarness(
                   })
                   .pipe(Effect.orDie)
             }
-            return messages
+            return options.promptText === undefined ? messages : messages.map((message, index) => index === messages.length - 1 ? { ...message, parts: [{ type: 'text' as const, text: options.promptText! }] } : message)
           }),
+        appendUserMessage: (input) => {
+          writes.push('append')
+          return store.appendUserMessage(input)
+        },
+        prepareEdit: (input) => {
+          writes.push('edit')
+          return store.prepareEdit(input)
+        },
+        prepareRegeneration: (input) => {
+          writes.push('regenerate')
+          return store.prepareRegeneration(input)
+        },
         finalizeAssistantMessage: (input: FinalizeInput) => {
           finalized.push(input)
           return store.finalizeAssistantMessage(input)
@@ -150,7 +165,10 @@ function createHarness(
                     } satisfies LanguageModelUsage),
                 )
           },
-          finalStep: Promise.resolve({ providerMetadata: undefined }),
+          finalStep: Promise.resolve({
+            finishReason: options.reportedCost === undefined ? undefined : 'length',
+            providerMetadata: options.reportedCost === undefined ? undefined : { gateway: { cost: options.reportedCost } },
+          }),
           stream: new ReadableStream<TextStreamPart<ToolSet>>({
             start(controller) {
               controller.enqueue({ type: 'start' })
@@ -237,6 +255,7 @@ function createHarness(
   ).pipe(Layer.provideMerge(dependencies))
   return {
     layer,
+    writes,
     finalized,
     recorded,
     released,
@@ -713,4 +732,71 @@ describe('stream control orchestration', () => {
       }).pipe(Effect.provide(harness.layer)),
     )
   })
+})
+
+it.each(['submit-message', 'regenerate-message', 'edit-message'] as const)(
+  'rejects %s before writing any turn or branch, even on repeated attempts',
+  async (trigger) => {
+    // 375K Latin tokens fit the raw 400K window but exceed it once the 10%
+    // margin, system instructions and answer allowance are included.
+    const harness = createHarness('', '', false, { promptText: 'a'.repeat(1_500_000) })
+    await Effect.runPromise(Effect.gen(function* () {
+      const orchestrator = yield* ChatOrchestratorService
+      const store = yield* MessageStoreService
+      const { threadId } = yield* orchestrator.createThread({
+        userId: 'limit-owner', requestId: 'create', modelId: 'openai/gpt-5-mini',
+      })
+      yield* store.appendUserMessage({
+        threadDbId: threadId, threadId, userId: 'limit-owner', model: 'openai/gpt-5-mini',
+        requestId: 'seed', expectedBranchVersion: 1,
+        message: { id: 'original', role: 'user', parts: [{ type: 'text', text: 'original question' }] },
+      })
+      harness.writes.length = 0
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const failure = yield* orchestrator.streamChat({
+          userId: 'limit-owner', threadId, requestId: `reject-${attempt}`,
+          route: '/api/chat', expectedBranchVersion: 1, trigger,
+          messageId: trigger === 'submit-message' ? undefined : 'original',
+          editedText: trigger === 'edit-message' ? 'edited question' : undefined,
+          message: trigger === 'submit-message'
+            ? { id: `pending-${attempt}`, role: 'user', parts: [{ type: 'text', text: 'new question' }] }
+            : undefined,
+          accessPolicy: resolveChatAccessPolicy({
+            userId: 'limit-owner', organizationId: 'org', isAnonymous: false, planId: 'plus',
+          }),
+        }).pipe(Effect.flip)
+        expect(failure._tag).toBe('ContextWindowExceededError')
+      }
+      expect(harness.writes).toEqual([])
+      expect(harness.signal()).toBeUndefined()
+      expect(harness.finalized).toEqual([])
+      expect(harness.recorded).toEqual([])
+      const streams = yield* StreamResumeService
+      expect(yield* streams.getActiveStreamId({ userId: 'limit-owner', threadId, requestId: 'inspect' })).toBeNull()
+    }).pipe(Effect.provide(harness.layer)))
+  },
+)
+
+it('settles a cost-only exhausted reasoning turn exactly once without visible output', async () => {
+  const harness = createHarness('', '', false, { reportedCost: 0.04 })
+  await Effect.runPromise(Effect.gen(function* () {
+    const orchestrator = yield* ChatOrchestratorService
+    const { threadId } = yield* orchestrator.createThread({
+      userId: 'reasoning-owner', requestId: 'create', modelId: 'openai/gpt-5-mini',
+    })
+    yield* orchestrator.streamChat({
+      userId: 'reasoning-owner', threadId, requestId: 'reasoning-budget',
+      route: '/api/chat', expectedBranchVersion: 1,
+      accessPolicy: resolveChatAccessPolicy({
+        userId: 'reasoning-owner', organizationId: 'org', isAnonymous: false, planId: 'plus',
+      }),
+      message: { id: 'question', role: 'user', parts: [{ type: 'text', text: 'Question' }] },
+    })
+    yield* Effect.promise(harness.finish)
+    expect(harness.finalized).toHaveLength(1)
+    expect(harness.finalized[0]).toMatchObject({ ok: false, finalContent: '', finishReason: 'length' })
+    expect(harness.recorded).toHaveLength(1)
+    expect(harness.recorded[0].actualCostUsd).toBe(0.04)
+    expect(harness.settlements()).toBe(1)
+  }).pipe(Effect.provide(harness.layer)))
 })

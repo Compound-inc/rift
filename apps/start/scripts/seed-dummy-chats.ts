@@ -703,9 +703,6 @@ async function insertMessages(pool: Pool, rows: readonly MessageRow[]): Promise<
           attachments_ids,
           sources,
           model_params,
-          provider_metadata,
-          generation_metadata,
-          ai_cost,
           public_cost,
           used_byok,
           input_tokens,
@@ -738,9 +735,6 @@ async function insertMessages(pool: Pool, rows: readonly MessageRow[]): Promise<
           x.attachments_ids,
           x.sources,
           x.model_params,
-          x.provider_metadata,
-          x.generation_metadata,
-          x.ai_cost,
           x.public_cost,
           x.used_byok,
           x.input_tokens,
@@ -772,9 +766,6 @@ async function insertMessages(pool: Pool, rows: readonly MessageRow[]): Promise<
           attachments_ids jsonb,
           sources jsonb,
           model_params jsonb,
-          provider_metadata jsonb,
-          generation_metadata jsonb,
-          ai_cost double precision,
           public_cost double precision,
           used_byok boolean,
           input_tokens bigint,
@@ -788,6 +779,17 @@ async function insertMessages(pool: Pool, rows: readonly MessageRow[]): Promise<
           billable_web_search_calls bigint
         )
       `,
+      [JSON.stringify(rowsChunk)],
+    )
+    await pool.query(
+      `INSERT INTO message_analytics(message_id, provider_metadata, generation_metadata, ai_cost)
+       SELECT id, provider_metadata, generation_metadata, ai_cost
+       FROM jsonb_to_recordset($1::jsonb) AS x(
+         id text, provider_metadata jsonb, generation_metadata jsonb, ai_cost double precision)
+       ON CONFLICT (message_id) DO UPDATE SET
+         provider_metadata = EXCLUDED.provider_metadata,
+         generation_metadata = EXCLUDED.generation_metadata,
+         ai_cost = EXCLUDED.ai_cost`,
       [JSON.stringify(rowsChunk)],
     )
   }

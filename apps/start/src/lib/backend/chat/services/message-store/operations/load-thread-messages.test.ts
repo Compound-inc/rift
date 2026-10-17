@@ -522,3 +522,34 @@ describe('makeLoadThreadMessagesOperation', () => {
     )
   })
 })
+
+it('previews edited text with retained files and RAG before creating a branch', async () => {
+  const original = userRow({ messageId: 'original', content: 'Old question', attachmentsIds: ['file'] })
+  const run = vi.fn()
+    .mockResolvedValueOnce([original, assistantRow({ messageId: 'answer', content: 'Old answer', parentMessageId: 'original', createdAt: 2 })])
+    .mockResolvedValueOnce({ activeChildByParent: { original: 'answer' } })
+    .mockResolvedValueOnce([attachmentRow({ id: 'file', fileName: 'retained.txt', messageId: 'original' })])
+  const { loadThreadMessages, buildTurnContext } = makeOperation({ run, context: { libraryBlock: 'Document context', turnBlock: '' } })
+  const messages = await Effect.runPromise(loadThreadMessages({
+    threadId: 'thread-1', userId: 'user-1', model: 'openai/gpt-5-mini', requestId: 'preview',
+    branchTurn: { targetMessageId: 'original', editedText: '  New question  ' },
+  }))
+  expect(messages.map((message) => message.id)).toEqual(['original'])
+  expect(textOf(messages[0])).toBe('Document context\n\nNew question')
+  expect(buildTurnContext.mock.calls[0][0].query.latestUserText).toBe('New question')
+  expect(buildTurnContext.mock.calls[0][0].attachmentIds).toEqual(['file'])
+  expect(original.content).toBe('Old question')
+})
+
+it('previews regeneration through its user anchor and excludes the old answer', async () => {
+  const run = vi.fn()
+    .mockResolvedValueOnce([userRow({ messageId: 'original', content: 'Question' }), assistantRow({ messageId: 'answer', content: 'Old answer', parentMessageId: 'original', createdAt: 2 })])
+    .mockResolvedValueOnce({ activeChildByParent: { original: 'answer' } })
+    .mockResolvedValueOnce([])
+  const { loadThreadMessages } = makeOperation({ run })
+  const messages = await Effect.runPromise(loadThreadMessages({
+    threadId: 'thread-1', userId: 'user-1', model: 'openai/gpt-5-mini', requestId: 'preview',
+    branchTurn: { targetMessageId: 'answer' },
+  }))
+  expect(messages.map((message) => message.id)).toEqual(['original'])
+})

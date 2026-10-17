@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UIMessage } from 'ai'
 import { Effect } from 'effect'
+import { getCatalogModel } from '@/lib/shared/ai-catalog'
 import { ModelGatewayService } from './model-gateway.service'
 import type { ModelGatewayServiceShape } from './model-gateway.service'
 
@@ -143,7 +144,7 @@ describe('ModelGatewayService v7 request boundary', () => {
 
     const options = streamTextMock.mock.calls[0][0]
     expect(options).toMatchObject({
-      maxOutputTokens: 12_000,
+      maxOutputTokens: getCatalogModel('openai/gpt-5-mini')?.defaultMaxOutputTokens,
       providerOptions,
       activeTools: [],
     })
@@ -165,7 +166,7 @@ describe('ModelGatewayService v7 request boundary', () => {
 
     // xai() changed its default API in v7; this app only uses xai.tools locally.
     expect(streamTextMock.mock.calls[0][0].model).toBe('spacexai/grok-4.3')
-    expect(streamTextMock.mock.calls[0][0].maxOutputTokens).toBe(8_000)
+    expect(streamTextMock.mock.calls[0][0].maxOutputTokens).toBe(128_000)
   })
 })
 

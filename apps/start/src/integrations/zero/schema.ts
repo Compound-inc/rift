@@ -1,3 +1,7 @@
+import type {
+  PersistedSource,
+  PersistedToolPart,
+} from '@/lib/shared/chat-contracts/generation-parts'
 import {
   createSchema,
   table,
@@ -277,8 +281,10 @@ const message = table('message')
     model: string(),
     attachmentsIds: json<readonly string[]>().from('attachments_ids'),
     sources: json<
-      readonly { sourceId: string; url: string; title?: string }[]
+      readonly (PersistedSource | { sourceId: string; url: string; title?: string })[]
     >().optional(),
+    parts: json<readonly PersistedToolPart[]>().optional(),
+    finishReason: string().from('finish_reason').optional(),
     modelParams: json<{
       temperature?: number
       topP?: number
@@ -295,8 +301,8 @@ const message = table('message')
     }>()
       .from('model_params')
       .optional(),
-    providerMetadata: json().from('provider_metadata').optional(),
-    generationMetadata: json().from('generation_metadata').optional(),
+    // Raw provider accounting/routing metadata stays in Postgres. Only public
+    // counters and finishReason are synced to clients.
     publicCost: number().from('public_cost').optional(),
     inputTokens: number().from('input_tokens').optional(),
     outputTokens: number().from('output_tokens').optional(),

@@ -198,3 +198,23 @@ describe('RagContextService.buildTurnContext', () => {
     await expect(build()).resolves.toEqual({ libraryBlock: '', turnBlock: '' })
   })
 })
+
+it('retrieves a 120K-character CJK document on a 200K model instead of inlining it', async () => {
+  const content = '中'.repeat(120_000)
+  records.conversation = [source('chinese', content.length)]
+  records.contents.set('chinese', content)
+  searchScopes.mockResolvedValue([[hit('chinese', 0, 0.9, 'Chinese excerpt')]])
+  const context = await build({ contextWindowTokens: 200_000 })
+  expect(context.libraryBlock).toBe('')
+  expect(context.turnBlock).toContain('Chinese excerpt')
+  expect(searchScopes).toHaveBeenCalledOnce()
+})
+
+it('limits fallback beginnings by their CJK token footprint', async () => {
+  records.conversation = [source('chinese', 120_000, { indexed: false })]
+  records.contents.set('chinese', '中'.repeat(120_000))
+  const context = await build({ contextWindowTokens: 32_000 })
+  const cjkCharacters = (context.turnBlock.match(/中/g) ?? []).length
+  // Beginning allowance is 3,600 Latin-equivalent units, or 900 tokens.
+  expect(cjkCharacters).toBe(750)
+})

@@ -1,5 +1,7 @@
+import { estimateToolTokens, resolveOutputLimits } from './chat-orchestrator/output-limits'
+import { estimateTokensFromText } from '@/lib/shared/chat-contracts/prompt-usage'
+import { hasProviderWork } from './chat-orchestrator/provider-work'
 import { createUIMessageStreamResponse, toUIMessageStream } from 'ai'
-import type { UIMessage } from 'ai'
 import type { ReadonlyJSONValue } from '@rocicorp/zero'
 import { Duration, Effect, Exit, Layer, ServiceMap } from 'effect'
 import type { ChatDomainError } from '../domain/errors'
@@ -7,12 +9,12 @@ import {
   DEFAULT_CONTEXT_WINDOW_MODE,
   getCatalogModel,
   resolveContextWindowForMode,
-  resolveModelContextWindow,
 } from '@/lib/shared/ai-catalog'
 import type { AiContextWindowMode } from '@/lib/shared/ai-catalog'
 import {
   InvalidRequestError,
   MessagePersistenceError,
+  ModelProviderError,
   QuotaExceededError,
   ContextWindowExceededError,
 } from '../domain/errors'
@@ -72,6 +74,7 @@ import { normalizeStreamCommand } from './chat-orchestrator/command'
 import { buildPersistedGenerationAnalytics } from '../domain/generation-metrics'
 import { nanoUsdToUsd } from '@/lib/backend/billing/services/workspace-usage/shared'
 import { writeFreeOrgUserUsageSummaryRecord } from '@/lib/backend/billing/services/workspace-usage/usage-summary-store'
+import { assembleSystemPrompt } from './chat-orchestrator/system-prompt'
 import { estimatePromptTokens } from '@/lib/shared/chat-contracts'
 import { ChatErrorCode } from '@/lib/shared/chat-contracts/error-codes'
 import { ChatErrorI18nKey } from '@/lib/shared/chat-contracts/error-i18n'
@@ -281,19 +284,6 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             threadModeId: threadAccess.modeId,
           })
 
-          /**
-           * If the Thread belongs to a Project, concatenate the Project's
-           * `custom_instruction` after the mode's system prompt so it can
-           * extend (not be overridden by) the mode's tone/role guidance.
-           * The instruction is resolved as part of `assertThreadAccess` so
-           * we don't pay a second project query per turn.
-           */
-          const baseSystemPrompt = effectiveMode?.definition.systemPrompt
-          const assembledSystemPrompt =
-            baseSystemPrompt && threadAccess.projectInstruction
-              ? `${baseSystemPrompt}\n\n${threadAccess.projectInstruction}`
-              : (threadAccess.projectInstruction ?? baseSystemPrompt)
-
           if (
             attachments &&
             attachments.length > 0 &&
@@ -451,8 +441,6 @@ export class ChatOrchestratorService extends ServiceMap.Service<
           const resolvedCatalogModel = getResolvedCatalogModel(
             modelResolution.modelId,
           )
-          const contextWindowResolution =
-            resolveModelContextWindow(resolvedCatalogModel)
           const effectiveContextWindowMode = contextWindowMode
             ? contextWindowMode
             : (threadAccess.contextWindowMode ?? DEFAULT_CONTEXT_WINDOW_MODE)
@@ -544,7 +532,75 @@ export class ChatOrchestratorService extends ServiceMap.Service<
 
           let assistantParentMessageId: string | undefined
           let regenSourceMessageId: string | undefined
-          let messages: UIMessage[]
+          // Build the exact proposed prompt, including skill expansion, retained
+          // attachments and RAG, without creating a user row or changing branches.
+          let messages = yield* messageStore.loadThreadMessages({
+            threadId,
+            model: modelResolution.modelId,
+            userId,
+            organizationId,
+            orgPolicy,
+            branchTurn: requestTrigger === 'submit-message'
+              ? undefined
+              : {
+                  targetMessageId: command.messageId!,
+                  editedText: requestTrigger === 'edit-message'
+                    ? command.editedText!
+                    : undefined,
+                },
+            pendingUserMessage: requestTrigger === 'submit-message' ? command.message! : undefined,
+            pendingAttachments: requestTrigger === 'submit-message' ? attachments : undefined,
+            contextWindowTokens: activeContextWindow,
+            requestId,
+          })
+          const assembledSystemPrompt = assembleSystemPrompt({
+            modelId: modelResolution.modelId,
+            modePrompt: effectiveMode?.definition.systemPrompt,
+            projectInstruction: threadAccess.projectInstruction,
+          })
+
+          const providerOptions = withDirectProviderPromptCaching({
+            providerOptions: withGatewayComplianceProviderOptions({
+              providerOptions: modelResolution.reasoningEffort
+                ? toolRegistry.providerOptionsByReasoning[modelResolution.reasoningEffort]
+                : toolRegistry.defaultProviderOptions,
+              orgPolicy,
+              hasProviderKeyOverride: Boolean(modelResolution.providerApiKeyOverride),
+            }),
+            providerKeyOverrideProviderId: modelResolution.providerApiKeyOverride?.providerId,
+          })
+
+          if (wideEvent) {
+            setWideEventContext(wideEvent, {
+              usage: { promptTokens: estimatePromptTokens(messages) },
+            })
+          }
+
+          // Every turn path checks the full prompt. The gateway repeats this at
+          // its boundary for callers outside chat, before contacting a provider.
+          const toolTokens = yield* Effect.tryPromise({
+            try: () => estimateToolTokens(toolRegistry.tools, toolRegistry.activeTools),
+            catch: (error) => new ModelProviderError({
+              message: 'Failed to prepare tool schemas',
+              requestId,
+              cause: String(error),
+            }),
+          })
+          yield* Effect.try({
+            try: () => resolveOutputLimits({
+              modelId: modelResolution.modelId,
+              estimatedPromptTokens:
+                estimatePromptTokens(messages) +
+                estimateTokensFromText(assembledSystemPrompt) +
+                toolTokens,
+              providerOptions,
+              contextWindowTokens: activeContextWindow,
+              requestId,
+              threadId,
+              contextWindowMode: effectiveContextWindowMode,
+            }),
+            catch: (error) => error as ContextWindowExceededError,
+          })
 
           if (requestTrigger === 'regenerate-message') {
             const regeneration = yield* messageStore.prepareRegeneration({
@@ -557,17 +613,6 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             })
             assistantParentMessageId = regeneration.anchorMessageId
             regenSourceMessageId = regeneration.regenSourceMessageId
-
-            messages = yield* messageStore.loadThreadMessages({
-              threadId,
-              model: modelResolution.modelId,
-              userId,
-              organizationId,
-              orgPolicy,
-              untilMessageId: regeneration.anchorMessageId,
-              contextWindowTokens: activeContextWindow,
-              requestId,
-            })
           } else if (requestTrigger === 'edit-message') {
             yield* Effect.annotateLogs(Effect.logInfo('chat_edit_requested'), {
               request_id: requestId,
@@ -588,16 +633,11 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             })
             assistantParentMessageId = edited.editedMessageId
             regenSourceMessageId = edited.regenSourceMessageId
-            messages = yield* messageStore.loadThreadMessages({
-              threadId,
-              model: modelResolution.modelId,
-              userId,
-              organizationId,
-              orgPolicy,
-              untilMessageId: edited.editedMessageId,
-              contextWindowTokens: activeContextWindow,
-              requestId,
-            })
+            messages = messages.map((message) =>
+              message.id === command.messageId
+                ? { ...message, id: edited.editedMessageId }
+                : message,
+            )
             yield* Effect.annotateLogs(Effect.logInfo('chat_edit_prepared'), {
               request_id: requestId,
               user_id: userId,
@@ -605,41 +645,6 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               edited_message_id: edited.editedMessageId,
             })
           } else {
-            const preparedMessages = yield* messageStore.loadThreadMessages({
-              threadId,
-              model: modelResolution.modelId,
-              userId,
-              organizationId,
-              orgPolicy,
-              pendingUserMessage: command.message!,
-              pendingAttachments: attachments,
-              contextWindowTokens: activeContextWindow,
-              requestId,
-            })
-            const usedTokens = estimatePromptTokens(preparedMessages)
-            if (wideEvent) {
-              setWideEventContext(wideEvent, {
-                usage: { promptTokens: usedTokens },
-              })
-            }
-            if (usedTokens >= activeContextWindow) {
-              return yield* Effect.fail(
-                new ContextWindowExceededError({
-                  message:
-                    contextWindowResolution.supportsDistinctMaxMode &&
-                    effectiveContextWindowMode === 'standard'
-                      ? 'This conversation has reached the standard context limit. Switch to Max to continue with the larger window.'
-                      : 'This conversation has reached the current context limit.',
-                  requestId,
-                  threadId,
-                  modelId: modelResolution.modelId,
-                  contextWindowMode: effectiveContextWindowMode,
-                  usedTokens,
-                  maxTokens: activeContextWindow,
-                }),
-              )
-            }
-
             yield* messageStore.appendUserMessage({
               threadDbId: threadAccess.dbId,
               threadId,
@@ -655,7 +660,6 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               requestId,
             })
 
-            messages = preparedMessages
             assistantParentMessageId = command.message!.id
           }
 
@@ -710,7 +714,6 @@ export class ChatOrchestratorService extends ServiceMap.Service<
           // and idempotent even when transport retries happen.
           const assistantMessageId = crypto.randomUUID()
           let receivedProviderOutput = false
-          let reportedProviderUsage = false
           let assistantFinalized = false
           let streamCleanedUp = false
           const assistantBuffer: AssistantDeltaBuffer = {
@@ -802,6 +805,9 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                       assistantBuffer.reasoning.trim().length > 0
                         ? assistantBuffer.reasoning
                         : undefined,
+                    sources: assistantBuffer.sources,
+                    parts: assistantBuffer.toolParts,
+                    finishReason: assistantBuffer.finishReason,
                     errorMessage: input.errorMessage,
                     errorCode: input.errorCode,
                     errorI18nKey: input.errorI18nKey,
@@ -816,7 +822,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
 
                 // Starting a request is not evidence of billable work. Providers
                 // can reject a large prompt before generating or reporting usage.
-                if (!receivedProviderOutput && !reportedProviderUsage) {
+                if (!hasProviderWork({ analytics: input.generationAnalytics, hasOutput: receivedProviderOutput })) {
                   yield* releaseQuotaReservation('no_provider_work')
                 } else {
                   yield* usageSettlement.recordChatUsage({
@@ -915,13 +921,6 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                 errorMessage: stopped
                   ? undefined
                   : GENERIC_ASSISTANT_FAILURE_MESSAGE,
-                generationAnalytics: {
-                  usedByok: Boolean(modelResolution.providerApiKeyOverride),
-                  aiCost: 0,
-                  inputTokens: 0,
-                  outputTokens: 0,
-                  totalTokens: 0,
-                },
               }),
             )
             cleanupActiveStream()
@@ -954,21 +953,8 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             requestId,
             tools: toolRegistry.tools,
             activeTools: toolRegistry.activeTools,
-            providerOptions: withDirectProviderPromptCaching({
-              providerOptions: withGatewayComplianceProviderOptions({
-                providerOptions: modelResolution.reasoningEffort
-                  ? toolRegistry.providerOptionsByReasoning[
-                      modelResolution.reasoningEffort
-                    ]
-                  : toolRegistry.defaultProviderOptions,
-                orgPolicy,
-                hasProviderKeyOverride: Boolean(
-                  modelResolution.providerApiKeyOverride,
-                ),
-              }),
-              providerKeyOverrideProviderId:
-                modelResolution.providerApiKeyOverride?.providerId,
-            }),
+            providerOptions,
+            contextWindowTokens: activeContextWindow,
             reasoningEffort: modelResolution.reasoningEffort,
             abortSignal: streamAbortController.signal,
             onChunk: (chunk: unknown) => {
@@ -977,7 +963,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               const type = (chunk as { type?: string } | null)?.type
               if (
                 type &&
-                /^(text-|reasoning-|tool-input-|tool-call$)/.test(type)
+                /^(text-|reasoning-|tool-input-|tool-call$|tool-result$|tool-error$)/.test(type)
               )
                 receivedProviderOutput = true
               applyAssistantChunkDelta(assistantBuffer, chunk)
@@ -1076,6 +1062,8 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             stream: toUIMessageStream({
               stream: result.stream,
               tools: toolRegistry.tools,
+              sendSources: true,
+              sendReasoning: true,
               originalMessages: messages,
               generateMessageId: () => assistantMessageId,
               onError: (error: unknown) => {
@@ -1141,6 +1129,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                     modelSource: modelResolution.source,
                     completedAt: Date.now(),
                     totalTokens: part.totalUsage.totalTokens,
+                    finishReason: part.finishReason,
                   }
                 }
                 return undefined
@@ -1150,6 +1139,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                 responseMessage,
                 outcome,
                 isCancelled,
+                finishReason,
               }) => {
                 // If chunk-level callbacks missed content, hydrate from final payload.
                 hydrateAssistantBufferFromResponse(
@@ -1157,6 +1147,10 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                   responseMessage,
                 )
 
+                receivedProviderOutput ||= Boolean(
+                  assistantBuffer.text || assistantBuffer.reasoning || assistantBuffer.toolParts?.length,
+                )
+                assistantBuffer.finishReason = finishReason ?? assistantBuffer.finishReason
                 const stopped = isUserStopped(streamAbortController.signal)
                 const ok =
                   stopped ||
@@ -1166,18 +1160,20 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                     !streamAbortController.signal.aborted &&
                     !transportErrorHandled &&
                     assistantBuffer.text.length > 0)
+                // v7 exposes all-step token totals and final-step provider accounting separately.
                 let persistedGeneration = await Promise.all([
                   Promise.resolve(result.usage).catch(() => undefined),
-                  Promise.resolve(result.finalStep)
-                    .then((step) => step.providerMetadata)
-                    .catch(() => undefined),
+                  Promise.resolve(result.finalStep).catch(() => undefined),
                 ])
-                  .then(([totalUsage, providerMetadata]) =>
-                    buildPersistedGenerationAnalytics({
-                      usage: totalUsage,
-                      providerMetadata,
+                  .then(([usage, finalStep]) => {
+                    assistantBuffer.finishReason =
+                      finalStep?.finishReason ?? assistantBuffer.finishReason
+                    return buildPersistedGenerationAnalytics({
+                      usage,
+                      providerMetadata: finalStep?.providerMetadata,
                       usedByok: Boolean(modelResolution.providerApiKeyOverride),
                       generationMetadata: {
+                        finishReason: assistantBuffer.finishReason,
                         activeToolKeys: resolvedToolPolicy.activeToolKeys,
                         deniedToolKeysByReason: resolvedToolPolicy.toolEntries
                           .filter((entry) => entry.reasons.length > 0)
@@ -1190,24 +1186,11 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                           true,
                         threadDisabledToolKeys: sanitizedDisabledToolKeys,
                       },
-                    }),
-                  )
+                    })
+                  })
                   .catch(() => undefined)
-                reportedProviderUsage = [
-                  persistedGeneration?.inputTokens,
-                  persistedGeneration?.outputTokens,
-                  persistedGeneration?.totalTokens,
-                  persistedGeneration?.reasoningTokens,
-                  persistedGeneration?.textTokens,
-                  persistedGeneration?.cacheReadTokens,
-                  persistedGeneration?.cacheWriteTokens,
-                  persistedGeneration?.noCacheTokens,
-                  persistedGeneration?.billableWebSearchCalls,
-                  persistedGeneration?.aiCost,
-                  persistedGeneration?.publicCost,
-                ].some((value) => value !== undefined)
                 if (
-                  (receivedProviderOutput || reportedProviderUsage) &&
+                  hasProviderWork({ analytics: persistedGeneration, hasOutput: receivedProviderOutput }) &&
                   (isAborted ||
                     isCancelled ||
                     outcome.status === 'failed' ||

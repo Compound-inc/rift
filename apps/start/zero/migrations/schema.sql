@@ -128,10 +128,9 @@ CREATE TABLE IF NOT EXISTS messages (
   model TEXT NOT NULL,
   attachments_ids JSONB NOT NULL,
   sources JSONB,
+  parts JSONB,
+  finish_reason TEXT,
   model_params JSONB,
-  provider_metadata JSONB,
-  generation_metadata JSONB,
-  ai_cost DOUBLE PRECISION,
   public_cost DOUBLE PRECISION,
   used_byok BOOLEAN,
   input_tokens BIGINT,
@@ -144,6 +143,8 @@ CREATE TABLE IF NOT EXISTS messages (
   no_cache_tokens BIGINT,
   billable_web_search_calls BIGINT
 );
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS parts JSONB;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS finish_reason TEXT;
 ALTER TABLE messages
 ADD COLUMN IF NOT EXISTS parent_message_id TEXT;
 ALTER TABLE messages
@@ -160,10 +161,6 @@ ALTER TABLE messages
 ADD COLUMN IF NOT EXISTS branch_anchor_message_id TEXT;
 ALTER TABLE messages
 ADD COLUMN IF NOT EXISTS regen_source_message_id TEXT;
-ALTER TABLE messages
-ADD COLUMN IF NOT EXISTS generation_metadata JSONB;
-ALTER TABLE messages
-ADD COLUMN IF NOT EXISTS ai_cost DOUBLE PRECISION;
 ALTER TABLE messages
 ADD COLUMN IF NOT EXISTS public_cost DOUBLE PRECISION;
 ALTER TABLE messages
@@ -186,12 +183,26 @@ ALTER TABLE messages
 ADD COLUMN IF NOT EXISTS no_cache_tokens BIGINT;
 ALTER TABLE messages
 ADD COLUMN IF NOT EXISTS billable_web_search_calls BIGINT;
+-- Release N keeps these nullable columns for old servers and Zero bundles.
+-- New code writes only message_analytics. Remove legacy columns in a separate
+-- release after all old bundles have drained for at least 24 hours.
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS provider_metadata JSONB;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS generation_metadata JSONB;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS ai_cost DOUBLE PRECISION;
+-- Private provider accounting must never enter Zero's published messages rows.
+-- Keep this table out of zero_data (the publication uses an explicit table list).
+CREATE TABLE IF NOT EXISTS message_analytics (
+  message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
+  provider_metadata JSONB,
+  generation_metadata JSONB,
+  ai_cost DOUBLE PRECISION
+);
+
 CREATE INDEX IF NOT EXISTS messages_thread_id ON messages (thread_id);
 CREATE INDEX IF NOT EXISTS messages_thread_user ON messages (thread_id, user_id);
 CREATE INDEX IF NOT EXISTS messages_user ON messages (user_id);
 CREATE INDEX IF NOT EXISTS messages_thread_created ON messages (thread_id, created_at);
 CREATE INDEX IF NOT EXISTS messages_thread_parent ON messages (thread_id, parent_message_id);
-CREATE INDEX IF NOT EXISTS messages_user_ai_cost ON messages (user_id, ai_cost);
 CREATE INDEX IF NOT EXISTS messages_user_public_cost ON messages (user_id, public_cost);
 CREATE INDEX IF NOT EXISTS messages_user_total_tokens ON messages (user_id, total_tokens);
 CREATE INDEX IF NOT EXISTS messages_content_search_fts
@@ -424,8 +435,7 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS invitation_seat_limit_guard ON invitation;
-CREATE TRIGGER invitation_seat_limit_guard
+CREATE OR REPLACE TRIGGER invitation_seat_limit_guard
 BEFORE INSERT OR UPDATE OF status, "organizationId"
 ON invitation
 FOR EACH ROW
@@ -464,8 +474,7 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS member_seat_limit_guard ON member;
-CREATE TRIGGER member_seat_limit_guard
+CREATE OR REPLACE TRIGGER member_seat_limit_guard
 BEFORE INSERT OR UPDATE OF "organizationId"
 ON member
 FOR EACH ROW

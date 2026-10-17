@@ -6,6 +6,7 @@ import type { ChatMessageMetadata } from '@/lib/shared/chat-contracts/message-me
 import type { ChatAttachment } from '@/lib/shared/chat-contracts/attachments'
 import { getCatalogModel } from '@/lib/shared/ai-catalog'
 import { MessageGenerationStatus } from './message-generation-status'
+import { ContinueResponse } from './message-parts/components/continue-response'
 import { AttachmentPreviewPill } from './attachment-preview-pill'
 import {
   AssistantMessageParts,
@@ -267,6 +268,7 @@ export function ChatMessage({
           canRetry={canRegenerate}
           onRetry={onRegenerate}
         />
+        {!isAnimating && metadata?.finishReason === 'length' ? <ContinueResponse messageId={message.id} onRetry={canRegenerate ? () => onRegenerate(message.id) : undefined} /> : null}
         <AssistantMessageFooter
           messageId={message.id}
           text={text}
