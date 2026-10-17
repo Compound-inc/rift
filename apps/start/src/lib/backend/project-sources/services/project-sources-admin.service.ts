@@ -19,6 +19,7 @@ import {
 } from '@/lib/backend/upload/upload.service'
 import { PROJECT_SOURCES_UPLOAD_POLICY } from '@/lib/shared/upload/upload-validation'
 import { summarizeProjectSourceIndexError } from '@/lib/shared/project-sources'
+import { projectOwnerIsMember } from '@/integrations/zero/project-access'
 import { checkProjectAccess } from '@/lib/shared/projects/access'
 import { ProjectSourcesPersistenceError } from '../domain/errors'
 
@@ -116,7 +117,11 @@ export class ProjectSourcesAdminService extends ServiceMap.Service<
             projectId,
           }, (db) =>
             Effect.tryPromise({
-              try: () => db.run(zql.project.where('id', projectId).one()),
+              try: async () => {
+                const project = await db.run(zql.project.where('id', projectId).one())
+                const ownerIsMember = await projectOwnerIsMember(db, project)
+                return { project, ownerIsMember }
+              },
               catch: (error) =>
                 new ProjectSourcesPersistenceError({
                   message: 'Failed to load project',
@@ -125,9 +130,10 @@ export class ProjectSourcesAdminService extends ServiceMap.Service<
                   cause: String(error),
                 }),
             }).pipe(
-              Effect.flatMap((project) => {
+              Effect.flatMap(({ project, ownerIsMember }) => {
                 const access = checkProjectAccess(project, {
                   userId,
+                  ownerIsMember,
                   orgContext: { enforce: false },
                 })
                 if (access.kind !== 'ok') {

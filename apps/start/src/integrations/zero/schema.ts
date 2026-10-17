@@ -610,6 +610,12 @@ const messageRelationships = relationships(message, ({ one }) => ({
  * soft-delete predicate.
  */
 const projectRelationships = relationships(project, ({ one, many }) => ({
+  // Correlate both columns so sharing stops as soon as the owner leaves this org.
+  ownerMembership: one({
+    sourceField: ['organizationId', 'userId'],
+    destField: ['organizationId', 'userId'],
+    destSchema: member,
+  }),
   user: one({
     sourceField: ['userId'],
     destField: ['id'],

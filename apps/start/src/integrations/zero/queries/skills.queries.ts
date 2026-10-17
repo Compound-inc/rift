@@ -1,7 +1,6 @@
-import type { ExpressionBuilder } from '@rocicorp/zero'
 import { defineQuery } from '@rocicorp/zero'
 import { z } from 'zod'
-import type { Schema } from '../schema'
+import { projectVisibleToCaller } from '../project-access'
 import { zql } from '../zql'
 
 /**
@@ -24,37 +23,6 @@ const projectScopedArgs = z.object({
   projectId: z.string().trim().min(1),
 })
 
-/**
- * Project visibility predicate copied from `projects.queries.ts` so skill
- * queries enforce the same access rule without a relationship-side join.
- *
- * A project is visible iff the caller owns it, or it is `visibility = 'org'`
- * and the caller is a member of the matching organization (and has an
- * active org context).
- */
-function projectVisibleToCaller(input: {
-  readonly userID: string
-  readonly organizationId?: string
-}) {
-  return (eb: ExpressionBuilder<'project', Schema>) => {
-    const { or, and, cmp, exists } = eb
-    return or(
-      cmp('userId', input.userID),
-      input.organizationId
-        ? and(
-            cmp('visibility', 'org'),
-            cmp('organizationId', input.organizationId),
-            exists('organization', (organization) =>
-              organization.whereExists('members', (members) =>
-                members.where('userId', input.userID),
-              ),
-            ),
-          )
-        : undefined,
-    )
-  }
-}
-
 export const skillQueryDefinitions = {
   skills: {
     /** Caller's Personal Skills (no project, no org). */
@@ -74,11 +42,14 @@ export const skillQueryDefinitions = {
      */
     listOrgShared: defineQuery(z.object({}).optional(), ({ ctx }) => {
       const orgId = ctx.organizationId?.trim()
-      if (!orgId) {
-        return zql.skill.where('id', '__no_org_context__').limit(1)
+      if (!orgId || ctx.isAnonymous) {
+        return zql.skill.where('id', 'IN', []).limit(1)
       }
       return zql.skill
         .where('organizationId', orgId)
+        .whereExists('organization', (organization) =>
+          organization.whereExists('members', (members) => members.where('userId', ctx.userID)),
+        )
         .where('projectId', 'IS', null)
         .where('deletedAt', 'IS', null)
         .orderBy('updatedAt', 'desc')
@@ -98,6 +69,7 @@ export const skillQueryDefinitions = {
             .where(
               projectVisibleToCaller({
                 userID: ctx.userID,
+                isAnonymous: ctx.isAnonymous,
                 organizationId: orgId,
               }),
             ),
@@ -123,6 +95,7 @@ export const skillQueryDefinitions = {
             .where(
               projectVisibleToCaller({
                 userID: ctx.userID,
+                isAnonymous: ctx.isAnonymous,
                 organizationId: orgId,
               }),
             ),

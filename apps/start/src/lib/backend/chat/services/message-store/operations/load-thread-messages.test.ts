@@ -334,7 +334,7 @@ describe('makeLoadThreadMessagesOperation', () => {
     })
   })
 
-  it('passes the project and its custom instruction for project threads', async () => {
+  it.each([true, false])('passes project authorization independently of org knowledge enabled=%s', async (enabled) => {
     const run = vi
       .fn()
       .mockResolvedValueOnce([
@@ -360,11 +360,15 @@ describe('makeLoadThreadMessagesOperation', () => {
         model: 'openai/gpt-5-mini',
         userId: 'user-1',
         requestId: 'req-project',
+        organizationId: 'org-1',
+        orgPolicy: orgPolicy(enabled),
       }),
     )
 
     const call = buildTurnContext.mock.calls[0][0]
     expect(call.projectId).toBe('project-1')
+    expect(call.projectOrganizationId).toBe('org-1')
+    expect(call.organizationId).toBe(enabled ? 'org-1' : undefined)
     expect(call.query.customInstruction).toBe('Act as a project planner.')
   })
 

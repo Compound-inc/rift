@@ -11,6 +11,7 @@ import {
   buildBootstrapThreadRecord,
   DEFAULT_THREAD_TITLE,
 } from '@/lib/shared/chat'
+import { projectMembershipQuery, projectOwnerIsMember } from '@/integrations/zero/project-access'
 import { checkProjectAccess } from '@/lib/shared/projects/access'
 import {
   MessagePersistenceError,
@@ -277,6 +278,12 @@ export class ThreadService extends ServiceMap.Service<
                     )
                     const access = checkProjectAccess(project, {
                       userId,
+                      action: 'use',
+                      ownerIsMember: await projectOwnerIsMember(db, project),
+                      memberOrganizationId:
+                        organizationId && await db.run(projectMembershipQuery(organizationId, userId))
+                          ? organizationId
+                          : undefined,
                       orgContext: {
                         enforce: true,
                         organizationId,
@@ -369,18 +376,10 @@ export class ThreadService extends ServiceMap.Service<
               )
             }
 
-            // Soft-deleted or missing parent projects make the thread
-            // unprojected from the orchestrator's point of view, matching
-            // ADR-0001's "hidden from UI but data preserved" stance: the
-            // thread itself remains accessible to its owner so a future
-            // restore can bring everything back. The project context just
-            // stops applying for new turns.
-            //
-            // Loading the project row here also returns its
-            // `custom_instruction`, so the orchestrator does not need a
-            // second query to assemble the system prompt.
+            // Re-check on every send. Revoking sharing or membership must stop
+            // new turns from using project context, including existing threads.
             const persistedProjectId = thread.projectId ?? undefined
-            let effectiveProjectId = persistedProjectId
+            const effectiveProjectId = persistedProjectId
             let effectiveProjectInstruction: string | undefined
             if (persistedProjectId) {
               const projectRow = yield* Effect.tryPromise({
@@ -394,9 +393,22 @@ export class ThreadService extends ServiceMap.Service<
                     cause: String(error),
                   }),
               })
+              const membership = organizationId
+                ? yield* Effect.tryPromise({
+                    try: () => db.run(projectMembershipQuery(organizationId, userId)),
+                    catch: (error) => new MessagePersistenceError({ message: 'Failed to validate project membership', requestId, threadId, cause: String(error) }),
+                  })
+                : undefined
+              const ownerIsMember = yield* Effect.tryPromise({
+                try: () => projectOwnerIsMember(db, projectRow),
+                catch: (error) => new MessagePersistenceError({ message: 'Failed to validate project owner membership', requestId, threadId, cause: String(error) }),
+              })
               const access = checkProjectAccess(projectRow, {
+                ownerIsMember,
                 userId,
-                orgContext: { enforce: false },
+                action: 'use',
+                memberOrganizationId: membership?.organizationId,
+                orgContext: { enforce: true, organizationId },
               })
               if (access.kind === 'ok') {
                 const trimmed = access.project.customInstruction?.trim()
@@ -404,7 +416,9 @@ export class ThreadService extends ServiceMap.Service<
                   effectiveProjectInstruction = trimmed
                 }
               } else {
-                effectiveProjectId = undefined
+                return yield* Effect.fail(new ThreadForbiddenError({
+                  message: 'Project is no longer available', requestId, threadId, userId,
+                }))
               }
             }
 

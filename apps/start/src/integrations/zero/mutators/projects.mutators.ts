@@ -4,6 +4,8 @@ import {
   PROJECT_ACCESS_FAILURE_CODE,
   checkProjectAccess,
 } from '@/lib/shared/projects/access'
+import { isAdminRole } from '@/lib/shared/auth/roles'
+import { projectMembershipQuery, projectOwnerIsMember } from '../project-access'
 import { zql } from '../zql'
 
 const PROJECT_NAME_MAX = 80
@@ -41,10 +43,7 @@ const projectPatchArgs = projectIdArgs.extend({
     .object({
       name: z.string().trim().min(1).max(PROJECT_NAME_MAX),
       description: z.string().trim().max(PROJECT_DESCRIPTION_MAX).nullable(),
-      customInstruction: z
-        .string()
-        .max(PROJECT_INSTRUCTION_MAX)
-        .nullable(),
+      customInstruction: z.string().max(PROJECT_INSTRUCTION_MAX).nullable(),
       visibility: z.enum(['private', 'org']),
       icon: z.string().trim().max(PROJECT_ICON_MAX).nullable(),
       color: z.string().trim().max(PROJECT_COLOR_MAX).nullable(),
@@ -102,7 +101,10 @@ function diffProjectPatch(
       next.customInstruction = desired
     }
   }
-  if (patch.visibility !== undefined && patch.visibility !== current.visibility) {
+  if (
+    patch.visibility !== undefined &&
+    patch.visibility !== current.visibility
+  ) {
     next.visibility = patch.visibility
   }
   if (patch.icon !== undefined) {
@@ -127,9 +129,8 @@ function diffProjectPatch(
 /**
  * Project mutators.
  *
- * Authorization: only the owner (`userId === ctx.userID`) can mutate or
- * soft-delete a project; org members reading an org-shared project cannot
- * mutate it in v1.
+ * Owners manage project context. Shared projects also require current owner
+ * membership. Admins can only retire orphaned shared projects via resolveOrphan.
  *
  * Access predicates (ownership / soft-delete) live in
  * `lib/shared/projects/access.ts` so this file, the chat mutators, and the
@@ -158,6 +159,13 @@ export const projectMutatorDefinitions = {
       // has no active org context, rather than throwing — avoids brittle
       // failures around org-switch ordering on the client.
       const orgId = ctx.organizationId?.trim()
+      if (
+        tx.location === 'server' &&
+        orgId &&
+        !(await tx.run(projectMembershipQuery(orgId, ctx.userID)))
+      ) {
+        throw new Error('project_create_requires_org_membership')
+      }
       const visibility = args.visibility === 'org' && orgId ? 'org' : 'private'
 
       await tx.mutate.project.insert({
@@ -187,14 +195,26 @@ export const projectMutatorDefinitions = {
       const project = await tx.run(
         zql.project.where('id', args.projectId).one(),
       )
-      const access = checkProjectAccess(project, { userId: ctx.userID })
-      if (access.kind !== 'ok') return
+      const access = checkProjectAccess(project, {
+        userId: ctx.userID,
+        isAnonymous: ctx.isAnonymous,
+        ownerIsMember:
+          tx.location !== 'server' || (await projectOwnerIsMember(tx, project)),
+      })
+      if (access.kind !== 'ok') {
+        throw new Error(PROJECT_ACCESS_FAILURE_CODE[access.kind])
+      }
 
-      if (
-        args.patch.visibility === 'org' &&
-        !ctx.organizationId?.trim()
-      ) {
-        throw new Error('project_visibility_requires_org_context')
+      if (args.patch.visibility === 'org') {
+        const orgId = access.project.organizationId
+        if (
+          !orgId ||
+          orgId !== ctx.organizationId ||
+          (tx.location === 'server' &&
+            !(await tx.run(projectMembershipQuery(orgId, ctx.userID))))
+        ) {
+          throw new Error('project_visibility_requires_org_membership')
+        }
       }
 
       const next = diffProjectPatch(access.project, args.patch)
@@ -208,6 +228,45 @@ export const projectMutatorDefinitions = {
     }),
 
     /**
+     * Admins may retire an orphaned shared project, but cannot edit its context.
+     * No optimistic write: the orphan and admin membership may not be synced.
+     */
+    resolveOrphan: defineMutator(
+      projectIdArgs.extend({ action: z.enum(['private', 'delete']) }),
+      async ({ tx, args, ctx }) => {
+        if (tx.location !== 'server') return
+        if (ctx.isAnonymous) throw new Error('project_admin_requires_auth')
+        const project = await tx.run(
+          zql.project.where('id', args.projectId).one(),
+        )
+        if (
+          !project ||
+          project.deletedAt != null ||
+          project.visibility !== 'org' ||
+          !project.organizationId ||
+          project.organizationId !== ctx.organizationId
+        ) {
+          throw new Error('project_not_orphaned')
+        }
+        const member = await tx.run(
+          projectMembershipQuery(project.organizationId, ctx.userID),
+        )
+        if (!member || !isAdminRole(member.role))
+          throw new Error('project_admin_required')
+        if (await projectOwnerIsMember(tx, project))
+          throw new Error('project_not_orphaned')
+        const now = Date.now()
+        await tx.mutate.project.update({
+          id: project.id,
+          ...(args.action === 'delete'
+            ? { deletedAt: now }
+            : { visibility: 'private' as const }),
+          updatedAt: now,
+        })
+      },
+    ),
+
+    /**
      * Soft-delete. Sets `deleted_at`; threads and attachments keep
      * their `project_id` and become invisible to UI via the `deletedAt IS
      * NULL` filter applied on every read path.
@@ -216,8 +275,15 @@ export const projectMutatorDefinitions = {
       const project = await tx.run(
         zql.project.where('id', args.projectId).one(),
       )
-      const access = checkProjectAccess(project, { userId: ctx.userID })
-      if (access.kind !== 'ok') return
+      const access = checkProjectAccess(project, {
+        userId: ctx.userID,
+        isAnonymous: ctx.isAnonymous,
+        ownerIsMember:
+          tx.location !== 'server' || (await projectOwnerIsMember(tx, project)),
+      })
+      if (access.kind !== 'ok') {
+        throw new Error(PROJECT_ACCESS_FAILURE_CODE[access.kind])
+      }
 
       const now = Date.now()
       await tx.mutate.project.update({

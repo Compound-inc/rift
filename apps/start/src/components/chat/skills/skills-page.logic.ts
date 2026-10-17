@@ -24,6 +24,7 @@ export type SkillEditContext = {
    * never loads a project" and "project failed to load").
    */
   readonly project: ProjectAccessSubject | null | undefined
+  readonly ownerIsMember?: boolean
 }
 
 /**
@@ -43,7 +44,12 @@ export function canEditSkill(input: {
   if (!context.currentUserId) return false
 
   const projectAccess = skill.projectId
-    ? checkProjectAccess(context.project, { userId: context.currentUserId })
+    ? checkProjectAccess(context.project, {
+        userId: context.currentUserId,
+        // The server verifies membership. An absent client projection is not
+        // evidence that the owner has left the workspace.
+        ownerIsMember: context.ownerIsMember ?? true,
+      })
     : undefined
 
   return (

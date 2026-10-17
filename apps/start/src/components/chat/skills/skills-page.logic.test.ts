@@ -28,8 +28,9 @@ describe('describeSkillError', () => {
   )
 
   it('also maps the project-access codes raised through PROJECT_ACCESS_FAILURE_CODE', () => {
-    expect(describeSkillError(new Error('project_not_found_or_deleted')))
-      .toBeTruthy()
+    expect(
+      describeSkillError(new Error('project_not_found_or_deleted')),
+    ).toBeTruthy()
     expect(describeSkillError(new Error('project_not_owned'))).toBeTruthy()
   })
 
@@ -133,9 +134,9 @@ describe('canEditSkill', () => {
   })
 
   it('lets the creator edit their personal skill', () => {
-    expect(
-      canEditSkill({ skill: personalSkill, context: baseContext }),
-    ).toBe(true)
+    expect(canEditSkill({ skill: personalSkill, context: baseContext })).toBe(
+      true,
+    )
   })
 
   it('blocks anonymous callers (no currentUserId)', () => {
@@ -176,6 +177,39 @@ describe('canEditSkill', () => {
         context: { ...baseContext, project: makeProject('user-1') },
       }),
     ).toBe(true)
+  })
+
+  it('lets the owner edit org-visible project skills unless membership is disproven', () => {
+    const input = {
+      skill: { ...personalSkill, projectId: 'project-1' },
+      context: {
+        ...baseContext,
+        project: {
+          ...makeProject('user-1'),
+          organizationId: 'org-1',
+          visibility: 'org' as const,
+        },
+      },
+    }
+    expect(canEditSkill(input)).toBe(true)
+    expect(
+      canEditSkill({
+        ...input,
+        context: { ...input.context, ownerIsMember: true },
+      }),
+    ).toBe(true)
+    expect(
+      canEditSkill({
+        ...input,
+        context: { ...input.context, ownerIsMember: false },
+      }),
+    ).toBe(false)
+    expect(
+      canEditSkill({
+        ...input,
+        context: { ...input.context, currentUserId: 'other' },
+      }),
+    ).toBe(false)
   })
 
   it('lets org admins co-edit Org-Shared skills only when allowAdminEdit is true', () => {

@@ -12,6 +12,7 @@ const records = vi.hoisted(() => ({
   contents: new Map<string, string>(),
   failListing: false,
 }))
+const listProjectSources = vi.hoisted(() => vi.fn())
 const embedQuery = vi.hoisted(() => vi.fn())
 const searchScopes = vi.hoisted(() => vi.fn())
 
@@ -20,7 +21,7 @@ vi.mock('./rag-source-records', () => ({
     records.failListing
       ? Effect.fail(new Error('db down'))
       : Effect.succeed(records.conversation),
-  listProjectSources: () => Effect.succeed(records.project),
+  listProjectSources,
   listOrgKnowledgeSources: () => Effect.succeed(records.org),
   loadSourceContents: (input: { ids: readonly string[]; maxChars?: number }) =>
     Effect.succeed(
@@ -79,6 +80,7 @@ beforeEach(() => {
   records.org = []
   records.contents = new Map()
   records.failListing = false
+  listProjectSources.mockReset().mockImplementation(() => Effect.succeed(records.project))
   embedQuery.mockReset().mockResolvedValue([0.1, 0.2, 0.3])
   searchScopes.mockReset().mockResolvedValue([])
 })
@@ -217,4 +219,12 @@ it('limits fallback beginnings by their CJK token footprint', async () => {
   const cjkCharacters = (context.turnBlock.match(/中/g) ?? []).length
   // Beginning allowance is 3,600 Latin-equivalent units, or 900 tokens.
   expect(cjkCharacters).toBe(750)
+})
+
+it('authorizes project files with the active org even when org knowledge is disabled', async () => {
+  records.project = [source('project-file', 12, { scope: 'project_source' })]
+  records.contents.set('project-file', 'Shared project instructions and reference material')
+  const context = await build({ projectId: 'p', projectOrganizationId: 'org-1', organizationId: undefined })
+  expect(listProjectSources).toHaveBeenCalledWith({ projectId: 'p', userId: 'user-1', organizationId: 'org-1' })
+  expect(context.libraryBlock).toContain('Shared project instructions and reference material')
 })

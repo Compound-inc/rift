@@ -6,6 +6,7 @@ import { useQuery, useZero } from '@rocicorp/zero/react'
 import type { QueryResultType } from '@rocicorp/zero'
 
 import { mutators, queries } from '@/integrations/zero'
+import { useProjectManagementAccess } from '@/lib/frontend/projects/use-project-management-access'
 import { m } from '@/paraglide/messages.js'
 
 /**
@@ -157,12 +158,13 @@ function useProjectFieldEditor(input: {
     }
 
     try {
-      await z.mutate(
+      const result = await z.mutate(
         mutators.projects.update({
           projectId: input.projectId,
           patch: { [input.fieldKey]: patch.value } as never,
         }),
-      ).client
+      ).server
+      if (result.type === 'error') throw new Error(m.chat_project_error_save_failed())
       setMessage({ kind: 'success', text: definition.successMessage() })
     } catch (cause) {
       setMessage({
@@ -182,6 +184,7 @@ export function useProjectSettingsPageLogic({
 }) {
   const z = useZero()
   const navigate = useNavigate()
+  const { canManage, isOrphan } = useProjectManagementAccess()
   const [project] = useQuery(queries.projects.byId({ projectId }))
 
   const nameEditor = useProjectFieldEditor({
@@ -209,7 +212,8 @@ export function useProjectSettingsPageLogic({
     setDeleteSubmitting(true)
     setDeleteMessage(null)
     try {
-      await z.mutate(mutators.projects.delete({ projectId })).client
+      const result = await z.mutate(mutators.projects.delete({ projectId })).server
+      if (result.type === 'error') throw new Error(m.chat_project_delete_failed())
       setDeleteDialogOpen(false)
       navigate({ to: '/chat' })
     } catch (cause) {
@@ -221,7 +225,8 @@ export function useProjectSettingsPageLogic({
 
   return {
     project,
-    canEdit: !!project,
+    canEdit: canManage(project),
+    isOrphan: isOrphan(project),
     nameEditor,
     descriptionEditor,
     instructionEditor,
