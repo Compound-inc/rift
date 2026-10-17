@@ -33,9 +33,29 @@ if (
   process.env.OPENROUTER_API_KEY?.trim()
 ) {
   const apiKey = process.env.OPENROUTER_API_KEY.trim()
+  // OpenRouter rejects Responses `include` values it does not know (the SDK
+  // adds `web_search_call.action.sources` whenever web search is active).
+  const allowedIncludes = new Set([
+    'file_search_call.results',
+    'message.input_image.image_url',
+    'computer_call_output.output.image_url',
+    'reasoning.encrypted_content',
+    'code_interpreter_call.outputs',
+  ])
   const openaiViaOpenRouter = createOpenAI({
     apiKey,
     baseURL: 'https://openrouter.ai/api/v1',
+    fetch: async (input, init) => {
+      if (typeof init?.body === 'string') {
+        const body = JSON.parse(init.body) as { include?: string[] }
+        if (Array.isArray(body.include)) {
+          body.include = body.include.filter((value) => allowedIncludes.has(value))
+          if (body.include.length === 0) delete body.include
+          init = { ...init, body: JSON.stringify(body) }
+        }
+      }
+      return fetch(input, init)
+    },
   })
   const openrouter = createOpenRouter({ apiKey })
 
@@ -50,7 +70,8 @@ if (
             ...params,
             providerOptions: {
               ...params.providerOptions,
-              openai: { ...params.providerOptions?.openai, store: false },
+              // OpenRouter slugs hide reasoning models from the SDK's id sniffing.
+              openai: { ...params.providerOptions?.openai, store: false, forceReasoning: true },
             },
           }),
         } as never,
