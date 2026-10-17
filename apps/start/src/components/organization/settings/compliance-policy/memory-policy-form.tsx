@@ -3,20 +3,28 @@ import { useQuery, useZero } from '@rocicorp/zero/react'
 import { Form } from '@rift/ui/form'
 import { mutators, queries } from '@/integrations/zero'
 import { managePersonalizationMemory } from '@/lib/frontend/settings/personalization/personalization.functions'
+import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 import { m } from '@/paraglide/messages.js'
 
 export function MemoryPolicyForm() {
   const z = useZero()
+  const { activeOrganizationId } = useAppAuth()
   const [policy, result] = useQuery(queries.orgPolicy.current())
   const [configured, setConfigured] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   useEffect(() => {
+    // The server rejects status checks for any workspace other than the
+    // active one, so wait until the session knows which workspace that is.
+    if (!activeOrganizationId) return
     let active = true
-    void managePersonalizationMemory({ data: { action: 'status' } })
+    void managePersonalizationMemory({
+      data: { action: 'status', organizationId: activeOrganizationId },
+    })
       .then((status) => {
-        if (active && 'configured' in status)
-          setConfigured(Boolean(status.configured))
+        if (!active) return
+        setError('')
+        if ('configured' in status) setConfigured(Boolean(status.configured))
       })
       .catch(() => {
         if (active) setError(m.personalization_load_error())
@@ -24,7 +32,7 @@ export function MemoryPolicyForm() {
     return () => {
       active = false
     }
-  }, [])
+  }, [activeOrganizationId])
   const zdr = Boolean(policy?.complianceFlags.require_zdr)
   return (
     <Form
