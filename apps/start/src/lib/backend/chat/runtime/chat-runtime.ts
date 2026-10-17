@@ -14,6 +14,7 @@ import { UpstreamPostgresLayer } from '@/lib/backend/server-effect/services/upst
 import { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
 import { RagContextService } from '@/lib/backend/rag'
 import { isRedisDisabled } from '@/utils/app-feature-flags'
+import { CompactionService } from '../services/compaction.service'
 import { ChatOrchestratorService } from '../services/chat-orchestrator.service'
 import { ChatSearchService } from '../services/chat-search.service'
 import { FreeChatAllowanceService } from '../services/free-chat-allowance.service'
@@ -69,7 +70,7 @@ const dependencyLayer = Layer.mergeAll(
 
 const layer = Layer.mergeAll(ChatOrchestratorService.layer, StopGenerationService.layer).pipe(
   // Expose orchestrator plus operational dependencies used directly by routes.
-  Layer.provideMerge(dependencyLayer),
+  Layer.provideMerge(CompactionService.layer.pipe(Layer.provideMerge(dependencyLayer))),
 )
 
 const runtime = makeRuntimeRunner(layer)

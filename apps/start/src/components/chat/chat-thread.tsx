@@ -1,11 +1,13 @@
 // Renders chat messages and keeps scroll pinned to the latest user message.
-import { memo, useCallback, useMemo } from 'react'
+import { Fragment, memo, useCallback, useMemo } from 'react'
 import type { RefObject } from 'react'
 import { isReasoningUIPart } from 'ai'
 import type { UIMessage } from 'ai'
 import { useQuery } from '@rocicorp/zero/react'
 import { useChatMessageActions, useChatMessages } from './chat-context'
 import { ChatMessage } from './chat-message'
+import { CompactionDivider } from './compaction-divider'
+import { useThreadCompaction } from './use-thread-compaction'
 import { usePinToLastUserMessage } from '@rift/chat-scroll'
 import { ChatProjectWelcomeScreen } from './chat-project-welcome-screen'
 import { ChatWelcomeScreen } from './chat-welcome-screen'
@@ -178,6 +180,7 @@ export function ChatThread() {
       status,
     })
 
+  const { view: compactionView, progress: compactionProgress } = useThreadCompaction(activeThreadId, messages)
   const isStreaming = status === 'submitted' || status === 'streaming'
   const lastMessage = messages.at(-1)
   const lastAssistantMessage =
@@ -308,8 +311,8 @@ export function ChatThread() {
         if (hidePendingAssistantShell) return null
 
         return (
+          <Fragment key={m.id}>
           <ChatThreadMessageRow
-            key={m.id}
             message={m}
             lastUserMessageId={lastUserMessageId}
             lastMessageId={lastMessage?.id}
@@ -324,9 +327,17 @@ export function ChatThread() {
             onEdit={editWithoutScrollShift}
             onSelectBranchVersion={selectBranchVersionWithoutScrollShift}
           />
+          {compactionView?.checkpoint.coversThroughMessageId === m.id && <CompactionDivider checkpoint={compactionView.checkpoint} />}
+          </Fragment>
         )
       })}
-      {showThinking && (
+      {isStreaming && compactionProgress?.status === 'running' && (
+        <p role="status" className="mx-auto w-full max-w-2xl py-2 text-xs text-foreground-tertiary">{m.chat_compaction_running()}</p>
+      )}
+      {compactionView?.checkpoint.kind === 'sliding-window' && (
+        <p role="status" className="mx-auto w-full max-w-2xl py-2 text-xs text-foreground-tertiary">{m.chat_compaction_fallback()}</p>
+      )}
+      {showThinking && compactionProgress?.status !== 'running' && (
         <div
           className="group mx-auto flex w-full max-w-2xl items-end gap-2 py-1 is-assistant"
           aria-live="polite"

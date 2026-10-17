@@ -73,6 +73,13 @@ export const chatQueryDefinitions = {
       return q.one()
     }),
   },
+  compactions: {
+    byThread: defineQuery(z.object({ threadId: z.string() }), ({ args, ctx }) =>
+      zql.threadCompaction
+        .where('threadId', args.threadId)
+        .where('userId', ctx.userID),
+    ),
+  },
   messages: {
     /** Messages in a thread, always scoped to the authenticated user context. */
     byThread: defineQuery(z.object({ threadId: z.string() }), ({ args, ctx }) =>

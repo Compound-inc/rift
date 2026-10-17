@@ -44,6 +44,7 @@ import {
   useComposerDraftValue,
 } from './composer-draft-store'
 import { resolveCurrentContextTokens } from './token-usage'
+import { useThreadCompaction } from './use-thread-compaction'
 import type {
   ChatAttachment,
   ChatAttachmentInput,
@@ -143,15 +144,9 @@ export function ChatInput() {
 
   const isBusy = status === 'submitted' || status === 'streaming'
   const hasPendingUploads = files.some((file) => file.isUploading)
-  const usedTokens = resolveCurrentContextTokens(latestAssistantUsage)
-  const isContextLimitReached =
-    usedTokens != null && usedTokens >= activeContextWindow
-  const contextLimitMessage = isContextLimitReached
-    ? contextWindowSupportsMaxMode && selectedContextWindowMode === 'standard'
-      ? 'This conversation has reached the standard context limit. Switch to Max to continue with the larger window.'
-      : 'This conversation has reached its current context limit. Start a new chat to continue.'
-    : null
-  const isSendBlocked = hasPendingUploads || isContextLimitReached
+  const { view: compactionView } = useThreadCompaction(activeThreadId, messages)
+  const usedTokens = compactionView?.promptTokens ?? resolveCurrentContextTokens(latestAssistantUsage)
+  const isSendBlocked = hasPendingUploads
   const parsedChatError = parseChatApiError(error)
   const chatErrorMessage = parsedChatError?.message ?? null
   const chatErrorTraceId = parsedChatError?.traceId ?? null
@@ -175,9 +170,7 @@ export function ChatInput() {
     ? chatErrorMessage
     : showUploadError
       ? uploadErrorMessage
-      : contextLimitMessage
-        ? contextLimitMessage
-        : null
+      : null
 
   useEffect(() => {
     if (error) setErrorDismissed(false)

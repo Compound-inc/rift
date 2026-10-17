@@ -419,8 +419,8 @@
   "error_chat_model_requires_paid_plan": "This model requires a paid plan to use.",
   "error_chat_provider_key_missing": "This provider requires an organization API key, but no key is configured.",
   "error_chat_provider_model_key_incompatible": "This model cannot be used with your organization provider API key. Choose another model from that provider or remove the provider key.",
-  "error_chat_context_window_exceeded": "This conversation has reached its current context limit ({maxTokens} tokens). Start a new chat to continue.",
-  "error_chat_context_window_exceeded_max_available": "This conversation has reached the standard context limit ({maxTokens} tokens). Switch to Max to continue with the larger window.",
+  "error_chat_context_window_exceeded": "The latest message or attached context is too large even after summarizing earlier messages. Shorten the message or reduce attachments and try again.",
+  "error_chat_context_window_exceeded_max_available": "The latest message or attached context is too large even after summarizing earlier messages. Shorten the message, reduce attachments, or choose Max.",
   "error_chat_rate_limited": "Too many requests. Please wait about {retryAfterSeconds} seconds and retry.",
   "error_chat_quota_exceeded": "This seat has exhausted its current AI usage allowance. Please wait until the monthly reset and try again.",
   "error_chat_free_allowance_exhausted": "Your free chat allowance is exhausted for now. Upgrade for more access or wait and try again.",
@@ -1153,5 +1153,9 @@
   "personalization_page": "{page} of {total}",
   "personalization_org_memory_title": "Allow memory",
   "personalization_org_memory_description": "Let members use Supermemory to remember details across chats. Memories are private to each member in this workspace. Disabling this stops recall and saving for everyone; it does not delete existing memories.",
-  "personalization_deleting": "Deleting…"
+  "personalization_deleting": "Deleting…",
+  "chat_compaction_running": "Summarizing earlier messages…",
+  "chat_compaction_divider": "Earlier messages summarized",
+  "chat_compaction_omitted": "Some earlier messages were omitted",
+  "chat_compaction_fallback": "Continuing with recent messages. Some earlier details are no longer in context."
 }

@@ -522,6 +522,17 @@ export const chatMutatorDefinitions = {
           await tx.mutate.document.delete({ id: document.id })
         }
       }
+      // Checkpoints contain private conversation text. Delete all branch
+      // summaries in the same server transaction as their owning thread.
+      // They are read-only in Zero, so the optimistic client cannot mutate them.
+      if (tx.location === 'server') {
+        const checkpoints = await tx.run(
+          zql.threadCompaction.where('threadId', args.threadId).where('userId', ctx.userID),
+        )
+        for (const checkpoint of checkpoints) {
+          await tx.mutate.threadCompaction.delete({ id: checkpoint.id })
+        }
+      }
       await tx.mutate.thread.delete({ id: thread.id })
     }),
 

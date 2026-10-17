@@ -587,6 +587,14 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
             role: message.role,
             parts: messageParts,
             metadata: {
+              // Compaction summarizes conversation text only, then moves the
+              // stable library block to the first surviving user turn.
+              compactionContext: {
+                text: expandedText,
+                ...(message.messageId === firstUserMessageRow?.messageId
+                  ? { libraryBlock: turnContext.libraryBlock }
+                  : {}),
+              },
               ...(message.role === 'assistant' ? { model: message.model } : {}),
               ...(attachmentMetadata.length > 0
                 ? { attachments: attachmentMetadata }

@@ -407,8 +407,8 @@
   "error_chat_model_requires_paid_plan": "Este modelo requiere un plan de pago para usarse.",
   "error_chat_provider_key_missing": "Este proveedor requiere una clave API de la organización, pero no hay ninguna configurada.",
   "error_chat_provider_model_key_incompatible": "Este modelo no se puede usar con la clave API del proveedor de tu organización. Elige otro modelo de ese proveedor o elimina la clave.",
-  "error_chat_context_window_exceeded": "Esta conversación alcanzó su límite de contexto actual ({maxTokens} tokens). Inicia un chat nuevo para continuar.",
-  "error_chat_context_window_exceeded_max_available": "Esta conversación alcanzó el límite de contexto estándar ({maxTokens} tokens). Cambia a Max para continuar con la ventana más grande.",
+  "error_chat_context_window_exceeded": "El último mensaje o los archivos adjuntos son demasiado grandes, incluso después de resumir los mensajes anteriores. Acorta el mensaje o reduce los archivos adjuntos e inténtalo de nuevo.",
+  "error_chat_context_window_exceeded_max_available": "El último mensaje o los archivos adjuntos son demasiado grandes, incluso después de resumir los mensajes anteriores. Acorta el mensaje, reduce los archivos adjuntos o elige Max.",
   "error_chat_rate_limited": "Demasiadas solicitudes. Espera aproximadamente {retryAfterSeconds} segundos y vuelve a intentarlo.",
   "error_chat_quota_exceeded": "Este asiento agotó su asignación actual de uso de IA. Espera hasta el reinicio mensual y vuelve a intentarlo.",
   "error_chat_free_allowance_exhausted": "Tu límite gratuito de chat se ha agotado por ahora. Mejora tu plan para obtener más acceso o espera y vuelve a intentarlo.",
@@ -1141,5 +1141,9 @@
   "personalization_page": "{page} de {total}",
   "personalization_org_memory_title": "Permitir memoria",
   "personalization_org_memory_description": "Permite que los miembros usen Supermemory para recordar detalles entre chats. Los recuerdos son privados para cada miembro de este espacio de trabajo. Desactivar esta opción detiene la consulta y el guardado para todos; no elimina los recuerdos existentes.",
-  "personalization_deleting": "Eliminando…"
+  "personalization_deleting": "Eliminando…",
+  "chat_compaction_running": "Resumiendo los mensajes anteriores…",
+  "chat_compaction_divider": "Se resumieron los mensajes anteriores",
+  "chat_compaction_omitted": "Se omitieron algunos mensajes anteriores",
+  "chat_compaction_fallback": "Continuaremos con los mensajes recientes. Algunos detalles anteriores ya no forman parte del contexto."
 }
