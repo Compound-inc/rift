@@ -1,4 +1,4 @@
-import { Navigate, Outlet, createFileRoute } from '@tanstack/react-router'
+import { Navigate, Outlet, createFileRoute, useLocation } from '@tanstack/react-router'
 import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 
 export const Route = createFileRoute('/(app)/_layout/settings')({
@@ -7,7 +7,9 @@ export const Route = createFileRoute('/(app)/_layout/settings')({
 
 function SettingsLayout() {
   const { loading, user, isAnonymous } = useAppAuth()
-  if (!loading && (!user || isAnonymous)) {
+  const isArchivePage = useLocation({ select: (location) => location.pathname === '/settings/archived' })
+  // Guests can recover their own archived threads without opening account settings.
+  if (!loading && (!user || (isAnonymous && !isArchivePage))) {
     return <Navigate to="/chat" replace />
   }
 

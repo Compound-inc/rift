@@ -1,6 +1,6 @@
 'use client'
 
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { PanelLeftClose, PanelLeftOpen, Share } from 'lucide-react'
 import { Button } from '@rift/ui/button'
 import { useHotkey } from '@tanstack/react-hotkeys'
 import { useMediaQuery } from '@rift/ui/hooks/useMediaQuery'
@@ -11,6 +11,8 @@ import { useChatMessages } from './chat-context'
 import { ChatInput } from './chat-input'
 import { ChatProjectChip } from './chat-project-chip'
 import { ChatThread } from './chat-thread'
+import { openThreadShare } from './thread-share-dialog'
+import { ThreadArchiveBanner } from './thread-archive-banner'
 
 /**
  * Shared shell used by both `/chat` and `/chat/$threadId`.
@@ -22,7 +24,7 @@ export function ChatPageShell() {
     useSideNav()
   const { isChatPageSidebarCollapsed, setIsChatPageSidebarCollapsed } =
     usePageSidebarVisibility()
-  const { isProjectLandingState } = useChatMessages()
+  const { isProjectLandingState, activeThreadId } = useChatMessages()
 
   const toggleSidebar = () => {
     if (isMobile) {
@@ -80,6 +82,19 @@ export function ChatPageShell() {
             </Button>
           </div>
           <ChatProjectChip />
+          {activeThreadId && (
+            <Button
+              type="button"
+              className="pointer-events-auto ml-auto"
+              variant="ghost"
+              size="iconSmall"
+              aria-label={m.share_title()}
+              title={m.share_title()}
+              onClick={() => openThreadShare(activeThreadId)}
+            >
+              <Share className="size-4" aria-hidden />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -88,6 +103,7 @@ export function ChatPageShell() {
         style={{ scrollbarGutter: 'stable' }}
       >
         <div className="h-full">
+          {activeThreadId && <ThreadArchiveBanner threadId={activeThreadId} />}
           <ChatThread />
         </div>
       </div>

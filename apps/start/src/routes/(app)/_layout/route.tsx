@@ -1,4 +1,5 @@
 import { Outlet, createFileRoute, redirect } from '@tanstack/react-router'
+import { ThreadShareDialogHost } from '@/components/chat/thread-share-dialog'
 import { DashboardLayout } from '@/components/layout'
 import { isSelfHosted } from '@/utils/app-feature-flags'
 
@@ -32,6 +33,7 @@ export const Route = createFileRoute('/(app)/_layout')({
 function AppLayoutComponent() {
   return (
     <DashboardLayout>
+      <ThreadShareDialogHost />
       <Outlet />
     </DashboardLayout>
   )

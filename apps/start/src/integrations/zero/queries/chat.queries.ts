@@ -31,6 +31,18 @@ const threadHistoryPageArgs = z.object({
  */
 export const chatQueryDefinitions = {
   threads: {
+    archived: defineQuery(z.object({ organizationId: z.string().optional() }), ({ args, ctx }) => {
+      let q = zql.thread.where('userId', ctx.userID).where('visibility', 'archived')
+        .where(({ or, cmp, exists }) => or(
+          cmp('projectId', 'IS', null),
+          exists('project', (project) => project.where('deletedAt', 'IS', null)),
+        ))
+        .orderBy('updatedAt', 'desc')
+      q = args.organizationId
+        ? q.where('ownerOrgId', args.organizationId)
+        : q.where('ownerOrgId', 'IS', null)
+      return q
+    }),
     historyPage: defineQuery(threadHistoryPageArgs, ({ args, ctx }) => {
       const orderDirection = args.dir === 'forward' ? 'desc' : 'asc'
       const organizationId = args.organizationId?.trim()

@@ -189,6 +189,7 @@ export const makeAppendUserMessageOperation = (dependencies: {
                 activeChildByParent,
                 branchVersion: thread.branchVersion + 1,
                 generationStatus: 'generation',
+                visibility: 'visible',
                 updatedAt: now,
                 lastMessageAt: now,
               })

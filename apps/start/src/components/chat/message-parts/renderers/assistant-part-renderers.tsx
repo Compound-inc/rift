@@ -8,6 +8,9 @@ import type {
 } from '../types'
 import { AssistantTextPart } from './assistant-text-part'
 
+// Shared pages render a read-only AssistantTextPart from this module.
+export { AssistantTextPart }
+
 function renderTextPart({
   part,
   isMessageStreaming,
