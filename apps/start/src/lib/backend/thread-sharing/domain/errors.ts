@@ -9,7 +9,7 @@ export class ShareUnavailableError extends Schema.TaggedErrorClass<ShareUnavaila
 
 export class SharePersistenceError extends Schema.TaggedErrorClass<SharePersistenceError>()(
   'SharePersistenceError',
-  { message: Schema.String },
+  { message: Schema.String, cause: Schema.optional(Schema.String) },
 ) {}
 
 /** Expected failures carry stable codes for localization; messages stay internal. */

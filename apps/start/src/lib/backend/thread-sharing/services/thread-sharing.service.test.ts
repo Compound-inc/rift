@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Logger } from 'effect'
+import { resolveCanonicalBranch } from '@/lib/shared/chat-branching/branch-resolver'
 import { ThreadSharingService } from './thread-sharing.service'
 import { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
 import { RateLimitService } from '@/lib/backend/chat/services/rate-limit.service'
@@ -37,7 +38,7 @@ const message = {
   role: 'assistant',
   content: 'Question',
   status: 'done',
-  branchIndex: 0,
+  branchIndex: 1,
   created_at: 1,
   attachmentsIds: ['file'],
   reasoning: 'private',
@@ -133,7 +134,7 @@ function harness(
   const insertThread = vi.fn(async (row: Record<string, unknown>) => {
     recent = [{ thread_id: String(row.threadId) }]
   })
-  const insertMessage = vi.fn(async (_row: unknown) => {})
+  const insertMessage = vi.fn(async (_row: { messageId: string; role: 'user' | 'assistant'; parentMessageId?: string; branchIndex: number; created_at: number; content: string }) => {})
   const assertAllowed = vi.fn(() =>
     Effect.succeed({ allowed: true as const, remaining: 9 }),
   )
@@ -429,6 +430,52 @@ describe('share management', () => {
 })
 
 describe('continuing shared chats', () => {
+  it('copies the full canonical chain with positive sibling indexes', async () => {
+    const messages = [
+      { ...message, messageId: 'question', role: 'user', content: 'Question', attachmentsIds: [] },
+      { ...message, messageId: 'answer', parentMessageId: 'question', content: 'Answer', created_at: 2, attachmentsIds: [] },
+      { ...message, messageId: 'followup', parentMessageId: 'answer', role: 'user', content: 'Followup', created_at: 3, attachmentsIds: [] },
+    ]
+    const h = harness({
+      messages,
+      thread: { activeChildByParent: { __root__: 'question', question: 'answer', answer: 'followup' } },
+    })
+    await h.execute((s) => s.fork({ shareId: thread.shareId, viewer }))
+    const copied = h.insertMessage.mock.calls.map(([row]) => row)
+    expect(copied).toHaveLength(messages.length)
+    for (const row of copied) expect(row.branchIndex).toBeGreaterThanOrEqual(1)
+    const selection = h.update.mock.calls.at(-1)![0].activeChildByParent
+    const resolved = resolveCanonicalBranch(
+      copied.map((row) => ({ ...row, createdAt: row.created_at })),
+      selection,
+    )
+    expect(resolved.canonicalMessageIds).toEqual(copied.map((row) => row.messageId))
+    expect(resolved.canonicalMessages.map((row) => row.content)).toEqual(messages.map((row) => row.content))
+  })
+
+  it('logs the underlying persistence cause with fork context and preserves it internally', async () => {
+    const h = harness({ messages: [message] })
+    const cause = new Error('messages_branch_index_positive')
+    h.insertMessage.mockRejectedValueOnce(cause)
+    const log = vi.fn()
+    const logger = Logger.layer([Logger.make(log)], { mergeWithExisting: false })
+    await expect(h.execute((s) =>
+      s.fork({ shareId: thread.shareId, viewer }).pipe(Effect.provide(logger)),
+    )).rejects.toMatchObject({
+      _tag: 'SharePersistenceError',
+      message: 'Sharing unavailable',
+      cause: String(cause),
+    })
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({
+      logLevel: 'Error',
+      message: ['Share transaction failed', {
+        shareId: thread.shareId,
+        threadId: h.insertThread.mock.calls[0][0].threadId,
+        cause,
+      }],
+    }))
+  })
+
   it.each([undefined, 'other'])(
     'requires switching to the owning workspace before forking an org-only link into %s',
     async (organizationId) => {

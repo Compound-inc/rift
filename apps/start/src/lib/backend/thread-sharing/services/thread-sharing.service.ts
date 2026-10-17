@@ -95,29 +95,44 @@ export class ThreadSharingService extends ServiceMap.Service<
     Effect.gen(function* () {
       const database = yield* ZeroDatabaseService
       const rateLimit = yield* RateLimitService
-      const transaction = <T>(run: (tx: ZeroServerTransaction) => Promise<T>) =>
+      // Keep database diagnostics on the server while callers receive a stable error.
+      const transaction = <T>(
+        run: (tx: ZeroServerTransaction) => Promise<T>,
+        context: { shareId?: string; threadId?: string },
+      ) =>
         database.getOrFail.pipe(
-          Effect.mapError(
-            () => new SharePersistenceError({ message: 'Sharing unavailable' }),
-          ),
           Effect.flatMap((db) =>
             Effect.tryPromise({
               try: () => db.transaction(run),
-              catch: (error) =>
-                error instanceof ShareUnavailableError ||
-                error instanceof ShareActionError
-                  ? error
-                  : new SharePersistenceError({
-                      message: 'Sharing unavailable',
-                    }),
+              catch: (error) => error,
             }),
           ),
+          Effect.catch((cause): Effect.Effect<never, ShareFailure> => {
+            if (
+              cause instanceof ShareUnavailableError ||
+              cause instanceof ShareActionError
+            ) {
+              return Effect.fail(cause)
+            }
+            return Effect.logError('Share transaction failed', {
+              ...context,
+              cause,
+            }).pipe(
+              Effect.andThen(
+                Effect.fail(new SharePersistenceError({
+                  message: 'Sharing unavailable',
+                  cause: String(cause),
+                })),
+              ),
+            )
+          }),
         )
       return {
         read: Effect.fn('ThreadSharingService.read')(({ shareId, viewer }) =>
           transaction(
             async (tx) =>
               (await loadSharedThread(tx, shareId, viewer)).snapshot,
+            { shareId },
           ),
         ),
         manage: Effect.fn('ThreadSharingService.manage')((input) =>
@@ -178,7 +193,7 @@ export class ThreadSharingService extends ServiceMap.Service<
             }
             await tx.mutate.thread.update({ id: thread.id, ...update })
             return currentSettings({ ...thread, ...update })
-          }),
+          }, { threadId: input.threadId }),
         ),
         fork: Effect.fn('ThreadSharingService.fork')(({ shareId, viewer }) =>
           Effect.gen(function* () {
@@ -202,9 +217,11 @@ export class ThreadSharingService extends ServiceMap.Service<
                       })
                     : new SharePersistenceError({
                         message: 'Sharing unavailable',
+                        cause: String(error),
                       }),
                 ),
               )
+            const context: { shareId: string; threadId?: string } = { shareId }
             return yield* transaction(async (tx) => {
               // Serialize matching requests across replicas before looking for a recent copy.
               await tx.dbTransaction.wrappedTransaction.query(
@@ -219,6 +236,7 @@ export class ThreadSharingService extends ServiceMap.Service<
               )
               const { thread, snapshot, publicSharingAllowed } =
                 await loadSharedThread(tx, shareId, viewer)
+              context.threadId = thread.threadId
               if (
                 (thread.orgOnly || !publicSharingAllowed) &&
                 viewer.organizationId !== thread.ownerOrgId
@@ -256,6 +274,7 @@ export class ThreadSharingService extends ServiceMap.Service<
               )
               if (recent.rows[0]) return { threadId: recent.rows[0].thread_id }
               const threadId = crypto.randomUUID()
+              context.threadId = threadId
               const now = Date.now()
               const activeChildByParent: Record<string, string> = {}
               let parentMessageId: string | undefined
@@ -289,7 +308,8 @@ export class ThreadSharingService extends ServiceMap.Service<
                   content: sanitizeForkText(message.text),
                   status: 'done',
                   parentMessageId,
-                  branchIndex: 0,
+                  // The fork is a linear chain, so every node is its parent's first child.
+                  branchIndex: 1,
                   created_at: now + index,
                   model: thread.model,
                   attachmentsIds: [],
@@ -301,7 +321,7 @@ export class ThreadSharingService extends ServiceMap.Service<
                 activeChildByParent,
               })
               return { threadId }
-            })
+            }, context)
           }),
         ),
       }
