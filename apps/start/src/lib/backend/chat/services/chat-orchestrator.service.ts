@@ -1,6 +1,9 @@
+import { createStepAccounting } from './chat-orchestrator/step-accounting'
 import { estimateToolTokens, resolveOutputLimits } from './chat-orchestrator/output-limits'
 import { estimateTokensFromText } from '@/lib/shared/chat-contracts/prompt-usage'
 import { hasProviderWork } from './chat-orchestrator/provider-work'
+import { documentToolsContext } from '@/lib/shared/documents/contracts'
+import { aggregateStepAccounting } from '../domain/multi-step-accounting'
 import { createUIMessageStreamResponse, toUIMessageStream } from 'ai'
 import type { ReadonlyJSONValue } from '@rocicorp/zero'
 import { Duration, Effect, Exit, Layer, ServiceMap } from 'effect'
@@ -59,6 +62,7 @@ import { resolveStoppedUsage } from './chat-orchestrator/stopped-usage'
 import type { AssistantDeltaBuffer } from './chat-orchestrator/assistant-buffer'
 import {
   applyAssistantChunkDelta,
+  markAssistantStepBoundary,
   hydrateAssistantBufferFromResponse,
 } from './chat-orchestrator/assistant-buffer'
 import {
@@ -556,6 +560,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
           const assembledSystemPrompt = assembleSystemPrompt({
             modelId: modelResolution.modelId,
             modePrompt: effectiveMode?.definition.systemPrompt,
+            activeTools: toolRegistry.activeTools,
             projectInstruction: threadAccess.projectInstruction,
           })
 
@@ -586,7 +591,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               cause: String(error),
             }),
           })
-          yield* Effect.try({
+          const outputLimits = yield* Effect.try({
             try: () => resolveOutputLimits({
               modelId: modelResolution.modelId,
               estimatedPromptTokens:
@@ -713,6 +718,11 @@ export class ChatOrchestratorService extends ServiceMap.Service<
           // This ID is generated server-side so start/finalize writes are deterministic
           // and idempotent even when transport retries happen.
           const assistantMessageId = crypto.randomUUID()
+          const stepAccounting = createStepAccounting({
+            modelId: modelResolution.modelId,
+            usedByok: Boolean(modelResolution.providerApiKeyOverride),
+            reservedNanoUsd: quotaReservation.estimatedNanoUsd,
+          })
           let receivedProviderOutput = false
           let assistantFinalized = false
           let streamCleanedUp = false
@@ -720,7 +730,6 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             text: '',
             reasoning: '',
           }
-          let transportErrorHandled = false
           const defaultStreamFailureMessage =
             'The assistant response failed while streaming. Please retry.'
 
@@ -952,11 +961,17 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             systemPrompt: assembledSystemPrompt,
             requestId,
             tools: toolRegistry.tools,
+            toolsContext: documentToolsContext({ userId, threadId, organizationId, sourceMessageId: assistantMessageId, maxOutputTokens: outputLimits.maxOutputTokens }, toolRegistry.activeTools),
             activeTools: toolRegistry.activeTools,
             providerOptions,
             contextWindowTokens: activeContextWindow,
             reasoningEffort: modelResolution.reasoningEffort,
             abortSignal: streamAbortController.signal,
+            onStepStart: (promptTokens) => stepAccounting.startStep(promptTokens),
+            onStepEnd: (step) => {
+              stepAccounting.finishStep(step)
+              markAssistantStepBoundary(assistantBuffer)
+            },
             onChunk: (chunk: unknown) => {
               // Lifecycle/error parts do not prove provider work. Text, reasoning
               // and tool input do, including tools with no visible assistant text.
@@ -966,6 +981,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                 /^(text-|reasoning-|tool-input-|tool-call$|tool-result$|tool-error$)/.test(type)
               )
                 receivedProviderOutput = true
+              stepAccounting.observe(chunk)
               applyAssistantChunkDelta(assistantBuffer, chunk)
             },
           }).pipe(
@@ -1068,35 +1084,13 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               generateMessageId: () => assistantMessageId,
               onError: (error: unknown) => {
                 if (isUserStopped(streamAbortController.signal)) return ''
-                // The AI SDK can invoke stream error hooks more than once for the same
-                // transport failure. We only persist/log once per request.
-                if (transportErrorHandled) {
-                  return defaultStreamFailureMessage
-                }
-                transportErrorHandled = true
-
+                // v7 also calls this formatter for local tool errors. Only onEnd's
+                // outcome classifies the transport and owns persistence/settlement.
                 const readableMessage = toReadableErrorMessage(
                   error,
                   defaultStreamFailureMessage,
                 )
                 const classification = classifyUnknownChatError()
-                if (wideEvent) {
-                  finalizeWideEventFailure(wideEvent, {
-                    status: classification.status,
-                    level: classification.severity,
-                    captureMode: classification.captureMode,
-                    retryable: true,
-                    errorTag: getErrorTag(error),
-                    message: readableMessage,
-                    errorCode: chatErrorCodeFromTag(getErrorTag(error)),
-                    i18nKey: classification.i18nKey,
-                    cause: error instanceof Error ? error.message : undefined,
-                  })
-                  void Effect.runPromise(drainWideEvent(wideEvent)).catch(
-                    () => undefined,
-                  )
-                }
-
                 return JSON.stringify(
                   buildChatApiErrorEnvelope({
                     requestId,
@@ -1158,19 +1152,19 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                     !isCancelled &&
                     outcome.status !== 'failed' &&
                     !streamAbortController.signal.aborted &&
-                    !transportErrorHandled &&
-                    assistantBuffer.text.length > 0)
+                    (assistantBuffer.text.length > 0 || Boolean(assistantBuffer.toolParts?.some((part) => part.state === 'output-available'))))
                 // v7 exposes all-step token totals and final-step provider accounting separately.
                 let persistedGeneration = await Promise.all([
                   Promise.resolve(result.usage).catch(() => undefined),
-                  Promise.resolve(result.finalStep).catch(() => undefined),
+                  Promise.resolve(result.steps ?? Promise.resolve(result.finalStep).then((step) => [step])).catch(() => undefined),
                 ])
-                  .then(([usage, finalStep]) => {
+                  .then(([usage, steps]) => {
+                    const finalStep = steps?.at(-1)
                     assistantBuffer.finishReason =
                       finalStep?.finishReason ?? assistantBuffer.finishReason
                     return buildPersistedGenerationAnalytics({
                       usage,
-                      providerMetadata: finalStep?.providerMetadata,
+                      providerMetadata: aggregateStepAccounting(steps ?? []),
                       usedByok: Boolean(modelResolution.providerApiKeyOverride),
                       generationMetadata: {
                         finishReason: assistantBuffer.finishReason,
@@ -1189,14 +1183,18 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                     })
                   })
                   .catch(() => undefined)
+                const interrupted = stepAccounting.interrupted()
                 if (
-                  hasProviderWork({ analytics: persistedGeneration, hasOutput: receivedProviderOutput }) &&
+                  hasProviderWork({ analytics: interrupted ?? persistedGeneration, hasOutput: receivedProviderOutput }) &&
                   (isAborted ||
                     isCancelled ||
                     outcome.status === 'failed' ||
                     streamAbortController.signal.aborted)
                 ) {
-                  persistedGeneration = resolveStoppedUsage({
+                  persistedGeneration = interrupted ? {
+                    ...interrupted,
+                    generationMetadata: persistedGeneration?.generationMetadata,
+                  } : resolveStoppedUsage({
                     analytics: persistedGeneration,
                     modelId: modelResolution.modelId,
                     messages,

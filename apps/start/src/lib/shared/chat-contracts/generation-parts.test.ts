@@ -281,3 +281,37 @@ it('deduplicates before limiting sources to 128 distinct entries', () => {
   expect(sources[1].sourceId).toBe('distinct-0')
   expect(sources.at(-1)?.sourceId).toBe('distinct-126')
 })
+
+it('stores document references in shared parts and rehydrates cards without bodies', () => {
+  const parts: UIMessage['parts'] = ['create_document', 'read_document', 'update_document'].map((toolName) => ({
+    type: 'dynamic-tool', toolName, toolCallId: toolName,
+    state: 'output-available',
+    input: { documentId: 'doc', title: 'Plan', kind: 'code', language: 'ts', content: 'SECRET'.repeat(40_000) },
+    output: { ok: true, documentId: 'doc', title: 'Plan', version: 2, content: 'SECRET'.repeat(40_000) },
+  }))
+  const persisted = persistToolParts(parts)
+  expect(JSON.stringify(persisted)).not.toContain('SECRET')
+  expect(persisted).toHaveLength(3)
+  const message = storedMessageToUI({ messageId: 'assistant', role: 'assistant', model: 'model', content: 'Ready', parts: persisted })
+  expect(message.parts.slice(0, 3)).toEqual(persisted)
+  expect(persisted[0]).toMatchObject({ input: { kind: 'code', language: 'ts' }, output: { documentId: 'doc', version: 2 } })
+})
+
+it.each([10, 70])('reserves document cards after %i generic tool parts within both byte and part caps', (count) => {
+  const generic: UIMessage['parts'] = Array.from({ length: count }, (_, index) => ({
+    type: 'dynamic-tool', toolName: 'code_execution', toolCallId: `code-${index}`,
+    state: 'output-available', input: { code: 'x'.repeat(count === 10 ? 15_000 : 1) },
+    output: { stdout: 'y'.repeat(count === 10 ? 7_000 : 1) },
+  }))
+  const card: UIMessage['parts'][number] = { type: 'dynamic-tool', toolName: 'create_document', toolCallId: 'doc',
+    state: 'output-available', input: { content: 'SECRET' }, output: { ok: true, documentId: 'doc', title: 'Report', version: 1 } }
+  const persisted = persistToolParts([generic[0], card, ...generic.slice(1), { ...card, toolCallId: 'late-doc' }])
+  expect(persisted.filter((part) => part.toolName === 'create_document').map((part) => part.toolCallId)).toEqual(['doc', 'late-doc'])
+  expect(persisted[0].toolCallId).toBe('code-0')
+  expect(persisted[1].toolCallId).toBe('doc')
+  expect(persisted.at(-1)?.toolCallId).toBe('late-doc')
+  expect(persisted.length).toBeLessThanOrEqual(64)
+  expect(new TextEncoder().encode(JSON.stringify(persisted)).byteLength).toBeLessThanOrEqual(131_072)
+  expect(rehydrateToolParts(persisted)).toEqual(persisted)
+  expect(JSON.stringify(persisted)).not.toContain('SECRET')
+})

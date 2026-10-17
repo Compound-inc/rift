@@ -1,8 +1,10 @@
+import { DOCUMENT_TOOL_PROMPT } from '@/lib/shared/documents/prompt'
 import { getCatalogModel } from '@/lib/shared/ai-catalog'
 
 export type SystemPromptInput = {
   readonly modelId?: string
   readonly date?: Date
+  readonly activeTools?: readonly string[]
   readonly modePrompt?: string
   readonly customInstructions?: string
   readonly memory?: string
@@ -25,7 +27,7 @@ function userSection(
 }
 
 /**
- * Stable prefix order: Rift rules, mode, user preferences, project, memory.
+ * Stable prefix order: Rift rules, mode, document tools, user preferences, project, memory.
  * Date varies once per UTC day; question-dependent context always comes last.
  * Project instructions apply to every project turn (ADR-0003). Full document
  * content remains on the first user message (ADR-0006), outside this prompt.
@@ -47,6 +49,7 @@ export function assembleSystemPrompt(input: SystemPromptInput = {}): string {
   return [
     base,
     input.modePrompt?.trim(),
+    input.activeTools?.includes('create_document') ? DOCUMENT_TOOL_PROMPT : undefined,
     userSection('custom-instructions', input.customInstructions),
     userSection('project-instruction', input.projectInstruction),
     userSection('memory', input.memory),

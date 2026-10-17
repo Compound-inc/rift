@@ -86,7 +86,7 @@ export type OrgModelPolicyPayload = {
     readonly key: string
     readonly providerId: string
     readonly advanced: boolean
-    readonly source: 'provider-native' | 'external'
+    readonly source: 'provider-native' | 'external' | 'built-in'
     readonly disabled: boolean
   }[]
 }
@@ -352,7 +352,7 @@ function toOrgModelPolicyPayload(
       source: tool.source,
       disabled:
         !(
-          tool.source === 'provider-native'
+          tool.source === 'built-in' ? true : tool.source === 'provider-native'
             ? (policy?.toolPolicy.providerNativeToolsEnabled ?? true)
             : (policy?.toolPolicy.externalToolsEnabled ?? true)
         ) ||

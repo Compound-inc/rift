@@ -17,6 +17,27 @@ export type AssistantDeltaBuffer = {
   finishReason?: string
 }
 
+type BufferState = {
+  textId?: string
+  reasoningId?: string
+  textBoundary?: boolean
+  reasoningBoundary?: boolean
+}
+// Internal stream bookkeeping must not become persisted assistant payload fields.
+const states = new WeakMap<AssistantDeltaBuffer, BufferState>()
+function stateFor(buffer: AssistantDeltaBuffer): BufferState {
+  const state = states.get(buffer) ?? {}
+  states.set(buffer, state)
+  return state
+}
+
+/** Providers may reuse text IDs between steps; the gateway calls this onStepEnd. */
+export function markAssistantStepBoundary(buffer: AssistantDeltaBuffer): void {
+  const state = stateFor(buffer)
+  state.textBoundary = !!buffer.text
+  state.reasoningBoundary = !!buffer.reasoning
+}
+
 /**
  * Applies model chunk deltas to the in-flight assistant buffer.
  */
@@ -26,6 +47,7 @@ export function applyAssistantChunkDelta(
 ): void {
   if (!chunk || typeof chunk !== 'object') return
 
+  const state = stateFor(buffer)
   const candidate = chunk as Record<string, unknown>
   if (
     (candidate.type === 'finish' || candidate.type === 'finish-step') &&
@@ -120,6 +142,16 @@ export function applyAssistantChunkDelta(
     ])
   }
   if (candidate.type === 'text-delta' && typeof candidate.text === 'string') {
+    if (
+      buffer.text &&
+      (state.textBoundary ||
+        (state.textId &&
+          typeof candidate.id === 'string' &&
+          candidate.id !== state.textId))
+    )
+      buffer.text += '\n\n'
+    state.textBoundary = false
+    if (typeof candidate.id === 'string') state.textId = candidate.id
     buffer.text += candidate.text
     return
   }
@@ -127,6 +159,16 @@ export function applyAssistantChunkDelta(
     candidate.type === 'reasoning-delta' &&
     typeof candidate.text === 'string'
   ) {
+    if (
+      buffer.reasoning &&
+      (state.reasoningBoundary ||
+        (state.reasoningId &&
+          typeof candidate.id === 'string' &&
+          candidate.id !== state.reasoningId))
+    )
+      buffer.reasoning += '\n\n'
+    state.reasoningBoundary = false
+    if (typeof candidate.id === 'string') state.reasoningId = candidate.id
     buffer.reasoning += candidate.text
   }
 }
@@ -153,17 +195,12 @@ export function hydrateAssistantBufferFromResponse(
   if (!buffer.text) {
     buffer.text = responseMessage.parts
       .filter(
-        (
-          part,
-        ): part is Extract<
-          typeof part,
-          { type: 'text'; text: string }
-        > =>
+        (part): part is Extract<typeof part, { type: 'text'; text: string }> =>
           part.type === 'text' &&
           typeof (part as { text?: unknown }).text === 'string',
       )
       .map((part) => part.text)
-      .join('')
+      .join('\n\n')
   }
 
   if (!buffer.reasoning) {
@@ -171,10 +208,7 @@ export function hydrateAssistantBufferFromResponse(
       .filter(
         (
           part,
-        ): part is Extract<
-          typeof part,
-          { type: 'reasoning'; text: string }
-        > =>
+        ): part is Extract<typeof part, { type: 'reasoning'; text: string }> =>
           part.type === 'reasoning' &&
           typeof (part as { text?: unknown }).text === 'string',
       )

@@ -98,7 +98,7 @@ function buildPolicyPayload(input: {
       source: tool.source,
       disabled:
         !(
-          tool.source === 'provider-native'
+          tool.source === 'built-in' ? true : tool.source === 'provider-native'
             ? policy.toolPolicy.providerNativeToolsEnabled
             : policy.toolPolicy.externalToolsEnabled
         ) ||

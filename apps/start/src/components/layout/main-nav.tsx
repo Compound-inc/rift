@@ -1,3 +1,6 @@
+import { Dialog, DialogContent, DialogTitle } from '@rift/ui/dialog'
+import { useDesktopRightSidebar } from './right-sidebar-media'
+import { m } from '@/paraglide/messages.js'
 import { useLocation } from '@tanstack/react-router'
 import type {
   ComponentType,
@@ -38,7 +41,8 @@ export function MainNav({ children, sidebar: Sidebar }: MainNavProps) {
   const { isMobile } = useMediaQuery()
   const direction = useDirection()
   const [isOpen, setIsOpen] = useState(false)
-  const { content: rightSidebarContent } = useRightSidebar()
+  const { content: rightSidebarContent, close: closeRightSidebar } = useRightSidebar()
+  const desktopRightSidebar = useDesktopRightSidebar()
 
   const contextValue = useMemo<SideNavContextValue>(
     () => ({ isOpen, setIsOpen }),
@@ -117,9 +121,19 @@ export function MainNav({ children, sidebar: Sidebar }: MainNavProps) {
         aria-hidden={!showRightSidebar}
       >
         <AppRightSidebar isOpen={showRightSidebar}>
-          {rightSidebarContent}
+          {desktopRightSidebar ? rightSidebarContent : null}
         </AppRightSidebar>
       </div>
+      {!desktopRightSidebar && (
+        <Dialog open={showRightSidebar} onOpenChange={(next) => {
+          if (!next) closeRightSidebar()
+        }}>
+        <DialogContent showCloseButton={false} className="inset-0 flex h-dvh w-screen max-w-none translate-x-0 translate-y-0 flex-col rounded-none border-0 p-3 sm:max-w-none motion-reduce:animate-none">
+          <DialogTitle className="sr-only">{m.layout_right_sidebar_aria_label()}</DialogTitle>
+          {rightSidebarContent}
+        </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

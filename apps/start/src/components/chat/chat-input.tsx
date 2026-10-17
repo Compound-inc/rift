@@ -625,6 +625,7 @@ const ComposerTextarea = memo(function ComposerTextarea({
     >
       <PromptInputTextarea
         ref={composerTextareaRef}
+        data-document-composer
         inputRef={textareaRef}
         value={composerInput}
         onChange={(e) => setComposerDraft(e.target.value)}

@@ -7,7 +7,7 @@ import type {CatalogProviderId} from './provider-tools';
 
 export type ToolCatalogEntry = {
   readonly key: string
-  readonly providerId: CatalogProviderId
+  readonly providerId: CatalogProviderId | 'rift'
   readonly providerToolId: string
   readonly advanced: boolean
   readonly category:
@@ -19,7 +19,7 @@ export type ToolCatalogEntry = {
     | 'video'
     | 'remote'
     | 'other'
-  readonly source: 'provider-native' | 'external'
+  readonly source: 'provider-native' | 'external' | 'built-in'
   readonly sortOrder: number
 }
 
@@ -67,6 +67,7 @@ function buildToolCatalog(): readonly ToolCatalogEntry[] {
     }
   }
 
+  entries.push({ key: 'rift.documents', providerId: 'rift', providerToolId: 'documents', advanced: false, category: 'files', source: 'built-in', sortOrder: entries.length + 1 })
   return entries
 }
 
@@ -83,7 +84,7 @@ export const TOOL_KEYS_BY_PROVIDER = TOOL_CATALOG.reduce(
     acc.set(entry.providerId, current)
     return acc
   },
-  new Map<CatalogProviderId, string[]>(),
+  new Map<ToolCatalogEntry['providerId'], string[]>(),
 )
 
 /**
@@ -94,6 +95,7 @@ export const TOOL_KEYS_BY_MODEL_ID = new Map(
   AI_CATALOG.map((model) => [
     model.id,
     model.providerToolIds
-      .map((providerToolId) => `${model.providerId}.${providerToolId}`),
+      .map((providerToolId) => `${model.providerId}.${providerToolId}`)
+      .concat(model.capabilities.supportsTools ? ['rift.documents'] : []),
   ]),
 )

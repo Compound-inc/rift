@@ -1,3 +1,4 @@
+import { compactDocumentHistory } from '@/lib/shared/documents/message-references'
 import type { UIMessage } from 'ai'
 
 /**
@@ -10,7 +11,7 @@ import type { UIMessage } from 'ai'
 export function sanitizeMessagesForModel(
   messages: readonly UIMessage[],
 ): UIMessage[] {
-  return messages.flatMap((message) => {
+  return compactDocumentHistory(messages).flatMap((message) => {
     if (message.role !== 'assistant') return [message]
 
     const parts = message.parts.filter(

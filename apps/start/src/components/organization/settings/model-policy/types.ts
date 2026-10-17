@@ -29,7 +29,7 @@ export type PolicyPayload = {
     key: string
     providerId: string
     advanced: boolean
-    source: 'provider-native' | 'external'
+    source: 'provider-native' | 'external' | 'built-in'
     disabled: boolean
   }>
 }
