@@ -1,3 +1,4 @@
+import './local-model-routing'
 import { Effect, Layer, ServiceMap } from 'effect'
 import { generateText } from 'ai'
 import { DEFAULT_CONTEXT_WINDOW_MODE } from '@/lib/shared/ai-catalog'

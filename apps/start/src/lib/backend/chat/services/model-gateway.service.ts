@@ -1,3 +1,4 @@
+import './local-model-routing'
 import type { CompletedModelStep } from './chat-orchestrator/step-accounting'
 import type { createDocumentTools } from '@/lib/backend/documents/tools'
 import type { DocumentScope } from '@/lib/shared/documents/contracts'
