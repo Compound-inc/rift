@@ -1,6 +1,5 @@
 {
   "lockfileVersion": 1,
-  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "Rift",
@@ -62,6 +61,7 @@
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
         "redis": "^5.10.0",
+        "remark-parse": "^11.0.0",
         "resend": "^6.9.3",
         "resumable-stream": "^2.2.10",
         "shiki": "^1.29.2",
@@ -70,6 +70,7 @@
         "stripe": "^20.4.1",
         "supermemory": "^5.0.2",
         "tailwindcss": "^4.1.18",
+        "unified": "^11.0.5",
         "zod": "4.3.6",
       },
       "devDependencies": {

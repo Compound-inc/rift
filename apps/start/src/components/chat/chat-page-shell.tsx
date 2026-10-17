@@ -11,6 +11,8 @@ import { useChatMessages } from './chat-context'
 import { ChatInput } from './chat-input'
 import { ChatProjectChip } from './chat-project-chip'
 import { ChatThread } from './chat-thread'
+import { openThreadShare } from './thread-share-dialog'
+import { ThreadArchiveBanner } from './thread-archive-banner'
 
 /**
  * Shared shell used by both `/chat` and `/chat/$threadId`.
@@ -22,7 +24,7 @@ export function ChatPageShell() {
     useSideNav()
   const { isChatPageSidebarCollapsed, setIsChatPageSidebarCollapsed } =
     usePageSidebarVisibility()
-  const { isProjectLandingState } = useChatMessages()
+  const { isProjectLandingState, activeThreadId } = useChatMessages()
 
   const toggleSidebar = () => {
     if (isMobile) {
@@ -80,6 +82,15 @@ export function ChatPageShell() {
             </Button>
           </div>
           <ChatProjectChip />
+          {activeThreadId && (
+            <Button
+              className="pointer-events-auto ml-auto"
+              variant="ghost"
+              onClick={() => openThreadShare(activeThreadId)}
+            >
+              {m.share_title()}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -88,6 +99,7 @@ export function ChatPageShell() {
         style={{ scrollbarGutter: 'stable' }}
       >
         <div className="h-full">
+          {activeThreadId && <ThreadArchiveBanner threadId={activeThreadId} />}
           <ChatThread />
         </div>
       </div>

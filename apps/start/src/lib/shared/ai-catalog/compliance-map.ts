@@ -1,6 +1,8 @@
 import type { AiModelCatalogEntry } from './types'
 
 export type OrgComplianceFlags = {
+  /** Prevents public chat publication; member-only links remain available. */
+  readonly disable_public_sharing?: boolean
   /** When true, only models with ZDR (Zero Data Retention) are allowed. */
   readonly require_zdr?: boolean
   /**

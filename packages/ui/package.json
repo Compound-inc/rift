@@ -169,6 +169,11 @@
       "import": "./src/components/scroll-area.tsx",
       "default": "./src/components/scroll-area.tsx"
     },
+    "./radio-group": {
+      "types": "./src/components/radio-group.tsx",
+      "import": "./src/components/radio-group.tsx",
+      "default": "./src/components/radio-group.tsx"
+    },
     "./select": {
       "types": "./src/components/select.tsx",
       "import": "./src/components/select.tsx",

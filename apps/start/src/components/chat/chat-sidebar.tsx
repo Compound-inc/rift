@@ -620,7 +620,7 @@ function ChatSidebarHistory({
      * sees the deleted row gone instead of waiting for the next Zero
      * tick. Specific to the global sidebar's virtualizer.
      */
-    onAfterDelete: () => {
+    onAfterRemoveFromList: () => {
       z.preload(
         queries.threads.historyPage({
           organizationId: activeOrganizationId,
@@ -798,6 +798,11 @@ export function ChatSidebarContent({ pathname }: { pathname: string }) {
           </>
         )}
       </div>
+      {shouldRenderHistory && (
+        <Button asChild variant="ghost" className="mx-3 mb-2 justify-start">
+          <Link to="/settings/archived">{m.archive_title()}</Link>
+        </Button>
+      )}
       {shouldShowBottomPanel ? (
         <ChatSidebarBottomPanel
           shouldShowLoginButton={shouldShowLoginButton}

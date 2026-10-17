@@ -999,3 +999,9 @@ BEGIN
     END;
   END IF;
 END $$;
+
+-- No existing thread metadata field can hold immutable share provenance.
+ALTER TABLE threads ADD COLUMN IF NOT EXISTS share_provenance JSONB;
+CREATE INDEX IF NOT EXISTS threads_recent_share_forks_idx
+  ON threads (user_id, (share_provenance->>'shareId'), created_at DESC)
+  WHERE share_provenance IS NOT NULL;

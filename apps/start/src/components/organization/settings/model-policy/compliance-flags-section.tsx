@@ -4,6 +4,7 @@ import { Form } from '@rift/ui/form'
 import type { WorkspaceFeatureAccessState } from '@/lib/shared/access-control'
 import { getFeatureAccessFormProps } from '@/components/organization/settings/feature-access-form-helpers'
 import { m } from '@/paraglide/messages.js'
+import { PUBLIC_SHARING_DISABLED_FLAG } from '@/lib/shared/thread-sharing/share'
 import type { PolicyPayload } from './types'
 import type { useProviderPolicy } from './use-provider-policy'
 
@@ -118,6 +119,26 @@ export function ComplianceFlagsSection({
 
   return (
     <div className="space-y-6">
+      <Form
+        title={m.share_policy_title()}
+        description={m.share_policy_description()}
+        {...getFeatureAccessFormProps({
+          enabled: sectionEnabled,
+          featureAccess,
+        })}
+        headerToggle={{
+          checked: Boolean(
+            payload.policy.complianceFlags[PUBLIC_SHARING_DISABLED_FLAG],
+          ),
+          onCheckedChange: (enabled) =>
+            void update({
+              action: 'toggle_compliance_flag',
+              flag: PUBLIC_SHARING_DISABLED_FLAG,
+              enabled,
+            }),
+          disabled: updating || !sectionEnabled,
+        }}
+      />
       <ZdrComplianceForm
         payload={payload}
         updating={updating || !sectionEnabled}
