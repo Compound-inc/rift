@@ -521,6 +521,34 @@ describe('makeLoadThreadMessagesOperation', () => {
       '<retrieved_context>excerpts</retrieved_context>\n\nFollow-up question',
     )
   })
+  it('freezes historical document references and appends current versions only to the latest turn', async () => {
+    const load = async (currentVersion: number) => {
+      const run = vi.fn()
+        .mockResolvedValueOnce([
+          userRow({ messageId: 'user-1', content: 'Write a plan' }),
+          { ...assistantRow({ messageId: 'assistant-1', parentMessageId: 'user-1', createdAt: 2, content: 'Ready.' }), parts: [{ type: 'dynamic-tool', toolName: 'create_document', toolCallId: 'call', state: 'output-available', input: {}, output: { ok: true, documentId: 'doc', title: 'Plan', version: 1 } }] },
+        ])
+        .mockResolvedValueOnce({ activeChildByParent: { 'user-1': 'assistant-1' } })
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: 'doc', title: 'Plan', currentVersion }])
+      const { loadThreadMessages } = makeOperation({ run })
+      const messages = await Effect.runPromise(loadThreadMessages({
+        threadId: 'thread-1', userId: 'user-1', model: 'openai/gpt-5-mini', requestId: 'req-docs',
+        pendingUserMessage: { id: 'latest', role: 'user', parts: [{ type: 'text', text: 'Revise it' }] },
+      }))
+      expect(run).toHaveBeenCalledTimes(4)
+      return messages
+    }
+    const before = await load(7)
+    const after = await load(8)
+    expect(after.slice(0, 2)).toEqual(before.slice(0, 2))
+    expect(textOf(after[1])).toContain('version 1')
+    expect(textOf(after[1])).not.toContain('latest version')
+    expect(textOf(before[2])).toContain('latest version 7')
+    expect(textOf(after[2])).toContain('latest version 8')
+    expect(textOf(after[2])).toContain('<current_document_versions>')
+  })
+
 })
 
 it('previews edited text with retained files and RAG before creating a branch', async () => {

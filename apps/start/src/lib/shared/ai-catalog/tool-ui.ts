@@ -57,6 +57,8 @@ function withVariant(label: string, variant: string): string {
  */
 export function getLocalizedToolCopy(toolKey: string): ToolUiCopy {
   switch (toolKey) {
+    case 'rift.documents':
+      return { label: m.document_tools_label(), description: m.document_tools_description() }
     case 'openai.web_search':
     case 'xai.web_search':
       return {

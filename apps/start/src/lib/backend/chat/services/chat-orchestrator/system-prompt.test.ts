@@ -93,3 +93,12 @@ it('keeps the project prefix stable when query-dependent memories change', () =>
   const second = assembleSystemPrompt({ date, projectInstruction: 'Stable project', memory: 'Second recall' })
   expect(first.split('<memory')[0]).toBe(second.split('<memory')[0])
 })
+
+it('keeps document guidance after mode and before variable user context', () => {
+  const first = assembleSystemPrompt({ date, modePrompt: 'MODE', activeTools: ['create_document'], projectInstruction: 'PROJECT', turnSections: ['FIRST'] })
+  const second = assembleSystemPrompt({ date, modePrompt: 'MODE', activeTools: ['create_document'], projectInstruction: 'PROJECT', turnSections: ['SECOND'] })
+  expect(first.indexOf('Documents:')).toBeGreaterThan(first.indexOf('MODE'))
+  expect(first.indexOf('Documents:')).toBeLessThan(first.indexOf('PROJECT'))
+  expect(first.split('FIRST')[0]).toBe(second.split('SECOND')[0])
+  expect(assembleSystemPrompt({ activeTools: ['web_search'] })).not.toContain('Documents:')
+})

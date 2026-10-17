@@ -413,6 +413,51 @@ const skillProjectOverride = table('skillProjectOverride')
   })
   .primaryKey('id')
 
+/** Version content is separate so thread lists only sync document metadata. */
+const document = table('document')
+  .from('documents')
+  .columns({
+    id: string(),
+    userId: string().from('user_id'),
+    organizationId: string().from('organization_id').optional(),
+    threadId: string().from('thread_id'),
+    projectId: string().from('project_id').optional(),
+    title: string(),
+    kind: enumeration<'markdown' | 'code'>(),
+    language: string().optional(),
+    currentVersion: number().from('current_version'),
+    createdAt: number().from('created_at'),
+    updatedAt: number().from('updated_at'),
+    deletedAt: number().from('deleted_at').optional(),
+  })
+  .primaryKey('id')
+
+const documentVersion = table('documentVersion')
+  .from('document_versions')
+  .columns({
+    documentId: string().from('document_id'),
+    version: number(),
+    content: string(),
+    createdBy: enumeration<'assistant' | 'user'>().from('created_by'),
+    sourceMessageId: string().from('source_message_id').optional(),
+    createdAt: number().from('created_at'),
+  })
+  .primaryKey('documentId', 'version')
+
+const documentRelationships = relationships(document, ({ one, many }) => ({
+  thread: one({
+    sourceField: ['threadId'], destField: ['threadId'], destSchema: thread,
+  }),
+  versions: many({
+    sourceField: ['id'], destField: ['documentId'], destSchema: documentVersion,
+  }),
+}))
+const documentVersionRelationships = relationships(documentVersion, ({ one }) => ({
+  document: one({
+    sourceField: ['documentId'], destField: ['id'], destSchema: document,
+  }),
+}))
+
 // ---------------------------------------------------------------------------
 // Relationships (optional; use for .related() in ZQL)
 // ---------------------------------------------------------------------------
@@ -629,6 +674,8 @@ export const schema = createSchema({
     project,
     skill,
     skillProjectOverride,
+    document,
+    documentVersion,
   ],
   relationships: [
     organizationRelationships,
@@ -642,6 +689,8 @@ export const schema = createSchema({
     threadProjectRelationship,
     skillRelationships,
     skillProjectOverrideRelationships,
+    documentRelationships,
+    documentVersionRelationships,
   ],
 })
 

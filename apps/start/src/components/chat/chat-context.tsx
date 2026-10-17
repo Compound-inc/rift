@@ -13,6 +13,10 @@ import {
   shouldReplaceFailedResponse,
 } from '@/lib/shared/chat-generation/retry'
 import {
+  documentReferenceFingerprint,
+} from '@/lib/shared/documents/message-references'
+
+import {
   createContext,
   useCallback,
   useContext,
@@ -429,6 +433,12 @@ function mergeStoredMessagesWithLocal(
     )
       ? localMessage.metadata.attachments.length
       : 0
+
+    const storedDocumentRefs = documentReferenceFingerprint(storedMessage.parts)
+    if (
+      storedDocumentRefs !== '[]' &&
+      storedDocumentRefs !== documentReferenceFingerprint(localMessage.parts)
+    ) return storedMessage
 
     // Preserve object identity when content is equivalent to avoid unnecessary row rerenders.
     if (localText === storedText) {

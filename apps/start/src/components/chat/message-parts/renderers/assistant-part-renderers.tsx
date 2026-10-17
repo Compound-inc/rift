@@ -1,46 +1,12 @@
 import { isToolUIPart } from 'ai'
 import { ToolCallPart } from '../components/tool-call-part'
-import { Streamdown } from 'streamdown'
-import {
-  streamdownRemarkPlugins,
-  streamdownStaticComponents,
-  streamdownStreamingComponents,
-} from './streamdown-components'
+import { DocumentCard } from '../../documents/document-card'
+import { isDocumentToolPart } from '@/lib/shared/documents/message-references'
 import type {
   AssistantPartRenderContext,
   AssistantPartRenderer,
 } from '../types'
-import { useStreamdownPlugins } from './use-streamdown-plugins'
-
-function AssistantTextPart({
-  isMessageStreaming,
-  text,
-}: {
-  isMessageStreaming: boolean
-  text: string
-}) {
-  const streamdownPlugins = useStreamdownPlugins()
-  // Explicit [[n]](url) links carry their own destination. A shared static
-  // plugin list avoids both global processor-cache collisions and block reparsing.
-
-  return (
-    <Streamdown
-      plugins={streamdownPlugins}
-      controls={false}
-      isAnimating={isMessageStreaming}
-      mode={isMessageStreaming ? 'streaming' : 'static'}
-      remarkPlugins={streamdownRemarkPlugins}
-      components={
-        isMessageStreaming
-          ? streamdownStreamingComponents
-          : streamdownStaticComponents
-      }
-      className="chat-streamdown min-w-0 max-w-full break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
-    >
-      {text || '\u00a0'}
-    </Streamdown>
-  )
-}
+import { AssistantTextPart } from './assistant-text-part'
 
 function renderTextPart({
   part,
@@ -73,6 +39,13 @@ function renderStepBoundary({ part, index }: AssistantPartRenderContext) {
  * fallbacks as this registry grows.
  */
 export const assistantPartRenderers: readonly AssistantPartRenderer[] = [
+  {
+    id: 'document',
+    match: isDocumentToolPart,
+    render: ({ part, isMessageStreaming }) => (
+      <DocumentCard part={part} isMessageStreaming={isMessageStreaming} />
+    ),
+  },
   {
     id: 'tool',
     match: isToolUIPart,

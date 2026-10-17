@@ -1,3 +1,4 @@
+import { documentReferenceText, documentReferencesFromParts } from '@/lib/shared/documents/message-references'
 import type { UIMessage } from 'ai'
 import { Effect } from 'effect'
 import { getCatalogModel } from '@/lib/shared/ai-catalog'
@@ -65,6 +66,7 @@ type AttachmentPromptRow = {
 
 type MessagePromptRow = {
   readonly messageId: string
+  readonly parts?: unknown
   readonly role: UIMessage['role']
   readonly parentMessageId?: string | null
   readonly branchIndex: number
@@ -468,6 +470,22 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
             contextWindowTokens ?? modelCatalogEntry?.contextWindow,
         })
 
+        const documentRows = canonicalRows.some((row) => documentReferencesFromParts(row.parts).length > 0) ? yield* Effect.tryPromise({
+          try: () => db.run(zql.document.where('threadId', threadId).where('userId', userId ?? '').where('deletedAt', 'IS', null)
+            .where('organizationId', organizationId ? '=' : 'IS', organizationId ?? null)),
+          catch: (error) => new MessagePersistenceError({ message: 'Failed to load document references', requestId, threadId, cause: String(error) }),
+        }) : []
+        // Live versions belong at the end of the current prompt. Historical
+        // tool references retain the version they produced for prefix caching.
+        const referencedIds = new Set(canonicalRows.flatMap((row) =>
+          documentReferencesFromParts(row.parts).map((reference) => reference.documentId)))
+        const currentDocuments = documentRows.filter((row) => referencedIds.has(row.id)).slice(0, 64)
+        const currentDocumentsBlock = currentDocuments.length > 0
+          ? '<current_document_versions>\n' + currentDocuments.map((row) =>
+              `Document ${JSON.stringify(row.title)} [${row.id}], latest version ${row.currentVersion}. Use read_document for current content.`,
+            ).join('\n') + '\n</current_document_versions>'
+          : ''
+        const latestMessageId = canonicalRows.at(-1)?.messageId
         return canonicalRows.map((message) => {
           const attachmentIds = Array.isArray(message.attachmentsIds)
             ? message.attachmentsIds
@@ -510,12 +528,17 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
           // Full-text documents ride on the first user message so the prompt
           // prefix is identical from turn to turn (provider prompt caching);
           // question-specific excerpts ride on the latest user message.
-          let modelText = expandedText
+          const references = documentReferencesFromParts(message.parts).map(documentReferenceText)
+          let modelText = [expandedText, ...references].filter(Boolean).join('\n\n')
           if (message.messageId === latestUserMessageRow?.messageId) {
             modelText = withContextPrefix(turnContext.turnBlock, modelText)
           }
           if (message.messageId === firstUserMessageRow?.messageId) {
             modelText = withContextPrefix(turnContext.libraryBlock, modelText)
+          }
+
+          if (message.messageId === latestMessageId && currentDocumentsBlock) {
+            modelText = [modelText, currentDocumentsBlock].filter(Boolean).join('\n\n')
           }
 
           const messageParts: UIMessage['parts'] = [

@@ -1,3 +1,7 @@
+import {
+  isDocumentToolPart,
+  documentToolDisplayData,
+} from '@/lib/shared/documents/message-references'
 import { isToolUIPart } from 'ai'
 import type { UIMessage } from 'ai'
 import type { ReadonlyJSONValue } from '@rocicorp/zero'
@@ -169,9 +173,14 @@ function summarizeOutput(
 export function persistToolParts(
   parts: UIMessage['parts'],
 ): PersistedToolPart[] {
-  const result: PersistedToolPart[] = []
+  const result: { index: number; part: PersistedToolPart }[] = []
   let remaining = 131_070
-  for (const part of parts) {
+  // Reserve bytes and slots for document cards before generic tool display data,
+  // then restore stream order so persistence does not reorder the conversation.
+  const prioritized = parts.map((part, index) => ({ part, index })).sort(
+    (a, b) => Number(isDocumentToolPart(b.part)) - Number(isDocumentToolPart(a.part)),
+  )
+  for (const { part, index } of prioritized) {
     if (!isToolUIPart(part) || result.length >= 64) continue
     const state =
       part.state === 'output-available'
@@ -179,6 +188,7 @@ export function persistToolParts(
         : part.state === 'output-error' || part.state === 'output-denied'
           ? 'output-error'
           : 'input-available'
+    const documentPart = isDocumentToolPart(part)
     const stored: PersistedToolPart = {
       type: 'dynamic-tool',
       toolCallId: safeText(part.toolCallId, 256),
@@ -186,7 +196,11 @@ export function persistToolParts(
         part.type === 'dynamic-tool' ? part.toolName : part.type.slice(5),
         128,
       ),
-      input: boundedJson(part.input, 16_384) ?? null,
+      input:
+        boundedJson(
+          documentPart ? documentToolDisplayData(part.input) : part.input,
+          16_384,
+        ) ?? null,
       ...(typeof part.providerExecuted !== 'boolean'
         ? {}
         : { providerExecuted: part.providerExecuted }),
@@ -198,7 +212,9 @@ export function persistToolParts(
                 part.type === 'dynamic-tool'
                   ? part.toolName
                   : part.type.slice(5),
-                part.output,
+                documentPart
+                  ? documentToolDisplayData(part.output)
+                  : part.output,
               ) ?? null,
           }
         : state === 'output-error'
@@ -214,18 +230,17 @@ export function persistToolParts(
           : { state }),
     }
     const size = new TextEncoder().encode(JSON.stringify(stored)).byteLength + 1
-    if (size > remaining) break
+    if (size > remaining) continue
     remaining -= size
-    result.push(stored)
+    result.push({ index, part: stored })
   }
-  return result
+  return result.sort((a, b) => a.index - b.index).map(({ part }) => part)
 }
 
 /** Restore only validated display parts, including interrupted tool activity. */
 export function rehydrateToolParts(value: unknown): UIMessage['parts'] {
   if (!Array.isArray(value)) return []
   const valid = value
-    .slice(0, 64)
     .filter(
       (part) =>
         part &&

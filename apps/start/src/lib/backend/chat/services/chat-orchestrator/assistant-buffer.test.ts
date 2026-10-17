@@ -3,6 +3,7 @@ import type { UIMessage } from 'ai'
 import {
   applyAssistantChunkDelta,
   hydrateAssistantBufferFromResponse,
+  markAssistantStepBoundary,
 } from './assistant-buffer'
 import type { AssistantDeltaBuffer } from './assistant-buffer'
 
@@ -141,5 +142,46 @@ describe('assistant display buffer', () => {
     expect(buffer.reasoning).toBe('Thinking')
     expect(buffer.sources).toHaveLength(1)
     expect(buffer.toolParts).toHaveLength(2)
+  })
+})
+describe('multi-step assistant buffer', () => {
+  it('preserves every step and separates text part IDs', () => {
+    const buffer = { text: '', reasoning: '' }
+    for (const chunk of [
+      { type: 'text-delta', id: 'step1', text: 'Let me ' },
+      { type: 'text-delta', id: 'step1', text: 'draft.' },
+      { type: 'tool-result', toolName: 'create_document', toolCallId: 'call', output: {} },
+      { type: 'text-delta', id: 'step2', text: 'The plan is ready.' },
+    ])
+      applyAssistantChunkDelta(buffer, chunk)
+    expect(buffer.text).toBe('Let me draft.\n\nThe plan is ready.')
+  })
+  it('separates steps when the provider reuses the same text ID', () => {
+    const buffer = { text: '', reasoning: '' }
+    applyAssistantChunkDelta(buffer, {
+      type: 'text-delta',
+      id: '0',
+      text: 'First.',
+    })
+    markAssistantStepBoundary(buffer)
+    applyAssistantChunkDelta(buffer, {
+      type: 'text-delta',
+      id: '0',
+      text: 'Next.',
+    })
+    expect(buffer).toEqual({ text: 'First.\n\nNext.', reasoning: '' })
+  })
+  it('hydrates tool-loop text without joining words across steps', () => {
+    const buffer = { text: '', reasoning: '' }
+    hydrateAssistantBufferFromResponse(buffer, {
+      id: 'a',
+      role: 'assistant',
+      parts: [
+        { type: 'text', text: 'First.' },
+        { type: 'step-start' },
+        { type: 'text', text: 'Done.' },
+      ],
+    })
+    expect(buffer.text).toBe('First.\n\nDone.')
   })
 })

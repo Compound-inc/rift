@@ -1,0 +1,47 @@
+.document-print-title {
+  display: none;
+}
+@media print {
+  /* Remove siblings along the panel's ancestor chain, so hidden chat layout
+     cannot consume pages before or after the exported document. */
+  body:has(.document-panel) > :not(:has(.document-panel)),
+  body:has(.document-panel)
+    *:has(.document-panel)
+    > :not(:has(.document-panel)):not(.document-panel) {
+    display: none !important;
+  }
+  body:has(.document-panel) *:has(.document-panel),
+  .document-panel,
+  .document-scroll {
+    display: block !important;
+    position: static !important;
+    transform: none !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .document-print-content {
+    color: #171717;
+    background: #fcfcfc;
+  }
+  .document-print-content * {
+    content-visibility: visible !important;
+    contain: none !important;
+    overflow: visible !important;
+  }
+  .document-print-title {
+    display: block;
+    font-size: 20pt;
+    margin-bottom: 1rem;
+  }
+  .document-print-content pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .document-toolbar,
+  .document-print-content button {
+    display: none !important;
+  }
+}

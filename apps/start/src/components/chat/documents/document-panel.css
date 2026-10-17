@@ -1,0 +1,38 @@
+/*
+ * Reading scale for documents in the side panel.
+ *
+ * Streamdown's chat styles (src/streamdown.css) size headings for the wide
+ * chat column (h1 = 2em of 16px). In a ~480px panel that reads like a poster,
+ * so documents get a slightly smaller body and a gentler heading ramp.
+ * These rules are unlayered on purpose: streamdown.css is unlayered too, and
+ * Tailwind utilities (layered) cannot override it.
+ */
+.document-panel .chat-streamdown {
+  font-size: 15px;
+  line-height: 26px;
+}
+
+.document-panel .chat-streamdown [data-streamdown="heading-1"] {
+  margin-bottom: 0.75em;
+  font-size: 1.6em;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.document-panel .chat-streamdown [data-streamdown="heading-2"] {
+  margin-top: 1.75em;
+  margin-bottom: 0.5em;
+  font-size: 1.2em;
+  font-weight: 650;
+  line-height: 1.35;
+  text-wrap: balance;
+}
+
+.document-panel .chat-streamdown [data-streamdown="heading-3"] {
+  margin-top: 1.5em;
+  margin-bottom: 0.4em;
+  font-size: 1.05em;
+  line-height: 1.45;
+}

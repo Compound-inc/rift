@@ -1,3 +1,4 @@
+import type { CompletedModelStep } from './step-accounting'
 import type { LanguageModelUsage, TextStreamPart, ToolSet } from 'ai'
 import { Effect, Layer } from 'effect'
 import { describe, expect, it, vi } from 'vitest'
@@ -27,6 +28,8 @@ function createHarness(
   reasoning: string,
   stopDuringPrompt = false,
   options: {
+    recoveredToolError?: boolean
+    completedSteps?: CompletedModelStep[]
     cleanupFails?: boolean
     reportedUsage?: LanguageModelUsage
     reportedCost?: number
@@ -133,6 +136,13 @@ function createHarness(
         })
         signal = input.abortSignal
         generating = true
+        if (options.completedSteps) {
+          for (const [index, step] of options.completedSteps.entries()) {
+            input.onStepStart?.(100 * (index + 1))
+            input.onStepEnd?.(step)
+          }
+          input.onStepStart?.(300)
+        }
         if (text) input.onChunk?.({ type: 'text-delta', text })
         if (reasoning)
           input.onChunk?.({ type: 'reasoning-delta', text: reasoning })
@@ -145,7 +155,7 @@ function createHarness(
           })
         return {
           get usage() {
-            return options.providerFailure
+            return options.providerFailure || options.completedSteps
               ? Promise.reject(new Error('No output generated'))
               : Promise.resolve(
                   options.reportedUsage ??
@@ -165,6 +175,9 @@ function createHarness(
                     } satisfies LanguageModelUsage),
                 )
           },
+          get steps() {
+            return options.completedSteps ? Promise.reject(new Error('Aborted before aggregate usage')) : undefined
+          },
           finalStep: Promise.resolve({
             finishReason: options.reportedCost === undefined ? undefined : 'length',
             providerMetadata: options.reportedCost === undefined ? undefined : { gateway: { cost: options.reportedCost } },
@@ -173,6 +186,17 @@ function createHarness(
             start(controller) {
               controller.enqueue({ type: 'start' })
               finish = async () => {
+                if (options.recoveredToolError) {
+                  controller.enqueue({ type: 'tool-call', toolName: 'read_document', toolCallId: 'missing', input: { documentId: 'missing' } })
+                  controller.enqueue({ type: 'tool-error', toolName: 'read_document', toolCallId: 'missing', input: { documentId: 'missing' }, error: new Error('Invalid tool input') })
+                  controller.enqueue({ type: 'text-start', id: 'recovered' })
+                  controller.enqueue({ type: 'text-delta', id: 'recovered', text })
+                  controller.enqueue({ type: 'text-end', id: 'recovered' })
+                  controller.enqueue({ type: 'finish', finishReason: 'stop', rawFinishReason: 'stop', totalUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, inputTokenDetails: { noCacheTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 }, outputTokenDetails: { textTokens: 1, reasoningTokens: 0 } } })
+                  controller.close()
+                  await drained
+                  return
+                }
                 controller.enqueue(
                   options.providerFailure
                     ? {
@@ -799,4 +823,57 @@ it('settles a cost-only exhausted reasoning turn exactly once without visible ou
     expect(harness.recorded[0].actualCostUsd).toBe(0.04)
     expect(harness.settlements()).toBe(1)
   }).pipe(Effect.provide(harness.layer)))
+})
+
+
+it.each(['', 'partial third step'])('bills finished steps when stopped in step 3 of 4, with pending output %j', async (text) => {
+  const usage: LanguageModelUsage = {
+    inputTokens: 100, outputTokens: 20, totalTokens: 120,
+    inputTokenDetails: { noCacheTokens: 100, cacheReadTokens: 0, cacheWriteTokens: 0 },
+    outputTokenDetails: { textTokens: 20, reasoningTokens: 0 },
+  }
+  const harness = createHarness(text, '', false, {
+    completedSteps: [
+      { usage, providerMetadata: { gateway: { cost: 0.01, billableWebSearchCalls: 1 } } },
+      { usage, providerMetadata: { gateway: { cost: 0.02, billableWebSearchCalls: 2 } } },
+    ],
+  })
+  await Effect.runPromise(Effect.gen(function* () {
+    const orchestrator = yield* ChatOrchestratorService
+    const stops = yield* StopGenerationService
+    const { threadId } = yield* orchestrator.createThread({ userId: 'loop-owner', requestId: 'create', modelId: 'openai/gpt-5-mini' })
+    yield* orchestrator.streamChat({ userId: 'loop-owner', threadId, requestId: 'loop-request', route: '/api/chat', expectedBranchVersion: 1,
+      accessPolicy: resolveChatAccessPolicy({ userId: 'loop-owner', organizationId: 'org', isAnonymous: false, planId: 'plus' }),
+      message: { id: 'user', role: 'user', parts: [{ type: 'text', text: 'Draft a plan' }] },
+    })
+    yield* stops.stop({ userId: 'loop-owner', threadId, requestId: 'stop' })
+    yield* Effect.promise(harness.finish)
+  }).pipe(Effect.provide(harness.layer)))
+  expect(harness.finalized).toHaveLength(1)
+  expect(harness.recorded).toHaveLength(1)
+  expect(harness.settlements()).toBe(1)
+  const analytics = harness.finalized[0].generationAnalytics!
+  expect(analytics).toMatchObject({ billableWebSearchCalls: 3, providerMetadata: { gateway: { cost: 0.03 } } })
+  expect(analytics.inputTokens).toBe(text ? 500 : 200)
+  expect(analytics.outputTokens).toBe(text ? 40 + Math.ceil(text.length / 4) : 40)
+  if (text) expect(harness.recorded[0].actualCostUsd).toBeGreaterThan(0.03)
+  else expect(harness.recorded[0].actualCostUsd).toBeCloseTo(0.03)
+})
+
+
+it('keeps a recovered SDK tool error out of stream failure and finalizes once', async () => {
+  const harness = createHarness('Recovered answer', '', false, { recoveredToolError: true })
+  await Effect.runPromise(Effect.gen(function* () {
+    const orchestrator = yield* ChatOrchestratorService
+    const { threadId } = yield* orchestrator.createThread({ userId: 'tool-owner', requestId: 'create', modelId: 'openai/gpt-5-mini' })
+    yield* orchestrator.streamChat({ userId: 'tool-owner', threadId, requestId: 'tool-error', route: '/api/chat', expectedBranchVersion: 1,
+      accessPolicy: resolveChatAccessPolicy({ userId: 'tool-owner', organizationId: 'org', isAnonymous: false, planId: 'plus' }),
+      message: { id: 'user', role: 'user', parts: [{ type: 'text', text: 'Read a document' }] },
+    })
+    yield* Effect.promise(harness.finish)
+  }).pipe(Effect.provide(harness.layer)))
+  expect(harness.finalized).toHaveLength(1)
+  expect(harness.finalized[0]).toMatchObject({ ok: true, finalContent: 'Recovered answer', parts: [{ toolName: 'read_document', state: 'output-error' }] })
+  expect(harness.recorded).toHaveLength(1)
+  expect(harness.settlements()).toBe(1)
 })
