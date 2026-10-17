@@ -16,6 +16,10 @@ export async function readShare(shareId: string) {
       const viewer = yield* getServerAuthContext()
       const service = yield* ThreadSharingService
       return yield* service.read({ shareId, viewer }).pipe(
+        // Persistence causes stay in server logs and typed service errors.
+        Effect.catchTag('SharePersistenceError', (error) =>
+          Effect.fail(new Error(error.message)),
+        ),
         Effect.catchTag('ShareUnavailableError', () => Effect.succeed(null)),
         Effect.catchTag('ShareActionError', (error) =>
           Effect.succeed({ error: error.code }),
@@ -39,6 +43,9 @@ export async function manageShare(input: {
         Effect.catchTag('ShareActionError', (error) =>
           Effect.succeed({ error: error.code }),
         ),
+        Effect.catchTag('SharePersistenceError', (error) =>
+          Effect.fail(new Error(error.message)),
+        ),
       )
     }),
   )
@@ -52,6 +59,9 @@ export async function forkShare(shareId: string) {
       return yield* service
         .fork({ shareId, viewer })
         .pipe(
+          Effect.catchTag('SharePersistenceError', (error) =>
+            Effect.fail(new Error(error.message)),
+          ),
           Effect.catchTag('ShareActionError', (error) =>
             Effect.succeed({ error: error.code }),
           ),
