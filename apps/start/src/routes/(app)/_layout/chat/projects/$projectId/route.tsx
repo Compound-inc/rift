@@ -1,16 +1,15 @@
+import { useQuery } from '@rocicorp/zero/react'
 import { useEffect } from 'react'
 import { Outlet, createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useQuery } from '@rocicorp/zero/react'
 
+import { ProjectUnavailable } from '@/components/chat/projects/project-unavailable'
 import { queries } from '@/integrations/zero'
 import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 
 /**
- * Layout route for `/chat/projects/$projectId/*`. The project chrome lives
- * in the chat sidebar (which switches into project-scoped mode for these
- * paths), so this layout is intentionally minimal: it just renders the
- * outlet and bails to `/chat` if the project disappears (deleted in another
- * tab, lost org access, etc.).
+ * Guard all project pages once access resolves. While Zero hydrates, leave the
+ * outlet mounted so each page keeps its normal loading behavior. Project chrome
+ * lives in the chat sidebar, outside this layout.
  */
 export const Route = createFileRoute('/(app)/_layout/chat/projects/$projectId')(
   {
@@ -20,22 +19,16 @@ export const Route = createFileRoute('/(app)/_layout/chat/projects/$projectId')(
 
 function ProjectDetailLayout() {
   const { projectId } = Route.useParams()
+  const [project, result] = useQuery(queries.projects.byId({ projectId }))
   const navigate = useNavigate()
   const { isAnonymous, loading, user } = useAppAuth()
-  const [project, projectResult] = useQuery(
-    queries.projects.byId({ projectId }),
-  )
-
   useEffect(() => {
     if (!loading && (!user || isAnonymous)) {
       void navigate({ to: '/chat' })
-      return
     }
+  }, [isAnonymous, loading, navigate, user])
 
-    if (projectResult.type === 'complete' && !project) {
-      void navigate({ to: '/chat' })
-    }
-  }, [isAnonymous, loading, navigate, project, projectResult.type, user])
+  if (result.type === 'complete' && !project) return <ProjectUnavailable />
 
   return <Outlet />
 }

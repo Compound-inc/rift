@@ -68,7 +68,7 @@ export function ChatProjectScopedSidebarContent({
   pathname: string
 }) {
   const direction = useDirection()
-  const [project] = useQuery(queries.projects.byId({ projectId }))
+  const [project, projectResult] = useQuery(queries.projects.byId({ projectId }))
   const [threads] = useQuery(
     queries.projects.threadsPage({
       projectId,
@@ -88,7 +88,21 @@ export function ChatProjectScopedSidebarContent({
     )
   }, [threads])
 
+  const projectUnavailable = !project && projectResult.type === 'complete'
   const projectName = project?.name ?? m.chat_project_loading()
+
+  // The path keeps project mode active after deletion or revoked access. Keep
+  // the escape link, but stop advertising pages and threads for that project.
+  if (projectUnavailable) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <ChatProjectScopedSidebarHeader
+          projectName={m.project_unavailable()}
+          loading={false}
+        />
+      </div>
+    )
+  }
 
   const sourcesItem: NavItemType = {
     name: m.chat_project_tab_sources(),

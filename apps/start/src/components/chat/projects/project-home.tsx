@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react'
-import { Link } from '@tanstack/react-router'
 import { useQuery } from '@rocicorp/zero/react'
 import { queries } from '@/integrations/zero'
 import { m } from '@/paraglide/messages.js'
 import type { ReactNode } from 'react'
+import { ProjectUnavailable } from './project-unavailable'
 import { ProjectHomeHeader } from './project-home-header'
 import { ProjectHomeSections } from './project-home-sections'
 
@@ -25,19 +25,14 @@ export function ProjectHome({
         ?.focus({ preventScroll: true })
     }
   }, [projectId, !!project])
+  // Keep standalone renders safe; the route layout handles all project pages.
+  if (!project && result.type === 'complete') return <ProjectUnavailable />
   if (!project)
     return (
       <div className="mx-auto w-full max-w-3xl space-y-4 px-4 py-16 md:px-8">
         <p role="status" className="text-sm text-foreground-tertiary">
-          {result.type === 'complete'
-            ? m.project_unavailable()
-            : m.project_home_loading()}
+          {m.project_home_loading()}
         </p>
-        {result.type === 'complete' ? (
-          <Link to="/chat" className="text-sm text-foreground-info underline">
-            {m.project_back_to_chat()}
-          </Link>
-        ) : null}
       </div>
     )
   return (

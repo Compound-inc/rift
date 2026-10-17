@@ -29,7 +29,7 @@ describe('project landing availability', () => {
   it('shows unavailable and a way back when the completed query is empty', () => {
     useQueryMock.mockReturnValue([undefined, { type: 'complete' }])
     render(<ProjectHome projectId="p" composer={<textarea name="message" />} />)
-    expect(screen.getByRole('status').textContent).toBe(
+    expect(screen.getByRole('status').textContent).toContain(
       "This project isn't available",
     )
     expect(screen.getByRole('link').getAttribute('href')).toBe('/chat')
@@ -41,6 +41,10 @@ describe('project landing availability', () => {
       <ProjectHome projectId="p" composer={<textarea name="message" />} />,
     )
     expect(screen.queryByRole('textbox')).toBeNull()
+    expect(screen.getByRole('status').textContent).not.toContain(
+      "This project isn't available",
+    )
+    expect(screen.queryByRole('link')).toBeNull()
     useQueryMock.mockReturnValue([{ id: 'p' }, { type: 'complete' }])
     view.rerender(
       <ProjectHome projectId="p" composer={<textarea name="message" />} />,
@@ -51,7 +55,7 @@ describe('project landing availability', () => {
       <ProjectHome projectId="p" composer={<textarea name="message" />} />,
     )
     expect(screen.queryByRole('textbox')).toBeNull()
-    expect(screen.getByRole('status').textContent).toBe(
+    expect(screen.getByRole('status').textContent).toContain(
       "This project isn't available",
     )
   })

@@ -1090,6 +1090,7 @@
   "project_source_disabled": "Disponible sin indexación",
   "project_home_read_only": "El propietario del proyecto administra este contexto.",
   "project_unavailable": "Este proyecto no está disponible",
+  "project_unavailable_description": "Es posible que se haya eliminado o que ya no tengas acceso.",
   "project_back_to_chat": "Volver al chat",
   "project_orphan_read_only": "Este proyecto ya no se comparte porque saliste del espacio de trabajo.",
   "project_orphans_title": "Proyectos sin responsable",

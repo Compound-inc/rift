@@ -21,7 +21,23 @@ const { auth, load, mutate, resolveOrphan } = vi.hoisted(() => ({
   mutate: vi.fn(),
   resolveOrphan: vi.fn((args: unknown) => args),
 }))
-vi.mock('@/lib/frontend/auth/use-auth', () => ({ useAppAuth: () => auth }))
+// Exercise the real auth hook: sessions supply the org ID; membership supplies
+// the role. A fabricated session role would hide regressions in this wiring.
+vi.mock('@/lib/frontend/auth/auth-client', () => ({
+  authClient: {
+    useSession: () => ({
+      data: {
+        user: { ...auth.user, isAnonymous: auth.isAnonymous },
+        session: { activeOrganizationId: auth.activeOrganizationId },
+      },
+      isPending: false,
+    }),
+    useActiveMemberRole: () => ({
+      data: { role: auth.activeOrganizationRole },
+      isPending: false,
+    }),
+  },
+}))
 vi.mock('@/lib/frontend/projects/project-owner.functions', () => ({
   getOrphanedProjects: load,
 }))
@@ -69,6 +85,17 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('admin orphan remediation', () => {
+  it.each(['owner', 'admin'])(
+    'shows the empty admin block for a membership %s without a session role',
+    async (role) => {
+      auth.activeOrganizationRole = role
+      load.mockResolvedValue([])
+      render(<OrphanedProjects refreshKey={null} />)
+      expect(screen.getByRole('heading', { name: 'Orphaned projects' })).toBeTruthy()
+      await screen.findByText('No orphaned projects.')
+    },
+  )
+
   it.each(['private', 'delete'] as const)(
     'confirms %s and waits for both mutation phases',
     async (action) => {

@@ -1102,6 +1102,7 @@
   "project_source_disabled": "Available without indexing",
   "project_home_read_only": "The project owner manages this context.",
   "project_unavailable": "This project isn't available",
+  "project_unavailable_description": "It may have been deleted, or you may no longer have access.",
   "project_back_to_chat": "Back to chat",
   "project_orphan_read_only": "This project is no longer shared because you left the workspace.",
   "project_orphans_title": "Orphaned projects",
