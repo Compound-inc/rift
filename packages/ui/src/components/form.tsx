@@ -951,7 +951,7 @@ export function Form({
           )}
         </div>
 
-        {(helpText != null || helpLearnMoreHref != null || error != null || success != null || hasMainField) && (
+        {(helpText != null || helpLearnMoreHref != null || error != null || success != null || hasActions) && (
           <div
             className={cn(
               "relative z-0 -mt-3 flex flex-col items-start justify-between gap-4 rounded-b-xl border-t px-5 pb-4 pt-6 transition-[background-color,border-color] duration-250 ease-out sm:flex-row sm:items-center sm:justify-between sm:space-y-0 sm:pb-3 sm:pt-5",

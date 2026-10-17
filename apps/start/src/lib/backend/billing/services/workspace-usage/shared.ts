@@ -280,6 +280,7 @@ function applyTierCost(input: {
 export function estimateReservedCostNanoUsd(input: {
   readonly modelId: string
   readonly messages: readonly UIMessage[]
+    readonly additionalPromptTokens?: number
   readonly usagePolicy: UsagePolicySnapshot
 }): number {
   const model = getCatalogModel(input.modelId)
@@ -287,7 +288,7 @@ export function estimateReservedCostNanoUsd(input: {
     return input.usagePolicy.minReserveNanoUsd
   }
 
-  const inputTokens = estimatePromptTokens(input.messages)
+  const inputTokens = estimatePromptTokens(input.messages) + (input.additionalPromptTokens ?? 0)
 
   const estimatedOutputTokens = Math.max(
     96,

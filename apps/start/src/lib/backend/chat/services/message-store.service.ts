@@ -18,6 +18,7 @@ import type {
   InvalidRequestError,
 } from '@/lib/backend/chat/domain/errors'
 import { MessagePersistenceError } from '@/lib/backend/chat/domain/errors'
+import { getUserMessageText } from '@/lib/backend/chat/domain/schemas'
 import type { IncomingUserMessage } from '@/lib/backend/chat/domain/schemas'
 import { getMemoryState } from '@/lib/backend/chat/infra/memory/state'
 import { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
@@ -40,6 +41,10 @@ export type MessageStoreServiceShape = {
     readonly userId?: string
     readonly organizationId?: string
     readonly orgPolicy?: OrgAiPolicy
+    /** Raw latest user text from the proposed branch, before skills, attachments or RAG. */
+    readonly onTurnUserText?: (text: string) => Effect.Effect<void>
+    /** Called when attachment or retrieved knowledge enters this turn's model context. */
+    readonly onPrivateContextUsed?: () => void
     readonly untilMessageId?: string
     /** Read-only view of a proposed regeneration/edit, before branch writes. */
     readonly branchTurn?: {
@@ -81,6 +86,8 @@ export type MessageStoreServiceShape = {
     readonly requestId: string
   }) => Effect.Effect<
     {
+      /** Raw canonical user text, before attachment/RAG/skill expansion. */
+      readonly userText: string
       readonly anchorMessageId: string
       readonly regenSourceMessageId: string
     },
@@ -98,6 +105,8 @@ export type MessageStoreServiceShape = {
     readonly requestId: string
   }) => Effect.Effect<
     {
+      /** The normalized text persisted on the new user branch. */
+      readonly userText: string
       readonly editedMessageId: string
       readonly regenSourceMessageId: string
     },
@@ -170,6 +179,8 @@ export class MessageStoreService extends ServiceMap.Service<
       model: _model,
       untilMessageId,
       branchTurn,
+      onTurnUserText,
+      onPrivateContextUsed,
       pendingUserMessage,
       requestId,
     }) =>
@@ -201,6 +212,28 @@ export class MessageStoreService extends ServiceMap.Service<
         if (!pendingUserMessage) return loaded
         return [...loaded, toUserMessage(pendingUserMessage, [])]
       }).pipe(
+        Effect.tap((messages) => {
+          if (
+            messages.some((message) =>
+              message.parts.some(
+                (part) =>
+                  part.type === 'file' ||
+                  part.type === 'dynamic-tool' ||
+                  part.type.startsWith('tool-'),
+              ),
+            )
+          )
+            onPrivateContextUsed?.()
+          const latest = messages
+            .slice()
+            .reverse()
+            .find((message) => message.role === 'user')
+          return (
+            onTurnUserText?.(
+              latest ? getUserMessageText({ ...latest, role: 'user' }) : '',
+            ) ?? Effect.void
+          )
+        }),
         Effect.catch((error) =>
           Effect.fail(
             new MessagePersistenceError({
@@ -252,6 +285,7 @@ export class MessageStoreService extends ServiceMap.Service<
         const target = existing[targetIndex]
         if (target.role === 'user') {
           return {
+            userText: getUserMessageText({ ...target, role: 'user' }),
             anchorMessageId: target.id,
             regenSourceMessageId: target.id,
           }
@@ -263,6 +297,7 @@ export class MessageStoreService extends ServiceMap.Service<
         }
 
         return {
+          userText: getUserMessageText({ ...previous, role: 'user' }),
           anchorMessageId: previous.id,
           regenSourceMessageId: target.id,
         }
@@ -313,6 +348,7 @@ export class MessageStoreService extends ServiceMap.Service<
         getMemoryState().messages.set(threadId, truncated)
 
         return {
+          userText: nextText,
           editedMessageId: nextId,
           regenSourceMessageId: nextId,
         }

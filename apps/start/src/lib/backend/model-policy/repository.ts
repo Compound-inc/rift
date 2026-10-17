@@ -27,6 +27,7 @@ function fromRow(row: {
   readonly providerNativeToolsEnabled?: boolean | null
   readonly externalToolsEnabled?: boolean | null
   readonly disabledToolKeys?: readonly string[]
+  readonly memoryEnabled?: boolean | null
   readonly orgKnowledgeEnabled?: boolean | null
   readonly providerKeyStatus?: OrgProviderKeyStatusSnapshot
   readonly enforcedModeId?: string | null
@@ -66,6 +67,7 @@ function fromRow(row: {
     complianceFlags: row.complianceFlags ?? {},
     toolPolicy,
     orgKnowledgeEnabled: row.orgKnowledgeEnabled ?? false,
+    memoryEnabled: row.memoryEnabled ?? true,
     providerKeyStatus,
     enforcedModeId: normalizedModeId,
     updatedAt: row.updatedAt ?? now(),

@@ -1,4 +1,5 @@
 import { documentQueryDefinitions } from './queries/documents.queries'
+import { personalizationQueryDefinitions } from './queries/personalization.queries'
 import { defineQueriesWithType } from '@rocicorp/zero'
 import type { Schema } from './schema'
 import { chatQueryDefinitions } from './queries/chat.queries'
@@ -15,6 +16,7 @@ import { skillQueryDefinitions } from './queries/skills.queries'
  */
 export const queries = defineQueriesWithType<Schema>()({
   ...documentQueryDefinitions,
+  ...personalizationQueryDefinitions,
   ...chatQueryDefinitions,
   ...orgBillingQueryDefinitions,
   ...orgKnowledgeQueryDefinitions,

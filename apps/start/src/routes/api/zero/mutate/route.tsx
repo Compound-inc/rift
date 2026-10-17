@@ -1,3 +1,4 @@
+import { kickMemoryPurge } from '@/lib/backend/chat/runtime/memory-purge-runtime'
 import { createFileRoute } from '@tanstack/react-router'
 import { PushProcessor } from '@rocicorp/zero/server'
 import { zeroNodePg } from '@rocicorp/zero/server/adapters/pg'
@@ -146,6 +147,7 @@ export const Route = createFileRoute('/api/zero/mutate')({
             : 200
 
           if (!failed && deletedThreadIds.length > 0) {
+            kickMemoryPurge()
             // Fire and forget: the user's delete already succeeded, and a
             // failed cleanup only leaves harmless orphan vectors.
             void runUpstreamPostgresEffect(
