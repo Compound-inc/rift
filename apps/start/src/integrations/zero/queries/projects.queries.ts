@@ -1,7 +1,6 @@
-import type { ExpressionBuilder } from '@rocicorp/zero'
 import { defineQuery } from '@rocicorp/zero'
 import { z } from 'zod'
-import type { Schema } from '../schema'
+import { projectVisibleToCaller } from '../project-access'
 import { zql } from '../zql'
 
 /** Cursor for the project page's virtualized thread list. */
@@ -27,46 +26,17 @@ const projectAttachmentsArgs = z.object({
   projectId: z.string().trim().min(1),
 })
 
-/**
- * Visibility predicate for the `project` table:
- * - the caller owns the project, OR
- * - the project is `visibility = 'org'` and the caller is a member of the
- *   matching organization (and has an active org context).
- */
-function projectVisibleToCaller(input: {
-  readonly userID: string
-  readonly organizationId?: string
-}) {
-  return (eb: ExpressionBuilder<'project', Schema>) => {
-    const { or, and, cmp, exists } = eb
-    return or(
-      cmp('userId', input.userID),
-      input.organizationId
-        ? and(
-            cmp('visibility', 'org'),
-            cmp('organizationId', input.organizationId),
-            exists('organization', (organization) =>
-              organization.whereExists('members', (members) =>
-                members.where('userId', input.userID),
-              ),
-            ),
-          )
-        : undefined,
-    )
-  }
-}
-
-/**
- * Project queries. Visibility rules and soft-delete behaviour are applied on
- * every read path.
- */
 export const projectQueryDefinitions = {
   projects: {
     list: defineQuery(z.object({}).optional(), ({ ctx }) => {
       const orgId = ctx.organizationId?.trim()
       return zql.project
         .where(
-          projectVisibleToCaller({ userID: ctx.userID, organizationId: orgId }),
+          projectVisibleToCaller({
+            userID: ctx.userID,
+            organizationId: orgId,
+            isAnonymous: ctx.isAnonymous,
+          }),
         )
         .where('deletedAt', 'IS', null)
         .orderBy('pinned', 'desc')
@@ -79,7 +49,11 @@ export const projectQueryDefinitions = {
       return zql.project
         .where('id', args.projectId)
         .where(
-          projectVisibleToCaller({ userID: ctx.userID, organizationId: orgId }),
+          projectVisibleToCaller({
+            userID: ctx.userID,
+            organizationId: orgId,
+            isAnonymous: ctx.isAnonymous,
+          }),
         )
         .where('deletedAt', 'IS', null)
         .one()
@@ -99,6 +73,7 @@ export const projectQueryDefinitions = {
             .where(
               projectVisibleToCaller({
                 userID: ctx.userID,
+                isAnonymous: ctx.isAnonymous,
                 organizationId: orgId,
               }),
             ),
@@ -115,6 +90,31 @@ export const projectQueryDefinitions = {
       return q
     }),
 
+    /** Bounded recent activity, deliberately independent of sidebar pin order. */
+    recentThreads: defineQuery(
+      projectByIdArgs.extend({
+        limit: z.number().int().positive(),
+        search: z.string().trim().max(200).optional(),
+      }),
+      ({ args, ctx }) => {
+        let query = zql.thread
+          .where('userId', ctx.userID)
+          .where('visibility', 'visible')
+          .where('projectId', args.projectId)
+          .whereExists('project', (project) =>
+            project.where(projectVisibleToCaller(ctx)),
+          )
+          .orderBy('updatedAt', 'desc')
+          .orderBy('threadId', 'desc')
+          .limit(args.limit)
+        // Filter upstream before applying the page limit, including older threads.
+        if (args.search)
+          query = query.where('title', 'ILIKE', `%${args.search}%`)
+        return query
+      },
+    ),
+
+    // Full attachment rows include bearer URLs and storage keys. Only owners sync them.
     attachments: defineQuery(projectAttachmentsArgs, ({ args, ctx }) => {
       const orgId = ctx.organizationId?.trim()
       return zql.attachment
@@ -124,10 +124,12 @@ export const projectQueryDefinitions = {
         .whereExists('project', (project) =>
           project
             .where('id', args.projectId)
+            .where('userId', ctx.userID)
             .where('deletedAt', 'IS', null)
             .where(
               projectVisibleToCaller({
                 userID: ctx.userID,
+                isAnonymous: ctx.isAnonymous,
                 organizationId: orgId,
               }),
             ),

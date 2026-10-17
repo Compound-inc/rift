@@ -3,14 +3,14 @@ import { Effect } from 'effect'
 import { ProjectSourcesRuntime } from '@/lib/backend/project-sources/runtime/project-sources-runtime'
 import { ProjectSourcesAdminService } from '@/lib/backend/project-sources/services/project-sources-admin.service'
 import { ProjectSourcesUnauthorizedError } from '@/lib/backend/project-sources/domain/errors'
-import { requireUserAuth } from '@/lib/backend/server-effect/http/server-auth'
+import { requireNonAnonymousUserAuth } from '@/lib/backend/server-effect/http/server-auth'
 
 const REQUEST_ID = 'project-sources'
 
 async function requireProjectSourceUserContext() {
   const headers = getRequestHeaders()
   return ProjectSourcesRuntime.run(
-    requireUserAuth({
+    requireNonAnonymousUserAuth({
       headers,
       onUnauthorized: () =>
         new ProjectSourcesUnauthorizedError({

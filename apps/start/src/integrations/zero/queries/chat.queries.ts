@@ -1,5 +1,6 @@
 import { defineQuery } from '@rocicorp/zero'
 import { z } from 'zod'
+import { projectVisibleToCaller } from '../project-access'
 import { zql } from '../zql'
 
 const orgScopedThreadByIdArgs = z.object({
@@ -62,7 +63,7 @@ export const chatQueryDefinitions = {
           or(
             cmp('projectId', 'IS', null),
             exists('project', (project) =>
-              project.where('deletedAt', 'IS', null),
+              project.where(projectVisibleToCaller(ctx)),
             ),
           ),
         )
@@ -79,6 +80,13 @@ export const chatQueryDefinitions = {
       zql.message
         .where('threadId', args.threadId)
         .where('userId', ctx.userID)
+        .whereExists('thread', (thread) => thread
+          .where('userId', ctx.userID)
+          .where(({ or, cmp, exists }) => or(
+            cmp('projectId', 'IS', null),
+            exists('project', (project) => project.where(projectVisibleToCaller(ctx))),
+          )),
+        )
         .orderBy('created_at', 'asc'),
     ),
   },

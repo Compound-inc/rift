@@ -58,10 +58,17 @@ export const listConversationSources = Effect.fn(
   return rows.map(toSource('attachment'))
 })
 
-/** Every file attached to a project. */
+/**
+ * Project files require current access independently of the thread check. This
+ * also blocks retrieval after a project is deleted or sharing is revoked.
+ */
 export const listProjectSources = Effect.fn(
   'RagSourceRecords.listProjectSources',
-)(function* (input: { readonly projectId: string }) {
+)(function* (input: {
+  readonly projectId: string
+  readonly userId: string
+  readonly organizationId?: string
+}) {
   const sql = yield* PgClient.PgClient
   const rows = yield* sql<SourceRow>`
     select id,
@@ -72,6 +79,16 @@ export const listProjectSources = Effect.fn(
            created_at as "createdAt"
       from attachments
      where project_id = ${input.projectId}
+       and exists (
+         select 1 from projects p
+         where p.id = attachments.project_id and p.deleted_at is null
+           and (p.user_id = ${input.userId} or (
+             p.visibility = 'org' and p.organization_id = ${input.organizationId ?? null}
+                and exists (select 1 from member owner_member where owner_member."organizationId" = p.organization_id and owner_member."userId" = p.user_id)
+             and exists (select 1 from member m
+               where m."organizationId" = p.organization_id and m."userId" = ${input.userId})
+           ))
+       )
        and org_knowledge_kind is null
        and coalesce(status, 'uploaded') = 'uploaded'
   `

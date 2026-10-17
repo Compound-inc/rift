@@ -36,6 +36,8 @@ export type BuildTurnContextInput = {
    */
   readonly attachmentIds: readonly string[]
   readonly projectId?: string
+  /** Active org for project authorization, independent of org-knowledge policy. */
+  readonly projectOrganizationId?: string
   /** Set only when org knowledge is enabled for the organization. */
   readonly organizationId?: string
   readonly query: RetrievalQueryInput
@@ -127,8 +129,8 @@ export class RagContextService extends ServiceMap.Service<
                     }),
                   ).pipe(orEmpty(noSources, 'rag_conversation_sources_failed'))
                 : Effect.succeed(noSources),
-              input.projectId
-                ? withPg(listProjectSources({ projectId: input.projectId })).pipe(
+              input.projectId && input.userId
+                ? withPg(listProjectSources({ projectId: input.projectId, userId: input.userId, organizationId: input.projectOrganizationId ?? input.organizationId })).pipe(
                     orEmpty(noSources, 'rag_project_sources_failed'),
                   )
                 : Effect.succeed(noSources),

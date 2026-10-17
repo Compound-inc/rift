@@ -14,6 +14,7 @@ import {
   isValidSkillName,
 } from '@/lib/shared/skills/skill-grammar'
 import type { SkillRow } from '@/lib/shared/skills/skill-row'
+import { projectOwnerIsMember } from '../project-access'
 import { zql } from '../zql'
 import type { Schema } from '../schema'
 
@@ -43,9 +44,17 @@ const createSkillArgs = z.object({
 const updateSkillArgs = skillIdArgs.extend({
   patch: z
     .object({
-      name: z.string().trim().min(SKILL_LIMITS.nameMin).max(SKILL_LIMITS.nameMax),
+      name: z
+        .string()
+        .trim()
+        .min(SKILL_LIMITS.nameMin)
+        .max(SKILL_LIMITS.nameMax),
       body: z.string().min(1).max(SKILL_LIMITS.bodyMax),
-      description: z.string().trim().max(SKILL_LIMITS.descriptionMax).nullable(),
+      description: z
+        .string()
+        .trim()
+        .max(SKILL_LIMITS.descriptionMax)
+        .nullable(),
       allowAdminEdit: z.boolean(),
     })
     .partial()
@@ -107,11 +116,15 @@ async function assertSkillEditable(args: {
 }): Promise<void> {
   const { tx, skill, userId, organizationId } = args
 
+  const project = skill.projectId
+    ? await tx.run(zql.project.where('id', skill.projectId).one())
+    : undefined
   const projectAccess = skill.projectId
-    ? checkProjectAccess(
-        await tx.run(zql.project.where('id', skill.projectId).one()),
-        { userId },
-      )
+    ? checkProjectAccess(project, {
+        userId,
+        ownerIsMember:
+          tx.location !== 'server' || (await projectOwnerIsMember(tx, project)),
+      })
     : undefined
 
   // Only fetch the membership row when admin co-edit is plausible —
@@ -123,14 +136,14 @@ async function assertSkillEditable(args: {
     skill.allowAdminEdit &&
     organizationId === skill.organizationId
   const callerOrgRole = needsAdminCoEditCheck
-    ? (
+    ? ((
         (await tx.run(
           zql.member
             .where('organizationId', skill.organizationId)
             .where('userId', userId)
             .one(),
         )) as { role?: string } | null | undefined
-      )?.role ?? null
+      )?.role ?? null)
     : null
 
   const decision = decideSkillEdit({
@@ -181,7 +194,12 @@ export const skillMutatorDefinitions = {
         const project = await tx.run(
           zql.project.where('id', args.projectId).one(),
         )
-        const access = checkProjectAccess(project, { userId: ctx.userID })
+        const access = checkProjectAccess(project, {
+          userId: ctx.userID,
+          ownerIsMember:
+            tx.location !== 'server' ||
+            (await projectOwnerIsMember(tx, project)),
+        })
         if (access.kind !== 'ok') {
           throw new Error(
             PROJECT_ACCESS_FAILURE_CODE[access.kind] ??
@@ -221,6 +239,7 @@ export const skillMutatorDefinitions = {
      * `(organization_id, name)`.
      */
     update: defineMutator(updateSkillArgs, async ({ tx, args, ctx }) => {
+      if (ctx.isAnonymous) throw new Error(SKILL_ERROR_CODE.requiresAuth)
       const skill = (await tx.run(
         zql.skill.where('id', args.skillId).one(),
       )) as SkillRow | null
@@ -322,6 +341,7 @@ export const skillMutatorDefinitions = {
      * `deleted_at IS NULL`).
      */
     delete: defineMutator(skillIdArgs, async ({ tx, args, ctx }) => {
+      if (ctx.isAnonymous) throw new Error(SKILL_ERROR_CODE.requiresAuth)
       const skill = (await tx.run(
         zql.skill.where('id', args.skillId).one(),
       )) as SkillRow | null
@@ -390,6 +410,7 @@ export const skillMutatorDefinitions = {
      * idempotent when the skill is already personal.
      */
     unshare: defineMutator(skillIdArgs, async ({ tx, args, ctx }) => {
+      if (ctx.isAnonymous) throw new Error(SKILL_ERROR_CODE.requiresAuth)
       const skill = (await tx.run(
         zql.skill.where('id', args.skillId).one(),
       )) as SkillRow | null
@@ -421,8 +442,16 @@ export const skillMutatorDefinitions = {
     setProjectOverride: defineMutator(
       setProjectOverrideArgs,
       async ({ tx, args, ctx }) => {
-        const project = await tx.run(zql.project.where('id', args.projectId).one())
-        const access = checkProjectAccess(project, { userId: ctx.userID })
+        if (ctx.isAnonymous) throw new Error(SKILL_ERROR_CODE.requiresAuth)
+        const project = await tx.run(
+          zql.project.where('id', args.projectId).one(),
+        )
+        const access = checkProjectAccess(project, {
+          userId: ctx.userID,
+          ownerIsMember:
+            tx.location !== 'server' ||
+            (await projectOwnerIsMember(tx, project)),
+        })
         if (access.kind !== 'ok') {
           throw new Error(
             PROJECT_ACCESS_FAILURE_CODE[access.kind] ??

@@ -2,6 +2,8 @@
 // "New chat / Search" actions and the date-grouped thread history.
 'use client'
 
+import { Users } from 'lucide-react'
+
 import { useCallback, useRef, useState } from 'react'
 import type { KeyboardEvent, RefObject } from 'react'
 import type { QueryResultType } from '@rocicorp/zero'
@@ -17,10 +19,11 @@ import PinOff from 'lucide-react/dist/esm/icons/pin-off'
 import Plus from 'lucide-react/dist/esm/icons/plus'
 import Trash2 from 'lucide-react/dist/esm/icons/trash-2'
 import { toast } from 'sonner'
+import { awaitProjectMutation } from '@/lib/frontend/projects/await-project-mutation'
 import { mutators, queries } from '@/integrations/zero'
 import { SidebarNavItem } from '@/components/layout/sidebar/sidebar-nav-item'
 import type { NavItemType } from '@/components/layout/sidebar/app-sidebar-nav.config'
-import { useAppAuth } from '@/lib/frontend/auth/use-auth'
+import { useProjectManagementAccess } from '@/lib/frontend/projects/use-project-management-access'
 import { m } from '@/paraglide/messages.js'
 
 export const PROJECTS_HREF_BASE = '/chat/projects'
@@ -94,7 +97,7 @@ function ProjectRenameInput({
 export function ChatSidebarProjects({ pathname }: { pathname: string }) {
   const z = useZero()
   const navigate = useNavigate()
-  const { user } = useAppAuth()
+  const { canManage } = useProjectManagementAccess()
   const [projects] = useQuery(queries.projects.list({}))
   const [creating, setCreating] = useState(false)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
@@ -131,13 +134,13 @@ export function ChatSidebarProjects({ pathname }: { pathname: string }) {
     const projectId = crypto.randomUUID()
     const createdAt = Date.now()
     try {
-      await z.mutate(
+      await awaitProjectMutation(z.mutate(
         mutators.projects.create({
           projectId,
           name,
           createdAt,
         }),
-      ).client
+      ))
       setCreateDialogOpen(false)
       resetCreateDialog()
       navigate({
@@ -147,6 +150,7 @@ export function ChatSidebarProjects({ pathname }: { pathname: string }) {
     } catch (error) {
       console.error('Failed to create project:', error)
       setCreateError(m.chat_sidebar_project_create_failed())
+      toast.error(m.chat_sidebar_project_create_failed())
     } finally {
       setCreating(false)
     }
@@ -179,12 +183,12 @@ export function ChatSidebarProjects({ pathname }: { pathname: string }) {
       }
 
       try {
-        await z.mutate(
+        await awaitProjectMutation(z.mutate(
           mutators.projects.update({
             projectId,
             patch: { name },
           }),
-        ).client
+        ))
         toast.success(m.chat_sidebar_project_renamed())
         cancelEditingProject()
       } catch (error) {
@@ -198,12 +202,12 @@ export function ChatSidebarProjects({ pathname }: { pathname: string }) {
   const setProjectPinned = useCallback(
     async (project: ProjectRow, pinned: boolean) => {
       try {
-        await z.mutate(
+        await awaitProjectMutation(z.mutate(
           mutators.projects.update({
             projectId: project.id,
             patch: { pinned },
           }),
-        ).client
+        ))
       } catch (error) {
         console.error('Failed to update project pin state:', error)
         toast.error(m.chat_sidebar_project_pin_failed())
@@ -215,8 +219,7 @@ export function ChatSidebarProjects({ pathname }: { pathname: string }) {
   const deleteProject = useCallback(
     async (project: ProjectRow) => {
       try {
-        await z.mutate(mutators.projects.delete({ projectId: project.id }))
-          .client
+        await awaitProjectMutation(z.mutate(mutators.projects.delete({ projectId: project.id })))
         toast.success(m.chat_project_deleted())
       } catch (error) {
         console.error('Failed to delete project:', error)
@@ -244,13 +247,13 @@ export function ChatSidebarProjects({ pathname }: { pathname: string }) {
         {projects.map((project) => {
           const isEditing = editingProjectId === project.id
           // Org-shared projects can appear in this list for non-owners, but
-          // project mutations are intentionally owner-only at the Zero layer.
-          const canMutate = project.userId === user?.id
+          // management also requires the shared project’s owner to remain a member.
+          const canMutate = canManage(project)
           const item: NavItemType = {
             name: project.name,
             href: `${PROJECTS_HREF_BASE}/${project.id}`,
             trailing: isEditing ? undefined : (
-              <ProjectPinTrailing pinned={project.pinned} />
+              <span className="flex items-center gap-1">{project.visibility === 'org' ? <Users className="size-3.5" aria-label={m.project_visibility_shared()} /> : null}<ProjectPinTrailing pinned={project.pinned} /></span>
             ),
             disableLink: isEditing,
             ...(isEditing && {

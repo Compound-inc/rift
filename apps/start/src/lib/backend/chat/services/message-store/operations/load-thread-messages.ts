@@ -7,6 +7,7 @@ import type {
 } from '@/lib/shared/chat-contracts/attachments'
 import { MessagePersistenceError } from '@/lib/backend/chat/domain/errors'
 import { getUserMessageText } from '@/lib/backend/chat/domain/schemas'
+import { projectVisibleToCaller } from '@/integrations/zero/project-access'
 import { zql } from '@/lib/backend/chat/infra/zero/db'
 import type { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
 import type { RagContextService } from '@/lib/backend/rag'
@@ -321,7 +322,9 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
         // remains in the user text + file names.
         const projectCustomInstruction = activeProjectId
           ? yield* Effect.tryPromise({
-              try: () => db.run(zql.project.where('id', activeProjectId).one()),
+              try: () => db.run(zql.project.where('id', activeProjectId)
+                .where(projectVisibleToCaller({ userID: userId ?? '', organizationId }))
+                .one()),
               catch: (error) =>
                 new MessagePersistenceError({
                   message: 'Failed to load project for intent enrichment',
@@ -390,6 +393,7 @@ export const makeLoadThreadMessagesOperation = (dependencies: {
           userId: latestUserMessageRow?.userId || userId || undefined,
           attachmentIds: [...fallbackAttachmentById.keys()],
           projectId: activeProjectId,
+          projectOrganizationId: organizationId,
           organizationId:
             organizationId && orgPolicy?.orgKnowledgeEnabled
               ? organizationId
