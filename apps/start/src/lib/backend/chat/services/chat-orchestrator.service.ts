@@ -48,6 +48,8 @@ import {
 import { WorkspaceUsageQuotaService } from '@/lib/backend/billing/services/workspace-usage-quota.service'
 import { WorkspaceUsageSettlementService } from '@/lib/backend/billing/services/workspace-usage-settlement.service'
 import { WorkspaceUsageQuotaExceededError } from '@/lib/backend/billing/domain/errors'
+import { PersonalizationTurnService } from './personalization/personalize-turn'
+import type { PersonalizationRecall } from './personalization/personalize-turn'
 import { MessageStoreService } from './message-store.service'
 import { ModelGatewayService } from './model-gateway.service'
 import { ModelPolicyService } from './model-policy.service'
@@ -144,6 +146,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
     Effect.gen(function* () {
       const threads = yield* ThreadService
       const messageStore = yield* MessageStoreService
+      const personalization = yield* PersonalizationTurnService
       const rateLimit = yield* RateLimitService
       const freeChatAllowance = yield* FreeChatAllowanceService
       const modelGateway = yield* ModelGatewayService
@@ -536,6 +539,19 @@ export class ChatOrchestratorService extends ServiceMap.Service<
 
           let assistantParentMessageId: string | undefined
           let regenSourceMessageId: string | undefined
+          let rawUserText = ''
+          let personalizationRecall: PersonalizationRecall = {
+            sections: Effect.succeed({
+              customInstructionsSection: '',
+              memorySection: '',
+            }),
+            preferences: Effect.succeed({ tokenBudget: 0 }),
+          }
+          let usedPrivateContext = Boolean(attachments?.length)
+          let usedTools = false
+          const onPrivateContextUsed = () => {
+            usedPrivateContext = true
+          }
           // Build the exact proposed prompt, including skill expansion, retained
           // attachments and RAG, without creating a user row or changing branches.
           let messages = yield* messageStore.loadThreadMessages({
@@ -544,6 +560,16 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             userId,
             organizationId,
             orgPolicy,
+            onPrivateContextUsed,
+            onTurnUserText: (text) =>
+              Effect.gen(function* () {
+                rawUserText = text
+                personalizationRecall = yield* personalization.startRecall({
+                  userId,
+                  organizationId,
+                  userText: text,
+                })
+              }),
             branchTurn: requestTrigger === 'submit-message'
               ? undefined
               : {
@@ -557,11 +583,20 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             contextWindowTokens: activeContextWindow,
             requestId,
           })
-          const assembledSystemPrompt = assembleSystemPrompt({
+          const personalizationPreferences =
+            yield* personalizationRecall.preferences
+          const sections = yield* personalizationRecall.sections
+          const systemPromptInput = {
             modelId: modelResolution.modelId,
             modePrompt: effectiveMode?.definition.systemPrompt,
             activeTools: toolRegistry.activeTools,
             projectInstruction: threadAccess.projectInstruction,
+          }
+          const baseSystemPrompt = assembleSystemPrompt(systemPromptInput)
+          const assembledSystemPrompt = assembleSystemPrompt({
+            ...systemPromptInput,
+            customInstructions: sections.customInstructionsSection,
+            memory: sections.memorySection,
           })
 
           const providerOptions = withDirectProviderPromptCaching({
@@ -575,12 +610,6 @@ export class ChatOrchestratorService extends ServiceMap.Service<
             providerKeyOverrideProviderId: modelResolution.providerApiKeyOverride?.providerId,
           })
 
-          if (wideEvent) {
-            setWideEventContext(wideEvent, {
-              usage: { promptTokens: estimatePromptTokens(messages) },
-            })
-          }
-
           // Every turn path checks the full prompt. The gateway repeats this at
           // its boundary for callers outside chat, before contacting a provider.
           const toolTokens = yield* Effect.tryPromise({
@@ -591,13 +620,23 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               cause: String(error),
             }),
           })
+          const additionalPromptTokens =
+            estimateTokensFromText(baseSystemPrompt) +
+            personalizationPreferences.tokenBudget +
+            toolTokens
+          if (wideEvent) {
+            setWideEventContext(wideEvent, {
+              usage: {
+                promptTokens:
+                  estimatePromptTokens(messages) + additionalPromptTokens,
+              },
+            })
+          }
           const outputLimits = yield* Effect.try({
             try: () => resolveOutputLimits({
               modelId: modelResolution.modelId,
               estimatedPromptTokens:
-                estimatePromptTokens(messages) +
-                estimateTokensFromText(assembledSystemPrompt) +
-                toolTokens,
+                estimatePromptTokens(messages) + additionalPromptTokens,
               providerOptions,
               contextWindowTokens: activeContextWindow,
               requestId,
@@ -675,6 +714,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               requestId,
               modelId: modelResolution.modelId,
               messages,
+              additionalPromptTokens,
               bypassQuota: Boolean(modelResolution.providerApiKeyOverride),
             })
             .pipe(
@@ -854,6 +894,27 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                 // its persistence error through the usual telemetry path.
                 if (Exit.isFailure(persisted))
                   return yield* Effect.failCause(persisted.cause)
+
+                // Learn only from persisted, completed answers. Stop status is
+                // explicit and independent of error-message persistence semantics.
+                if (
+                  input.ok &&
+                  !input.stopped &&
+                  !streamAbortController.signal.aborted &&
+                  rawUserText.trim() &&
+                  assistantBuffer.text.trim()
+                ) {
+                  yield* personalization.rememberTurn({
+                    userId,
+                    organizationId,
+                    scope: personalizationPreferences.scope,
+                    assistantMessageId,
+                    userText: rawUserText,
+                    assistantText: assistantBuffer.text,
+                    userTextOnly: usedPrivateContext || usedTools,
+                  })
+                }
+
               }).pipe(
                 Effect.catch((error) =>
                   Effect.flatMap(
@@ -982,6 +1043,17 @@ export class ChatOrchestratorService extends ServiceMap.Service<
               )
                 receivedProviderOutput = true
               stepAccounting.observe(chunk)
+              if (
+                chunk &&
+                typeof chunk === 'object' &&
+                'type' in chunk &&
+                typeof chunk.type === 'string' &&
+                (chunk.type.includes('tool') ||
+                  chunk.type === 'source' ||
+                  chunk.type.startsWith('source-'))
+              )
+                usedTools = true
+              // Persisted assistant content is reconstructed from deltas as they arrive.
               applyAssistantChunkDelta(assistantBuffer, chunk)
             },
           }).pipe(
@@ -1141,6 +1213,10 @@ export class ChatOrchestratorService extends ServiceMap.Service<
                   responseMessage,
                 )
 
+                usedTools ||= Boolean(
+                  assistantBuffer.toolParts?.length ||
+                  assistantBuffer.sources?.length,
+                )
                 receivedProviderOutput ||= Boolean(
                   assistantBuffer.text || assistantBuffer.reasoning || assistantBuffer.toolParts?.length,
                 )

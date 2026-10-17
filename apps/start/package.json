@@ -6,6 +6,7 @@
     "#/*": "./src/*"
   },
   "scripts": {
+    "memory:purge": "bun run scripts/memory-purge.ts",
     "models:audit": "bun run scripts/audit-model-catalog.ts",
     "i18n:compile": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide",
     "predev": "bun run i18n:compile",
@@ -79,6 +80,7 @@
     "sonner": "^2.0.4",
     "streamdown": "^2.4.0",
     "stripe": "^20.4.1",
+    "supermemory": "^5.0.2",
     "tailwindcss": "^4.1.18",
     "zod": "4.3.6"
   },

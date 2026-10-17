@@ -44,6 +44,7 @@ export type WorkspaceUsageQuotaServiceShape = {
     readonly requestId: string
     readonly modelId: string
     readonly messages: readonly UIMessage[]
+    readonly additionalPromptTokens?: number
     readonly bypassQuota: boolean
   }) => Effect.Effect<
     QuotaReservationResult,

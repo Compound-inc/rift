@@ -1,6 +1,13 @@
+import { startMemoryPurgeWorker } from './lib/backend/chat/runtime/memory-purge-runtime'
 import { paraglideMiddleware } from './paraglide/server.js'
 import handler from '@tanstack/react-start/server-entry'
 import { captureUnhandledServerErrorInPostHog } from './lib/backend/chat/observability/posthog.server'
+
+const stopMemoryPurgeWorker = startMemoryPurgeWorker()
+if (import.meta.hot)
+  import.meta.hot.dispose(() => {
+    void stopMemoryPurgeWorker?.()
+  })
 
 /**
  * Middleware to redirect www.rift.mx to rift.mx (naked domain).

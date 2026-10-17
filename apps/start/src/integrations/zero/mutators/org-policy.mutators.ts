@@ -58,6 +58,7 @@ type OrgPolicyRow = {
   providerNativeToolsEnabled?: boolean | null
   externalToolsEnabled?: boolean | null
   disabledToolKeys?: readonly string[]
+  memoryEnabled?: boolean | null
   orgKnowledgeEnabled?: boolean | null
   providerKeyStatus: {
     syncedAt: number
@@ -77,6 +78,7 @@ type OrgPolicySnapshot = {
   providerNativeToolsEnabled: boolean
   externalToolsEnabled: boolean
   disabledToolKeys: readonly string[]
+  memoryEnabled: boolean
   orgKnowledgeEnabled: boolean
   providerKeyStatus: {
     syncedAt: number
@@ -201,6 +203,7 @@ function toSnapshot(row?: OrgPolicyRow): OrgPolicySnapshot {
     externalToolsEnabled: row?.externalToolsEnabled ?? true,
     disabledToolKeys: row?.disabledToolKeys ?? [],
     orgKnowledgeEnabled: row?.orgKnowledgeEnabled ?? false,
+    memoryEnabled: row?.memoryEnabled ?? true,
     providerKeyStatus: row?.providerKeyStatus ?? {
       syncedAt: 0,
       hasAnyProviderKey: false,
@@ -233,6 +236,7 @@ async function persistOrgPolicy(args: {
           providerNativeToolsEnabled: boolean
           externalToolsEnabled: boolean
           disabledToolKeys: readonly string[]
+          memoryEnabled: boolean
           orgKnowledgeEnabled: boolean
           providerKeyStatus: {
             syncedAt: number
@@ -253,6 +257,7 @@ async function persistOrgPolicy(args: {
           providerNativeToolsEnabled: boolean
           externalToolsEnabled: boolean
           disabledToolKeys: readonly string[]
+          memoryEnabled: boolean
           orgKnowledgeEnabled: boolean
           providerKeyStatus: {
             syncedAt: number
@@ -285,6 +290,7 @@ async function persistOrgPolicy(args: {
       externalToolsEnabled: args.next.externalToolsEnabled,
       disabledToolKeys: args.next.disabledToolKeys,
       orgKnowledgeEnabled: args.next.orgKnowledgeEnabled,
+      memoryEnabled: args.next.memoryEnabled,
       providerKeyStatus: args.next.providerKeyStatus,
       enforcedModeId: args.next.enforcedModeId ?? null,
       updatedAt,
@@ -301,6 +307,7 @@ async function persistOrgPolicy(args: {
     externalToolsEnabled: args.next.externalToolsEnabled,
     disabledToolKeys: args.next.disabledToolKeys,
     orgKnowledgeEnabled: args.next.orgKnowledgeEnabled,
+    memoryEnabled: args.next.memoryEnabled,
     providerKeyStatus: args.next.providerKeyStatus,
     enforcedModeId: args.next.enforcedModeId ?? null,
     updatedAt,
@@ -313,6 +320,12 @@ async function persistOrgPolicy(args: {
  */
 export const orgPolicyMutatorDefinitions = {
   orgPolicy: {
+    setMemoryEnabled: defineMutator(z.object({ enabled: z.boolean() }), async ({ tx, args, ctx }) => {
+      const { organizationId } = await requireOrgPolicyAdmin({ tx, ctx })
+      const existing = await tx.run(zql.orgAiPolicy.where('organizationId', organizationId).one())
+      const snapshot = toSnapshot(existing)
+      await persistOrgPolicy({ tx, organizationId, existing, next: { ...snapshot, memoryEnabled: args.enabled } })
+    }),
     toggleProvider: defineMutator(toggleProviderPolicyArgs, async ({ tx, args, ctx }) => {
       const { organizationId } = await requireOrgPolicyAdmin({
         tx,

@@ -1,3 +1,5 @@
+import { MemoryService } from '../services/personalization/memory.service'
+import { PersonalizationTurnService } from '../services/personalization/personalize-turn'
 import { describe, expect, it } from 'vitest'
 import { Effect } from 'effect'
 import { ChatOrchestratorService } from '@/lib/backend/chat/services/chat-orchestrator.service'
@@ -12,6 +14,24 @@ import { ChatRuntime } from './chat-runtime'
  * tests using memory layers still passed.
  */
 describe('ChatRuntime', () => {
+  it('resolves personalization and optional memory from the production graph', async () => {
+    const result = await ChatRuntime.run(
+      Effect.gen(function* () {
+        const memory = yield* MemoryService
+        const personalization = yield* PersonalizationTurnService
+        return {
+          configured: memory.configured,
+          startRecall: typeof personalization.startRecall,
+          rememberTurn: typeof personalization.rememberTurn,
+        }
+      }),
+    )
+    expect(result.startRecall).toBe('function')
+    expect(result.rememberTurn).toBe('function')
+    expect(result.configured).toBe(
+      Boolean(process.env.SUPERMEMORY_API_KEY?.trim()),
+    )
+  })
   it('resolves the message store from the production runtime graph', async () => {
     const result = await ChatRuntime.run(
       Effect.gen(function* () {

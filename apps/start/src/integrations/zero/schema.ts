@@ -35,6 +35,30 @@ const user = table('user')
   })
   .primaryKey('id')
 
+const userPersonalization = table('userPersonalization')
+  .from('user_personalization')
+  .columns({
+    userId: string().from('user_id'),
+    instructionsEnabled: boolean().from('instructions_enabled'),
+    memoryDefaultEnabled: boolean().from('memory_default_enabled'),
+    aboutYou: string().from('about_you'),
+    responsePreferences: string().from('response_preferences'),
+    updatedAt: number().from('updated_at'),
+  })
+  .primaryKey('userId')
+
+const userMemoryPreference = table('userMemoryPreference')
+  .from('user_memory_preference')
+  .columns({
+    userId: string().from('user_id'),
+    organizationId: string().from('organization_id'),
+    enabled: boolean(),
+    generation: string(),
+    retiredGenerations: json<readonly string[]>().from('retired_generations'),
+    updatedAt: number().from('updated_at'),
+  })
+  .primaryKey('userId', 'organizationId')
+
 const organization = table('organization')
   .from('organization')
   .columns({
@@ -82,6 +106,7 @@ const orgAiPolicy = table('orgAiPolicy')
     disabledToolKeys: json<readonly string[]>()
       .from('disabled_tool_keys'),
     orgKnowledgeEnabled: boolean().from('org_knowledge_enabled').optional(),
+    memoryEnabled: boolean().from('memory_enabled').optional(),
     providerKeyStatus: json<{
       syncedAt: number
       hasAnyProviderKey: boolean
@@ -659,6 +684,8 @@ const skillProjectOverrideRelationships = relationships(
 export const schema = createSchema({
   tables: [
     user,
+    userPersonalization,
+    userMemoryPreference,
     organization,
     member,
     invitation,
@@ -681,6 +708,9 @@ export const schema = createSchema({
     organizationRelationships,
     memberRelationships,
     orgAiPolicyRelationships,
+    relationships(userMemoryPreference, ({ one }) => ({
+      organization: one({ sourceField: ['organizationId'], destField: ['id'], destSchema: organization }),
+    })),
     attachmentRelationships,
     orgSubscriptionRelationships,
     orgUserUsageSummaryRelationships,

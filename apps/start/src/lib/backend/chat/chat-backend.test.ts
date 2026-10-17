@@ -1,14 +1,22 @@
+import { personalizationTokenBudget } from './services/personalization/prompt-sections'
+import {
+  MIN_ANSWER_TOKENS,
+  resolveOutputLimits,
+} from './services/chat-orchestrator/output-limits'
+import { assembleSystemPrompt } from './services/chat-orchestrator/system-prompt'
+import { estimateTokensFromText } from '@/lib/shared/chat-contracts/prompt-usage'
+import {
+  getCatalogModel,
+  resolveContextWindowForMode,
+} from '@/lib/shared/ai-catalog'
+import { PersonalizationTurnService } from './services/personalization/personalize-turn'
 // Smoke tests for the chat backend scaffold (memory layers + error envelope).
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LanguageModelUsage, TextStreamPart, ToolSet, UIMessage } from 'ai'
 import { Effect, Layer } from 'effect'
 import { resolveChatAccessPolicy } from '@/lib/backend/access-control'
-import {
-  WorkspaceUsageQuotaService,
-} from '@/lib/backend/billing/services/workspace-usage-quota.service'
-import {
-  WorkspaceUsageSettlementService,
-} from '@/lib/backend/billing/services/workspace-usage-settlement.service'
+import { WorkspaceUsageQuotaService } from '@/lib/backend/billing/services/workspace-usage-quota.service'
+import { WorkspaceUsageSettlementService } from '@/lib/backend/billing/services/workspace-usage-settlement.service'
 import {
   BranchVersionConflictError,
   InvalidRequestError,
@@ -35,22 +43,31 @@ import { ToolRegistryService } from '@/lib/backend/chat/services/tool-registry.s
 let includeGenerationOutput = false
 let usageOnly = false
 const recordedUsageRequests: string[] = []
+let streamUsesTool = false
+let streamEnd: 'success' | 'abort' | 'error' | 'empty' = 'success'
 
 let lastStreamRequest: {
+  readonly systemPrompt?: string
   readonly messages?: readonly UIMessage[]
   readonly providerOptions?: Record<string, unknown>
-  readonly systemPrompt?: string
 } | null = null
 
 const TestModelGatewayLive = Layer.succeed(ModelGatewayService, {
-  streamResponse: ({ messages, providerOptions, systemPrompt }) =>
+  streamResponse: ({ messages, providerOptions, systemPrompt, onChunk }) =>
     Effect.sync<ModelStreamResult>(() => {
       lastStreamRequest = {
+        systemPrompt,
         messages,
         providerOptions,
-        systemPrompt,
       }
 
+      if (streamUsesTool)
+        onChunk?.({
+          type: 'tool-call',
+          toolName: 'web_search',
+          toolCallId: 'memory-search',
+          input: {},
+        })
       const usage: LanguageModelUsage = {
         inputTokens: 5,
         inputTokenDetails: {
@@ -89,7 +106,7 @@ const TestModelGatewayLive = Layer.succeed(ModelGatewayService, {
               {
                 type: 'text-delta',
                 id: 'text-1',
-                text: 'Mocked assistant response',
+                text: streamEnd === 'empty' ? '' : 'Mocked assistant response',
               },
               { type: 'text-end', id: 'text-1' },
               {
@@ -102,6 +119,12 @@ const TestModelGatewayLive = Layer.succeed(ModelGatewayService, {
               if (usageOnly && ['text-start', 'text-delta', 'text-end', 'reasoning-start', 'reasoning-delta', 'reasoning-end'].includes(chunk.type)) continue
               controller.enqueue(chunk)
             }
+            if (streamEnd === 'abort') controller.enqueue({ type: 'abort' })
+            if (streamEnd === 'error')
+              controller.enqueue({
+                type: 'error',
+                error: new Error('Transport failed'),
+              })
             controller.close()
           },
         }),
@@ -128,22 +151,36 @@ const RecordingToolRegistryLayer = Layer.succeed(ToolRegistryService, {
     }),
 })
 
-const TestChatLayer = ChatOrchestratorService.layer.pipe(
-  Layer.provideMerge(ThreadService.layerMemory),
-  Layer.provideMerge(MessageStoreService.layerMemory),
-  Layer.provideMerge(RateLimitService.layerMemory),
-  Layer.provideMerge(FreeChatAllowanceService.layerMemory),
-  Layer.provideMerge(ModelPolicyService.layerMemory),
-  Layer.provideMerge(ToolPolicyService.layer),
-  Layer.provideMerge(RecordingToolRegistryLayer),
-  Layer.provideMerge(TestModelGatewayLive),
-  Layer.provideMerge(StreamResumeService.layerMemory),
-  Layer.provideMerge(WorkspaceUsageQuotaService.layerNoop),
-  Layer.provideMerge(Layer.succeed(WorkspaceUsageSettlementService, {
-    recordChatUsage: ({ requestId }) => Effect.sync(() => { recordedUsageRequests.push(requestId) }),
-    settleMonetizationEvent: () => Effect.void,
-  })),
-)
+const makeTestChatLayer = (
+  personalizationLayer = PersonalizationTurnService.layerNoop,
+  messageStoreLayer = MessageStoreService.layerMemory,
+  threadLayer = ThreadService.layerMemory,
+  quotaLayer = WorkspaceUsageQuotaService.layerNoop,
+) =>
+  ChatOrchestratorService.layer.pipe(
+    Layer.provideMerge(threadLayer),
+    Layer.provideMerge(messageStoreLayer),
+    Layer.provideMerge(personalizationLayer),
+    Layer.provideMerge(RateLimitService.layerMemory),
+    Layer.provideMerge(FreeChatAllowanceService.layerMemory),
+    Layer.provideMerge(ModelPolicyService.layerMemory),
+    Layer.provideMerge(ToolPolicyService.layer),
+    Layer.provideMerge(RecordingToolRegistryLayer),
+    Layer.provideMerge(TestModelGatewayLive),
+    Layer.provideMerge(StreamResumeService.layerMemory),
+    Layer.provideMerge(quotaLayer),
+    Layer.provideMerge(
+      Layer.succeed(WorkspaceUsageSettlementService, {
+        recordChatUsage: ({ requestId }) =>
+          Effect.sync(() => {
+            recordedUsageRequests.push(requestId)
+          }),
+        settleMonetizationEvent: () => Effect.void,
+      }),
+    ),
+  )
+
+const TestChatLayer = makeTestChatLayer()
 
 beforeEach(() => {
   const state = getMemoryState()
@@ -156,6 +193,8 @@ beforeEach(() => {
   includeGenerationOutput = false
   usageOnly = false
   recordedUsageRequests.length = 0
+  streamEnd = 'success'
+  streamUsesTool = false
 })
 
 const paidAccessPolicy = resolveChatAccessPolicy({
@@ -186,7 +225,9 @@ describe('chat-backend scaffold', () => {
     )
 
     expect(result.threadId).toBeTypeOf('string')
-    expect(getMemoryState().threads.get(result.threadId)?.modeId).toBeUndefined()
+    expect(
+      getMemoryState().threads.get(result.threadId)?.modeId,
+    ).toBeUndefined()
   })
 
   it('uses deterministic bootstrap identity for create-if-missing threads', async () => {
@@ -289,7 +330,9 @@ describe('chat-backend scaffold', () => {
     expect(sse).toContain(`"messageId":"${messages?.[1]?.id}"`)
     expect(sse).toContain('"type":"reasoning-delta"')
     expect(sse).toContain('"totalTokens":8')
-    expect(result.response.headers.get('x-vercel-ai-ui-message-stream')).toBe('v1')
+    expect(result.response.headers.get('x-vercel-ai-ui-message-stream')).toBe(
+      'v1',
+    )
   })
 
   it('streams and keeps tool activity, URL/document sources, and length metadata through finalization', async () => {
@@ -473,6 +516,7 @@ describe('chat-backend scaffold', () => {
     const testLayer = ChatOrchestratorService.layer.pipe(
       Layer.provideMerge(ThreadService.layerMemory),
       Layer.provideMerge(MessageStoreService.layerMemory),
+      Layer.provideMerge(PersonalizationTurnService.layerNoop),
       Layer.provideMerge(RateLimitService.layerMemory),
       Layer.provideMerge(FreeChatAllowanceService.layerMemory),
       Layer.provideMerge(ByokModelPolicyLayer),
@@ -583,10 +627,14 @@ describe('chat-backend scaffold', () => {
 
     const messages = getMemoryState().messages.get(result.created.threadId)
     expect(messages?.length).toBeGreaterThanOrEqual(2)
-    const editedUserMessage = messages?.find((message) => message.role === 'user')
+    const editedUserMessage = messages?.find(
+      (message) => message.role === 'user',
+    )
     expect(editedUserMessage?.role).toBe('user')
     const firstUserText = editedUserMessage?.parts
-      .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+      .filter(
+        (part): part is { type: 'text'; text: string } => part.type === 'text',
+      )
       .map((part) => part.text)
       .join('')
     expect(firstUserText).toBe('edited question')
@@ -664,7 +712,9 @@ describe('chat-backend scaffold', () => {
 
     const payload = await uploadDenied.json()
     expect(payload.error.code).toBe(ChatErrorCode.InvalidRequest)
-    expect(payload.error.i18nKey).toBe(ChatErrorI18nKey.FileUploadPlanRestricted)
+    expect(payload.error.i18nKey).toBe(
+      ChatErrorI18nKey.FileUploadPlanRestricted,
+    )
   })
 
   it('normalizes nested gateway beta-flag errors into readable copy', () => {
@@ -698,7 +748,10 @@ describe('chat-backend scaffold', () => {
   })
 
   it('falls back when the source error is not human-readable', () => {
-    const readable = toReadableErrorMessage('[object Object]', 'fallback message')
+    const readable = toReadableErrorMessage(
+      '[object Object]',
+      'fallback message',
+    )
     expect(readable).toBe('fallback message')
   })
 
@@ -720,10 +773,7 @@ describe('chat-backend scaffold', () => {
         windowMs: 60_000,
         maxRequests: 30,
       })
-    }).pipe(
-      Effect.provide(RateLimitService.layerMemory),
-      Effect.flip,
-    )
+    }).pipe(Effect.provide(RateLimitService.layerMemory), Effect.flip)
 
     const error = await Effect.runPromise(effect)
     expect(error._tag).toBe('RateLimitExceededError')
@@ -809,7 +859,10 @@ describe('chat-backend scaffold', () => {
           windowMs: 60_000,
           maxRequests: 1,
         })
-      }).pipe(Effect.provide(FreeChatAllowanceService.layerMemory), Effect.flip),
+      }).pipe(
+        Effect.provide(FreeChatAllowanceService.layerMemory),
+        Effect.flip,
+      ),
     )
 
     expect(error._tag).toBe('QuotaExceededError')
@@ -857,4 +910,405 @@ it.each(['regenerate-message', 'edit-message'] as const)('rejects exhausted cont
   }).pipe(Effect.provide(TestChatLayer)))
   expect(error._tag).toBe('ContextWindowExceededError')
   expect(lastStreamRequest).toBeNull()
+})
+
+describe('explicit personalization orchestration', () => {
+  for (const context of ['plain', 'rag', 'tool'] as const) {
+    for (const trigger of [
+      'submit-message',
+      'regenerate-message',
+      'edit-message',
+    ] as const) {
+      it(`recalls and remembers raw user text for ${trigger} with ${context} context`, async () => {
+        const startRecall = vi.fn<
+          PersonalizationTurnService['Service']['startRecall']
+        >(() =>
+          Effect.succeed({
+            sections: Effect.succeed({
+              customInstructionsSection: 'user preferences',
+              memorySection: 'past facts',
+            }),
+            preferences: Effect.succeed({
+              tokenBudget: 100,
+              scope: {
+                userId: 'user-personalization',
+                organizationId: 'org-personalization',
+                generation: 'initial',
+              },
+            }),
+          }),
+        )
+        const rememberTurn = vi.fn<
+          PersonalizationTurnService['Service']['rememberTurn']
+        >(() => Effect.void)
+        const storeLayer = Layer.effect(
+          MessageStoreService,
+          Effect.gen(function* () {
+            const store = yield* MessageStoreService
+            return {
+              ...store,
+              loadThreadMessages: (
+                args: Parameters<
+                  MessageStoreService['Service']['loadThreadMessages']
+                >[0],
+              ) =>
+                store.loadThreadMessages(args).pipe(
+                  Effect.map((messages) => {
+                    expect(startRecall).toHaveBeenCalledTimes(1)
+                    if (context === 'rag') args.onPrivateContextUsed?.()
+                    return messages.map((message) =>
+                      message.role === 'user'
+                        ? {
+                            ...message,
+                            parts: [
+                              {
+                                type: 'text' as const,
+                                text: 'Expanded private RAG context and skills',
+                              },
+                            ],
+                          }
+                        : message,
+                    )
+                  }),
+                ),
+            }
+          }),
+        ).pipe(Layer.provide(MessageStoreService.layerMemory))
+        const threadLayer = Layer.effect(
+          ThreadService,
+          Effect.gen(function* () {
+            const threads = yield* ThreadService
+            return {
+              ...threads,
+              assertThreadAccess: (
+                args: Parameters<
+                  ThreadService['Service']['assertThreadAccess']
+                >[0],
+              ) =>
+                threads.assertThreadAccess(args).pipe(
+                  Effect.map((access) => ({
+                    ...access,
+                    projectInstruction: 'project instructions',
+                  })),
+                ),
+            }
+          }),
+        ).pipe(Layer.provide(ThreadService.layerMemory))
+        const layer = makeTestChatLayer(
+          Layer.succeed(PersonalizationTurnService, {
+            startRecall,
+            rememberTurn,
+          }),
+          storeLayer,
+          threadLayer,
+        )
+        streamUsesTool = context === 'tool'
+        const rawText =
+          trigger === 'edit-message'
+            ? 'Edited raw question'
+            : 'Raw user question'
+        const result = await Effect.runPromise(
+          Effect.gen(function* () {
+            const orchestrator = yield* ChatOrchestratorService
+            const created = yield* orchestrator.createThread({
+              userId: 'user-personalization',
+              requestId: 'create',
+              modelId: 'openai/gpt-5-mini',
+            })
+            const state = getMemoryState()
+            if (trigger !== 'submit-message')
+              state.messages.set(created.threadId, [
+                {
+                  id: 'raw-anchor',
+                  role: 'user',
+                  parts: [{ type: 'text', text: 'Raw user question' }],
+                },
+                {
+                  id: 'previous-assistant',
+                  role: 'assistant',
+                  parts: [{ type: 'text', text: 'Previous answer' }],
+                },
+              ])
+            const response = yield* orchestrator.streamChat({
+              userId: 'user-personalization',
+              organizationId: 'org-personalization',
+              threadId: created.threadId,
+              accessPolicy: paidAccessPolicy,
+              requestId: 'personalize',
+              route: '/api/chat',
+              expectedBranchVersion: 1,
+              trigger,
+              messageId:
+                trigger === 'regenerate-message'
+                  ? 'previous-assistant'
+                  : 'raw-anchor',
+              editedText: trigger === 'edit-message' ? rawText : undefined,
+              message:
+                trigger === 'submit-message'
+                  ? {
+                      id: 'raw-anchor',
+                      role: 'user',
+                      parts: [
+                        { type: 'text', text: rawText },
+                        { type: 'file', text: 'Private attachment text' },
+                      ],
+                    }
+                  : undefined,
+            })
+            return { response, threadId: created.threadId }
+          }).pipe(Effect.provide(layer)),
+        )
+        await result.response.text()
+        await vi.waitFor(() => expect(rememberTurn).toHaveBeenCalledTimes(1))
+        expect(startRecall).toHaveBeenCalledWith({
+          userId: 'user-personalization',
+          organizationId: 'org-personalization',
+          userText: rawText,
+        })
+        expect(
+          lastStreamRequest?.messages?.some((message) =>
+            message.parts.some(
+              (part) =>
+                part.type === 'text' &&
+                part.text.includes('Expanded private RAG'),
+            ),
+          ),
+        ).toBe(true)
+        expect(lastStreamRequest?.systemPrompt).toBe(
+          assembleSystemPrompt({
+            modelId: 'openai/gpt-5-mini',
+            customInstructions: 'user preferences',
+            projectInstruction: 'project instructions',
+            memory: 'past facts',
+          }),
+        )
+        const saved = rememberTurn.mock.calls[0][0]
+        expect(saved.userText).toBe(rawText)
+        expect(saved.assistantText).toBe('Mocked assistant response')
+        expect(saved.userTextOnly).toBe(context !== 'plain')
+        expect(JSON.stringify(saved)).not.toMatch(
+          /reasoning|Expanded private|Private attachment/,
+        )
+        // Saving follows successful assistant persistence.
+        expect(
+          getMemoryState()
+            .messages.get(result.threadId)
+            ?.find((message) => message.id === saved.assistantMessageId)?.role,
+        ).toBe('assistant')
+      })
+    }
+  }
+  for (const outcome of ['abort', 'error', 'empty'] as const) {
+    it(`does not remember an ${outcome} response`, async () => {
+      streamEnd = outcome
+      const rememberTurn = vi.fn<
+        PersonalizationTurnService['Service']['rememberTurn']
+      >(() => Effect.void)
+      const layer = makeTestChatLayer(
+        Layer.succeed(PersonalizationTurnService, {
+          startRecall: () =>
+            Effect.succeed({
+              sections: Effect.succeed({
+                customInstructionsSection: '',
+                memorySection: '',
+              }),
+              preferences: Effect.succeed({
+                tokenBudget: 0,
+                scope: {
+                  userId: 'user-stop',
+                  organizationId: 'org-stop',
+                  generation: 'initial',
+                },
+              }),
+            }),
+          rememberTurn,
+        }),
+      )
+      const response = await Effect.runPromise(
+        Effect.gen(function* () {
+          const orchestrator = yield* ChatOrchestratorService
+          const created = yield* orchestrator.createThread({
+            userId: 'user-stop',
+            requestId: 'create',
+            modelId: 'openai/gpt-5-mini',
+          })
+          return yield* orchestrator.streamChat({
+            userId: 'user-stop',
+            organizationId: 'org-stop',
+            threadId: created.threadId,
+            accessPolicy: paidAccessPolicy,
+            requestId: 'stop',
+            route: '/api/chat',
+            expectedBranchVersion: 1,
+            message: {
+              id: 'question',
+              role: 'user',
+              parts: [{ type: 'text', text: 'Question' }],
+            },
+          })
+        }).pipe(Effect.provide(layer)),
+      )
+      await response.text()
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      expect(rememberTurn).not.toHaveBeenCalled()
+    })
+  }
+})
+
+it.each(['submit-message', 'edit-message', 'regenerate-message'] as const)('checks personalization before persistence for %s and includes it in quota', async (trigger) => {
+  const budgetSections = {
+    customInstructionsSection: '中'.repeat(1500),
+    memorySection: '中'.repeat(1200),
+  }
+  const budget = personalizationTokenBudget(budgetSections)
+  const budgetLayer = Layer.succeed(PersonalizationTurnService, {
+    startRecall: () =>
+      Effect.succeed({
+        sections: Effect.succeed(budgetSections),
+        preferences: Effect.succeed({
+          tokenBudget: budget,
+        }),
+      }),
+    rememberTurn: () => Effect.void,
+  })
+  const window = resolveContextWindowForMode({
+    model: getCatalogModel('openai/gpt-5-mini')!,
+    mode: 'standard',
+  })
+  const baseTokens = estimateTokensFromText(
+    assembleSystemPrompt({ modelId: 'openai/gpt-5-mini' }),
+  )
+  const maxPrompt = Math.floor((window - MIN_ANSWER_TOKENS) / 1.1)
+  const historyTokens = maxPrompt - baseTokens - Math.floor(budget / 2)
+  expect(() =>
+    resolveOutputLimits({
+      modelId: 'openai/gpt-5-mini',
+      estimatedPromptTokens: historyTokens + baseTokens,
+      contextWindowTokens: window,
+    }),
+  ).not.toThrow()
+  const storeLayer = Layer.effect(
+    MessageStoreService,
+    Effect.gen(function* () {
+      const store = yield* MessageStoreService
+      return {
+        ...store,
+        loadThreadMessages: (args) =>
+          store.loadThreadMessages(args).pipe(
+            Effect.as([
+              {
+                id: 'large',
+                role: 'user' as const,
+                parts: [
+                  {
+                    type: 'text' as const,
+                    text: 'x'.repeat(historyTokens * 4),
+                  },
+                ],
+              },
+            ]),
+          ),
+      }
+    }),
+  ).pipe(Layer.provide(MessageStoreService.layerMemory))
+  const error = await Effect.runPromise(
+    Effect.gen(function* () {
+      const orchestrator = yield* ChatOrchestratorService
+      const created = yield* orchestrator.createThread({
+        userId: 'user-limit',
+        requestId: 'create-limit',
+        modelId: 'openai/gpt-5-mini',
+      })
+      const state = getMemoryState()
+      if (trigger !== 'submit-message')
+        state.messages.set(created.threadId, [
+          {
+            id: 'anchor',
+            role: 'user',
+            parts: [{ type: 'text', text: 'Original question' }],
+          },
+          {
+            id: 'answer',
+            role: 'assistant',
+            parts: [{ type: 'text', text: 'Previous answer' }],
+          },
+        ])
+      const messagesBefore = structuredClone(
+        state.messages.get(created.threadId),
+      )
+      const error = yield* orchestrator
+        .streamChat({
+          trigger,
+          messageId: trigger === 'regenerate-message' ? 'answer' : 'anchor',
+          editedText:
+            trigger === 'edit-message' ? 'Changed question' : undefined,
+          userId: 'user-limit',
+          threadId: created.threadId,
+          requestId: 'limit',
+          route: '/api/chat',
+          accessPolicy: paidAccessPolicy,
+          expectedBranchVersion: 1,
+          message: {
+            id: 'u',
+            role: 'user',
+            parts: [{ type: 'text', text: 'Question' }],
+          },
+        })
+        .pipe(Effect.flip)
+      expect(state.messages.get(created.threadId)).toEqual(messagesBefore)
+      expect(lastStreamRequest).toBeNull()
+      return error
+    }).pipe(Effect.provide(makeTestChatLayer(budgetLayer, storeLayer))),
+  )
+  expect(error._tag).toBe('ContextWindowExceededError')
+  if (error._tag === 'ContextWindowExceededError')
+    expect(error.usedTokens).toBeGreaterThan(maxPrompt)
+
+  const reserveChatQuota = vi.fn<
+    WorkspaceUsageQuotaService['Service']['reserveChatQuota']
+  >(() => Effect.succeed({ bypassed: true }))
+  const quotaLayer = Layer.effect(
+    WorkspaceUsageQuotaService,
+    Effect.gen(function* () {
+      return { ...(yield* WorkspaceUsageQuotaService), reserveChatQuota }
+    }),
+  ).pipe(Layer.provide(WorkspaceUsageQuotaService.layerNoop))
+  const response = await Effect.runPromise(
+    Effect.gen(function* () {
+      const orchestrator = yield* ChatOrchestratorService
+      const created = yield* orchestrator.createThread({
+        userId: 'user-budget',
+        requestId: 'create-budget',
+        modelId: 'openai/gpt-5-mini',
+      })
+      return yield* orchestrator.streamChat({
+        userId: 'user-budget',
+        threadId: created.threadId,
+        requestId: 'budget',
+        route: '/api/chat',
+        accessPolicy: paidAccessPolicy,
+        expectedBranchVersion: 1,
+        message: {
+          id: 'u',
+          role: 'user',
+          parts: [{ type: 'text', text: 'Question' }],
+        },
+      })
+    }).pipe(
+      Effect.provide(
+        makeTestChatLayer(
+          budgetLayer,
+          MessageStoreService.layerMemory,
+          ThreadService.layerMemory,
+          quotaLayer,
+        ),
+      ),
+    ),
+  )
+  await response.text()
+  expect(reserveChatQuota.mock.calls[0][0].additionalPromptTokens).toBe(
+    estimateTokensFromText(
+      assembleSystemPrompt({ modelId: 'openai/gpt-5-mini' }),
+    ) + budget,
+  )
 })

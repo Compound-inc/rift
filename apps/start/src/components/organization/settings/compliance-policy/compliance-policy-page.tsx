@@ -1,5 +1,6 @@
 'use client'
 
+import { MemoryPolicyForm } from './memory-policy-form'
 import { ContentPage } from '@/components/layout'
 import { useOrgFeatureAccess } from '@/lib/frontend/billing/use-org-billing'
 import { m } from '@/paraglide/messages.js'
@@ -29,6 +30,7 @@ export function CompliancePolicyPage() {
         </div>
       )}
 
+      <MemoryPolicyForm />
       <ComplianceFlagsSection
         payload={payload}
         updating={busy}

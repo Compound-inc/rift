@@ -1,3 +1,4 @@
+import { kickMemoryPurge } from '@/lib/backend/chat/runtime/memory-purge-runtime'
 import { betterAuth } from 'better-auth'
 import { stripe } from '@better-auth/stripe'
 import { emailOTP, testUtils } from 'better-auth/plugins'
@@ -421,6 +422,11 @@ export const auth = betterAuth({
   trustedOrigins: [authBaseURL],
   databaseHooks: {
     user: {
+      delete: {
+        after: async () => {
+          kickMemoryPurge()
+        },
+      },
       create: {
         after: async (user) => {
           if (
@@ -579,7 +585,11 @@ export const auth = betterAuth({
         afterCancelInvitation: async ({ organization }) => {
           await recomputeOrgEntitlementSnapshot(organization.id)
         },
+        afterDeleteOrganization: async () => {
+          kickMemoryPurge()
+        },
         afterRemoveMember: async ({ organization }) => {
+          kickMemoryPurge()
           await recomputeOrgEntitlementSnapshot(organization.id)
         },
       },

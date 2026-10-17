@@ -110,7 +110,9 @@ export const makePrepareEditOperation = (dependencies: {
               const targetRow = threadMessages.find(
                 (message) => message.messageId === targetMessageId,
               )
-              const carriedAttachmentIds = Array.isArray(targetRow?.attachmentsIds)
+              const carriedAttachmentIds = Array.isArray(
+                targetRow?.attachmentsIds,
+              )
                 ? (targetRow.attachmentsIds as readonly unknown[]).filter(
                     (id): id is string => typeof id === 'string',
                   )
@@ -160,6 +162,7 @@ export const makePrepareEditOperation = (dependencies: {
               })
 
               return {
+                userText: normalizedEditedText,
                 editedMessageId: nextMessageId,
                 regenSourceMessageId: nextMessageId,
               }

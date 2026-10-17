@@ -1,3 +1,7 @@
+import { MemoryLedgerService } from '../services/personalization/memory-ledger.service'
+import { PersonalizationTurnService } from '../services/personalization/personalize-turn'
+import { MemoryService } from '../services/personalization/memory.service'
+import { PersonalizationService } from '../services/personalization/personalization.service'
 import { Layer } from 'effect'
 import {
   WorkspaceUsageQuotaService,
@@ -40,6 +44,11 @@ const messageStoreLayer = MessageStoreService.layer.pipe(
 )
 
 const dependencyLayer = Layer.mergeAll(
+  PersonalizationTurnService.layer.pipe(
+    Layer.provideMerge(PersonalizationService.layer),
+    Layer.provideMerge(MemoryService.layer),
+    Layer.provideMerge(MemoryLedgerService.layer),
+  ),
   ThreadService.layer,
   ChatSearchService.layer,
   messageStoreLayer,

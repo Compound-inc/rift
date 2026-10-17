@@ -22,9 +22,18 @@ beforeEach(() => {
 
 describe('resolveUsagePolicySnapshot', () => {
   it('computes per-plan budgets from the seeded plan defaults', () => {
-    const snapshot = resolveUsagePolicySnapshot('plus', resolveDefaultUsagePolicyTemplate('plus'))
-    const proSnapshot = resolveUsagePolicySnapshot('pro', resolveDefaultUsagePolicyTemplate('pro'))
-    const scaleSnapshot = resolveUsagePolicySnapshot('scale', resolveDefaultUsagePolicyTemplate('scale'))
+    const snapshot = resolveUsagePolicySnapshot(
+      'plus',
+      resolveDefaultUsagePolicyTemplate('plus'),
+    )
+    const proSnapshot = resolveUsagePolicySnapshot(
+      'pro',
+      resolveDefaultUsagePolicyTemplate('pro'),
+    )
+    const scaleSnapshot = resolveUsagePolicySnapshot(
+      'scale',
+      resolveDefaultUsagePolicyTemplate('scale'),
+    )
 
     expect(snapshot.planId).toBe('plus')
     expect(snapshot.enabled).toBe(true)
@@ -115,7 +124,13 @@ describe('estimateReservedCostNanoUsd', () => {
   it('uses the minimum reserve floor when the estimated cost is tiny', () => {
     const estimate = estimateReservedCostNanoUsd({
       modelId: 'openai/gpt-5-mini',
-      messages: [{ id: 'message-1', role: 'user', parts: [{ type: 'text', text: 'hi' }] }],
+      messages: [
+        {
+          id: 'message-1',
+          role: 'user',
+          parts: [{ type: 'text', text: 'hi' }],
+        },
+      ],
       usagePolicy: resolveUsagePolicySnapshot(
         'plus',
         resolveDefaultUsagePolicyTemplate('plus'),
@@ -177,4 +192,22 @@ it('reserves the same spend for equivalent Latin and CJK token footprints', () =
   // 120K CJK characters and 576K Latin characters both estimate 144K tokens.
   expect(reserve('中'.repeat(120_000))).toBe(reserve('a'.repeat(576_000)))
   expect(reserve('中'.repeat(120_000))).toBeGreaterThan(usagePolicy.minReserveNanoUsd)
+})
+
+it('includes personalization tokens in quota reservation pricing', () => {
+  const usagePolicy = {
+    ...resolveUsagePolicySnapshot(
+      'pro',
+      resolveDefaultUsagePolicyTemplate('pro'),
+    ),
+    minReserveNanoUsd: 0,
+  }
+  const input = {
+    modelId: 'openai/gpt-5-mini',
+    messages: [] as UIMessage[],
+    usagePolicy,
+  }
+  expect(
+    estimateReservedCostNanoUsd({ ...input, additionalPromptTokens: 7002 }),
+  ).toBeGreaterThan(estimateReservedCostNanoUsd(input))
 })

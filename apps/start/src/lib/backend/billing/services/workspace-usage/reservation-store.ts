@@ -239,6 +239,7 @@ export const reserveChatQuotaRecordEffect = Effect.fn(
     readonly requestId: string
     readonly modelId: string
     readonly messages: readonly UIMessage[]
+    readonly additionalPromptTokens?: number
     readonly bypassQuota: boolean
   }): Effect.Effect<QuotaReservationResult, unknown, PgClient.PgClient> =>
     Effect.gen(function* () {
@@ -337,6 +338,7 @@ export const reserveChatQuotaRecordEffect = Effect.fn(
           const estimatedNanoUsd = estimateReservedCostNanoUsd({
             modelId: input.modelId,
             messages: input.messages,
+            additionalPromptTokens: input.additionalPromptTokens,
             usagePolicy,
           })
 
@@ -463,6 +465,7 @@ export async function reserveChatQuotaRecord(input: {
   readonly requestId: string
   readonly modelId: string
   readonly messages: readonly UIMessage[]
+    readonly additionalPromptTokens?: number
   readonly bypassQuota: boolean
 }): Promise<QuotaReservationResult> {
   return runBillingSqlEffect(reserveChatQuotaRecordEffect(input))

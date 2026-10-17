@@ -1,5 +1,5 @@
 import { isAreaPath } from '@/utils/nav-utils'
-import { Lock, Settings, User } from 'lucide-react'
+import { Lock, Settings, SlidersHorizontal, User } from 'lucide-react'
 import { m } from '@/paraglide/messages.js'
 
 export const SETTINGS_HREF = '/settings'
@@ -22,6 +22,7 @@ export const settingsNavArea = () => ({
           href: SETTINGS_HREF,
           exact: true,
         },
+        { name: m.personalization_title(), icon: SlidersHorizontal, href: `${SETTINGS_HREF}/personalization` },
         {
           name: m.settings_security_page_title(),
           icon: Lock,
