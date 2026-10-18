@@ -36,7 +36,7 @@ export function ProjectHome({
       </div>
     )
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 pt-10 md:px-8">
+    <div className="mx-auto w-full max-w-3xl px-4 pt-12 md:px-8 md:pt-20">
       <ProjectHomeHeader projectId={projectId} />
       <div ref={composerRef}>{composer}</div>
       <ProjectHomeSections projectId={projectId} />

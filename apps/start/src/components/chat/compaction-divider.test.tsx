@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { CompactionDivider } from './compaction-divider'
 import type { ThreadCompaction } from '@/lib/shared/chat-contracts/compaction'
@@ -19,16 +19,11 @@ const checkpoint: ThreadCompaction = {
 afterEach(cleanup)
 
 describe('compaction divider', () => {
-  it('shows an accessible expandable summary without hiding the original messages', () => {
+  it('marks where earlier messages were summarized without showing the summary', () => {
     const { container } = render(<CompactionDivider checkpoint={checkpoint} />)
-    const summary = screen
-      .getByText('Earlier messages summarized')
-      .closest('summary')!
-    expect(container.querySelector('details')?.open).toBe(false)
-    fireEvent.click(summary)
-    expect(container.querySelector('details')?.open).toBe(true)
-    expect(screen.getByText(checkpoint.summary)).toBeTruthy()
-    expect(screen.getByText('View summary')).toBeTruthy()
+    expect(screen.getByText('Earlier messages summarized')).toBeTruthy()
+    expect(screen.queryByText(checkpoint.summary)).toBeNull()
+    expect(container.querySelector('details, button')).toBeNull()
   })
 
   it('labels a lossy fallback honestly', () => {

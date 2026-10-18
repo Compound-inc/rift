@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery, useZero } from '@rocicorp/zero/react'
 import { Button } from '@rift/ui/button'
 import {
+  Check,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -10,6 +11,7 @@ import {
   Printer,
   X,
 } from 'lucide-react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { queries, mutators } from '@/integrations/zero'
 import { useRightSidebar } from '@/components/layout/right-sidebar-context'
 import { AssistantTextPart } from '../message-parts/renderers/assistant-text-part'
@@ -23,10 +25,16 @@ import { documentContentSchema } from '@/lib/shared/documents/contracts'
 import { m } from '@/paraglide/messages.js'
 import { useDocumentPreview } from './document-preview-store'
 import {
+  DocumentToolbar,
+  DocumentToolbarButton,
+  DocumentToolbarDivider,
+} from './document-toolbar'
+import {
   buildDocumentReference,
   documentFilename,
   documentPanelView,
 } from './document-view-model'
+import './document-panel.css'
 import './document-print.css'
 
 /** Zero owns saved versions; partial v7 tool input supplies the live preview. */
@@ -147,6 +155,7 @@ export function DocumentPanel({
     try {
       await navigator.clipboard.writeText(editor?.content ?? content)
       setCopied(true)
+      window.setTimeout(() => setCopied(false), 1600)
     } catch {
       setError(m.document_action_failed())
     }
@@ -201,135 +210,138 @@ export function DocumentPanel({
     )
   }
 
+  const kindLabel =
+    kind === 'code'
+      ? (language ?? m.document_kind_code())
+      : m.document_kind_markdown()
+  const statusLabel = writing
+    ? m.document_writing()
+    : preview?.failed
+      ? m.document_write_failed()
+      : null
+
   return (
+    // The sidebar shell pads its children by 12px (p-3) on desktop and in the
+    // mobile dialog. The panel cancels that so the header rule can run edge to
+    // edge and the document gets its own reading margins.
     <section
-      className="document-panel flex min-h-0 flex-1 flex-col text-foreground-primary"
+      className="document-panel -m-3 flex min-h-0 flex-1 flex-col text-foreground-primary"
       aria-label={title}
     >
-      <header className="document-toolbar space-y-2 border-b border-border-base pb-3">
-        <div className="flex items-start gap-2">
-          <h2 className="min-w-0 flex-1 break-words pt-2 text-base font-medium text-foreground-strong">
-            {title || m.document_untitled()}
-          </h2>
+      <header className="document-toolbar border-b border-border-base px-5 pb-3 pt-4">
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1 pt-1">
+            <h2 className="line-clamp-2 text-[15px] font-medium leading-snug text-balance text-foreground-strong">
+              {title || m.document_untitled()}
+            </h2>
+            <p
+              className="mt-1 text-xs text-foreground-tertiary tabular-nums"
+              role="status"
+            >
+              {statusLabel ?? kindLabel}
+            </p>
+          </div>
           <Button
             ref={closeRef}
             size="icon"
             variant="ghost"
+            className="-mr-1.5 shrink-0"
             aria-label={m.document_close()}
             onClick={() => (editor ? setError(m.document_unsaved()) : close())}
           >
             <X className="size-4" />
           </Button>
         </div>
-        <div className="flex flex-wrap items-center gap-1">
-          <div
-            className="flex items-center gap-1"
-            role="group"
-            aria-label={m.document_history()}
-          >
-            <Button
-              size="icon"
-              variant="ghost"
-              aria-label={m.document_previous_version()}
-              disabled={!!editor || writing || version <= 1}
-              onClick={() => {
-                setSelectedVersion(version - 1)
-                setCopied(false)
-                setPassage('')
-              }}
+        <div className="mt-3">
+          <DocumentToolbar label={m.document_toolbar()}>
+            <div
+              className="flex items-center"
+              role="group"
+              aria-label={m.document_history()}
             >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <span className="text-xs tabular-nums">
-              {m.document_version({ version })}
-            </span>
-            <Button
-              size="icon"
-              variant="ghost"
-              aria-label={m.document_next_version()}
-              disabled={!!editor || writing || version >= latestVersion}
+              <DocumentToolbarButton
+                label={m.document_previous_version()}
+                icon={<ChevronLeft className="size-4" />}
+                disabled={!!editor || writing || version <= 1}
+                onClick={() => {
+                  setSelectedVersion(version - 1)
+                  setCopied(false)
+                  setPassage('')
+                }}
+              />
+              <span className="min-w-[4.75rem] px-1 text-center text-xs text-foreground-tertiary tabular-nums">
+                {m.document_version({ version })}
+              </span>
+              <DocumentToolbarButton
+                label={m.document_next_version()}
+                icon={<ChevronRight className="size-4" />}
+                disabled={!!editor || writing || version >= latestVersion}
+                onClick={() => {
+                  const next = version + 1
+                  setSelectedVersion(next === latestVersion ? null : next)
+                  setCopied(false)
+                  setPassage('')
+                }}
+              />
+            </div>
+            <DocumentToolbarDivider />
+            <DocumentToolbarButton
+              label={m.document_edit()}
+              icon={<Pencil className="size-3.5" />}
+              showLabel
+              disabled={!canEdit || version !== latestVersion || !!editor}
               onClick={() => {
-                const next = version + 1
-                setSelectedVersion(next === latestVersion ? null : next)
-                setCopied(false)
-                setPassage('')
+                setEditor({ content, baseVersion: latestVersion })
+                setError('')
+                window.setTimeout(() => textareaRef.current?.focus(), 0)
               }}
-            >
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
-          <Button
-            size="icon"
-            variant="ghost"
-            aria-label={copied ? m.document_copied() : m.document_copy()}
-            title={copied ? m.document_copied() : m.document_copy()}
-            disabled={!available}
-            onClick={copy}
-          >
-            <Copy className="size-4" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            aria-label={m.document_export()}
-            title={m.document_export()}
-            disabled={!available}
-            onClick={download}
-          >
-            <Download className="size-4" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            aria-label={m.document_print()}
-            title={m.document_print()}
-            disabled={!available || !!editor}
-            onClick={() => window.print()}
-          >
-            <Printer className="size-4" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            aria-label={m.document_edit()}
-            title={m.document_edit()}
-            disabled={!canEdit || version !== latestVersion || !!editor}
-            onClick={() => {
-              setEditor({ content, baseVersion: latestVersion })
-              setError('')
-              window.setTimeout(() => textareaRef.current?.focus(), 0)
-            }}
-          >
-            <Pencil className="size-4" />
-          </Button>
-        </div>
-        <div className="text-xs text-foreground-tertiary" role="status">
-          {writing
-            ? m.document_writing()
-            : preview?.failed
-              ? m.document_write_failed()
-              : kind === 'code'
-                ? (language ?? m.document_kind_code())
-                : m.document_kind_markdown()}
+            />
+            <DocumentToolbarDivider />
+            <div className="flex items-center" role="group">
+              <DocumentToolbarButton
+                label={copied ? m.document_copied() : m.document_copy()}
+                icon={<CopyIcon copied={copied} />}
+                disabled={!available}
+                onClick={copy}
+              />
+              <DocumentToolbarButton
+                label={m.document_export()}
+                icon={<Download className="size-4" />}
+                disabled={!available}
+                onClick={download}
+              />
+              <DocumentToolbarButton
+                label={m.document_print()}
+                icon={<Printer className="size-4" />}
+                disabled={!available || !!editor}
+                onClick={() => window.print()}
+              />
+            </div>
+          </DocumentToolbar>
         </div>
         {selectedVersion !== null && selectedVersion !== latestVersion && (
-          <Button
-            variant="ghost"
-            disabled={!canEdit || saving || !!editor}
-            onClick={() => save(content, latestVersion)}
-          >
-            {m.document_restore()}
-          </Button>
+          <div className="mt-3">
+            <Button
+              variant="outline"
+             
+              disabled={!canEdit || saving || !!editor}
+              onClick={() => save(content, latestVersion)}
+            >
+              {m.document_restore()}
+            </Button>
+          </div>
         )}
         {editor && (
-          <div className="flex gap-2">
+          <div className="mt-3 flex gap-2">
             <Button
+             
               disabled={saving}
               onClick={() => save(editor.content, editor.baseVersion)}
             >
               {saving ? m.document_saving() : m.document_save()}
             </Button>
             <Button
+             
               variant="ghost"
               disabled={saving}
               onClick={() => {
@@ -342,20 +354,20 @@ export function DocumentPanel({
           </div>
         )}
         {error && (
-          <p role="alert" className="text-sm text-foreground-error">
+          <p role="alert" className="mt-3 text-sm text-foreground-error">
             {error}
           </p>
         )}
       </header>
       {passage && !editor && document && (
-        <div className="document-toolbar border-b border-border-base py-1">
-          <Button variant="ghost" onClick={ask}>
+        <div className="document-toolbar border-b border-border-base px-5 py-2">
+          <Button variant="ghost" className="-ml-2" onClick={ask}>
             {m.document_ask()}
           </Button>
         </div>
       )}
       <div
-        className="document-scroll min-h-0 flex-1 overflow-auto py-4"
+        className="document-scroll min-h-0 flex-1 overflow-auto px-5 pb-12 pt-5"
         onMouseUp={readSelection}
         onTouchEnd={readSelection}
         onKeyUp={readSelection}
@@ -364,7 +376,7 @@ export function DocumentPanel({
           <textarea
             ref={textareaRef}
             aria-label={m.document_editor()}
-            className="min-h-80 w-full resize-none rounded-md border border-border-base bg-surface-base p-3 font-geist-mono text-sm leading-6 focus-visible:outline-2 focus-visible:outline-accent-primary"
+            className="min-h-80 w-full resize-none rounded-lg border border-border-base bg-surface-base p-4 font-geist-mono text-sm leading-6 focus-visible:outline-2 focus-visible:outline-accent-primary"
             value={editor.content}
             disabled={saving}
             onChange={(event) =>
@@ -374,7 +386,7 @@ export function DocumentPanel({
         ) : (
           <div
             ref={contentRef}
-            className="document-print-content min-w-0 text-sm leading-relaxed"
+            className="document-print-content min-w-0 text-pretty"
           >
             <h1 className="document-print-title">{title}</h1>
             {!available && !writing ? (
@@ -395,5 +407,30 @@ export function DocumentPanel({
         )}
       </div>
     </section>
+  )
+}
+
+/** Copy morphs into a check for a moment after copying (skipped for reduced motion). */
+function CopyIcon({ copied }: { readonly copied: boolean }) {
+  const reducedMotion = useReducedMotion()
+  const hidden = reducedMotion
+    ? { opacity: 0 }
+    : { opacity: 0, scale: 0.25, filter: 'blur(4px)' }
+  const shown = reducedMotion
+    ? { opacity: 1 }
+    : { opacity: 1, scale: 1, filter: 'blur(0px)' }
+  return (
+    <AnimatePresence mode="popLayout" initial={false}>
+      <motion.span
+        key={copied ? 'check' : 'copy'}
+        className="inline-flex"
+        initial={hidden}
+        animate={shown}
+        exit={hidden}
+        transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+      >
+        {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+      </motion.span>
+    </AnimatePresence>
   )
 }

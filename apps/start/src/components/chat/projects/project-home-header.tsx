@@ -9,6 +9,11 @@ import { getProjectOwnerName } from '@/lib/frontend/projects/project-owner.funct
 import { useProjectHomeResource } from './use-project-home-resource'
 import { ProjectVisibilityControl } from './project-visibility-control'
 
+/**
+ * Project name, description and one quiet meta row (visibility + owner).
+ * Visibility rules are explained in the pill's tooltip and in settings; only
+ * the orphaned state, which changes what the viewer can do, gets a line here.
+ */
 export function ProjectHomeHeader({
   projectId,
 }: {
@@ -24,19 +29,24 @@ export function ProjectHomeHeader({
       </p>
     )
   return (
-    <header className="space-y-3 pb-5 pt-6 md:pt-10">
+    <header className="pb-8">
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 space-y-2">
-          <h1 className="wrap-break-word text-balance text-2xl font-semibold tracking-tight text-foreground-strong">
+        <div className="min-w-0">
+          <h1 className="wrap-break-word text-balance text-[28px] font-semibold leading-tight tracking-tight text-foreground-strong">
             {project.name}
           </h1>
           {project.description ? (
-            <p className="text-pretty text-sm text-foreground-tertiary">
+            <p className="mt-2 max-w-prose text-pretty text-[15px] leading-relaxed text-foreground-tertiary">
               {project.description}
             </p>
           ) : null}
         </div>
-        <Button variant="ghost" size="icon" asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="-mr-2 -mt-1 shrink-0 text-foreground-tertiary hover:text-foreground-primary"
+          asChild
+        >
           <Link
             to="/chat/projects/$projectId/settings"
             params={{ projectId }}
@@ -47,19 +57,19 @@ export function ProjectHomeHeader({
           </Link>
         </Button>
       </div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <div className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-foreground-tertiary">
         <ProjectVisibilityControl project={project} compact />
         {project.visibility === 'org' ? (
-          <p className="text-xs text-foreground-tertiary">
+          <span>
             {m.project_home_owner({
               name: owner.data?.name ?? m.project_home_owner_unknown(),
             })}
-          </p>
+          </span>
         ) : null}
       </div>
-      {project.visibility === 'org' ? (
-        <p className="max-w-prose text-pretty text-xs leading-relaxed text-foreground-tertiary">
-          {isOrphan(project) ? m.project_orphan_read_only() : m.project_visibility_workspace_hint()}
+      {project.visibility === 'org' && isOrphan(project) ? (
+        <p className="mt-3 max-w-prose text-pretty text-xs leading-relaxed text-foreground-tertiary">
+          {m.project_orphan_read_only()}
         </p>
       ) : null}
     </header>

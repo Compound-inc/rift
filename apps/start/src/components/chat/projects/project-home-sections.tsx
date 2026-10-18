@@ -13,7 +13,7 @@ export function ProjectHomeSections({
   readonly projectId: string
 }) {
   return (
-    <div className="space-y-8 pb-10 pt-8">
+    <div className="space-y-12 pb-16 pt-12">
       <ProjectHomeConversations key={projectId} projectId={projectId} />
       <ProjectHomeContext projectId={projectId} />
       <ProjectHomeUsage projectId={projectId} />
@@ -28,9 +28,9 @@ function ProjectHomeUsage({ projectId }: { readonly projectId: string }) {
   )
   if (failed)
     return (
-      <div className="text-xs text-foreground-tertiary">
+      <div className="flex items-center gap-2 text-xs text-foreground-tertiary">
         <p>{m.project_home_data_error()}</p>
-        <Button variant="ghost" className="min-h-10" onClick={retry}>
+        <Button variant="ghost" className="h-8 px-2.5 text-xs" onClick={retry}>
           {m.project_home_retry()}
         </Button>
       </div>
@@ -46,26 +46,27 @@ function ProjectHomeUsage({ projectId }: { readonly projectId: string }) {
           minimumFractionDigits: 2,
           maximumFractionDigits: 4,
         }).format(data.publicCost)
+  // One quiet line; the tooltip explains what the numbers include.
   return (
-    <aside
-      className="space-y-1 border-t border-border-base pt-4 text-xs text-foreground-tertiary"
+    <p
+      className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tabular-nums text-foreground-tertiary"
       title={m.project_usage_hint()}
     >
-      <p>
+      <span>
         {data.scope === 'project'
           ? m.project_usage_total()
           : m.project_usage_own()}
-      </p>
-      <p className="flex flex-wrap gap-x-3 gap-y-1 tabular-nums">
-        <span>{m.project_usage_tokens({ count })}</span>
-        <span>
-          {cost === null
-            ? m.project_usage_no_cost()
-            : data.unpricedMessages
-              ? m.project_usage_partial_cost({ cost })
-              : m.project_usage_cost({ cost })}
-        </span>
-      </p>
-    </aside>
+      </span>
+      <span aria-hidden>·</span>
+      <span>{m.project_usage_tokens({ count })}</span>
+      <span aria-hidden>·</span>
+      <span>
+        {cost === null
+          ? m.project_usage_no_cost()
+          : data.unpricedMessages
+            ? m.project_usage_partial_cost({ cost })
+            : m.project_usage_cost({ cost })}
+      </span>
+    </p>
   )
 }
