@@ -7,7 +7,7 @@ import {
   evaluateModelAvailability,
   getCatalogModelById,
 } from '@/lib/shared/model-policy/policy-engine'
-import { getModelAccess  } from '@/lib/shared/access-control'
+import { getModelAccess, isFreeTierContext } from '@/lib/shared/access-control'
 import type {AccessContext} from '@/lib/shared/access-control';
 import {
   isByokSupportedProviderId,
@@ -218,9 +218,12 @@ export class ModelPolicyService extends ServiceMap.Service<
             )
           }
 
+          // Free requests always use the model default, including retries of
+          // threads that previously saved a user-selected reasoning level.
+          const canSelectReasoning = !accessContext || !isFreeTierContext(accessContext)
           const requestedEffort = [
-            requestedReasoningEffort,
-            threadReasoningEffort,
+            canSelectReasoning ? requestedReasoningEffort : undefined,
+            canSelectReasoning ? threadReasoningEffort : undefined,
             selectedModel.defaultReasoningEffort,
           ].find(
             (value): value is AiReasoningEffort =>
@@ -444,7 +447,9 @@ export class ModelPolicyService extends ServiceMap.Service<
           return {
             modelId,
             reasoningEffort:
-              requestedReasoningEffort && requestedReasoningEffort !== 'none'
+              accessContext && isFreeTierContext(accessContext)
+                ? getCatalogModelById(modelId)?.defaultReasoningEffort
+                : requestedReasoningEffort && requestedReasoningEffort !== 'none'
                 ? (requestedReasoningEffort as AiReasoningEffort)
                 : undefined,
             source: modeModelId

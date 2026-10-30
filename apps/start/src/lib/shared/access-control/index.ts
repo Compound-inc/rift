@@ -185,10 +185,12 @@ const BILLING_SETTINGS_HREF = '/organization/settings/billing'
 const ENTERPRISE_CONTACT_HREF = 'mailto:enterprise@rift.mx'
 
 /** Fast free-chat default; shared by selection and server-side model access. */
-export const FREE_CHAT_DEFAULT_MODEL_ID = 'meta/muse-spark-open'
+export const FREE_CHAT_DEFAULT_MODEL_ID = 'alibaba/qwen3.8-omni-flash'
 
 const FREE_TIER_ALLOWED_MODEL_IDS = new Set<string>([
   FREE_CHAT_DEFAULT_MODEL_ID,
+  // Preserve access for existing free conversations using the previous default.
+  'meta/muse-spark-open',
   ...AI_CATALOG.filter(
     (model) =>
       model.providerId === 'meta' && model.id.startsWith('meta/llama-'),

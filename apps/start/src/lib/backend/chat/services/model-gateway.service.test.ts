@@ -45,7 +45,7 @@ function streamResponse(
 }
 
 describe('ModelGatewayService v7 request boundary', () => {
-  it('runs Muse Spark Open through guest access, model policy, and document tools', async () => {
+  it('runs the free default through guest access, model policy, and document tools', async () => {
     await Effect.runPromise(
       Effect.gen(function* () {
         const policy = yield* ModelPolicyService
@@ -62,7 +62,7 @@ describe('ModelGatewayService v7 request boundary', () => {
           resolvedToolKeys: resolveToolPolicy({ modelId: resolution.modelId })
             .activeToolKeys,
         })
-        expect(resolution.reasoningEffort).toBe('low')
+        expect(resolution.reasoningEffort).toBeUndefined()
         yield* gateway.streamResponse({
           model: resolution.modelId,
           requestId: 'guest-request',
@@ -92,7 +92,7 @@ describe('ModelGatewayService v7 request boundary', () => {
       expect.objectContaining({
         model: FREE_CHAT_DEFAULT_MODEL_ID,
         providerOptions: undefined,
-        reasoning: 'low',
+        reasoning: undefined,
         activeTools: expect.arrayContaining([
           'create_document',
           'read_document',

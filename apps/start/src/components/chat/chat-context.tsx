@@ -49,6 +49,7 @@ import {
   getFeatureAccessState,
   getModelAccess,
   getDefaultChatModel,
+  isFreeTierContext,
   hasFeatureAccess,
 } from '@/lib/shared/access-control'
 import type {
@@ -794,6 +795,7 @@ export function ChatProvider({
     }),
     [activeOrganizationId, entitlement?.planId, isAnonymous],
   )
+  const canSelectReasoning = canUseReasoningControls && !isFreeTierContext(accessContext)
   const uploadPermission = useMemo(
     () =>
       getFeatureAccessState({
@@ -824,7 +826,7 @@ export function ChatProvider({
       return {
         id: model.id,
         name: model.name,
-        reasoningEfforts: canUseReasoningControls ? model.reasoningEfforts : [],
+        reasoningEfforts: canSelectReasoning ? model.reasoningEfforts : [],
         defaultReasoningEffort: canUseReasoningControls
           ? model.defaultReasoningEffort
           : undefined,
@@ -832,7 +834,7 @@ export function ChatProvider({
         minimumPlanId: modelAccess.minimumPlanId,
       }
     })
-  }, [accessContext, orgPolicy])
+  }, [accessContext, canSelectReasoning, orgPolicy])
   const selectableModels = useMemo<readonly ChatModelOption[]>(() => {
     return visibleModels.filter((model) => {
       return !model.locked
@@ -2298,6 +2300,7 @@ export function ChatProvider({
   )
   const setReasoningSelection = useCallback(
     (reasoningEffort?: AiReasoningEffort) => {
+      if (!canSelectReasoning) return
       const model = selectableModels.find(
         (entry) => entry.id === selectedModelId,
       )
@@ -2309,7 +2312,7 @@ export function ChatProvider({
       if (!model.reasoningEfforts.includes(reasoningEffort)) return
       setSelectedReasoningEffort(reasoningEffort)
     },
-    [selectableModels, selectedModelId],
+    [canSelectReasoning, selectableModels, selectedModelId],
   )
   const setContextWindowModeSelection = useCallback(
     async (contextWindowMode: AiContextWindowMode) => {

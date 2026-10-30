@@ -376,6 +376,24 @@ describe('ChatProvider', () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(mockedThreadId)
   })
 
+  it('hides reasoning levels and prevents free users from changing them', () => {
+    function ReasoningConsumer() {
+      const chat = useChat()
+      return <>
+        <output data-testid="reasoning-options">{chat.visibleModels.every((model) => model.reasoningEfforts.length === 0) ? 'hidden' : 'visible'}</output>
+        <output data-testid="reasoning-value">{chat.selectedReasoningEffort ?? 'default'}</output>
+        <button onClick={() => chat.setSelectedModelId('meta/muse-spark-open')}>Select Muse</button>
+        <button onClick={() => chat.setSelectedReasoningEffort('high')}>Change reasoning</button>
+      </>
+    }
+    const view = render(<ChatProvider threadId={undefined}><ReasoningConsumer /></ChatProvider>)
+    expect(view.getByTestId('reasoning-options').textContent).toBe('hidden')
+    fireEvent.click(view.getByRole('button', { name: 'Select Muse' }))
+    expect(view.getByTestId('reasoning-value').textContent).toBe('low')
+    fireEvent.click(view.getByRole('button', { name: 'Change reasoning' }))
+    expect(view.getByTestId('reasoning-value').textContent).toBe('low')
+  })
+
   it('uses the new thread session (not composer) for first message from /chat', async () => {
     const view = render(
       <ChatProvider threadId={undefined}>
@@ -397,7 +415,7 @@ describe('ChatProvider', () => {
       args: {
         threadId: mockedThreadId,
         createdAt: 1_700_000_000_000,
-        modelId: 'meta/muse-spark-open',
+        modelId: 'alibaba/qwen3.8-omni-flash',
         modeId: undefined,
         contextWindowMode: 'standard',
         disabledToolKeys: [],

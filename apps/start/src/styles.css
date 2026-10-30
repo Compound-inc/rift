@@ -47,6 +47,12 @@
   --right-sidebar-width: min(560px, clamp(240px, 35vw, 560px));
 }
 
+/* Keep trackpad boundary gestures from bouncing the viewport or nested scroll
+ * areas on either axis. This preserves normal scrolling inside each area. */
+* {
+  overscroll-behavior: none;
+}
+
 body {
   @apply m-0;
   font-family: var(--font-geist);
