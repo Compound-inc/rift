@@ -48,6 +48,7 @@ import {
   coerceWorkspacePlanId,
   getFeatureAccessState,
   getModelAccess,
+  getDefaultChatModel,
   hasFeatureAccess,
 } from '@/lib/shared/access-control'
 import type {
@@ -134,7 +135,6 @@ type ChatActionsContextValue = Pick<
   ReturnType<typeof useAIChat<ChatUIMessage>>,
   'status' | 'error' | 'setMessages' | 'resumeStream' | 'regenerate'
 > & {
-  errorMessageId?: string
   stopGeneration: () => Promise<void>
   retryLastMessage: () => Promise<void>
   canRetryLastMessage: boolean
@@ -184,7 +184,6 @@ type ChatComposerContextValue = Pick<
   ChatActionsContextValue,
   | 'status'
   | 'error'
-  | 'errorMessageId'
   | 'sendMessage'
   | 'stopGeneration'
   | 'retryLastMessage'
@@ -624,13 +623,6 @@ export function ChatProvider({
     string | undefined
   >(undefined)
   const [localError, setLocalError] = useState<Error | null>(null)
-  const generationErrorRef = useRef<Error | undefined>(undefined)
-  // Associate a transport error with the response row that displays it. Later
-  // validation errors have a different identity and still belong in the composer.
-  const [failedResponseError, setFailedResponseError] = useState<{
-    error: Error
-    messageId: string
-  } | null>(null)
   const [pendingBranchSelector, setPendingBranchSelector] =
     useState<PendingBranchSelectorState | null>(null)
   const [optimisticBranchStateByThreadId, setOptimisticBranchStateByThreadId] =
@@ -846,6 +838,7 @@ export function ChatProvider({
       return !model.locked
     })
   }, [visibleModels])
+  const defaultModel = getDefaultChatModel(selectableModels, accessContext)
   const orgEnforcedModeId = useMemo<ChatModeId | undefined>(() => {
     return orgPolicy?.enforcedModeId
   }, [orgPolicy])
@@ -875,7 +868,7 @@ export function ChatProvider({
   }, [orgEnforcedModeId, threadModeId])
   const effectiveModeId = resolvedMode?.modeId
   const [selectedModelId, setSelectedModelId] = useState(
-    selectableModels[0]?.id ?? '',
+    defaultModel?.id ?? '',
   )
   const [selectedReasoningEffort, setSelectedReasoningEffort] = useState<
     AiReasoningEffort | undefined
@@ -1053,7 +1046,6 @@ export function ChatProvider({
         api: '/api/chat',
         credentials: 'include',
         prepareReconnectToStreamRequest: () => {
-          generationErrorRef.current = undefined
           if (threadIdRef.current)
             generationQueue.clearRequestId(threadIdRef.current)
           return {
@@ -1069,7 +1061,6 @@ export function ChatProvider({
           messageId,
           body,
         }) => {
-          generationErrorRef.current = undefined
           const attachments = pendingAttachmentsRef.current
           // Consume once to avoid leaking metadata into later turns.
           pendingAttachmentsRef.current = undefined
@@ -1151,7 +1142,6 @@ export function ChatProvider({
     },
     onError: (chatError) => {
       clearCompactionProgress(threadIdRef.current)
-      generationErrorRef.current = chatError
       if (!isThreadStopRequested(activeThreadId)) setLocalError(chatError)
     },
     onFinish: ({
@@ -1161,12 +1151,6 @@ export function ChatProvider({
       isDisconnect,
       isError,
     }) => {
-      if (isError && generationErrorRef.current) {
-        setFailedResponseError({
-          error: generationErrorRef.current,
-          messageId: message.id,
-        })
-      }
       // AI SDK callbacks use the latest React closure, even for an older chat
       // instance. Route completion using the request's metadata after navigation.
       const ownerThreadId =
@@ -1266,15 +1250,15 @@ export function ChatProvider({
   }, [activeThreadId, localError, status])
 
   useEffect(() => {
-    if (selectableModels.length === 0) return
+    if (!defaultModel) return
     if (
       !activeThreadId &&
       !selectableModels.some((model) => model.id === selectedModelId)
     ) {
-      setSelectedModelId(selectableModels[0].id)
-      setSelectedReasoningEffort(selectableModels[0].defaultReasoningEffort)
+      setSelectedModelId(defaultModel.id)
+      setSelectedReasoningEffort(defaultModel.defaultReasoningEffort)
     }
-  }, [activeThreadId, selectableModels, selectedModelId])
+  }, [activeThreadId, selectableModels, selectedModelId, defaultModel])
 
   useEffect(() => {
     if (!activeThreadId) {
@@ -2478,10 +2462,6 @@ export function ChatProvider({
       error:
         localError ??
         (isThreadStopRequested(activeThreadId) ? undefined : error),
-      errorMessageId:
-        failedResponseError?.error === (localError ?? error)
-          ? failedResponseError?.messageId
-          : undefined,
       sendMessage,
       stopGeneration,
       retryLastMessage,
@@ -2516,7 +2496,6 @@ export function ChatProvider({
       status,
       error,
       localError,
-      failedResponseError,
       sendMessage,
       stopGeneration,
       retryLastMessage,

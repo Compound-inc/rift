@@ -464,6 +464,7 @@ export class ChatOrchestratorService extends ServiceMap.Service<
           })
           const toolRegistry = yield* tools.resolveForModel({
             modelId: modelResolution.modelId,
+            providerId: modelResolution.providerApiKeyOverride?.providerId,
             resolvedToolKeys: resolvedToolPolicy.activeToolKeys,
           })
           if (wideEvent) {

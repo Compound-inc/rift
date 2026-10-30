@@ -397,7 +397,7 @@ describe('ChatProvider', () => {
       args: {
         threadId: mockedThreadId,
         createdAt: 1_700_000_000_000,
-        modelId: 'meta/llama-4-maverick',
+        modelId: 'meta/muse-spark-open',
         modeId: undefined,
         contextWindowMode: 'standard',
         disabledToolKeys: [],

@@ -3,6 +3,8 @@ import {
   getFeatureAccessState,
   getPlanEffectiveFeatures,
   getModelAccess,
+  getDefaultChatModel,
+  FREE_CHAT_DEFAULT_MODEL_ID,
   getWorkspaceFeatureAccessState,
   hasFeatureAccess,
   resolveWorkspacePlanIdFromStripePriceId,
@@ -38,6 +40,33 @@ describe('access-control', () => {
     })
 
     expect(access.allowed).toBe(true)
+  })
+
+  it('allows the fast default for guests and signed-in free workspaces', () => {
+    for (const isAnonymous of [true, false]) {
+      expect(
+        getModelAccess({
+          modelId: FREE_CHAT_DEFAULT_MODEL_ID,
+          context: { isAnonymous, planId: 'free' },
+        }).allowed,
+      ).toBe(true)
+    }
+  })
+
+  it('chooses the free default independently of catalog ordering and honors org exclusions', () => {
+    const models = [
+      { id: 'meta/llama-3.3-70b' },
+      { id: FREE_CHAT_DEFAULT_MODEL_ID },
+    ]
+    const free = { isAnonymous: true, planId: 'free' as const }
+    expect(getDefaultChatModel(models, free)?.id).toBe(
+      FREE_CHAT_DEFAULT_MODEL_ID,
+    )
+    expect(getDefaultChatModel(models.slice(0, 1), free)?.id).toBe(models[0].id)
+    expect(getDefaultChatModel([], free)).toBeUndefined()
+    expect(
+      getDefaultChatModel(models, { isAnonymous: false, planId: 'plus' })?.id,
+    ).toBe(models[0].id)
   })
 
   it('keeps paid-only models visible but locked on the free tier', () => {

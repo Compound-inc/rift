@@ -43,7 +43,17 @@ Then update:
 Create `apps/start/src/lib/ai-catalog/providers/<provider>.ts` and export:
 
 - `readonly AiModelCatalogEntry<'<provider>'>[]`
-- Per-model capabilities
+- Per-model capabilities, including generic `supportsTools` metadata.
+- Streaming tools require a successful live route check, recorded separately in
+  `streaming-tools-verification.json`. Generic Gateway `tools` metadata does
+  not establish this combination. Unknown routes expose no tools.
+  Run `bun run scripts/verify-streaming-tools.ts <catalog-model-id>` from
+  `apps/start` with a working `AI_GATEWAY_API_KEY`. The command makes a billable
+  stream using the real tool schemas, strips local execution, and requires a
+  complete document function call before recording evidence. `--all` checks
+  every declared Gateway tool-capable model. Review the generated evidence.
+  Gateway evidence does not enable direct BYOK or OpenRouter routes; those need
+  independent checks. No automatic retry or runtime capability inference occurs.
 - `reasoningEfforts` / `defaultReasoningEffort`
 - `providerOptionsByReasoning` only when needed
 - `providerToolIds` for tools that model should expose

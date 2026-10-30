@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Effect } from 'effect'
 import { DEFAULT_ORG_TOOL_POLICY } from '@/lib/shared/model-policy/types'
 import { ToolPolicyService } from './tool-policy.service'
@@ -181,4 +181,10 @@ describe('ToolPolicyService', () => {
       )?.reasons,
     ).not.toContain('blocked_by_compliance')
   })
+})
+
+// Policy tests assume a successful compatibility check for their synthetic routes.
+vi.mock('@/lib/shared/ai-catalog/streaming-tools-verification', async () => {
+  const { verifiedToolFixture } = await import('@/lib/shared/ai-catalog/streaming-tools.test-helpers')
+  return { getStreamingToolsVerification: verifiedToolFixture }
 })

@@ -5,11 +5,20 @@ import { Effect, Layer } from 'effect'
 import { MockLanguageModelV4 } from 'ai/test'
 import type { LanguageModelV4StreamPart } from '@ai-sdk/provider'
 import { createDocumentTools } from '@/lib/backend/documents/tools'
-import { fixture, scope } from '@/lib/backend/documents/services/document.test-helpers'
+import {
+  fixture,
+  scope,
+} from '@/lib/backend/documents/services/document.test-helpers'
 import { makeRuntimeRunner } from '@/lib/backend/server-effect'
 import { ZeroDatabaseService } from '@/lib/backend/server-effect/services/zero-database.service'
 import { estimateTokensFromText } from '@/lib/shared/chat-contracts/token-estimate'
-import { getCatalogModel } from '@/lib/shared/ai-catalog'
+import { AI_CATALOG, getCatalogModel } from '@/lib/shared/ai-catalog'
+import { FREE_CHAT_DEFAULT_MODEL_ID } from '@/lib/shared/access-control'
+import { TOOL_CATALOG } from '@/lib/shared/ai-catalog/tool-catalog'
+import { DOCUMENT_TOOL_PROMPT } from '@/lib/shared/documents/prompt'
+import { resolveToolPolicy } from '@/lib/shared/chat/tool-policy'
+import { ModelPolicyService } from './model-policy.service'
+import { ToolRegistryService } from './tool-registry.service'
 import { ModelGatewayService } from './model-gateway.service'
 import type { ModelGatewayServiceShape } from './model-gateway.service'
 
@@ -36,6 +45,125 @@ function streamResponse(
 }
 
 describe('ModelGatewayService v7 request boundary', () => {
+  it('runs Muse Spark Open through guest access, model policy, and document tools', async () => {
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const policy = yield* ModelPolicyService
+        const registry = yield* ToolRegistryService
+        const gateway = yield* ModelGatewayService
+        const resolution = yield* policy.resolveThreadModel({
+          threadId: 'guest-thread',
+          requestId: 'guest-request',
+          requestedModelId: FREE_CHAT_DEFAULT_MODEL_ID,
+          accessContext: { isAnonymous: true, planId: 'free' },
+        })
+        const tools = yield* registry.resolveForModel({
+          modelId: resolution.modelId,
+          resolvedToolKeys: resolveToolPolicy({ modelId: resolution.modelId })
+            .activeToolKeys,
+        })
+        expect(resolution.reasoningEffort).toBe('low')
+        yield* gateway.streamResponse({
+          model: resolution.modelId,
+          requestId: 'guest-request',
+          messages: [
+            {
+              id: 'guest-message',
+              role: 'user',
+              parts: [{ type: 'text', text: 'Hello' }],
+            },
+          ],
+          tools: tools.tools,
+          activeTools: tools.activeTools,
+          providerOptions: tools.defaultProviderOptions,
+          reasoningEffort: resolution.reasoningEffort,
+        })
+      }).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            ModelPolicyService.layer,
+            ToolRegistryService.layer,
+            ModelGatewayService.layer,
+          ),
+        ),
+      ),
+    )
+    expect(streamTextMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: FREE_CHAT_DEFAULT_MODEL_ID,
+        providerOptions: undefined,
+        reasoning: 'low',
+        activeTools: expect.arrayContaining([
+          'create_document',
+          'read_document',
+          'update_document',
+        ]),
+      }),
+    )
+  })
+
+  it.each(
+    AI_CATALOG.filter(
+      (model) => !model.capabilities.supportsTools,
+    ).map((model) => model.id),
+  )(
+    'prepares %s without tools before making its only provider request',
+    async (modelId) => {
+      await Effect.runPromise(
+        Effect.gen(function* () {
+          const registry = yield* ToolRegistryService
+          const gateway = yield* ModelGatewayService
+          // Exercise stale preferences, not merely the happy-path policy output.
+          const selected = yield* registry.resolveForModel({
+            modelId,
+            resolvedToolKeys: TOOL_CATALOG.map((tool) => tool.key),
+          })
+          yield* gateway.streamResponse({
+            model: modelId,
+            requestId: 'plain-stream',
+            messages: [
+              {
+                id: 'user',
+                role: 'user',
+                parts: [{ type: 'text', text: 'Hello' }],
+              },
+            ],
+            tools: selected.tools,
+            activeTools: selected.activeTools,
+          })
+        }).pipe(
+          Effect.provide(
+            Layer.mergeAll(
+              ToolRegistryService.layer,
+              ModelGatewayService.layer,
+            ),
+          ),
+        ),
+      )
+      expect(streamTextMock).toHaveBeenCalledOnce()
+      const request = streamTextMock.mock.calls[0][0]
+      expect(request.model).toBe(modelId)
+      expect(request.tools).toEqual({})
+      expect(request.activeTools).toEqual([])
+      expect(request.instructions[0].content).not.toContain(DOCUMENT_TOOL_PROMPT)
+    },
+  )
+
+  it('rejects an invalid streaming-tool request locally when a caller bypasses the registry', async () => {
+    await expect(
+      streamResponse({
+        model: 'meta/llama-3.3-70b',
+        requestId: 'invalid-tools',
+        messages: [],
+        tools: createDocumentTools(),
+      }),
+    ).rejects.toMatchObject({
+      _tag: 'InvalidRequestError',
+      issue: 'unverified_streaming_tools',
+    })
+    expect(streamTextMock).not.toHaveBeenCalled()
+  })
+
   it('does not call the provider with an already-aborted signal', async () => {
     const controller = new AbortController()
     controller.abort('replaced')
@@ -159,7 +287,7 @@ describe('ModelGatewayService v7 request boundary', () => {
     })
     expect(options.abortSignal).toBe(controller.signal)
     expect(options.tools).toBe(tools)
-    expect(options.reasoning).toBeUndefined()
+    expect(options.reasoning).toBe('xhigh')
     const chunk = { type: 'abort', reason: 'stopped' }
     options.onChunk({ chunk })
     expect(onChunk).toHaveBeenCalledWith(chunk)
@@ -203,7 +331,9 @@ describe('model gateway canonical routing', () => {
       }).pipe(Effect.provide(ModelGatewayService.layer)),
     )
     expect(streamTextMock).toHaveBeenCalledWith(
-      expect.objectContaining({ model: gatewayId }),
+      expect.objectContaining({
+        model: gatewayId,
+      }),
     )
   })
 })
@@ -227,7 +357,11 @@ it('keeps native tools in the four-step loop and binds document budgets to the r
   const options = streamTextMock.mock.calls[0][0]
   expect(options.tools).toBe(tools)
   expect(options.toolCallConcurrency).toBe(1)
-  expect(options.stopWhen({ steps: Array.from({ length: 3 }, () => ({ response: { messages: [] } })) })).toBe(false)
+  expect(
+    options.stopWhen({
+      steps: Array.from({ length: 3 }, () => ({ response: { messages: [] } })),
+    }),
+  ).toBe(false)
   expect(options.stopWhen({ steps: Array(4) })).toBe(true)
   expect(options.toolsContext.read_document.maxOutputTokens).toBe(
     options.maxOutputTokens,
@@ -241,7 +375,6 @@ it('keeps native tools in the four-step loop and binds document budgets to the r
   options.onStepStart({ messages: [] })
   expect(onStepStart).toHaveBeenCalledWith(expect.any(Number))
 })
-
 
 it('reserves fixed thinking tokens before admitting a document read', async () => {
   await streamResponse({
@@ -510,4 +643,11 @@ it('finishes the real SDK loop successfully with the saved card and actual usage
   } finally {
     await runtime.dispose()
   }
+})
+
+// Provider construction tests use synthetic successful route checks. Live
+// eligibility and missing evidence are covered separately in catalog tests.
+vi.mock('@/lib/shared/ai-catalog/streaming-tools-verification', async () => {
+  const { verifiedToolFixture } = await import('@/lib/shared/ai-catalog/streaming-tools.test-helpers')
+  return { getStreamingToolsVerification: verifiedToolFixture }
 })

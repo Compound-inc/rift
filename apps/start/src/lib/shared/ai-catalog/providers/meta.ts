@@ -28,7 +28,9 @@ export const META_MODELS: readonly AiModelCatalogEntry<'meta'>[] = [
     },
     providerToolIds: [],
     skipDefaultProviderTools: true,
-    reasoningEfforts: [],
+    reasoningEfforts: ['low', 'medium', 'high', 'xhigh'],
+    // Keep the guest experience responsive; users can request deeper reasoning.
+    defaultReasoningEffort: 'low',
     defaultMaxOutputTokens: 1048576,
     pricing: {
       inputPerToken: '0.00000125',
@@ -237,7 +239,8 @@ export const META_MODELS: readonly AiModelCatalogEntry<'meta'>[] = [
     contextWindow: 128000,
     zeroDataRetention: true,
     capabilities: {
-      supportsTools: true,
+      // Gateway rejects function tools combined with streaming on this route.
+      supportsTools: false,
       supportsStreaming: true,
       supportsReasoning: false,
       supportsImageInput: false,
@@ -264,7 +267,8 @@ export const META_MODELS: readonly AiModelCatalogEntry<'meta'>[] = [
     contextWindow: 128000,
     zeroDataRetention: true,
     capabilities: {
-      supportsTools: true,
+      // Gateway rejects function tools combined with streaming on this route.
+      supportsTools: false,
       supportsStreaming: true,
       supportsReasoning: false,
       supportsImageInput: false,
@@ -291,7 +295,8 @@ export const META_MODELS: readonly AiModelCatalogEntry<'meta'>[] = [
     contextWindow: 128000,
     zeroDataRetention: false,
     capabilities: {
-      supportsTools: true,
+      // This route rejects Rift's document schemas with an opaque Bad Request.
+      supportsTools: false,
       supportsStreaming: true,
       supportsReasoning: false,
       supportsImageInput: false,

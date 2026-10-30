@@ -9,6 +9,34 @@ function deepseekDefaultProviderOptions(): Record<string, unknown> {
 
 export const DEEPSEEK_MODELS: readonly AiModelCatalogEntry<'deepseek'>[] = [
   // Chat models verified against https://ai-gateway.vercel.sh/v1/models on 2026-10-16.
+  // Release metadata and pricing verified against AI Gateway on 2026-10-30.
+  {
+    id: 'deepseek/deepseek-v4.1-flash-1017',
+    providerId: 'deepseek',
+    providers: ['gateway'],
+    name: 'DeepSeek V4.1 Flash 1017',
+    description:
+      'DeepSeek V4.1 Flash 1017 served by Baseten for multimodal reasoning, tool calling, and structured output, with automatic prefix caching.',
+    contextWindow: 1048576,
+    zeroDataRetention: false,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: false,
+      supportsPdfInput: false,
+    },
+    providerToolIds: [],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: [],
+    defaultMaxOutputTokens: 262144,
+    pricing: {
+      inputPerToken: '0.0000003',
+      outputPerToken: '0.0000012',
+      inputCacheReadPerToken: '0.000000007',
+    },
+  },
   {
     id: 'deepseek/deepseek-v4.1-flash',
     providerId: 'deepseek',

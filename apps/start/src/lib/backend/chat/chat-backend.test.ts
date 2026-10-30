@@ -1338,3 +1338,9 @@ it.each(['submit-message', 'edit-message', 'regenerate-message'] as const)('chec
     ) + budget,
   )
 })
+
+// Policy tests assume a successful compatibility check for their synthetic routes.
+vi.mock('@/lib/shared/ai-catalog/streaming-tools-verification', async () => {
+  const { verifiedToolFixture } = await import('@/lib/shared/ai-catalog/streaming-tools.test-helpers')
+  return { getStreamingToolsVerification: verifiedToolFixture }
+})

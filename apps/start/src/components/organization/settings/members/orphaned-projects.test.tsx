@@ -32,10 +32,9 @@ vi.mock('@/lib/frontend/auth/auth-client', () => ({
       },
       isPending: false,
     }),
-    useActiveMemberRole: () => ({
-      data: { role: auth.activeOrganizationRole },
-      isPending: false,
-    }),
+    organization: {
+      getActiveMemberRole: async () => ({ data: { role: auth.activeOrganizationRole }, error: null }),
+    },
   },
 }))
 vi.mock('@/lib/frontend/projects/project-owner.functions', () => ({
@@ -91,7 +90,9 @@ describe('admin orphan remediation', () => {
       auth.activeOrganizationRole = role
       load.mockResolvedValue([])
       render(<OrphanedProjects refreshKey={null} />)
-      expect(screen.getByRole('heading', { name: 'Orphaned projects' })).toBeTruthy()
+      expect(
+        await screen.findByRole('heading', { name: 'Orphaned projects' }),
+      ).toBeTruthy()
       await screen.findByText('No orphaned projects.')
     },
   )
@@ -150,11 +151,11 @@ describe('admin orphan remediation', () => {
     },
   )
 
-  it('hides the admin block from ordinary members', () => {
+  it('hides the admin block from ordinary members', async () => {
     auth.activeOrganizationRole = 'member'
     render(<OrphanedProjects refreshKey={null} />)
+    await waitFor(() => expect(screen.queryByText('Orphaned projects')).toBeNull())
     expect(load).not.toHaveBeenCalled()
-    expect(screen.queryByText('Orphaned projects')).toBeNull()
   })
 
   it('clears the old workspace list and confirmation on an org switch', async () => {

@@ -184,12 +184,16 @@ export const RUNTIME_FEATURE_MINIMUM_PLANS: Record<
 const BILLING_SETTINGS_HREF = '/organization/settings/billing'
 const ENTERPRISE_CONTACT_HREF = 'mailto:enterprise@rift.mx'
 
-const FREE_TIER_ALLOWED_MODEL_IDS = new Set<string>(
-  AI_CATALOG.filter(
+/** Fast free-chat default; shared by selection and server-side model access. */
+export const FREE_CHAT_DEFAULT_MODEL_ID = 'meta/muse-spark-open'
+
+const FREE_TIER_ALLOWED_MODEL_IDS = new Set<string>([
+  FREE_CHAT_DEFAULT_MODEL_ID,
+  ...AI_CATALOG.filter(
     (model) =>
       model.providerId === 'meta' && model.id.startsWith('meta/llama-'),
   ).map((model) => model.id),
-)
+])
 
 export function getWorkspacePlan(planId: WorkspacePlanId): WorkspacePlan {
   const plan = WORKSPACE_PLANS.find((candidate) => candidate.id === planId)
@@ -424,6 +428,20 @@ export function hasFeatureAccess(
 
 export function isFreeTierContext(context: AccessContext): boolean {
   return context.isAnonymous || context.planId === 'free'
+}
+
+/** Prefer the free-chat model only when org policy leaves it selectable.
+ * Saved thread selections remain owned by the caller.
+ */
+export function getDefaultChatModel<T extends { readonly id: string }>(
+  models: readonly T[],
+  context: AccessContext,
+): T | undefined {
+  return (
+    (isFreeTierContext(context)
+      ? models.find((model) => model.id === FREE_CHAT_DEFAULT_MODEL_ID)
+      : undefined) ?? models[0]
+  )
 }
 
 /**

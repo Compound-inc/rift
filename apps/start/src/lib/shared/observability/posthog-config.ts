@@ -1,4 +1,4 @@
-export const DEFAULT_POSTHOG_HOST = 'https://z.rift.mx'
+export const DEFAULT_POSTHOG_HOST = 'https://us.i.posthog.com'
 export const DEFAULT_POSTHOG_UI_HOST = 'https://us.posthog.com'
 
 /**

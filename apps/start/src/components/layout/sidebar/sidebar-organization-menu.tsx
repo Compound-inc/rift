@@ -56,8 +56,13 @@ function loadSidebarOrganizationBillingSummary() {
 export function SidebarOrganizationMenu({
   isOrgAreaActive,
 }: SidebarOrganizationMenuProps) {
-  const { user, isAnonymous, activeOrganizationId, refetchSession } =
-    useAppAuth()
+  const {
+    user,
+    isAnonymous,
+    activeOrganizationId,
+    activeOrganizationRole,
+    refetchSession,
+  } = useAppAuth()
   const { activeOrganization, loading: activeOrganizationLoading } =
     useActiveOrganization()
   const navigate = useNavigate()
@@ -77,8 +82,9 @@ export function SidebarOrganizationMenu({
     string | null
   >(null)
   const [creatingOrganization, setCreatingOrganization] = useState(false)
-  const [canManageOrganizationSettings, setCanManageOrganizationSettings] =
-    useState(false)
+  const canManageOrganizationSettings = isAdminRole(
+    activeOrganizationRole ?? '',
+  )
 
   const organizationFallbackName = isAnonymous
     ? '?'
@@ -156,40 +162,6 @@ export function SidebarOrganizationMenu({
       cancelled = true
     }
   }, [OrganizationBillingSummary, isMenuOpen])
-
-  /**
-   * Only owners/admins should see and use the settings entrypoint.
-   * Role is read from Better Auth for the current active organization.
-   */
-  useEffect(() => {
-    let cancelled = false
-
-    if (!user?.id || !activeOrganizationId || isAnonymous) {
-      setCanManageOrganizationSettings(false)
-      return
-    }
-
-    void authClient.organization
-      .getActiveMemberRole({
-        query: {
-          organizationId: activeOrganizationId,
-        },
-      })
-      .then(({ data, error }) => {
-        if (cancelled) {
-          return
-        }
-        if (error || !data?.role) {
-          setCanManageOrganizationSettings(false)
-          return
-        }
-        setCanManageOrganizationSettings(isAdminRole(data.role))
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [activeOrganizationId, isAnonymous, user?.id])
 
   /**
    * Applies org switch in auth session first, then refreshes the shell session

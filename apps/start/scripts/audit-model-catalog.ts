@@ -3,6 +3,9 @@ import {
   getCatalogModelProviderRoute,
 } from '../src/lib/shared/ai-catalog'
 
+import { STREAMING_TOOLS_VERIFICATIONS } from '../src/lib/shared/ai-catalog/streaming-tools-verification'
+import { DECLARED_TOOL_KEYS_BY_MODEL_ID } from '../src/lib/shared/ai-catalog/tool-catalog'
+
 /** Gateway names the model creator independently of Rift's stable provider IDs. */
 const GATEWAY_CREATOR_BY_PROVIDER: Readonly<Record<string, string>> = {
   xai: 'spacexai',
@@ -11,6 +14,7 @@ const GATEWAY_CREATOR_BY_PROVIDER: Readonly<Record<string, string>> = {
 interface GatewayModel {
   readonly id: string
   readonly type: string
+  readonly supported_parameters?: readonly string[]
   readonly modalities?: { readonly output?: readonly string[] }
 }
 
@@ -64,6 +68,56 @@ for (const provider of providers) {
   for (const model of missing) console.error(`  Missing: ${model.id}`)
   missingCount += missing.length
 }
+
+// Tools and streaming are separate Gateway capabilities. Catch models that
+// cannot accept tools at all here. A generic tools parameter is not proof of
+// streaming-tool compatibility; that must be verified for the model route.
+const gatewayById = new Map(models.map((model) => [model.id, model]))
+for (const model of AI_CATALOG) {
+  const route = getCatalogModelProviderRoute({
+    modelId: model.id,
+    providerId: 'gateway',
+  })
+  const parameters = route
+    ? gatewayById.get(route.modelId)?.supported_parameters
+    : undefined
+  if (
+    model.capabilities.supportsTools &&
+    parameters &&
+    !parameters.includes('tools')
+  ) {
+    console.error(
+      `Catalog enables tools on a Gateway route without tool support: ${model.id}`,
+    )
+    missingCount += 1
+  }
+}
+
+// A generic tools parameter is never a substitute for live combined-request
+// evidence. Reject stale or malformed certificates instead of silently keeping
+// a route enabled after its model ID or declared tool set changes.
+for (const record of STREAMING_TOOLS_VERIFICATIONS) {
+  const route = getCatalogModelProviderRoute({
+    modelId: record.modelId,
+    providerId: record.providerId,
+  })
+  const declared = DECLARED_TOOL_KEYS_BY_MODEL_ID.get(record.modelId) ?? []
+  if (
+    route?.modelId !== record.routeModelId ||
+    !Number.isFinite(Date.parse(record.verifiedAt)) ||
+    record.runtimeToolNames.length === 0 ||
+    record.toolKeys.length === 0 ||
+    record.toolKeys.some((key) => !declared.includes(key))
+  ) {
+    console.error(
+      `Invalid streaming-tool evidence: ${record.providerId}/${record.modelId}`,
+    )
+    missingCount += 1
+  }
+}
+console.log(
+  `${STREAMING_TOOLS_VERIFICATIONS.length} verified streaming/tool routes; unverified combinations remain disabled`,
+)
 
 // Catch stale routes among the default choices without dropping saved legacy IDs.
 for (const model of AI_CATALOG) {

@@ -275,13 +275,7 @@ export function ChatMessage({
               parts={message.parts}
               isAnimating={isAnimating}
             />
-            <MessageGenerationStatus
-              messageId={message.id}
-              status={metadata?.status}
-              errorMessage={metadata?.errorMessage}
-              canRetry={canRegenerate}
-              onRetry={onRegenerate}
-            />
+            <MessageGenerationStatus status={metadata?.status} />
             {!isAnimating && metadata?.finishReason === 'length' ? <ContinueResponse messageId={message.id} onRetry={canRegenerate ? () => onRegenerate(message.id) : undefined} /> : null}
           </>
         )}

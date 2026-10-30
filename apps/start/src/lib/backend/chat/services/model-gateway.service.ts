@@ -21,7 +21,8 @@ import {
   toReadableErrorCause,
   toReadableErrorMessage,
 } from '../domain/error-formatting'
-import { ContextWindowExceededError, ModelProviderError } from '../domain/errors'
+import { getStreamingToolsVerification } from '@/lib/shared/ai-catalog/streaming-tools-verification'
+import { ContextWindowExceededError, InvalidRequestError, ModelProviderError } from '../domain/errors'
 import { estimatePromptTokens, estimateTokensFromText } from '@/lib/shared/chat-contracts/prompt-usage'
 import { sanitizeMessagesForModel } from './model-prompt'
 import { estimateToolTokens } from './chat-orchestrator/output-limits'
@@ -177,7 +178,7 @@ export type ModelGatewayServiceShape = {
     readonly onStepStart?: (promptTokens: number) => void
     readonly onChunk?: (chunk: unknown) => void
     readonly abortSignal?: AbortSignal
-  }) => Effect.Effect<ModelStreamResult, ModelProviderError | ContextWindowExceededError>
+  }) => Effect.Effect<ModelStreamResult, ModelProviderError | ContextWindowExceededError | InvalidRequestError>
 }
 
 /** Injectable model gateway token. */
@@ -185,7 +186,7 @@ export class ModelGatewayService extends ServiceMap.Service<
   ModelGatewayService,
   ModelGatewayServiceShape
 >()('chat-backend/ModelGatewayService') {
-  /** Live OpenAI-backed gateway implementation. */
+  /** Provider-backed model streams with validated request capabilities. */
   static readonly layer = Layer.succeed(this, {
     streamResponse: Effect.fn('ModelGatewayService.streamResponse')(
       ({
@@ -201,6 +202,7 @@ export class ModelGatewayService extends ServiceMap.Service<
         activeTools,
         toolsContext,
         providerOptions,
+        reasoningEffort,
         onChunk,
         onStepEnd,
         onStepStart,
@@ -233,6 +235,17 @@ export class ModelGatewayService extends ServiceMap.Service<
       }) =>
         Effect.tryPromise({
           try: async () => {
+            // Normal chat requests have already been filtered by tool policy.
+            // Keep this invariant at the provider boundary too, so another
+            // caller cannot send a tool/stream combination the route rejects.
+            const verification = getStreamingToolsVerification(model, providerApiKeyOverride?.providerId)
+            if (Object.keys(tools).some((name) => !verification?.runtimeToolNames.includes(name))) {
+              throw new InvalidRequestError({
+                message: 'Selected model route has no verified streaming support for these tools',
+                requestId,
+                issue: 'unverified_streaming_tools',
+              })
+            }
             const promptMessages = sanitizeMessagesForModel(messages)
             const modelMessages = await convertToModelMessages(promptMessages)
             const runtimeModel = resolveRuntimeModel({
@@ -274,6 +287,7 @@ export class ModelGatewayService extends ServiceMap.Service<
             abortSignal?.throwIfAborted()
             return streamText({
               model: runtimeModel,
+              reasoning: reasoningEffort,
               // Legacy system rows come from server-loaded history. Keep them out
               // of v7's messages list while retaining the mode/project prompt.
               instructions: [
@@ -344,7 +358,7 @@ export class ModelGatewayService extends ServiceMap.Service<
             })
           },
           catch: (error) => {
-            if (error instanceof ContextWindowExceededError) return error
+            if (error instanceof ContextWindowExceededError || error instanceof InvalidRequestError) return error
             const message = toReadableErrorMessage(
               error,
               'Model provider failed to start stream',

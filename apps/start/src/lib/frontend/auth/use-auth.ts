@@ -1,12 +1,15 @@
 import { useCallback } from 'react'
 import { authClient } from './auth-client'
+import { useWorkspaceRole } from './workspace-role'
 import type { AppSession } from './auth-client'
 import { isSelfHosted } from '@/utils/app-feature-flags'
 
 export type AppAuthSession = AppSession
 export type AppAuthUser = AppSession['user']
 
-function readActiveOrganizationId(session: AppSession['session'] | undefined): string | null {
+function readActiveOrganizationId(
+  session: AppSession['session'] | undefined,
+): string | null {
   const value = (session as { activeOrganizationId?: unknown } | undefined)
     ?.activeOrganizationId
   return typeof value === 'string' && value.trim().length > 0 ? value : null
@@ -28,17 +31,20 @@ function readEmailVerified(user: AppSession['user'] | undefined): boolean {
 export function useAppAuth() {
   const sessionQuery = authClient.useSession()
   const user = sessionQuery.data?.user ?? null
-  const activeOrganizationId = readActiveOrganizationId(sessionQuery.data?.session)
+  const activeOrganizationId = readActiveOrganizationId(
+    sessionQuery.data?.session,
+  )
   const isAnonymous = readIsAnonymous(sessionQuery.data?.user)
   const emailVerified = readEmailVerified(sessionQuery.data?.user)
-  // Organization roles belong to membership, not the session. Reuse Better Auth's
-  // active-member query so all role-gated UI follows membership and org changes.
-  const activeMemberRole = authClient.useActiveMemberRole()
-  const activeOrganizationRole =
-    user && !isAnonymous && activeOrganizationId && !activeMemberRole.isPending &&
-    !activeMemberRole.error
-      ? activeMemberRole.data?.role ?? null
-      : null
+  const workspaceRole = useWorkspaceRole(
+    !sessionQuery.isPending && user && !isAnonymous && activeOrganizationId
+      ? {
+          userId: user.id,
+          organizationId: activeOrganizationId,
+          sessionId: sessionQuery.data?.session.id ?? '',
+        }
+      : null,
+  )
 
   const signOut = useCallback(async () => {
     await authClient.signOut()
@@ -60,7 +66,8 @@ export function useAppAuth() {
     loading: sessionQuery.isPending,
     session: sessionQuery.data?.session,
     activeOrganizationId,
-    activeOrganizationRole,
+    activeOrganizationRole: workspaceRole.role,
+    activeOrganizationRoleLoading: workspaceRole.loading,
     isAnonymous,
     emailVerified,
     signOut,

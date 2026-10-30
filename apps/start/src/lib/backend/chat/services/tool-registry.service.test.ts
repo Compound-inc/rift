@@ -1,12 +1,48 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Effect } from 'effect'
-import {
-  DOCUMENT_TOOL_PROMPT,
-} from '@/lib/shared/documents/prompt'
+import { DOCUMENT_TOOL_PROMPT } from '@/lib/shared/documents/prompt'
 import { assembleSystemPrompt } from './chat-orchestrator/system-prompt'
+import { resolveToolPolicy } from '@/lib/shared/chat/tool-policy'
 import { ToolRegistryService } from './tool-registry.service'
 
 describe('ToolRegistryService', () => {
+  it.each(['meta/llama-3.3-70b', 'meta/llama-3.1-70b', 'meta/llama-3.1-8b'])(
+    'keeps %s chat streams free of unsupported function tools',
+    async (modelId) => {
+      const policy = resolveToolPolicy({ modelId })
+      expect(policy.availableToolKeys).not.toContain('rift.documents')
+      const result = await Effect.runPromise(
+        Effect.gen(function* () {
+          const registry = yield* ToolRegistryService
+          // Saved preferences must not force unsupported tools back into runtime.
+          return yield* registry.resolveForModel({
+            modelId,
+            resolvedToolKeys: ['rift.documents'],
+          })
+        }).pipe(Effect.provide(ToolRegistryService.layer)),
+      )
+      expect(result.tools).toEqual({})
+      expect(result.activeTools).toEqual([])
+      expect(
+        assembleSystemPrompt({ modelId, activeTools: result.activeTools }),
+      ).not.toContain(DOCUMENT_TOOL_PROMPT)
+    },
+  )
+
+  it('does not construct a provider tool that the selected model does not offer', async () => {
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const registry = yield* ToolRegistryService
+        return yield* registry.resolveForModel({
+          modelId: 'openai/gpt-6.1-sol',
+          resolvedToolKeys: ['openai.code_interpreter', 'rift.documents'],
+        })
+      }).pipe(Effect.provide(ToolRegistryService.layer)),
+    )
+    expect(result.activeTools).not.toContain('code_interpreter')
+    expect(result.activeTools).toContain('create_document')
+  })
+
   it('falls back Anthropic dynamic web search to the legacy runtime tool when code execution is unavailable', async () => {
     const result = await Effect.runPromise(
       Effect.gen(function* () {
@@ -122,4 +158,11 @@ describe('Gemini document tool compatibility', () => {
       ).toBe(documentsEnabled)
     },
   )
+})
+
+// Provider construction tests use synthetic successful route checks. Live
+// eligibility and missing evidence are covered separately in catalog tests.
+vi.mock('@/lib/shared/ai-catalog/streaming-tools-verification', async () => {
+  const { verifiedToolFixture } = await import('@/lib/shared/ai-catalog/streaming-tools.test-helpers')
+  return { getStreamingToolsVerification: verifiedToolFixture }
 })

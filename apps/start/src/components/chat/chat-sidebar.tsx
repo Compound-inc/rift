@@ -128,7 +128,7 @@ function getThreadHistoryGroupKey(
 }
 
 /** Static sections only. Dynamic history is rendered as a dedicated virtualized pane. */
-function getStaticSections(): NavSection[] {
+function getStaticSections(showSkills = true): NavSection[] {
   return [
     {
       items: [
@@ -143,12 +143,16 @@ function getStaticSections(): NavSection[] {
           onSelect: () => openChatSearchCommand({ hideActions: true }),
           icon: Search,
         },
-        {
-          name: m.chat_sidebar_skills(),
-          href: '/chat/skills',
-          icon: Wand2,
-          exact: true,
-        },
+        ...(showSkills
+          ? [
+              {
+                name: m.chat_sidebar_skills(),
+                href: '/chat/skills',
+                icon: Wand2,
+                exact: true,
+              },
+            ]
+          : []),
       ],
     },
   ]
@@ -748,7 +752,10 @@ export function ChatSidebarContent({ pathname }: { pathname: string }) {
   const normalizedOrganizationId = activeOrganizationId?.trim() || undefined
   // Avoid mounting the virtualized history list until auth resolves
   const shouldRenderHistory = !loading && user != null
-  const staticSections = useMemo(() => getStaticSections(), [])
+  const staticSections = useMemo(
+    () => getStaticSections(!loading && user != null && !isAnonymous),
+    [loading, user, isAnonymous],
+  )
   const { shouldShowLoginButton, shouldShowUpgradeCta, shouldShowBottomPanel } =
     resolveChatSidebarBottomPanelVisibility({
       loading,
@@ -798,7 +805,7 @@ export function ChatSidebarContent({ pathname }: { pathname: string }) {
           </>
         )}
       </div>
-      {shouldRenderHistory && (
+      {shouldRenderHistory && !isAnonymous && (
         <Button asChild variant="ghost" className="mx-3 mb-2 justify-start">
           <Link to="/settings/archived">{m.archive_title()}</Link>
         </Button>

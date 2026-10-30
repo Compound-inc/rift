@@ -39,6 +39,88 @@ function openaiDefaultProviderOptions(): Record<string, unknown> {
  */
 export const OPENAI_MODELS: readonly AiModelCatalogEntry<'openai'>[] = [
   // Chat models verified against https://ai-gateway.vercel.sh/v1/models on 2026-10-16.
+  // Release metadata and pricing verified against AI Gateway on 2026-10-30.
+  {
+    id: 'openai/gpt-6.1-terra',
+    providerId: 'openai',
+    providers: ['gateway'],
+    name: 'GPT-6.1 Terra',
+    description:
+      'GPT-6.1 Terra is OpenAI’s model for visual reasoning, precise computer use, and natural writing. It accepts text and images and generates text, with configurable reasoning effort, structured outputs, tool calling through the Responses API, and implicit and explicit prompt caching.',
+    contextWindow: 1050000,
+    zeroDataRetention: true,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: true,
+      supportsPdfInput: true,
+    },
+    providerToolIds: ['web_search'],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
+    defaultReasoningEffort: 'medium',
+    defaultMaxOutputTokens: 128000,
+    providerOptionsByReasoning: {
+      none: openaiReasoningOptions('none'),
+      low: openaiReasoningOptions('low'),
+      medium: openaiReasoningOptions('medium'),
+      high: openaiReasoningOptions('high'),
+      xhigh: openaiReasoningOptions('xhigh'),
+      max: openaiReasoningOptions('max'),
+    },
+    pricing: {
+      inputPerToken: '0.000001',
+      outputPerToken: '0.000005',
+      inputCacheReadPerToken: '0.00000005',
+      inputCacheWritePerToken: '0.00000125',
+      inputTiers: [
+        {
+          cost: '0.000001',
+          min: 0,
+          max: 272001,
+        },
+        {
+          cost: '0.000002',
+          min: 272001,
+        },
+      ],
+      outputTiers: [
+        {
+          cost: '0.000005',
+          min: 0,
+          max: 272001,
+        },
+        {
+          cost: '0.0000075',
+          min: 272001,
+        },
+      ],
+      inputCacheReadTiers: [
+        {
+          cost: '0.00000005',
+          min: 0,
+          max: 272001,
+        },
+        {
+          cost: '0.0000001',
+          min: 272001,
+        },
+      ],
+      inputCacheWriteTiers: [
+        {
+          cost: '0.00000125',
+          min: 0,
+          max: 272001,
+        },
+        {
+          cost: '0.0000025',
+          min: 272001,
+        },
+      ],
+    },
+  },
   {
     id: 'openai/gpt-6.1-sol',
     providerId: 'openai',

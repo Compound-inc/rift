@@ -94,7 +94,6 @@ export function ChatInput() {
     canRetryLastMessage,
     status,
     error,
-    errorMessageId,
     visibleModels,
     selectedModelId,
     selectedReasoningEffort,
@@ -118,7 +117,7 @@ export function ChatInput() {
 
   const [queuedAttachments, setQueuedAttachments] =
     useState<Pick<QueuedMessage, 'attachments' | 'attachmentManifest'>>()
-  const [errorDismissed, setErrorDismissed] = useState(false)
+  const [dismissedFailure, setDismissedFailure] = useState<string | null>(null)
   const [uploadErrorDismissed, setUploadErrorDismissed] = useState(false)
 
   // File upload: worker-supported markdown-convertible files, max 10 files.
@@ -145,26 +144,34 @@ export function ChatInput() {
   const isBusy = status === 'submitted' || status === 'streaming'
   const hasPendingUploads = files.some((file) => file.isUploading)
   const { view: compactionView } = useThreadCompaction(activeThreadId, messages)
-  const usedTokens = compactionView?.promptTokens ?? resolveCurrentContextTokens(latestAssistantUsage)
+  const usedTokens =
+    compactionView?.promptTokens ??
+    resolveCurrentContextTokens(latestAssistantUsage)
   const isSendBlocked = hasPendingUploads
   const parsedChatError = parseChatApiError(error)
-  const chatErrorMessage = parsedChatError?.message ?? null
+  // Persisted failures keep the same composer placement after Zero catches up
+  // or the thread is reopened. A newer transport error takes precedence.
+  const failedMessage =
+    !isBusy &&
+    latestMessage?.role === 'assistant' &&
+    latestMessage.metadata?.status === 'error'
+      ? latestMessage
+      : undefined
+  const chatErrorMessage =
+    parsedChatError?.message ??
+    (failedMessage
+      ? (failedMessage.metadata?.errorMessage ?? m.error_chat_unknown())
+      : null)
   const chatErrorTraceId = parsedChatError?.traceId ?? null
   const uploadErrorMessage =
     files.find((file) => !!file.uploadError)?.uploadError ?? null
-  const showChatError =
-    !!chatErrorMessage &&
-    !errorDismissed &&
-    !(
-      latestMessage?.role === 'assistant' &&
-      latestMessage.metadata?.status === 'error' &&
-      // Zero can supply the failed row without a matching SDK finish ID. Match
-      // the text rendered by MessageGenerationStatus too, while keeping later
-      // validation errors with different messages visible in the composer.
-      (latestMessage.id === errorMessageId ||
-        (latestMessage.metadata.errorMessage ?? m.error_chat_unknown()) ===
-          chatErrorMessage)
-    )
+  // Transport and persisted errors describe the same user turn. Keep dismissal
+  // attached to that turn while the transport clears or Zero catches up.
+  const failureKey = JSON.stringify([
+    activeThreadId,
+    [...messages].reverse().find((message) => message.role === 'user')?.id,
+  ])
+  const showChatError = !!chatErrorMessage && dismissedFailure !== failureKey && !isBusy
   const showUploadError = !!uploadErrorMessage && !uploadErrorDismissed
   const activeErrorMessage = showChatError
     ? chatErrorMessage
@@ -173,14 +180,19 @@ export function ChatInput() {
       : null
 
   useEffect(() => {
-    if (error) setErrorDismissed(false)
-  }, [error])
+    // A new transport failure or generation is a new attempt. Clearing the
+    // transport error alone must not redisplay a dismissed persisted failure.
+    if (error || isBusy) setDismissedFailure(null)
+  }, [error, isBusy])
 
   useEffect(() => {
     if (uploadErrorMessage) setUploadErrorDismissed(false)
   }, [uploadErrorMessage])
 
-  const handleDismissError = useCallback(() => setErrorDismissed(true), [])
+  const handleDismissError = useCallback(
+    () => setDismissedFailure(failureKey),
+    [failureKey],
+  )
   const handleDismissUploadError = useCallback(
     () => setUploadErrorDismissed(true),
     [],
@@ -312,6 +324,7 @@ export function ChatInput() {
         return
       }
       clearComposerDraft()
+      setDismissedFailure(null)
 
       try {
         clearFiles()
@@ -545,6 +558,7 @@ export function ChatInput() {
           onRetry={
             showChatError && canRetryLastMessage
               ? () => {
+                  setDismissedFailure(null)
                   void retryLastMessage()
                 }
               : undefined

@@ -1,9 +1,7 @@
 import { AI_CATALOG } from './index'
-import {
-  getProviderToolDefinition
-  
-} from './provider-tools'
-import type {CatalogProviderId} from './provider-tools';
+import { getStreamingToolsVerification } from './streaming-tools-verification'
+import { getProviderToolDefinition } from './provider-tools'
+import type { CatalogProviderId } from './provider-tools'
 
 export type ToolCatalogEntry = {
   readonly key: string
@@ -67,7 +65,15 @@ function buildToolCatalog(): readonly ToolCatalogEntry[] {
     }
   }
 
-  entries.push({ key: 'rift.documents', providerId: 'rift', providerToolId: 'documents', advanced: false, category: 'files', source: 'built-in', sortOrder: entries.length + 1 })
+  entries.push({
+    key: 'rift.documents',
+    providerId: 'rift',
+    providerToolId: 'documents',
+    advanced: false,
+    category: 'files',
+    source: 'built-in',
+    sortOrder: entries.length + 1,
+  })
   return entries
 }
 
@@ -77,25 +83,37 @@ export const TOOL_CATALOG_BY_KEY = new Map(
   TOOL_CATALOG.map((entry) => [entry.key, entry]),
 )
 
-export const TOOL_KEYS_BY_PROVIDER = TOOL_CATALOG.reduce(
-  (acc, entry) => {
-    const current = acc.get(entry.providerId) ?? []
-    current.push(entry.key)
-    acc.set(entry.providerId, current)
-    return acc
-  },
-  new Map<ToolCatalogEntry['providerId'], string[]>(),
-)
+export const TOOL_KEYS_BY_PROVIDER = TOOL_CATALOG.reduce((acc, entry) => {
+  const current = acc.get(entry.providerId) ?? []
+  current.push(entry.key)
+  acc.set(entry.providerId, current)
+  return acc
+}, new Map<ToolCatalogEntry['providerId'], string[]>())
 
 /**
  * Request-path tool resolution needs an O(1) model lookup so the orchestrator
  * can filter tools without rebuilding provider catalogs on every request.
  */
-export const TOOL_KEYS_BY_MODEL_ID = new Map(
+export const DECLARED_TOOL_KEYS_BY_MODEL_ID = new Map(
   AI_CATALOG.map((model) => [
     model.id,
-    model.providerToolIds
-      .map((providerToolId) => `${model.providerId}.${providerToolId}`)
-      .concat(model.capabilities.supportsTools ? ['rift.documents'] : []),
+    model.capabilities.supportsTools &&
+    model.capabilities.supportsStreaming
+      ? [
+          ...model.providerToolIds.map(
+            (providerToolId) => `${model.providerId}.${providerToolId}`,
+          ),
+          'rift.documents',
+        ]
+      : [],
   ]),
+)
+
+/** Only live-tested streaming/tool combinations are offered to chat requests. */
+export const TOOL_KEYS_BY_MODEL_ID = new Map(
+  AI_CATALOG.map((model) => {
+    const verifiedKeys = getStreamingToolsVerification(model.id)?.toolKeys ?? []
+    const declared = DECLARED_TOOL_KEYS_BY_MODEL_ID.get(model.id) ?? []
+    return [model.id, declared.filter((key) => verifiedKeys.includes(key))]
+  }),
 )

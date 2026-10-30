@@ -1,5 +1,7 @@
 'use client'
 
+import { TOOL_KEYS_BY_MODEL_ID } from '@/lib/shared/ai-catalog/tool-catalog'
+
 import * as React from 'react'
 import {
   ChevronDown,
@@ -490,7 +492,9 @@ const ModelRow = React.memo(function ModelRow({
   style,
 }: ModelRowProps) {
   const capabilities = CAPABILITY_ORDER.filter(
-    (key) => model.capabilities[key as keyof typeof model.capabilities],
+    (key) => key === 'supportsTools'
+      ? (TOOL_KEYS_BY_MODEL_ID.get(model.id)?.length ?? 0) > 0
+      : model.capabilities[key as keyof typeof model.capabilities],
   )
   const costTier = getModelCostTier(model)
   const costTierLabel = costTier ? costTierLabels[costTier] : null

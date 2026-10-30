@@ -26,6 +26,35 @@ function moonshotaiReasoningOptions(
  */
 export const MOONSHOTAI_MODELS: readonly AiModelCatalogEntry<'moonshotai'>[] = [
   // Chat models verified against https://ai-gateway.vercel.sh/v1/models on 2026-10-16.
+  // Release metadata and pricing verified against AI Gateway on 2026-10-30.
+  {
+    id: 'moonshotai/kimi-k3.1-pro',
+    providerId: 'moonshotai',
+    providers: ['gateway'],
+    name: 'Kimi K3.1 Pro',
+    description:
+      'Kimi K3.1 Pro is a frontier model from Moonshot AI for complex reasoning, coding, and agentic workflows, with support for vision, tool use, structured outputs, and long-context tasks.',
+    contextWindow: 1048576,
+    zeroDataRetention: true,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: false,
+      supportsPdfInput: false,
+    },
+    providerToolIds: [],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: [],
+    defaultMaxOutputTokens: 1048576,
+    pricing: {
+      inputPerToken: '0.000002',
+      outputPerToken: '0.00001',
+      inputCacheReadPerToken: '0.0000002',
+      inputCacheWritePerToken: '0.000002',
+    },
+  },
   {
     id: 'moonshotai/kimi-k3',
     providerId: 'moonshotai',

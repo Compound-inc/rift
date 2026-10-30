@@ -9,6 +9,34 @@ function minimaxDefaultProviderOptions(): Record<string, unknown> {
 
 export const MINIMAX_MODELS: readonly AiModelCatalogEntry<'minimax'>[] = [
   // Chat models verified against https://ai-gateway.vercel.sh/v1/models on 2026-10-16.
+  // Release metadata and pricing verified against AI Gateway on 2026-10-30.
+  {
+    id: 'minimax/minimax-m3.1-flash',
+    providerId: 'minimax',
+    providers: ['gateway'],
+    name: 'MiniMax-M3.1-Flash',
+    description:
+      'MiniMax-M3.1-Flash is MiniMax’s multimodal M-series model for agent reasoning, tool use, coding, and long-context tasks. Fireworks serves the final weights with hybrid MXFP8 and NVFP4 expert precision, text and image inputs, structured outputs, and implicit prompt caching.',
+    contextWindow: 1048576,
+    zeroDataRetention: false,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: false,
+      supportsPdfInput: false,
+    },
+    providerToolIds: [],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: [],
+    defaultMaxOutputTokens: 1048576,
+    pricing: {
+      inputPerToken: '0.00000015',
+      outputPerToken: '0.0000006',
+      inputCacheReadPerToken: '0.000000015',
+    },
+  },
   {
     id: 'minimax/minimax-m3',
     providerId: 'minimax',

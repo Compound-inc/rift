@@ -25,6 +25,7 @@ export type AiProviderToolId = CatalogProviderToolId
  * by feature support instead of provider-specific conditionals.
  */
 export type AiModelCapabilities = {
+  /** Generic tool support. Streaming eligibility also requires route evidence. */
   readonly supportsTools: boolean
   readonly supportsStreaming: boolean
   readonly supportsReasoning: boolean

@@ -1,5 +1,4 @@
 import { Navigate, Outlet, createFileRoute } from '@tanstack/react-router'
-import { authClient } from '@/lib/frontend/auth/auth-client'
 import { useAppAuth } from '@/lib/frontend/auth/use-auth'
 
 /** Layout for organization settings subsection (e.g. provider-policy). */
@@ -8,9 +7,8 @@ export const Route = createFileRoute('/(app)/_layout/organization/settings')({
 })
 
 function OrganizationSettingsLayout() {
-  const { activeOrganizationId, isAnonymous, loading, user } = useAppAuth()
-  const activeMemberRole = authClient.useActiveMemberRole()
-  const normalizedRole = activeMemberRole.data?.role?.trim().toLowerCase()
+  const { activeOrganizationId, activeOrganizationRole, activeOrganizationRoleLoading, isAnonymous, loading, user } = useAppAuth()
+  const normalizedRole = activeOrganizationRole?.trim().toLowerCase()
   const isPrivilegedRole = normalizedRole === 'admin' || normalizedRole === 'owner'
 
 
@@ -22,7 +20,7 @@ function OrganizationSettingsLayout() {
     return <Navigate to="/" />
   }
 
-  if (activeMemberRole.isPending) {
+  if (activeOrganizationRoleLoading) {
     return null
   }
 

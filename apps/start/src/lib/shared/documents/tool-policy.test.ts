@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { AI_CATALOG } from '@/lib/shared/ai-catalog'
 import {
   resolveToolPolicy,
@@ -60,4 +60,11 @@ describe('document tool policy', () => {
       }),
     ).toEqual(['rift.documents'])
   })
+})
+
+// Provider construction tests use synthetic successful route checks. Live
+// eligibility and missing evidence are covered separately in catalog tests.
+vi.mock('@/lib/shared/ai-catalog/streaming-tools-verification', async () => {
+  const { verifiedToolFixture } = await import('@/lib/shared/ai-catalog/streaming-tools.test-helpers')
+  return { getStreamingToolsVerification: verifiedToolFixture }
 })

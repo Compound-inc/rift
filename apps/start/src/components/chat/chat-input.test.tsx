@@ -20,7 +20,6 @@ const addFilesMock = vi.fn()
 const retryLastMessageMock = vi.fn(async () => undefined)
 let composerStatus = 'ready'
 let composerError: Error | null = null
-let errorMessageId: string | undefined
 let composerMessages: UIMessage<ChatMessageMetadata>[] = []
 let uploadError: string | undefined
 const { embeddingFlagState } = vi.hoisted(() => ({
@@ -29,7 +28,9 @@ const { embeddingFlagState } = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('./use-thread-compaction', () => ({ useThreadCompaction: () => ({ view: undefined, progress: undefined }) }))
+vi.mock('./use-thread-compaction', () => ({
+  useThreadCompaction: () => ({ view: undefined, progress: undefined }),
+}))
 
 vi.mock('./chat-context', () => ({
   useChatMessages: () => ({
@@ -45,7 +46,6 @@ vi.mock('./chat-context', () => ({
     retryLastMessage: retryLastMessageMock,
     canRetryLastMessage: true,
     error: composerError,
-    errorMessageId,
     visibleModels: [],
     selectedModelId: 'test-model',
     selectedReasoningEffort: undefined,
@@ -129,13 +129,16 @@ vi.mock('./prompt-input', () => ({
   PromptInputError: ({
     error,
     onRetry,
+    onDismiss,
   }: {
     error: string
     onRetry?: () => void
+    onDismiss?: () => void
   }) => (
     <div role="alert">
       {error}
       {onRetry && <button onClick={onRetry}>Retry</button>}
+      {onDismiss && <button onClick={onDismiss}>Dismiss</button>}
     </div>
   ),
   PromptInputAttachments: () => null,
@@ -162,7 +165,6 @@ describe('ChatInput paste-to-attachment behavior', () => {
     clearComposerDraft()
     composerStatus = 'ready'
     composerError = null
-    errorMessageId = undefined
     composerMessages = []
     sendMessageMock.mockClear()
     retryLastMessageMock.mockClear()
@@ -174,41 +176,29 @@ describe('ChatInput paste-to-attachment behavior', () => {
     clearComposerDraft()
   })
 
-  it.each([undefined, 'sdk-answer', 'failed-answer'])(
-    'keeps only the inline failure when the transport message ID is %s',
-    (transportMessageId) => {
-      const failureMessage = m.error_chat_unknown()
-      composerMessages = [
-        {
-          id: 'failed-answer',
-          role: 'assistant',
-          metadata: { status: 'error', errorMessage: failureMessage },
-          parts: [],
-        },
-      ]
-      composerError = new Error(failureMessage)
-      errorMessageId = transportMessageId
-      const regenerateMessage = vi.fn()
-      const view = render(
-        <>
-          <MessageGenerationStatus
-            messageId="failed-answer"
-            status="error"
-            errorMessage={failureMessage}
-            canRetry
-            onRetry={regenerateMessage}
-          />
-          <ChatInput />
-        </>,
-      )
-      expect(view.getAllByRole('alert')).toHaveLength(1)
-      fireEvent.click(view.getByRole('button', { name: 'Retry' }))
-      expect(regenerateMessage).toHaveBeenCalledExactlyOnceWith('failed-answer')
-      expect(retryLastMessageMock).not.toHaveBeenCalled()
-    },
-  )
+  it('keeps a saved failure by the composer and retries the same turn', () => {
+    const failureMessage = m.error_chat_unknown()
+    composerMessages = [
+      {
+        id: 'failed-answer',
+        role: 'assistant',
+        metadata: { status: 'error', errorMessage: failureMessage },
+        parts: [],
+      },
+    ]
+    composerError = new Error(failureMessage)
+    const view = render(
+      <>
+        <MessageGenerationStatus status="error" />
+        <ChatInput />
+      </>,
+    )
+    expect(view.getAllByRole('alert')).toHaveLength(1)
+    fireEvent.click(view.getByRole('button', { name: 'Retry' }))
+    expect(retryLastMessageMock).toHaveBeenCalledOnce()
+  })
 
-  it('suppresses the matching default inline error without error metadata', () => {
+  it('shows the default failure by the composer without error metadata', () => {
     composerMessages = [
       {
         id: 'failed-answer',
@@ -218,7 +208,59 @@ describe('ChatInput paste-to-attachment behavior', () => {
       },
     ]
     composerError = new Error(m.error_chat_unknown())
-    expect(render(<ChatInput />).queryByRole('alert')).toBeNull()
+    expect(render(<ChatInput />).getByRole('alert').textContent).toContain(
+      m.error_chat_unknown(),
+    )
+  })
+
+  it('keeps a dismissed error hidden when its saved message arrives', () => {
+    composerError = new Error('Provider failed')
+    const view = render(<ChatInput />)
+    fireEvent.click(view.getByRole('button', { name: 'Dismiss' }))
+    composerMessages = [
+      {
+        id: 'failed-answer',
+        role: 'assistant',
+        parts: [],
+        metadata: { status: 'error', errorMessage: 'Provider failed' },
+      },
+    ]
+    view.rerender(<ChatInput />)
+    expect(view.queryByRole('alert')).toBeNull()
+  })
+
+  it('keeps dismissal through saved failure arrival and transport cleanup', () => {
+    composerError = new Error('Provider failed')
+    const view = render(<ChatInput />)
+    fireEvent.click(view.getByRole('button', { name: 'Dismiss' }))
+    composerMessages = [{
+      id: 'failed-answer', role: 'assistant', parts: [],
+      metadata: { status: 'error', errorMessage: 'Provider failed' },
+    }]
+    view.rerender(<ChatInput />)
+    composerError = null
+    view.rerender(<ChatInput />)
+    expect(view.queryByRole('alert')).toBeNull()
+    composerStatus = 'submitted'
+    view.rerender(<ChatInput />)
+    composerStatus = 'ready'
+    composerError = new Error('Provider failed')
+    view.rerender(<ChatInput />)
+    expect(view.getByRole('alert').textContent).toContain('Provider failed')
+  })
+
+  it('shows a saved failure after reopening the thread without a transport error', () => {
+    composerMessages = [
+      {
+        id: 'failed-answer',
+        role: 'assistant',
+        parts: [],
+        metadata: { status: 'error', errorMessage: 'Provider failed' },
+      },
+    ]
+    expect(render(<ChatInput />).getByRole('alert').textContent).toContain(
+      'Provider failed',
+    )
   })
 
   it.each([
@@ -238,7 +280,7 @@ describe('ChatInput paste-to-attachment behavior', () => {
     },
   )
 
-  it('keeps upload errors visible alongside an inline generation failure', () => {
+  it('keeps generation errors ahead of upload errors', () => {
     composerMessages = [
       {
         id: 'failed-answer',
@@ -248,11 +290,12 @@ describe('ChatInput paste-to-attachment behavior', () => {
       },
     ]
     composerError = new Error(m.error_chat_unknown())
-    errorMessageId = 'failed-answer'
     uploadError = 'Upload failed'
     const view = render(<ChatInput />)
-    expect(view.getByRole('alert').textContent).toBe('Upload failed')
-    expect(view.queryByRole('button', { name: 'Retry' })).toBeNull()
+    expect(view.getByRole('alert').textContent).toContain(
+      m.error_chat_unknown(),
+    )
+    expect(view.getByRole('button', { name: 'Retry' })).toBeTruthy()
   })
 
   it('shows a new pre-send error after a failed assistant response', () => {
@@ -270,7 +313,7 @@ describe('ChatInput paste-to-attachment behavior', () => {
       'The selected model is locked',
     )
   })
-  it('suppresses only the error associated with the failed message row', () => {
+  it('updates the composer when a new transport error follows a saved failure', () => {
     composerMessages = [
       {
         id: 'failed-answer',
@@ -280,11 +323,9 @@ describe('ChatInput paste-to-attachment behavior', () => {
       },
     ]
     composerError = new Error('Provider failed')
-    errorMessageId = 'failed-answer'
     const view = render(<ChatInput />)
-    expect(view.queryByRole('alert')).toBeNull()
+    expect(view.getByRole('alert').textContent).toContain('Provider failed')
     composerError = new Error('Uploads are disabled')
-    errorMessageId = undefined
     view.rerender(<ChatInput />)
     expect(view.getByRole('alert').textContent).toContain(
       'Uploads are disabled',
