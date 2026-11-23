@@ -19,9 +19,38 @@ function alibabaReasoningOptions(
 }
 
 export const ALIBABA_MODELS: readonly AiModelCatalogEntry<'alibaba'>[] = [
-  // Chat models verified against https://ai-gateway.vercel.sh/v1/models on 2026-10-16.
+  // Chat models verified against https://ai-gateway.vercel.sh/v1/models on 2026-11-23.
+  {
+    id: 'alibaba/qwen4-max',
+    providerId: 'alibaba',
+    providers: ['gateway'],
+    name: 'Qwen 4 Max',
+    description:
+      'Qwen 4 Max brings deeper knowledge, richer world understanding, and stronger coding and agentic capabilities. It is built for real-world tasks, from complex coding and knowledge work to front-end builds and professional software workflows.',
+    contextWindow: 1000000,
+    zeroDataRetention: true,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: false,
+      supportsPdfInput: false,
+    },
+    providerToolIds: [],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: [],
+    defaultMaxOutputTokens: 384000,
+    pricing: {
+      inputPerToken: '0.0000015',
+      outputPerToken: '0.0000045',
+      inputCacheReadPerToken: '0.000000075',
+      inputCacheWritePerToken: '0.000001875',
+    },
+  },
   {
     id: 'alibaba/qwen3.8-max-prime',
+    legacy: true,
     providerId: 'alibaba',
     providers: ['gateway'],
     name: 'Qwen 3.8 Max Prime',
@@ -77,6 +106,7 @@ export const ALIBABA_MODELS: readonly AiModelCatalogEntry<'alibaba'>[] = [
   },
   {
     id: 'alibaba/qwen3.8-max-0902',
+    legacy: true,
     providerId: 'alibaba',
     providers: ['gateway'],
     name: 'Qwen3.8 Max 0902',
@@ -187,6 +217,7 @@ export const ALIBABA_MODELS: readonly AiModelCatalogEntry<'alibaba'>[] = [
   },
   {
     id: 'alibaba/qwen3.8-max',
+    legacy: true,
     providerId: 'alibaba',
     providers: ['gateway'],
     name: 'Qwen 3.8 Max',
@@ -405,6 +436,33 @@ export const ALIBABA_MODELS: readonly AiModelCatalogEntry<'alibaba'>[] = [
       outputPerToken: '0.0000075',
       inputCacheReadPerToken: '0.0000005',
       inputCacheWritePerToken: '0.000003125',
+    },
+  },
+  {
+    id: 'alibaba/qwen3.6-35b-a3b',
+    providerId: 'alibaba',
+    providers: ['gateway'],
+    name: 'Qwen 3.6 35B A3B',
+    description:
+      'Qwen 3.6 35B A3B is a mixture-of-experts model with 35 billion total parameters and 3 billion active parameters, built for coding, reasoning, and tool-based workflows.',
+    contextWindow: 262144,
+    zeroDataRetention: true,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: false,
+      supportsPdfInput: false,
+    },
+    providerToolIds: [],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: [],
+    defaultMaxOutputTokens: 65536,
+    legacy: true,
+    pricing: {
+      inputPerToken: '0.000000375',
+      outputPerToken: '0.00000225',
     },
   },
   {

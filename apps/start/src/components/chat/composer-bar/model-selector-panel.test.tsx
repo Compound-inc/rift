@@ -16,7 +16,7 @@ vi.mock('@/lib/frontend/access-control', () => ({
 afterEach(cleanup)
 
 const options = [
-  { id: 'openai/gpt-6.1-sol', name: 'GPT-6.1 Sol' },
+  { id: 'openai/gpt-6.2-sol', name: 'GPT-6.2 Sol' },
   { id: 'openai/gpt-5.5', name: 'GPT-5.5' },
   { id: 'anthropic/claude-opus-5.5', name: 'Claude Opus 5.5' },
   { id: 'anthropic/claude-opus-4.7', name: 'Claude Opus 4.7' },

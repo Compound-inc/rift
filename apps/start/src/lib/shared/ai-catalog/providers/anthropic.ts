@@ -88,7 +88,7 @@ function anthropicDefaultProviderOptions(): Record<string, unknown> {
  * between the 20260120 and 20250825 tool revisions.
  */
 export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
-  // Chat models verified against https://ai-gateway.vercel.sh/v1/models on 2026-10-16.
+  // Chat models verified against https://ai-gateway.vercel.sh/v1/models on 2026-11-23.
   {
     id: 'anthropic/claude-haiku-5.5',
     providerId: 'anthropic',
@@ -323,7 +323,79 @@ export const ANTHROPIC_MODELS: readonly AiModelCatalogEntry<'anthropic'>[] = [
     },
   },
   {
+    id: 'anthropic/claude-fable-5.2',
+    providerId: 'anthropic',
+    providers: ['gateway'],
+    name: 'Claude Fable 5.2',
+    description:
+      'Claude Fable 5.2 supports agentic coding, knowledge work, and research with always-on adaptive thinking and adjustable reasoning effort from low through max.',
+    contextWindow: 1000000,
+    zeroDataRetention: false,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: true,
+      supportsPdfInput: true,
+    },
+    providerToolIds: [],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+    defaultMaxOutputTokens: 128000,
+    defaultReasoningEffort: 'medium',
+    providerOptionsByReasoning: {
+      low: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'low',
+        },
+      },
+      medium: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'medium',
+        },
+      },
+      high: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'high',
+        },
+      },
+      xhigh: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'xhigh',
+        },
+      },
+      max: {
+        anthropic: {
+          thinking: {
+            type: 'adaptive',
+          },
+          effort: 'max',
+        },
+      },
+    },
+    pricing: {
+      inputPerToken: '0.000008',
+      outputPerToken: '0.00004',
+      inputCacheReadPerToken: '0.0000002',
+      inputCacheWritePerToken: '0.00001',
+    },
+  },
+  {
     id: 'anthropic/claude-fable-5.1',
+    legacy: true,
     providerId: 'anthropic',
     providers: ['gateway'],
     name: 'Claude Fable 5.1',

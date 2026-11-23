@@ -50,7 +50,113 @@ function googleDefaultProviderOptions(): Record<string, unknown> {
  * Google (Gemini) model catalog.
  */
 export const GOOGLE_MODELS: readonly AiModelCatalogEntry<'google'>[] = [
-  // Chat models verified against https://ai-gateway.vercel.sh/v1/models on 2026-10-16.
+  // Chat models verified against https://ai-gateway.vercel.sh/v1/models on 2026-11-23.
+  {
+    id: 'google/gemini-4-neon',
+    providerId: 'google',
+    providers: ['gateway'],
+    name: 'Gemini 4 Neon',
+    description:
+      "Gemini 4 Neon is Google's fast multimodal reasoning model for coding, agentic workflows, and complex tasks, delivering high-quality results with low latency. It accepts text, images, video, and documents, with tool calling and structured outputs for building responsive applications.",
+    contextWindow: 1000000,
+    zeroDataRetention: false,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: true,
+      supportsPdfInput: true,
+    },
+    providerToolIds: ['google_search'],
+    skipDefaultProviderTools: true,
+    // Gateway also lists `xhigh` for this model, but the Google SDK's
+    // `thinkingLevel` only accepts minimal|low|medium|high, so it is omitted.
+    reasoningEfforts: ['low', 'medium', 'high'],
+    defaultMaxOutputTokens: 1000000,
+    defaultReasoningEffort: 'medium',
+    providerOptionsByReasoning: {
+      low: googleReasoningOptionsByLevel('low'),
+      medium: googleReasoningOptionsByLevel('medium'),
+      high: googleReasoningOptionsByLevel('high'),
+    },
+    pricing: {
+      inputPerToken: '0.000003',
+      outputPerToken: '0.000015',
+      inputCacheReadPerToken: '0.00000015',
+      webSearchPerRequest: '14',
+    },
+  },
+  {
+    id: 'google/gemini-4-hydrogen',
+    providerId: 'google',
+    providers: ['gateway'],
+    name: 'Gemini 4 Hydrogen',
+    description:
+      "Gemini 4 Hydrogen is Google's fast multimodal model for reasoning, coding, and agentic workflows. It supports understanding text, images, video, and documents, with tool calling and structured outputs for building responsive applications.",
+    contextWindow: 1000000,
+    zeroDataRetention: false,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: true,
+      supportsPdfInput: true,
+    },
+    providerToolIds: ['google_search'],
+    skipDefaultProviderTools: true,
+    // Gateway also lists `xhigh` for this model, but the Google SDK's
+    // `thinkingLevel` only accepts minimal|low|medium|high, so it is omitted.
+    reasoningEfforts: ['low', 'medium', 'high'],
+    defaultMaxOutputTokens: 1000000,
+    defaultReasoningEffort: 'medium',
+    providerOptionsByReasoning: {
+      low: googleReasoningOptionsByLevel('low'),
+      medium: googleReasoningOptionsByLevel('medium'),
+      high: googleReasoningOptionsByLevel('high'),
+    },
+    pricing: {
+      inputPerToken: '0.0000015',
+      outputPerToken: '0.0000075',
+      inputCacheReadPerToken: '0.000000075',
+      webSearchPerRequest: '14',
+    },
+  },
+  {
+    id: 'google/gemini-4-carbon',
+    providerId: 'google',
+    providers: ['gateway'],
+    name: 'Gemini 4 Carbon',
+    description:
+      'Gemini 4 Carbon is Google’s reasoning model for complex software engineering, sustained agentic workflows, and cybersecurity defense. It combines a 1M-token context window with multimodal understanding, tool calling, and structured outputs for working across large codebases and documents. Carbon emphasizes reliable execution of multi-step plans, clearer handling of uncertainty, and identifying, validating, and remediating security vulnerabilities.',
+    contextWindow: 1000000,
+    zeroDataRetention: false,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: true,
+      supportsPdfInput: true,
+    },
+    providerToolIds: ['google_search'],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: ['low', 'medium', 'high'],
+    defaultMaxOutputTokens: 1000000,
+    defaultReasoningEffort: 'medium',
+    providerOptionsByReasoning: {
+      low: googleReasoningOptionsByLevel('low'),
+      medium: googleReasoningOptionsByLevel('medium'),
+      high: googleReasoningOptionsByLevel('high'),
+    },
+    pricing: {
+      inputPerToken: '0.000002',
+      outputPerToken: '0.00001',
+      inputCacheReadPerToken: '0.0000001',
+      webSearchPerRequest: '14',
+    },
+  },
   {
     id: 'google/gemini-4-argon',
     providerId: 'google',

@@ -8,7 +8,7 @@ describe('model picker provider groups', () => {
       { id: 'openrouter/auto' },
       locked,
       { id: 'anthropic/claude-opus-5.5' },
-      { id: 'openai/gpt-6.1-sol' },
+      { id: 'openai/gpt-6.2-sol' },
       { id: 'anthropic/claude-opus-4.7' },
     ])
     expect(groups.map((group) => group.providerId)).toEqual([
@@ -17,7 +17,7 @@ describe('model picker provider groups', () => {
       'anthropic',
     ])
     expect(groups[1].current.map((model) => model.id)).toEqual([
-      'openai/gpt-6.1-sol',
+      'openai/gpt-6.2-sol',
     ])
     expect(groups[1].legacy).toEqual([locked])
     expect(groups[2].legacy.map((model) => model.id)).toEqual([

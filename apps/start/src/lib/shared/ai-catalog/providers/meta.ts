@@ -8,7 +8,34 @@ function metaDefaultProviderOptions(): Record<string, unknown> {
 }
 
 export const META_MODELS: readonly AiModelCatalogEntry<'meta'>[] = [
-  // Chat models verified against https://ai-gateway.vercel.sh/v1/models on 2026-10-16.
+  // Chat models verified against https://ai-gateway.vercel.sh/v1/models on 2026-11-23.
+  {
+    id: 'meta/muse-ember',
+    providerId: 'meta',
+    providers: ['gateway'],
+    name: 'Muse Ember',
+    description:
+      'Muse Ember is Meta’s multimodal language model for conversational, reasoning, and agentic applications. It supports text and image understanding, tool calling, structured outputs, and document input, with a 1,048,576-token context window for working with large prompts and extended conversations. Implicit prompt caching supports reuse of shared input across requests.',
+    contextWindow: 1048576,
+    zeroDataRetention: true,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: true,
+      supportsPdfInput: true,
+    },
+    providerToolIds: [],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: [],
+    defaultMaxOutputTokens: 1048576,
+    pricing: {
+      inputPerToken: '0.0000001',
+      outputPerToken: '0.0000005',
+      inputCacheReadPerToken: '0.000000004',
+    },
+  },
   {
     id: 'meta/muse-spark-open',
     providerId: 'meta',

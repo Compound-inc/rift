@@ -8,7 +8,7 @@ function zaiDefaultProviderOptions(): Record<string, unknown> {
 }
 
 export const ZAI_MODELS: readonly AiModelCatalogEntry<'zai'>[] = [
-  // Chat models verified against https://ai-gateway.vercel.sh/v1/models on 2026-10-16.
+  // Chat models verified against https://ai-gateway.vercel.sh/v1/models on 2026-11-23.
   {
     id: 'zai/glm-5.3-flashx',
     providerId: 'zai',
@@ -16,6 +16,33 @@ export const ZAI_MODELS: readonly AiModelCatalogEntry<'zai'>[] = [
     name: 'GLM 5.3 FlashX',
     description:
       'GLM-5.3-FlashX is the high-speed serving option for Z.ai’s native multimodal coding model, featuring 320B total parameters, 18B activated parameters, and a 1M-token context window. Its efficient hybrid attention architecture supports visual coding, tool use, and end-to-end professional workflows across code, browsers, documents, and graphical interfaces.',
+    contextWindow: 1000000,
+    zeroDataRetention: false,
+    capabilities: {
+      supportsTools: true,
+      supportsStreaming: true,
+      supportsReasoning: true,
+      supportsImageInput: true,
+      supportsFileInput: false,
+      supportsPdfInput: false,
+    },
+    providerToolIds: [],
+    skipDefaultProviderTools: true,
+    reasoningEfforts: [],
+    defaultMaxOutputTokens: 131072,
+    pricing: {
+      inputPerToken: '0.00000037',
+      outputPerToken: '0.00000125',
+      inputCacheReadPerToken: '0.000000075',
+    },
+  },
+  {
+    id: 'zai/glm-5.3-flashx-legal',
+    providerId: 'zai',
+    providers: ['gateway'],
+    name: 'GLM 5.3 FlashX Legal',
+    description:
+      'GLM 5.3 FlashX Legal is Z.ai’s model optimized for legal workflows, including contract review, evidence analysis, and compliance research. It helps teams analyze legal documents, cross-check records, and prepare structured findings for further review.',
     contextWindow: 1000000,
     zeroDataRetention: false,
     capabilities: {
